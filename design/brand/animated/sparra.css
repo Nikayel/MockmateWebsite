@@ -91,12 +91,17 @@
     transform: translateX(3px);
   }
 }
+/* Determinate scoring ring. Literal endpoints: a calc() containing a var() is
+   left unresolved by Blink and silently degrades to DISCRETE interpolation (the
+   ring holds empty for half the duration, then snaps). Keep calc() and var()
+   apart in any animated property. 207.345 = 2*PI*33; 10.367 is 5% of it.
+   Stops short of closing because a timer cannot know when the work ends. */
 @keyframes sparra-score-ring {
   from {
-    stroke-dashoffset: var(--sparra-ring-len, 207);
+    stroke-dashoffset: 207.345;
   }
   to {
-    stroke-dashoffset: 0;
+    stroke-dashoffset: 10.367;
   }
 }
 @keyframes sparra-flicker {
@@ -146,7 +151,8 @@
 }
 /* determinate 10s ring — set --sparra-score-duration to your real p95 */
 .sparra[data-state="scoring"] .sparra-ring {
-  animation: sparra-score-ring var(--sparra-score-duration, 10s) linear forwards;
+  animation: sparra-score-ring var(--sparra-score-duration, 30s) cubic-bezier(0.25, 0.8, 0.4, 1)
+    forwards;
 }
 .sparra[data-state="streak"] .sparra-flame {
   transform-origin: 50% 23%;

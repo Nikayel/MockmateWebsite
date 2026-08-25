@@ -22,8 +22,22 @@ interface SparraProps {
   /** Accessible name. Omit when purely decorative (aria-hidden). */
   label?: string
   className?: string
-  /** Scoring only: match to the real p95 of the wait this fronts. */
+  /**
+   * Scoring only, and the honest option: a real progress fraction (0..1). Drives
+   * the ring directly, so it advances when the work advances. Pass 1 only when
+   * the result is actually on screen.
+   */
+  progress?: number
+  /**
+   * Scoring only, fallback for callers with no signal: paces the ring on a timer.
+   * A timer can only ever guess, so it deliberately stops short of closing.
+   * Ignored when `progress` is given.
+   */
   scoreDurationMs?: number
+  /** Scoring only: ms for the current tween. Widen it for the closing beat. */
+  ringTweenMs?: number
+  /** Scoring only: easing for the current tween. */
+  ringEase?: string
   /** Fires for the one-shot pass/fail wrapper animations. */
   onAnimationEnd?: AnimationEventHandler<HTMLSpanElement>
 }
@@ -31,8 +45,18 @@ interface SparraProps {
 const CHIP = { width: 64, height: 64, rx: 17 }
 const FACE_TRANSFORM = "translate(10.88 10.88) scale(0.66)"
 
-/** Ring circumference for the scoring variant (2π·33, per brand asset). */
-const SCORE_RING_LENGTH = 207
+/** Radius of the scoring ring, per brand asset. */
+const SCORE_RING_RADIUS = 33
+/**
+ * Ring circumference. DERIVED, not typed in: this was hardcoded to 207 while the
+ * true value is 207.345, so the dash pattern and the keyframe endpoints disagreed
+ * by a third of a unit and left a notch at the close. The literals in
+ * sparra.css (207.345 / 10.367) must match this.
+ */
+const RING_LEN = 2 * Math.PI * SCORE_RING_RADIUS
+
+/** Where the timer-driven fallback parks when motion is off and it cannot tween. */
+const STATIC_ARC_FRACTION = 0.35
 
 function EmberGradient({ id }: { id: string }) {
   return (
@@ -181,26 +205,54 @@ const CHIP_VARIANTS: Record<
   },
 }
 
-/** Scoring variant: determinate ring around an inset chip with scanning eyes. */
-function ScoringSvg({ size }: { size: number }) {
+/**
+ * Scoring variant: determinate ring around an inset chip with scanning eyes.
+ *
+ * `progress` (0..1) drives the ring from a real signal. Omit it and the ring
+ * falls back to the CSS timer, which can pace a wait but never honestly finish
+ * one. The track is thinner than the arc on purpose: at equal widths a
+ * near-empty ring reads as a circle with a bite taken out of it rather than as
+ * a ring filling up.
+ */
+function ScoringSvg({ size, progress }: { size: number; progress?: number }) {
+  const driven = typeof progress === "number"
+  // Driven: inline STYLE, so the CSS transition reliably fires on every sample.
+  // A presentation attribute participates in the cascade at zero specificity and
+  // transitions off it are not worth betting the indicator on.
+  // Timer: presentation ATTRIBUTE only, so it stays out of the keyframe's way and
+  // surfaces solely when the animation is suppressed (reduced motion), where it
+  // shows a static partial arc instead of an empty ring.
+  const dashOffset = driven
+    ? RING_LEN * (1 - Math.min(Math.max(progress, 0), 1))
+    : RING_LEN * (1 - STATIC_ARC_FRACTION)
+
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width={size} height={size}>
       <defs>
         <DuoGradient id="sparra-g-score" from="#8ab4f0" to="#3b6fc9" />
       </defs>
       <g transform="rotate(-90 36 36)">
-        <circle cx="36" cy="36" r="33" fill="none" stroke="rgba(59,111,201,.22)" strokeWidth="4" />
+        <circle
+          cx="36"
+          cy="36"
+          r={SCORE_RING_RADIUS}
+          fill="none"
+          stroke="rgba(59,111,201,.22)"
+          strokeWidth="3"
+        />
         <circle
           className="sparra-ring"
           cx="36"
           cy="36"
-          r="33"
+          r={SCORE_RING_RADIUS}
           fill="none"
           stroke="#8ab4f0"
-          strokeWidth="4"
+          strokeWidth="4.5"
           strokeLinecap="round"
-          strokeDasharray={SCORE_RING_LENGTH}
-          strokeDashoffset={SCORE_RING_LENGTH}
+          strokeDasharray={RING_LEN}
+          {...(driven
+            ? { style: { strokeDashoffset: dashOffset } }
+            : { strokeDashoffset: dashOffset })}
         />
       </g>
       <rect x="12" y="12" width="48" height="48" rx="13" fill="url(#sparra-g-score)" />
@@ -226,15 +278,40 @@ export function Sparra({
   size = 64,
   label,
   className,
-  scoreDurationMs = 10000,
+  progress,
+  scoreDurationMs = 30000,
+  ringTweenMs = 180,
+  ringEase = "linear",
   onAnimationEnd,
 }: SparraProps) {
-  const a11y = label ? { role: "img", "aria-label": label } : { "aria-hidden": true as const }
+  const scoring = state === "scoring"
+  const driven = scoring && typeof progress === "number"
 
-  const style =
-    state === "scoring"
-      ? ({ "--sparra-score-duration": `${scoreDurationMs}ms` } as CSSProperties)
-      : undefined
+  // A determinate ring IS a progress bar; screen readers should get the number,
+  // not just the label. The timer-driven fallback has no honest number to report,
+  // so it stays an image rather than claiming a percentage it invented.
+  const a11y = driven
+    ? {
+        role: "progressbar" as const,
+        "aria-valuemin": 0,
+        "aria-valuemax": 100,
+        "aria-valuenow": Math.round(Math.min(Math.max(progress, 0), 1) * 100),
+        ...(label ? { "aria-label": label } : {}),
+      }
+    : label
+      ? { role: "img", "aria-label": label }
+      : { "aria-hidden": true as const }
+
+  const style = scoring
+    ? ({
+        ...(driven
+          ? {
+              "--sparra-ring-tween": `${ringTweenMs}ms`,
+              "--sparra-ring-ease": ringEase,
+            }
+          : { "--sparra-score-duration": `${scoreDurationMs}ms` }),
+      } as CSSProperties)
+    : undefined
 
   const variant = CHIP_VARIANTS[state === "scoring" ? "default" : (state ?? "default")]
 
@@ -242,12 +319,13 @@ export function Sparra({
     <span
       className={cn("sparra", className)}
       data-state={state}
+      data-driven={driven ? "true" : undefined}
       style={style}
       onAnimationEnd={onAnimationEnd}
       {...a11y}
     >
       {state === "scoring" ? (
-        <ScoringSvg size={size} />
+        <ScoringSvg size={size} progress={progress} />
       ) : (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width={size} height={size}>
           <defs>{variant.gradient}</defs>

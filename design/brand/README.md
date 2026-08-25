@@ -19,7 +19,7 @@ brand/
   characters/   sparra-default.svg  sparra-pass.svg  sparra-fail.svg
                 sparra-thinking.svg sparra-streak.svg sparra-scoring.svg
   animated/     sparra-idle.svg     self-contained animated icon (works in <img>)
-                sparra-scoring.svg  10s determinate scoring ring (works in <img>)
+                sparra-scoring.svg  determinate scoring ring (works in <img>)
                 sparra.css          keyframes + state classes for in-app use
   marks/        flux · duel · core · orbit · pulse · seam  (alternate symbols)
 favicon.svg     copy of the primary icon
@@ -59,7 +59,7 @@ class names to the corresponding groups in your inlined SVG.
 |---|---|
 | idle | nav avatar, dashboard greeting, empty states, favicon |
 | thinking | interviewer composing, test run in flight, code executing |
-| scoring | the ~10s evaluation wait after a submission — grading in progress |
+| scoring | the evaluation wait after a submission — grading in progress |
 | pass | suite green, lesson complete, submission accepted |
 | fail | failing assertion, runtime error, timed-out session |
 | streak | streak milestone, module finished, level unlocked |
@@ -79,26 +79,37 @@ Think #ffd27a → #e09a2a       Streak #c3a4f0 → #7b4fc9
 Score #8ab4f0 → #3b6fc9       Score face ink #07162e
 ```
 
-## Scoring state (10s wait)
+## Scoring state
 
 Distinct from `thinking` on purpose: thinking is indeterminate and amber, scoring is
-**determinate** and blue. The closing ring tells the user the wait is bounded, which is
-what stops a 10s pause from reading as a hang.
+**determinate** and blue. The ring tells the user the wait is bounded, which is what stops a
+long pause from reading as a hang.
+
+**The ring reports progress. It does not run a clock.** Pass `progress` (0..1) derived from
+real signals — phase events, milestones, whatever the work actually emits — and the ring
+advances when the work advances. It closes to 100% at the instant the result lands, and the
+close *is* the arrival.
+
+```jsx
+<Sparra state="scoring" size={88} progress={progress} label="Scoring your submission" />
+```
+
+There is a timer-driven fallback (`scoreDurationMs`) for callers with no signal at all. It
+paces the wait and deliberately stops short of closing, because a clock cannot know when the
+work ends — a ring that reaches 100% while the answer is still being computed is a lie, and
+that is the one thing this state must never do. Prefer wiring a real signal; reach for the
+timer only when there genuinely isn't one.
 
 ```html
-<!-- zero-JS version -->
+<!-- zero-JS version, timer-paced. These assets carry their own <style> element:
+     external CSS never applies inside an <img>. -->
 <img src="/brand/animated/sparra-scoring.svg" alt="Scoring your submission" width="72" height="72">
 ```
 
-```jsx
-// in-app: ring length must match your circle's circumference (2πr)
-<span className="sparra" data-state="scoring" style={{ "--sparra-score-duration": "10s" }}>
-  <SparraScoringSvg />   {/* ring circle needs className="sparra-ring", eyes group "sparra-eyes" */}
-</span>
-```
-
-If real scoring can exceed the estimate, hold the ring at ~95% rather than completing it,
-and only close it when the result actually lands. Never let it finish before the answer does.
+Never put `calc()` and `var()` together in an animated property. Blink leaves a `calc()`
+containing a `var()` unresolved and silently degrades the animation to *discrete* — the ring
+holds empty for half the duration, then snaps. It looks fine in Safari, which is how it
+survived. `components/brand/__tests__/sparra-motion.test.ts` guards this.
 
 ## Clear space & minimum size
 - Clear space on all sides = the icon's corner radius (17/64 of icon width).

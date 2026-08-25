@@ -1,9 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="72" height="72">
+  <style>
+    /* Self-contained on purpose: external CSS never applies inside an &lt;img&gt;,
+       so without this element the classes below are inert and the ring renders
+       FULL — reading as finished on a page that is still waiting.
+       Literal endpoints: a calc() containing a var() degrades to discrete
+       interpolation in Blink. 207.345 = 2*PI*33; 10.367 is 5% of it. */
+    @keyframes r { from { stroke-dashoffset: 207.345 } to { stroke-dashoffset: 10.367 } }
+    @keyframes e { 0%, 100% { transform: translateX(-3px) } 50% { transform: translateX(3px) } }
+    .r { animation: r 30s cubic-bezier(.25,.8,.4,1) forwards }
+    .e { animation: e 2.2s ease-in-out infinite }
+    @media (prefers-reduced-motion: reduce) {
+      .r { animation: none; stroke-dashoffset: 134.774 }
+      .e { animation: none }
+    }
+  </style>
   <defs><linearGradient id="gsc" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8ab4f0"></stop><stop offset="1" stop-color="#3b6fc9"></stop></linearGradient></defs>
   
   <g transform="rotate(-90 36 36)">
     <circle cx="36" cy="36" r="33" fill="none" stroke="rgba(59,111,201,.22)" stroke-width="4"></circle>
-    <circle class="r" cx="36" cy="36" r="33" fill="none" stroke="#8ab4f0" stroke-width="4" stroke-linecap="round" stroke-dasharray="207"></circle>
+    <circle class="r" stroke-dashoffset="207.345" cx="36" cy="36" r="33" fill="none" stroke="#8ab4f0" stroke-width="4" stroke-linecap="round" stroke-dasharray="207"></circle>
   </g>
   <rect x="12" y="12" width="48" height="48" rx="13" fill="url(#gsc)"></rect>
   <g transform="translate(20.16 20.16) scale(0.4875)" fill="#07162e">

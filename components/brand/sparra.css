@@ -95,15 +95,31 @@
     transform: translateX(3px);
   }
 }
-/* Determinate scoring ring. Ends at 5% remaining instead of closing: real scoring
-   can outlast the estimate, and the ring must never finish before the answer does
-   (design/brand/README.md). The result state replaces the ring when it lands. */
+/* Determinate scoring ring, timer-driven fallback.
+   Used when no real progress signal is available (the zero-JS <img> assets, and
+   any caller that passes scoreDurationMs instead of progress). Callers that have
+   a signal pass `progress` and drive stroke-dashoffset from JS instead — see
+   components/brand/Sparra.tsx — which is the only path that can honestly close.
+   This one stops short of closing because it has no idea when the work ends.
+
+   ENDPOINTS ARE LITERALS ON PURPOSE. These used to be var(--sparra-ring-len, 207)
+   and calc(var(--sparra-ring-len, 207) * 0.05). Blink leaves a calc() CONTAINING a
+   var() as an unresolved token and falls back to DISCRETE interpolation: measured
+   in real Chromium, sampling getComputedStyle every 250ms, the whole animation had
+   exactly TWO distinct values — the ring held EMPTY for the first half of the
+   duration, then snapped to 95%. At 15s that was 7.5 dead seconds; on the sessions
+   page at 60s it was 30. WebKit was smooth; Firefox was smooth but ran to 0.
+   Registering the custom property with @property does NOT fix it — that was tested.
+   Keep calc() and var() apart in any animated property; the guard test in
+   components/brand/__tests__/sparra-motion.test.ts enforces it.
+
+   207.345 = 2π·33; 10.367 is 5% of it. Both must match RING_LEN in Sparra.tsx. */
 @keyframes sparra-score-ring {
   from {
-    stroke-dashoffset: var(--sparra-ring-len, 207);
+    stroke-dashoffset: 207.345;
   }
   to {
-    stroke-dashoffset: calc(var(--sparra-ring-len, 207) * 0.05);
+    stroke-dashoffset: 10.367;
   }
 }
 @keyframes sparra-flicker {
@@ -151,9 +167,22 @@
 .sparra[data-state="scoring"] .sparra-eyes {
   animation: sparra-scan 2.2s ease-in-out infinite;
 }
-/* set --sparra-score-duration to the real p95 of the wait it fronts */
+/* Timer-driven ring: only when the caller has no real signal to give us.
+   Decelerating, not linear, and tuned pessimistically. Linear spent its whole arc
+   on the optimistic case and then parked for the 30+ seconds a slow run still had
+   to go. Decelerating from a longer default degrades in both directions: ~49% by
+   5s and ~65% by 10s, so a fast run still reads as fast, yet it is still visibly
+   creeping at 25s. The duration is PACING, not a promise — nothing shows it. */
 .sparra[data-state="scoring"] .sparra-ring {
-  animation: sparra-score-ring var(--sparra-score-duration, 10s) linear forwards;
+  animation: sparra-score-ring var(--sparra-score-duration, 30s) cubic-bezier(0.25, 0.8, 0.4, 1)
+    forwards;
+}
+/* Signal-driven ring: stroke-dashoffset is authored inline from a real progress
+   fraction, so the keyframe must not fight it. The transition carries the value
+   between samples; the close overrides both custom properties for one beat. */
+.sparra[data-state="scoring"][data-driven="true"] .sparra-ring {
+  animation: none;
+  transition: stroke-dashoffset var(--sparra-ring-tween, 180ms) var(--sparra-ring-ease, linear);
 }
 .sparra[data-state="streak"] .sparra-flame {
   transform-origin: 50% 23%;
@@ -245,9 +274,14 @@
     animation: none !important;
     opacity: 1;
   }
-  /* Without motion the ring would render empty forever; hold a static partial
-     arc so the wait still reads as in-progress. */
-  .sparra[data-state="scoring"] .sparra-ring {
-    stroke-dashoffset: calc(var(--sparra-ring-len, 207) * 0.6);
+  /* Reduce motion, not information. The signal-driven ring keeps its real value
+     and simply STEPS to each milestone instead of tweening — five honest jumps.
+     This used to park every scoring ring at a hardcoded 60% forever, which
+     asserts a progress value that was never real and then freezes there: the
+     hang read, permanently, for the users least able to tolerate ambiguity.
+     The timer-driven fallback has no real value to show, so Sparra.tsx authors
+     a static partial arc inline for it. */
+  .sparra[data-state="scoring"][data-driven="true"] .sparra-ring {
+    transition: none !important;
   }
 }
