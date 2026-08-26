@@ -4416,7 +4416,7 @@ serialization B, one row per fact, header binding preserved:
   retrieved row is true on its own.
 \`\`\`
 
-Serialization B is the same information written so that it survives being retrieved alone, which is the chunking lesson's standalone-claim rule applied one stage earlier. Element-based parsing, which annotates the structural elements of a document with a document-understanding model and chunks on those, is measured to improve RAG results on financial reports, and it reaches a workable chunk size without anyone tuning one.
+Serialization B is the same information written so that it survives being retrieved alone, which is the [chunking lesson](/learn/system-design/specialized-systems/sd-l11-chunking-strategy)'s standalone-claim rule applied one stage earlier. Element-based parsing, which annotates the structural elements of a document with a document-understanding model and chunks on those, is measured to improve RAG results on financial reports, and it reaches a workable chunk size without anyone tuning one.
 
 ## The error cascade
 
@@ -4637,7 +4637,7 @@ at query time:
   finally have the same shape, length and register
 \`\`\`
 
-One generation per chunk at ingestion, the same order of spend as contextual retrieval in the chunking lesson, and zero milliseconds added to any request. The trade is that ingestion-time questions are guesses about what will be asked, so they help most where the query distribution is stable and least where users ask things nobody anticipated.
+One generation per chunk at ingestion, the same order of spend as contextual retrieval in the [chunking lesson](/learn/system-design/specialized-systems/sd-l11-chunking-strategy), and zero milliseconds added to any request. The trade is that ingestion-time questions are guesses about what will be asked, so they help most where the query distribution is stable and least where users ask things nobody anticipated.
 
 ## Decomposition, and an honest negative result
 
@@ -4762,7 +4762,7 @@ The axis that organizes all four options is when the interaction between query a
 }
 \`\`\`
 
-Sparse and bi-encoder are early interaction: the document representation is finished before your query exists. The cross-encoder is fully late and therefore unindexable, which is why the RAG architecture lesson could only ever put it over a candidate list. Late interaction is the middle rung, and the middle rung is where the engineering is.
+Sparse and bi-encoder are early interaction: the document representation is finished before your query exists. The cross-encoder is fully late and therefore unindexable, which is why the [RAG architecture lesson](/learn/system-design/specialized-systems/sd-l11-rag-architecture) could only ever put it over a candidate list. Late interaction is the middle rung, and the middle rung is where the engineering is.
 
 ## MaxSim, computed rather than described
 
@@ -4875,7 +4875,7 @@ stage 3  run full MaxSim on what survived
 
 PLAID's authors call stage 1 centroid interaction, and sparsifying that bag of centroids centroid pruning. The reported effect is up to 7x faster on GPU and up to 45x on CPU against vanilla ColBERTv2 without impacting quality, reaching tens of milliseconds on GPU at 140M passages. The successor engine WARP reports a further 3x over the ColBERTv2 and PLAID engine, and 41x over the reference implementation of a related multi-vector retriever, again while maintaining retrieval quality.
 
-Notice what that stage 1 is. It is the coarse quantizer from the ANN lesson, in a different costume: a cheap first pass over centroids that decides what the expensive pass is ever allowed to look at, with the same consequence that a bad first pass caps your recall no matter how much work stage 3 does.
+Notice what that stage 1 is. It is the coarse quantizer from the [ANN lesson](/learn/system-design/specialized-systems/sd-l11-vector-db-ann), in a different costume: a cheap first pass over centroids that decides what the expensive pass is ever allowed to look at, with the same consequence that a bad first pass caps your recall no matter how much work stage 3 does.
 
 ## Where it fits, and where it does not
 
@@ -5059,7 +5059,7 @@ Microsoft reports the indexing cost of this design as identical to vector RAG, a
 }
 \`\`\`
 
-**Interview nuance:** the strong answer is a router, not a religion. In almost every product, the overwhelming majority of traffic is local and belongs on the hybrid pipeline the RAG architecture lesson already built, which is cheaper, faster and better at it. The graph exists for the minority of questions that are global, so the design question an interviewer is actually asking is how a query gets classified into the right path, and what happens when the classifier is wrong. A misrouted local question sent to global search is slow and expensive; a misrouted global question sent to top-k returns a confident answer built from eight documents out of three thousand, which is the worse failure because it looks like an answer.
+**Interview nuance:** the strong answer is a router, not a religion. In almost every product, the overwhelming majority of traffic is local and belongs on the hybrid pipeline the [RAG architecture lesson](/learn/system-design/specialized-systems/sd-l11-rag-architecture) already built, which is cheaper, faster and better at it. The graph exists for the minority of questions that are global, so the design question an interviewer is actually asking is how a query gets classified into the right path, and what happens when the classifier is wrong. A misrouted local question sent to global search is slow and expensive; a misrouted global question sent to top-k returns a confident answer built from eight documents out of three thousand, which is the worse failure because it looks like an answer.
 
 **Recap:** a global question is one whose answer is a property of the corpus rather than of any passage in it, so similarity ranking selects on the wrong property and no k fixes it. GraphRAG answers it by extracting an entity graph, partitioning it with recursive Leiden community detection into a hierarchy of mutually exclusive levels, summarizing every community, and map-reducing over the summaries at a chosen level. That costs an LLM call per chunk and per community, which lands around 80x vector-RAG indexing on the stated example. LazyGraphRAG builds the graph from noun-phrase co-occurrence and defers every LLM call to query time, reported at vector-RAG indexing cost. The shippable design routes local traffic to the existing pipeline and reserves the graph for the questions that need coverage.
 
@@ -5110,7 +5110,7 @@ Microsoft reports the indexing cost of this design as identical to vector RAG, a
 const embeddingLifecycleTeach = `
 ## Two models' vectors are not merely different, they are incomparable
 
-The ANN lesson called re-embedding "the migration nobody plans for" and then moved on. This lesson is the plan, and the lever that pays for it.
+The [ANN lesson](/learn/system-design/specialized-systems/sd-l11-vector-db-ann) called re-embedding "the migration nobody plans for" and then moved on. This lesson is the plan, and the lever that pays for it.
 
 Start with the fact that makes the migration unavoidable, stated precisely enough that it cannot be hand-waved. Two embedding models trained separately produce two different spaces. Not two views of one space with a rotation between them, and not one space where one model is noisier. Each model learned its own arrangement of meaning across its own axes, and the number that comes out of a cosine similarity between a vector from model A and a vector from model B is arithmetically well-formed and semantically meaningless. It is not a worse score. It is not a score.
 
@@ -5142,7 +5142,7 @@ That is why a model upgrade is a full corpus rebuild rather than a config change
 
 ## The migration is a blue-green deploy
 
-You already have the pattern. Level 7's deployment-strategies lesson gave you blue-green: stand the new thing up beside the old one, move traffic when you have evidence, keep the old one warm long enough to go back. A re-embedding migration is that pattern applied to an index instead of a service, and treating it as a transfer rather than as new machinery is most of the answer.
+You already have the pattern. [Level 7's deployment-strategies lesson](/learn/system-design/reliability-ops/sd-l7-deployment-strategies) gave you blue-green: stand the new thing up beside the old one, move traffic when you have evidence, keep the old one warm long enough to go back. A re-embedding migration is that pattern applied to an index instead of a service, and treating it as a transfer rather than as new machinery is most of the answer.
 
 \`\`\`
 state          reads served by   writes go to      rollback move
