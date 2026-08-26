@@ -3346,6 +3346,87 @@ The single most architecturally load-bearing requirement is **data residency**. 
 
 **Interview nuance:** the sharpest scope-reduction lever is **tokenization**. If you never store the raw card number (PAN), and instead hand it to a PCI-certified provider (Stripe, Adyen) that returns a token, then most of your systems fall out of PCI scope entirely. Your database holds \`tok_1a2b\`, not a card. The same idea reduces GDPR and HIPAA blast radius: the less sensitive data you hold, the fewer systems the auditor examines. Data minimization is a security control, not just a privacy nicety.
 
+"Falls out of scope" is worth pricing, because scope is the unit the audit bills in. Every system that stores, processes, or transmits a raw card number has to be segmented off, logged, access-reviewed, vulnerability-scanned quarterly, and evidenced for the assessor, and that work repeats every year for every system in the set. So a payments flow spread across 40 services that can each see a PAN is a 40-system assessment. Hand the card straight to the provider's hosted field instead and only the checkout page and the token callback ever touch a real number, which is a 2-system assessment for the same product.
+
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "What tokenization actually removes from the audit",
+  "predictPrompt": {
+    "question": "Forty services in your payments flow can each see a raw card number today. You switch to the provider's hosted field, so only the checkout page and the token callback ever touch a real number. How many systems does the assessor still examine?",
+    "options": [
+      "Still about 40, because the payment still flows through them",
+      "About 20, roughly half",
+      "A couple",
+      "Zero, because tokenization removes PCI scope entirely"
+    ]
+  },
+  "workedExample": "At the starting settings nothing is tokenized: all 40 services can see a PAN, and together with the checkout page and the token callback that never leave scope the assessment covers 42 systems, 630,000 USD a year to keep them audit-ready, and 126 engineer-days of evidence gathering per cycle. Now drag the tokenized share to 100 percent. The same product is 2 systems, 30,000 USD, and 6 engineer-days. Nothing about the product changed; what changed is how many machines a real card number was ever allowed to touch.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "services",
+      "label": "Services in the payment flow",
+      "min": 2,
+      "max": 200,
+      "scale": "linear",
+      "step": 1,
+      "initial": 40,
+      "unit": "services"
+    },
+    {
+      "kind": "slider",
+      "id": "tokenized_pct",
+      "label": "Share of the card-number flow handed straight to the provider",
+      "min": 0,
+      "max": 100,
+      "scale": "linear",
+      "step": 1,
+      "initial": 0,
+      "unit": "percent"
+    },
+    {
+      "kind": "slider",
+      "id": "cost_per",
+      "label": "Yearly cost of keeping one system audit-ready",
+      "min": 2000,
+      "max": 50000,
+      "scale": "linear",
+      "step": 1000,
+      "initial": 15000,
+      "unit": "USD"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "in_scope",
+      "label": "Systems the assessor examines",
+      "expr": "ceil(services * (100 - tokenized_pct) / 100) + 2",
+      "format": "number",
+      "unit": "systems"
+    },
+    {
+      "id": "annual",
+      "label": "Cost of keeping them audit-ready",
+      "expr": "in_scope * cost_per",
+      "format": "compact",
+      "unit": "USD per year",
+      "sparkline": {
+        "over": "tokenized_pct"
+      }
+    },
+    {
+      "id": "evidence",
+      "label": "Evidence gathering, one audit cycle",
+      "expr": "in_scope * 3",
+      "format": "number",
+      "unit": "engineer-days"
+    }
+  ],
+  "caption": "Scope is a count of systems, which is why tokenization is an architecture move that deletes rows from that count rather than a control you bolt onto each one. Watch the floor of 2: the page that collects the card and the callback that receives the token stay in scope forever, so tokenization shrinks the assessment hard and never to zero."
+}
+\`\`\`
+
 Rounding it out: DPAs (Data Processing Agreements) govern each processor, DPIAs (Data Protection Impact Assessments) are required before high-risk processing, and SOC 2 evidence means access reviews, change tickets, and log retention you can produce on demand.
 
 **Recap:** build the shared baseline (encryption, access control, logging, backups) once, layer framework-specific non-negotiables on top, treat data residency as a regional-sharding driver rather than a checkbox, and use tokenization to pull whole systems out of PCI/PHI scope.
@@ -5211,12 +5292,12 @@ export const systemDesignLevel8: DesignLevel = {
             thinkAbout: [
               "Why is event-driven per-owner erasure better than a synchronous orchestrator at this scale?",
               "How do you erase from a petabyte lake without rewriting it per request?",
-              "Why do Cassandra tombstones and gc_grace_seconds matter for real deletion?",
+              "Why does a Cassandra delete only write a tombstone (a marker that hides the row), and why does the grace period before that row is really purged matter for real deletion?",
             ],
             modelAnswerOutline: [
               "Assumptions: 500M users, high erasure request volume, PII replicated across Cassandra (multi-region), Kafka event streams, a petabyte S3 lake, an ML feature store, and 30+ vendors. Scale makes both discovery and lake rewriting the hard parts.",
               "**Event-driven fan-out.** An erasure request publishes a `UserDeletionRequested(user_id)` event to Kafka. Every data-owning system subscribes and is responsible for erasing its own copy, then emits a `DeletionCompleted(user_id, system)` ack. A central coordinator tracks acks against the 30-day SLA and escalates stragglers. This scales far better than a synchronous orchestrator calling dozens of systems.",
-              "**Live stores:** Cassandra deletes emit tombstones; I must ensure `gc_grace_seconds` and repair actually purge them across regions, not just mask them. Feature store rows and cached vectors are deleted or invalidated so the ML models stop seeing the user.",
+              "**Live stores:** Cassandra deletes emit tombstones; I must ensure `gc_grace_seconds` (the window a tombstone is kept before compaction really drops the row, which exists so a replica that was offline during the delete cannot resurrect it) and repair actually purge them across regions, not just mask them. Feature store rows and cached vectors are deleted or invalidated so the ML models stop seeing the user.",
               "**Petabyte lake:** you cannot rewrite a petabyte on every request. Two moves: (1) crypto-shred, per-user keys so destroying a key neutralizes lake and backup copies instantly without a rewrite, and (2) batch physical deletion via a table format (Apache Iceberg/Hudi/Delta) that supports row-level deletes and periodic compaction, so tombstones from many users are applied in scheduled compaction rather than per-request. Crypto-shredding is what makes the 30-day SLA feasible at this scale.",
               "**Third parties:** call each vendor's deletion API (or suppression list where deletion is not offered), store the receipt, and treat a missing ack as an SLA breach to chase. Streams and backups: Kafka topics with PII get short retention plus crypto-shredding; immutable backups are handled entirely by key destruction.",
               "Common wrong turn: trying to synchronously find and rewrite every copy at request time. At 500M users and petabyte lakes that never meets the SLA. Crypto-shredding plus event-driven per-owner erasure plus batched compaction is the scalable pattern.",
