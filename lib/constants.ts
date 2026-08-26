@@ -242,6 +242,13 @@ export const SESSION = {
   MAX_DURATION_HOURS: 4,
   /** Guest session expiry in days */
   GUEST_EXPIRY_DAYS: 7,
+  /**
+   * Expiry for a COMPLETED guest trial, stamped by the completion PUT. The
+   * trial cookie and every "see your score" promise run 30 days, and since
+   * the score lock the server doc is the score's only copy — so it must
+   * outlive the promise window. Abandoned sessions keep the short clock.
+   */
+  GUEST_COMPLETED_EXPIRY_DAYS: 30,
   /** Inactive session cleanup threshold in days */
   INACTIVE_CLEANUP_DAYS: 30,
 } as const

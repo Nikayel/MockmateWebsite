@@ -284,6 +284,12 @@ export async function PUT(request: NextRequest) {
     if (performanceScore !== undefined) {
       updateData.performance_score = performanceScore
       updateData.completed_at = new Date().toISOString()
+      // The completed doc is the withheld score's only copy, and the trial
+      // cookie plus the "see your score" promises run 30 days — so the doc
+      // must outlive them. Abandoned sessions keep the 7-day clock.
+      updateData.expires_at = new Date(
+        Date.now() + SESSION.GUEST_COMPLETED_EXPIRY_DAYS * 24 * 60 * 60 * 1000
+      ).toISOString()
     }
     if (feedback) updateData.feedback = feedback
     if (finalCode) updateData.final_code = finalCode

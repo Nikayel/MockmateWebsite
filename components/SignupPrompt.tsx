@@ -243,7 +243,7 @@ export function SignupPrompt({
               </span>
               <span className="flex items-center gap-1">
                 <CheckCircle className="h-3 w-3" />
-                Your session is kept
+                Saved for 30 days
               </span>
             </div>
           </CardContent>

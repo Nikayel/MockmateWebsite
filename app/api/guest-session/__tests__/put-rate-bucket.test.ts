@@ -47,15 +47,17 @@ vi.mock("@/lib/logger", () => ({
 
 import { PUT } from "../route"
 
-function makePutRequest() {
+function makePutRequest(
+  body: Record<string, unknown> = {
+    sessionId: "sess-1",
+    guestId: GUEST_ID,
+    performanceScore: 100,
+    feedback: "Completed Two Sum with 2/2 tests passing",
+  }
+) {
   return {
     headers: { get: () => null },
-    json: async () => ({
-      sessionId: "sess-1",
-      guestId: GUEST_ID,
-      performanceScore: 100,
-      feedback: "Completed Two Sum with 2/2 tests passing",
-    }),
+    json: async () => body,
   } as never
 }
 
@@ -63,6 +65,36 @@ beforeEach(() => {
   buckets.updates = []
   buckets.guestSessionRateLimit.mockClear()
   buckets.guestApiRateLimit.mockClear()
+})
+
+describe("PUT /api/guest-session completion retention", () => {
+  // The login wall and the lock promise the score for the life of the
+  // 30-day trial cookie, but expires_at was stamped once at creation
+  // (+7d) and never extended — so the cleanup cron deleted the score's
+  // only copy while the promise was still live. Completion extends it;
+  // abandoned sessions still purge on the short clock.
+  it("extends expires_at to ~30 days when the score lands", async () => {
+    const response = (await PUT(makePutRequest())) as { status: number; data: any }
+
+    expect(response.status).toBe(200)
+    const expiresAt = new Date(buckets.updates[0].expires_at as string).getTime()
+    const days = (expiresAt - Date.now()) / (24 * 60 * 60 * 1000)
+    expect(days).toBeGreaterThan(29)
+    expect(days).toBeLessThan(31)
+  })
+
+  it("leaves expires_at alone on resume-only autosaves", async () => {
+    const response = (await PUT(
+      makePutRequest({
+        sessionId: "sess-1",
+        guestId: GUEST_ID,
+        sessionState: { code: "wip", language: "javascript", elapsedTime: 60 },
+      })
+    )) as { status: number }
+
+    expect(response.status).toBe(200)
+    expect(buckets.updates[0]).not.toHaveProperty("expires_at")
+  })
 })
 
 describe("PUT /api/guest-session rate bucket", () => {

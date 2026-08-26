@@ -28,6 +28,9 @@ describe("GuestFeedbackLock", () => {
     // The button sells the bundle, not the number the guest can already
     // compute from their own test results.
     expect(screen.getByRole("button", { name: /unlock your results/i })).toBeTruthy()
+    // Specific and true beats vague: the server keeps a completed trial for
+    // 30 days, so the chip says exactly that instead of "kept".
+    expect(screen.getByText(/saved for 30 days/i)).toBeTruthy()
   })
 
   it("fires onSignIn when the guest asks for their results", () => {
