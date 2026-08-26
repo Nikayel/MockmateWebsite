@@ -1907,11 +1907,124 @@ get the whole resource) or under-fetch (you need another call).
 
 gRPC is contract-first RPC. You define services and messages in a Protobuf \`.proto\` file, generate
 typed clients and servers in every language, and send compact binary frames over HTTP/2 with
-multiplexing and bidirectional streaming. On an internal service mesh at high QPS this is the winner:
-a Protobuf payload is typically around 2 to 3 times smaller than the equivalent JSON (much less on
-text-heavy payloads), parsing is faster, and the generated stubs make cross-service calls feel like
-local function calls. The cost is that it is unfriendly to browsers (you need grpc-web plus a proxy)
-and to casual \`curl\` debugging, and HTTP caches cannot see inside a binary POST.
+multiplexing and bidirectional streaming. Inside your own fleet, where services call each other
+through a mesh of small local proxies and the traffic is measured in **QPS** (queries per second: how
+many requests arrive each second, the number you size in
+[Level 0's read and write QPS lesson](/learn/system-design/interview-method/sd-l0-qps-read-write)),
+this is the winner: a Protobuf payload is typically around 2 to 3 times smaller than the equivalent
+JSON (much less on text-heavy payloads), parsing is faster, and the generated stubs make cross-service
+calls feel like local function calls. The cost is that it is unfriendly to browsers (you need
+grpc-web plus a proxy) and to casual \`curl\` debugging, and HTTP caches cannot see inside a binary
+POST.
+
+Those two claims, "2 to 3 times smaller" and "fewer round trips", are worth turning into numbers
+before you repeat them in an interview. Drag the sliders and watch which one your traffic actually
+cares about.
+
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "What REST costs and what gRPC buys, in bytes and round trips",
+  "predictPrompt": {
+    "question": "A 20-field order message crosses between two of your own services 20,000 times a second. Moving that one hop from JSON to Protobuf saves roughly how much bandwidth per second?",
+    "options": [
+      "About 75 KB",
+      "About 7.5 MB",
+      "About 750 MB",
+      "Nothing you could measure"
+    ]
+  },
+  "workedExample": "At the initial values, a 20-field message costs about 580 bytes as JSON (every field carries its own name, quotes, and punctuation on every single message) and about 204 bytes as Protobuf (fields are tagged by number, so the names never travel). That is 2.8x smaller, and at 20,000 calls a second the difference is about 7.5 MB every second on one hop. The round-trip column is a separate saving: the mobile screen needs 3 REST calls at 25 ms each, so 75 ms of pure waiting, where one gRPC call would wait 25 ms. Now drag the fields slider down to 5 and watch the byte gap shrink toward nothing, then drag QPS up and watch it matter again.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "fields",
+      "label": "Fields in the message",
+      "min": 3,
+      "max": 120,
+      "step": 1,
+      "initial": 20,
+      "unit": "fields"
+    },
+    {
+      "kind": "slider",
+      "id": "qps",
+      "label": "Calls per second on this hop",
+      "min": 10,
+      "max": 200000,
+      "scale": "log",
+      "initial": 20000,
+      "unit": "QPS"
+    },
+    {
+      "kind": "slider",
+      "id": "hops",
+      "label": "REST round trips the screen needs",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "initial": 3,
+      "unit": "calls"
+    },
+    {
+      "kind": "slider",
+      "id": "rtt_ms",
+      "label": "Round-trip time per call",
+      "min": 1,
+      "max": 120,
+      "step": 1,
+      "initial": 25,
+      "unit": "ms"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "json_bytes",
+      "label": "One message as JSON (names on the wire)",
+      "expr": "fields * 28 + 20",
+      "format": "bytes"
+    },
+    {
+      "id": "proto_bytes",
+      "label": "One message as Protobuf (numbered tags)",
+      "expr": "fields * 10 + 4",
+      "format": "bytes"
+    },
+    {
+      "id": "shrink",
+      "label": "How many times smaller Protobuf is",
+      "expr": "json_bytes / proto_bytes",
+      "format": "number",
+      "unit": "x"
+    },
+    {
+      "id": "saved_per_sec",
+      "label": "Bandwidth the switch saves",
+      "expr": "(json_bytes - proto_bytes) * qps",
+      "format": "bytes",
+      "unit": "per second",
+      "sparkline": {
+        "over": "qps"
+      }
+    },
+    {
+      "id": "rest_wait_ms",
+      "label": "Waiting for the REST calls, one after another",
+      "expr": "hops * rtt_ms",
+      "format": "number",
+      "unit": "ms"
+    },
+    {
+      "id": "wait_saved_ms",
+      "label": "Waiting one gRPC call removes",
+      "expr": "(hops - 1) * rtt_ms",
+      "format": "number",
+      "unit": "ms"
+    }
+  ],
+  "caption": "Two different savings, and they matter to two different systems. Bytes per second is what an internal hop at high QPS feels, so that column is the argument for gRPC between your own services. Round trips are what a phone on a slow network feels, and a REST API cannot fix that by getting smaller. Notice that at 5 fields and 100 calls a second the byte column is worth nothing at all, which is why the paradigm follows the consumer rather than the benchmark."
+}
+\`\`\`
 
 ### GraphQL
 
@@ -1920,7 +2033,10 @@ request. That directly solves the over/under-fetching problem for clients with v
 needs, which is why product teams with many screens and one flexible backend reach for it. The costs
 are real: HTTP caching mostly stops working because everything is a POST to \`/graphql\`, you must
 add explicit query-cost limiting and depth limiting to stop a client from asking for the whole graph,
-and the resolver layer invites N+1 database calls unless you add DataLoader-style batching.
+and the resolver layer invites **N+1 database calls**: one query to fetch the list of 100 orders, then
+one MORE query per order to fetch its customer, so 101 queries where a join would have been 1. The
+fix is DataLoader-style batching, which collects the per-item lookups that happen in the same tick and
+sends them as a single query.
 
 There is a third guard next to cost and depth limits, and where you control the client it is the
 strongest of the three: **persisted queries**, also called an allow list. The build extracts every
@@ -2193,6 +2309,59 @@ teams shipping independent services.
 **Interview nuance:** when asked "how do you keep two teams' services compatible," the strong answer
 is "schema as source of truth plus consumer-driven contract tests in CI," not "we coordinate
 releases." Coordination does not scale past a handful of services.
+
+"Does not scale" is worth turning into arithmetic, because the two approaches grow at different
+speeds. Coordinated releases mean every pair of services has to agree before anyone ships, and pairs
+grow as N x (N - 1) / 2. Contract tests grow as N: each consumer records the expectations it actually
+relies on once, and every provider build replays them.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Services on the release train",
+    "Pairs that must agree before anyone ships",
+    "Contract-test suites CI replays",
+    "What the humans do"
+  ],
+  "rows": [
+    [
+      "3",
+      "3",
+      "3",
+      "one short thread; coordination genuinely works here"
+    ],
+    [
+      "6",
+      "15",
+      "6",
+      "a weekly release meeting starts to appear"
+    ],
+    [
+      "12",
+      "66",
+      "12",
+      "the meeting is now a job, and it blocks every deploy"
+    ],
+    [
+      "25",
+      "300",
+      "25",
+      "nobody holds 300 agreements in their head; breaks reach production"
+    ],
+    [
+      "60",
+      "1,770",
+      "60",
+      "coordination is not slow here, it is impossible"
+    ]
+  ],
+  "highlightCols": [
+    "Pairs that must agree before anyone ships"
+  ],
+  "caption": "Doubling the services from 6 to 12 barely doubles the CI work and more than quadruples the human agreements. That gap is the whole argument: contract tests move a cost that grows like N squared onto a machine, where it grows like N."
+}
+\`\`\`
 
 Recap: make a machine-readable schema the source of truth, name and type it for tolerant additive
 evolution, and enforce it with consumer-driven contract tests in CI.
@@ -3071,7 +3240,8 @@ const realtimeCommsTeach = `
 ## "Real-time" is a menu, not a single choice
 
 You pick from short-poll, long-poll, SSE, WebSocket, and webhooks by four axes: latency, connection
-cost at your fan-out, direction of data flow, and delivery guarantee. Getting this right is mostly
+cost at your fan-out (how many people one update has to reach: 50 in a chat room, 5 million on a
+live scoreboard), direction of data flow, and delivery guarantee. Getting this right is mostly
 about not paying for a duplex, stateful connection when the workload is one-directional.
 
 **Short-polling**: the client re-requests every N seconds. Dead simple and fully stateless (any
