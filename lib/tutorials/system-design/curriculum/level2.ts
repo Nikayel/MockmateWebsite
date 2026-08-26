@@ -54,10 +54,16 @@ the hardest and most-probed guarantee, and the next lesson is entirely about its
 
 **Durability** means once the database returns "committed," that data survives a crash, a power
 loss, or a kill -9. The concrete mechanism: the change is written and \`fsync\`'d to the write-ahead
-log (WAL) on durable storage before the commit acknowledgment is sent. A commit that is only in a
-memory buffer is not durable; if the box loses power, it is gone. This is why a synchronous commit
-costs a disk \`fsync\` (often a few ms), and why "group commit" batches many transactions into one
-\`fsync\` to amortize it.
+log (WAL) on durable storage before the commit acknowledgment is sent. Both of those terms unpack
+into plain moves. The write-ahead log is the database's diary: an append-only file that every change
+is written to before anything else happens. And \`fsync\` is the system call that says "stop holding
+this in memory, put it on the physical disk right now," because an ordinary write only hands the
+bytes to the operating system, which is free to sit on them for a while. A later lesson in this
+level takes both apart:
+[pages, buffer pool and the WAL](/learn/system-design/data-storage/sd-l2-physical-storage-wal).
+A commit that is only in a memory buffer is not durable; if the box loses power, it is gone. This is
+why a synchronous commit costs a disk \`fsync\` (often a few ms), and why "group commit" batches many
+transactions into one \`fsync\` so they share the cost of it.
 
 **Interview nuance:** When asked "is your write durable?" the strong answer names the WAL and
 \`fsync\`, and flags the tradeoff: \`synchronous_commit = off\` in Postgres returns faster but risks
@@ -216,7 +222,10 @@ losing the last few hundred ms of commits on a crash. Money says on; a like coun
 When a violated invariant means lost money, double-charged users, or corrupted balances, pay for it:
 a single-primary relational database (Postgres, MySQL InnoDB) with real transactions. When the
 invariant is soft (a view count, a feed ordering) you can relax to BASE (basically available, soft
-state, eventual consistency) and buy horizontal scale and availability instead.
+state, eventual consistency, which means copies of the data may briefly disagree and then catch up a
+moment later) and buy the ability to spread the work over many machines and to keep answering when
+one of them drops off the network. Consistency models get a full lesson in
+[Level 5](/learn/system-design/distributed-core/sd-l5-consistency-spectrum).
 
 \`\`\`
 BEGIN
@@ -810,7 +819,11 @@ in a single table. There are two big families of machinery, and modern databases
 ### MVCC: readers don't block writers
 
 **Multi-Version Concurrency Control (MVCC)** is the reason "readers don't block writers and writers
-don't block readers" in Postgres, MySQL InnoDB, Oracle, and most serious OLTP engines. The idea: a
+don't block readers" in Postgres, MySQL InnoDB, Oracle, and most serious OLTP engines. OLTP is
+online transaction processing: a database doing many small live reads and writes for users, the
+checkout-and-profile kind of work, as opposed to OLAP (online analytical processing), which scans and
+adds up millions of rows to answer one report. That split gets its own lesson in
+[Level 9](/learn/system-design/modern-architecture/sd-l9-oltp-vs-olap). The idea: a
 write does not overwrite a row in place; it creates a new version of the row, tagged with the
 transaction that created it. Every transaction runs against a consistent snapshot defined by which
 versions were committed as of its start. So a long analytical read sees a frozen, coherent view while
@@ -898,9 +911,12 @@ rule is: **optimistic under low contention, pessimistic under high contention.**
 
 For a hot key specifically (a viral post's like counter taking thousands of increments per second on
 one row), the wrong move is heavy pessimistic locking, which serializes every writer behind one lock
-and caps throughput at one-at-a-time. The right moves: **shard the counter** into N sub-rows
-(\`like_count_shard_0..N\`), increment a random shard, and sum on read, which spreads contention
-N-fold; or aggregate increments in memory/Redis and flush periodically; or use an atomic in-database
+and caps throughput at one-at-a-time. The right moves: **shard the counter** into N sub-rows (to
+shard is to cut one thing into slices that are stored and updated separately, and
+[Level 3 gives sharding a whole lesson](/learn/system-design/scaling-data/sd-l3-partitioning-strategies)),
+so \`like_count_shard_0..N\` each hold part of the total, increment a random shard, and sum on read,
+which spreads contention N-fold; or aggregate increments in memory/Redis and flush periodically; or
+use an atomic in-database
 increment so each write is a single short operation rather than a read-modify-write holding a lock.
 
 \`\`\`csdiagram
