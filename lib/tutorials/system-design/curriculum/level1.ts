@@ -2516,7 +2516,14 @@ request from a 2016-pinned account
 \`\`\`
 
 The bill is real: every dated version is a shim you keep and test forever, and the count only grows.
-What you buy is that an old caller costs a function rather than a fork or a forced migration.
+Price both sides before you pick one. Say the API takes two genuine breaks a year for ten years.
+Under dated per-account versions that is 20 shims, each maybe 15 lines, so roughly 300 lines that are
+written once and never edited again, plus a conversion chain at most 20 deep for your single oldest
+account. Under URL versions the same decade is 20 forced migrations, and every one of them lands on
+customers who did not schedule it: an integration nobody maintains any more does not migrate, it
+breaks. Twenty small functions you own is the cheaper bill, which is why Stripe carries dated versions
+rather than a \`/v20\`. What you buy is that an old caller costs a function rather than a fork or a
+forced migration.
 
 ### Retiring a version is a sequenced migration
 
