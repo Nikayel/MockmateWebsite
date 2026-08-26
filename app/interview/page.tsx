@@ -1376,6 +1376,8 @@ function InterviewPageContent() {
     isFromRoadmap,
     activeRoadmap,
     currentSessionId,
+    showFeedback,
+    showPostInterviewDiscussion,
     streamingFeedback,
     setScoreBreakdown,
     setPerformanceScore,
