@@ -1492,7 +1492,7 @@ Each link carries an upstream trace id, so from the batch span every order that 
 const timeoutsRetriesTeach = `
 ## The self-inflicted DDoS
 
-Level 1's resilience-primitives lesson introduced the four call-policy parts (timeouts, retries, circuit breakers, isolation) as a first pass; this lesson is the deep walkthrough of the first two. The single most common way a distributed system takes itself down is not a hardware failure. It is a small blip amplified by its own retry logic into a self-inflicted DDoS, and this lesson is the defense.
+[Level 1's resilience-primitives lesson](/learn/system-design/foundations/sd-l1-resilience-primitives) introduced the four call-policy parts (timeouts, retries, circuit breakers, isolation) as a first pass; this lesson is the deep walkthrough of the first two. The single most common way a distributed system takes itself down is not a hardware failure. It is a small blip amplified by its own retry logic into a self-inflicted DDoS, and this lesson is the defense.
 
 ## Every call needs a timeout
 
@@ -1762,7 +1762,7 @@ The exponential part (\`base * 2^attempt\`) spaces retries further apart as fail
 const circuitBreakersTeach = `
 ## Three patterns of failure isolation
 
-Level 1's resilience-primitives lesson sketched the circuit-breaker state machine (Closed to Open to Half-Open) as a first pass. This lesson credits that and goes past the single breaker to what senior answers actually hinge on: how the breaker and the bulkhead cover different halves of the same failure, and how a service mesh configures both. Timeouts and retries stop one slow call from hanging forever; when a dependency is broadly failing you instead want to stop calling it at all, contain the damage to one part of your service, and serve something useful instead of an error. That is circuit breakers, bulkheads, and fallbacks: the three patterns of failure isolation.
+[Level 1's resilience-primitives lesson](/learn/system-design/foundations/sd-l1-resilience-primitives) sketched the circuit-breaker state machine (Closed to Open to Half-Open) as a first pass. This lesson credits that and goes past the single breaker to what senior answers actually hinge on: how the breaker and the bulkhead cover different halves of the same failure, and how a service mesh (a proxy that sits next to every service and carries the calls between them, so rules like these become configuration instead of code, covered in [Level 9](/learn/system-design/modern-architecture/sd-l9-service-mesh)) configures both. Timeouts and retries stop one slow call from hanging forever; when a dependency is broadly failing you instead want to stop calling it at all, contain the damage to one part of your service, and serve something useful instead of an error. That is circuit breakers, bulkheads, and fallbacks: the three patterns of failure isolation.
 
 ## Circuit breaker
 
@@ -2076,7 +2076,7 @@ Fallbacks answer "what do we serve when the dependency is unavailable?" Options,
 const loadSheddingDegradationTeach = `
 ## Load shedding protects you from too many clients
 
-Levels 1 and 4 already covered the shedding mechanics (reject early at the edge with 429/503, bound every queue, prioritize by request class, discover the limit with adaptive concurrency); this lesson recaps those in one pass and leads with the two ideas that decide whether shedding actually saves you: goodput versus throughput, and metastable failure. Circuit breakers protect you from a sick *dependency*; load shedding protects you from too many *clients*. When demand exceeds capacity you have two choices: try to serve everyone and serve no one (collapse), or deliberately reject some requests so the rest succeed. Controlled partial service beats total collapse, every time.
+[Level 1's resilience primitives](/learn/system-design/foundations/sd-l1-resilience-primitives) and [Level 4's load shedding and backpressure](/learn/system-design/scaling-compute/sd-l4-load-shedding-backpressure) already covered the shedding mechanics (reject early at the edge with 429/503, bound every queue, prioritize by request class, discover the limit with adaptive concurrency); this lesson recaps those in one pass and leads with the two ideas that decide whether shedding actually saves you: goodput versus throughput, and metastable failure. Circuit breakers protect you from a sick *dependency*; load shedding protects you from too many *clients*. When demand exceeds capacity you have two choices: try to serve everyone and serve no one (collapse), or deliberately reject some requests so the rest succeed. Controlled partial service beats total collapse, every time.
 
 ## Goodput, not throughput
 
@@ -2084,7 +2084,7 @@ Throughput is requests you process; goodput is requests you process *successfull
 
 ## The mechanics, recapped in one pass
 
-Levels 1 and 4 own the how, so this is only the recap. Shed at the edge with \`429 Too Many Requests\` or \`503 Service Unavailable\` plus a \`Retry-After\` header before you spend work on a request; prioritize by request class so prefetch and batch jobs die before checkout and paying-customer writes; and cap in-flight work with bounded queues and adaptive concurrency limits (a TCP-Vegas-style controller such as Netflix's \`concurrency-limits\`) rather than a bigger queue, which adds only latency and eventually an OOM. With those assumed, the rest of this lesson is *why* they work: goodput, and the metastable trap they exist to break.
+Levels 1 and 4 own the how, so this is only the recap. Shed at the edge with \`429 Too Many Requests\` or \`503 Service Unavailable\` plus a \`Retry-After\` header before you spend work on a request; prioritize by request class so prefetch and batch jobs die before checkout and paying-customer writes; and cap in-flight work with bounded queues and adaptive concurrency limits (a controller that watches how response times are moving instead of only counting the requests in flight, the way Netflix's \`concurrency-limits\` library does) rather than a bigger queue, which adds only latency and eventually an OOM. With those assumed, the rest of this lesson is *why* they work: goodput, and the metastable trap they exist to break.
 
 ## Metastable failures
 
