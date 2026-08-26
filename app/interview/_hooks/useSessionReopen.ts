@@ -137,6 +137,7 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
             const scenario = await getScenarioById(guestScenarioId)
             let sessionState: Record<string, any> | null = null
             let completedAt: string | null = null
+            let sessionNotFound = false
             try {
               const response = await fetch(
                 `/api/guest-session?sessionId=${encodeURIComponent(guestSessionId)}&guestId=${encodeURIComponent(guestId)}`
@@ -145,15 +146,21 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
                 const data = await response.json()
                 sessionState = data.session?.session_state ?? null
                 completedAt = data.session?.completed_at ?? null
+              } else if (response.status === 404) {
+                // Regenerated guest id or a migrated doc: this browser can
+                // never write to that session again — every autosave and the
+                // completion PUT would 404, losing the score silently.
+                sessionNotFound = true
               }
             } catch {
               // Offline or API down: fall through to a fresh start below.
             }
 
-            if (!scenario || completedAt) {
-              // Unknown scenario, or a trial that was already submitted (a
-              // guest cannot view /sessions): drop the stale params so the
-              // browser's resume notice cannot key off them forever.
+            if (!scenario || completedAt || sessionNotFound) {
+              // Unknown scenario, an already-submitted trial (a guest cannot
+              // view /sessions), or a session this browser no longer owns:
+              // drop the stale params so the browser's resume notice cannot
+              // key off them forever.
               opts.router.replace("/interview")
               opts.setIsLoading(false)
               return

@@ -49,10 +49,11 @@ export function useRedirectSignInReturn(
 
     if (!opts.firebaseUser) {
       // Auth initialized with no user: the visitor cancelled at the provider
-      // or the redirect failed. Clear the marker and hand the page back to
+      // or the redirect failed. Clear the markers and hand the page back to
       // the normal guest flow.
       handledRef.current = true
       consumeRedirectSignIn()
+      localStorage.removeItem("auth_redirect")
       setRedirectReturnPending(false)
       return
     }
@@ -61,6 +62,10 @@ export function useRedirectSignInReturn(
     const firebaseUser = opts.firebaseUser
     const completeReturnLeg = async () => {
       consumeRedirectSignIn()
+      // The stored destination existed for the /login lane; this handler
+      // decides the landing itself. Left behind, it hijacks the redirect of
+      // the NEXT /login visit.
+      localStorage.removeItem("auth_redirect")
 
       // The popup path tracks inside signInWithPopup; this leg completes as
       // a cold load and must report itself or a redirect convert reads as a

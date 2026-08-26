@@ -84,6 +84,10 @@ export async function migrateGuestSessionsOnLogin(params: {
   }
 
   if (response.status === 404 || (response.ok && result && result.migrated === 0)) {
+    // Nothing recoverable exists, so the guest identity retires with the
+    // marker: keeping it would make every future login POST a pointless
+    // migrate. The trial-used flag survives (confirm never touches it).
+    confirmGuestSessionMigration()
     localStorage.removeItem(PENDING_MIGRATION_KEY)
     return { status: "gone" }
   }

@@ -218,6 +218,24 @@ describe("useSessionReopen for a guest mid-trial refresh", () => {
     expect(opts.setCode).toHaveBeenCalledTimes(1)
   })
 
+  it("drops the params when the server does not recognize the session", async () => {
+    // A regenerated guest id (cleared storage) or a migrated doc makes the
+    // GET 404. Proceeding as a fresh start would bind the live interview to
+    // a session id every autosave and the completion PUT will 404 against,
+    // losing the score silently.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}) }))
+    )
+    const opts = buildGuestOpts()
+
+    renderHook(() => useSessionReopen(opts as never))
+    await flush()
+
+    expect(opts.router.replace).toHaveBeenCalledWith("/interview")
+    expect(opts.setIsInterviewStarted).not.toHaveBeenCalled()
+  })
+
   it("drops the params of a submitted trial instead of spinning on them", async () => {
     vi.stubGlobal(
       "fetch",

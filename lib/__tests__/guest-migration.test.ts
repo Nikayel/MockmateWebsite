@@ -51,7 +51,7 @@ describe("migrateGuestSessionsOnLogin", () => {
     expect(localStorage.getItem("mockmate_guest_id")).toBeNull()
   })
 
-  it("treats a 404 as gone and stops retrying", async () => {
+  it("treats a 404 as gone, stops retrying, and retires the guest identity", async () => {
     seedGuestState()
     fetchMock.mockResolvedValueOnce({ ok: false, status: 404, json: async () => ({}) })
 
@@ -59,6 +59,9 @@ describe("migrateGuestSessionsOnLogin", () => {
 
     expect(result).toEqual({ status: "gone" })
     expect(localStorage.getItem(PENDING_KEY)).toBeNull()
+    // Nothing recoverable exists, so keeping the guest id only makes every
+    // future login POST a pointless migrate.
+    expect(localStorage.getItem("mockmate_guest_id")).toBeNull()
   })
 
   it("keeps the retry marker through a server error", async () => {

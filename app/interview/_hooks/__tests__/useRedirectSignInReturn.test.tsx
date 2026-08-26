@@ -85,6 +85,8 @@ async function flush() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  localStorage.clear()
+  localStorage.setItem("auth_redirect", "sessions/sess-9")
   auth.inFlight = false
   auth.consumed = []
   hasPendingGuestMigration.mockReturnValue(true)
@@ -112,6 +114,9 @@ describe("useRedirectSignInReturn", () => {
     expect(opts.router.replace).toHaveBeenCalledWith("/sessions/sess-9")
     // Pending stays up through the navigation so the reopen effect never runs.
     expect(result.current.redirectReturnPending).toBe(true)
+    // The stored destination was for the /login lane; this handler lands the
+    // user itself. Left behind, it hijacks the NEXT /login visit's redirect.
+    expect(localStorage.getItem("auth_redirect")).toBeNull()
   })
 
   it("drops the guest params and releases the page when nothing migrated", async () => {
