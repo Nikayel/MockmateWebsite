@@ -1625,7 +1625,7 @@ The fix maps 2D coordinates to a 1D sortable key so "nearby" becomes a range or 
 
 - **Geohash**: interleaves lat/lng bits into a base-32 string; a shared prefix means spatial proximity. Simple and stringy, but has edge effects (two close points can straddle a cell boundary and share no prefix), so you always query the cell plus its 8 neighbors.
 - **Quadtree**: recursively splits space into 4 quadrants, adapting depth to density. Great for skewed distributions (dense downtown, empty suburbs) but is a tree you must maintain in memory.
-- **S2 (Google)** and **H3 (Uber)**: project onto a space-filling curve (S2 uses a Hilbert curve on a sphere; H3 uses hexagons). Hexagons matter because every neighbor is equidistant, which makes "expand the search ring" uniform. Uber built and open-sourced H3 for exactly this.
+- **S2 (Google)** and **H3 (Uber)**: project onto a space-filling curve, one long winding path that visits every cell of the map exactly once, so cells that sit near each other on the ground also sit near each other along the path and a neighborhood becomes one range of numbers (S2 uses a Hilbert curve on a sphere; H3 uses hexagons). Hexagons matter because every neighbor is equidistant, which makes "expand the search ring" uniform. Uber built and open-sourced H3 for exactly this.
 
 \`\`\`cswidget
 {
@@ -2738,7 +2738,7 @@ Edits are operations like \`insert(pos=5, "x")\` and \`delete(pos=8)\`. When two
 
 ## CRDTs
 
-Instead of transforming operations, CRDTs give every character a globally unique, totally-ordered identifier (often a fractional index or a dense position between two neighbors) so that concurrent inserts have a deterministic, commutative merge order with no transformation needed. Sequence CRDTs (RGA, Logoot, YATA as used by Yjs, Automerge) let replicas merge in any order and converge. The advantage is they work **peer-to-peer and offline** without a central sequencer; the cost is metadata overhead (every character carries an id, and deleted characters may linger as tombstones).
+Instead of transforming operations, CRDTs give every character a globally unique, totally-ordered identifier (often a fractional index: the new character gets a number that falls between its two neighbors' numbers, 0.5 between 0 and 1, so no one has to renumber anything) so that concurrent inserts have a deterministic, commutative merge order with no transformation needed. Sequence CRDTs (RGA, Logoot, YATA as used by Yjs, Automerge) let replicas merge in any order and converge. The advantage is they work **peer-to-peer and offline** without a central sequencer; the cost is metadata overhead (every character carries an id, and deleted characters may linger as tombstones).
 
 \`\`\`csdiagram
 {
