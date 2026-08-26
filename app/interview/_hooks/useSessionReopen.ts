@@ -106,7 +106,124 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
         const canTrial = opts.canStartGuestTrial()
         if (canTrial) {
           // Allow guest mode
-          opts.enterGuestMode()
+          const guestId = opts.enterGuestMode()
+
+          // The page writes ?session&scenario into the URL for guests too, so
+          // a mid-trial refresh arrives here carrying both. Returning without
+          // honoring them left ScenarioBrowser's resume notice spinning
+          // forever while the guest's work sat saved on the server. The
+          // signed-in reopen below cannot serve them (its Firestore read is
+          // permission-denied for guest-owned docs), so guests rehydrate from
+          // their own API here.
+          const guestSessionId = opts.searchParams?.get("session")
+          const guestScenarioId = opts.searchParams?.get("scenario")
+          if (guestSessionId && guestScenarioId) {
+            if (opts.isShowingCompletedSession(guestSessionId)) {
+              opts.setIsLoading(false)
+              return
+            }
+
+            const scenario = await getScenarioById(guestScenarioId)
+            let sessionState: Record<string, any> | null = null
+            let completedAt: string | null = null
+            try {
+              const response = await fetch(
+                `/api/guest-session?sessionId=${encodeURIComponent(guestSessionId)}&guestId=${encodeURIComponent(guestId)}`
+              )
+              if (response.ok) {
+                const data = await response.json()
+                sessionState = data.session?.session_state ?? null
+                completedAt = data.session?.completed_at ?? null
+              }
+            } catch {
+              // Offline or API down: fall through to a fresh start below.
+            }
+
+            if (!scenario || completedAt) {
+              // Unknown scenario, or a trial that was already submitted (a
+              // guest cannot view /sessions): drop the stale params so the
+              // browser's resume notice cannot key off them forever.
+              opts.router.replace("/interview")
+              opts.setIsLoading(false)
+              return
+            }
+
+            opts.setSelectedScenario(scenario)
+            opts.setShowOptimalApproach(false)
+            opts.setCurrentSessionId(guestSessionId)
+            opts.setShowScenarioBrowser(false)
+            opts.setIsInterviewStarted(true)
+            opts.setStartTime(Date.now())
+
+            // Guests only reach the DSA and Debugging tracks, so the code
+            // init covers bugfix and default starter code; workspace and
+            // system-design scenarios never start as guest trials.
+            let initialCode: string
+            if (scenario.type === "bugfix") {
+              const scenarioLanguage = getBugfixScenarioLanguage(scenario, opts.selectedLanguage)
+              if (scenarioLanguage !== opts.selectedLanguage) {
+                opts.setSelectedLanguage(scenarioLanguage)
+              }
+              initialCode =
+                (scenario as any).buggyCode?.[scenarioLanguage] ||
+                `// Bug fix code not available for ${scenarioLanguage}`
+              const codebaseFiles = (scenario as any).codebaseFiles?.[scenarioLanguage] || []
+              if (codebaseFiles.length > 0) {
+                opts.setWorkspaceContext(toWorkspaceContextFiles(codebaseFiles))
+              }
+            } else {
+              initialCode =
+                (scenario as any).starterCode?.[opts.selectedLanguage] ||
+                `function solution() {
+  // Write your solution here
+
+}`
+            }
+
+            const problemType =
+              scenario.type === "bugfix"
+                ? "BUG FIX"
+                : scenario.type === "add-functionality"
+                  ? "ADD FUNCTIONALITY"
+                  : scenario.type.toUpperCase()
+            const freshInterviewerMessage = {
+              type: "ai" as const,
+              message: getInitialInterviewerMessage(
+                scenario.title,
+                scenario.difficulty,
+                problemType
+              ),
+            }
+
+            if (sessionState) {
+              opts.setCode(sessionState.code || initialCode)
+              if (sessionState.language) {
+                opts.setSelectedLanguage(sessionState.language as EditorLanguage)
+              }
+              opts.setInterviewerMessages(
+                sessionState.interviewer_messages?.length
+                  ? (sessionState.interviewer_messages as ChatMessage[])
+                  : [freshInterviewerMessage]
+              )
+              opts.setChatMessages(
+                sessionState.chat_messages?.length
+                  ? (sessionState.chat_messages as ChatMessage[])
+                  : []
+              )
+              if (sessionState.elapsed_time) {
+                opts.setElapsedTime(sessionState.elapsed_time)
+              }
+              if (sessionState.test_results?.length) {
+                opts.setTestResults(sessionState.test_results as TestResult[])
+              }
+              toast.success("Session resumed")
+            } else {
+              opts.setCode(initialCode)
+              opts.setInterviewerMessages([freshInterviewerMessage])
+              opts.setChatMessages([])
+            }
+          }
+
           opts.setIsLoading(false)
           return
         } else {

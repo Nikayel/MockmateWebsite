@@ -49,7 +49,7 @@ import { useSessionReopen } from "../useSessionReopen"
 
 function buildOpts(overrides: Record<string, unknown> = {}) {
   return {
-    router: { push: vi.fn() },
+    router: { push: vi.fn(), replace: vi.fn() },
     searchParams: new URLSearchParams("session=sess-1&scenario=dsa-two-sum"),
     firebaseUser: { uid: "user-1" },
     authLoading: false,
@@ -121,5 +121,97 @@ describe("useSessionReopen when the submitted session is already on screen", () 
     await flush()
 
     expect(opts.router.push).toHaveBeenCalledWith("/sessions/sess-1")
+  })
+})
+
+/**
+ * A guest's URL carries ?session&scenario once their trial starts (the page
+ * writes them for everyone), but the guest branch used to return before Case
+ * 1 ever ran — so a mid-trial refresh left ScenarioBrowser's resume notice
+ * spinning forever while the work sat saved on the server. The guest branch
+ * must rehydrate from /api/guest-session itself: the signed-in restore reads
+ * Firestore, which denies guests.
+ */
+describe("useSessionReopen for a guest mid-trial refresh", () => {
+  function buildGuestOpts(overrides: Record<string, unknown> = {}) {
+    return buildOpts({
+      firebaseUser: null,
+      user: null,
+      canStartGuestTrial: () => true,
+      enterGuestMode: vi.fn(() => "guest-1"),
+      ...overrides,
+    })
+  }
+
+  it("rehydrates the trial from the saved server state", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          session: {
+            session_state: {
+              code: "function twoSum() { /* my progress */ }",
+              elapsed_time: 300,
+              language: "javascript",
+              interviewer_messages: [{ type: "ai", message: "Welcome" }],
+              chat_messages: [],
+            },
+          },
+        }),
+      }))
+    )
+    const opts = buildGuestOpts()
+
+    renderHook(() => useSessionReopen(opts as never))
+    await flush()
+
+    expect(opts.setSelectedScenario).toHaveBeenCalled()
+    expect(opts.setCurrentSessionId).toHaveBeenCalledWith("sess-1")
+    expect(opts.setShowScenarioBrowser).toHaveBeenCalledWith(false)
+    expect(opts.setIsInterviewStarted).toHaveBeenCalledWith(true)
+    expect(opts.setCode).toHaveBeenCalledWith("function twoSum() { /* my progress */ }")
+    expect(opts.setElapsedTime).toHaveBeenCalledWith(300)
+    expect(opts.router.push).not.toHaveBeenCalled()
+    expect(opts.setIsLoading).toHaveBeenCalledWith(false)
+  })
+
+  it("starts the scenario fresh when nothing was saved yet", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ session: { session_state: null } }),
+      }))
+    )
+    const opts = buildGuestOpts()
+
+    renderHook(() => useSessionReopen(opts as never))
+    await flush()
+
+    expect(opts.setIsInterviewStarted).toHaveBeenCalledWith(true)
+    const codeArg = (opts.setCode as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]
+    expect(codeArg).toMatch(/function solution/)
+  })
+
+  it("drops the params of a submitted trial instead of spinning on them", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          session: { completed_at: "2026-08-25T12:00:00.000Z", session_state: null },
+        }),
+      }))
+    )
+    const opts = buildGuestOpts()
+
+    renderHook(() => useSessionReopen(opts as never))
+    await flush()
+
+    // The URL params drive ScenarioBrowser's resume notice; they must go.
+    expect(opts.router.replace).toHaveBeenCalledWith("/interview")
+    expect(opts.setIsInterviewStarted).not.toHaveBeenCalled()
+    expect(opts.setIsLoading).toHaveBeenCalledWith(false)
   })
 })
