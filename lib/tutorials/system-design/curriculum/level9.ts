@@ -725,7 +725,7 @@ The other three controls are easy to mix up, because all three sound like "where
       "feedback": "A PDB is the only one of the three that bounds a voluntary eviction. It does not place anything: it makes the drain wait until removing the next Pod is safe."
     },
     {
-      "label": "Put the sidecar cache on the same node as the API Pod that reads it",
+      "label": "Put the shared cache Pod on the same node as the API Pod that reads it",
       "bucket": "Affinity / anti-affinity",
       "feedback": "The attracting half of the same rule. Affinity pulls Pods together, anti-affinity pushes them apart, and both are written on the Pod."
     },
