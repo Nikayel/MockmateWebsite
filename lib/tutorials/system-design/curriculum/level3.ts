@@ -3012,7 +3012,24 @@ number of distinct objects the shield must coalesce on.
 
 **Interview nuance:** the sharpest question is "what can you cache and what must you never cache?"
 Static assets and public semi-dynamic HTML: yes, with **micro-caching** (a 1 to 5 second TTL on the
-homepage still collapses a 100k-QPS spike to ~20 origin fetches/sec). Personalized or authenticated
+homepage still collapses a 100k-QPS spike to ~20 origin fetches/sec). That number is not a slogan,
+it is division:
+
+\`\`\`
+origin fetches/sec = (caches that pull through on expiry) / TTL seconds
+
+  20 regional tiers, 1s TTL       20 / 1  =  20 fetches/sec at the origin
+  20 regional tiers, 5s TTL       20 / 5  =   4 fetches/sec
+  put the shield in front         the 20 collapse to 1 per TTL
+
+user QPS is not in the formula. The same 100,000 QPS arrives in every row: the
+moment an object is cacheable at all, origin load stops tracking traffic and
+starts tracking TTL. The price of the 1s -> 5s cut is a homepage that can be
+five seconds out of date, which is why this works for a landing page and not
+for a checkout total.
+\`\`\`
+
+Personalized or authenticated
 responses: never at a shared edge, or you leak one user's account page to another. Do personalization
 with **edge compute** (Cloudflare Workers, Lambda@Edge) that assembles a cached shell plus a small
 per-user fragment.
@@ -3269,8 +3286,21 @@ choose between paying for hot disk and deleting the data.
 \`\`\`
 
 **Interview nuance:** the classic trap is **deep pagination**. \`from: 100000, size: 10\` forces
-every shard to sort 100,010 docs and is O(offset). Use **\`search_after\`** (a cursor on the last
-sort value) for deep result sets, and cap the max page. Also be ready to say why you would not make
+every shard to sort 100,010 docs and is O(offset). Put a number on it, across 10 shards:
+
+\`\`\`
+                        each shard ranks   coordinator receives   returns
+  from: 0,      size 10        10                    100            10
+  from: 100000, size 10   100,010              1,000,100            10
+  search_after cursor           10                    100            10
+
+the deep page does about 10,000x the work of the first page to hand back the
+same ten rows, and 999,990 of the merged hits are thrown away. search_after
+carries the last row's sort values ("score below X, id after Y"), so each shard
+resumes where it stopped and every page costs what page one cost.
+\`\`\`
+
+Use \`search_after\` for deep result sets, and cap the max page. Also be ready to say why you would not make
 Elasticsearch your primary DB: weaker durability and consistency guarantees, and no transactions.
 
 Recap: search runs on a dedicated tier built on an inverted index plus an analysis pipeline, ranks
@@ -3338,11 +3368,67 @@ neighbors even with zero shared words. Retrieval becomes: embed the query, find 
 vectors by cosine similarity.
 
 Exhaustively comparing the query to every vector is O(N) and too slow at millions of docs, so you use
-an **approximate nearest neighbor (ANN)** index. The two workhorses are **HNSW** (a navigable
-small-world graph, excellent recall and latency, high memory) and **IVF** (cluster the space and
-search a few clusters, lower memory, tunable recall). ANN trades a little **recall** for a massive
-latency win; you tune parameters (\`efSearch\`, \`nprobe\`) to sit where you want on the
-recall/latency/memory curve.
+an **approximate nearest neighbor (ANN)** index. Approximate is the operative word: it may miss a few
+of the genuinely nearest vectors, and **recall** is the word for the share it did return, so recall
+97 percent means 97 of every 100 true top-10 results came back and 3 were quietly lost. The two
+workhorses are **HNSW** (a navigable small-world graph, excellent recall and latency, high memory)
+and **IVF** (cluster the space and search a few clusters, lower memory, tunable recall).
+
+ANN trades a little recall for a large latency win, and \`efSearch\` (HNSW) or \`nprobe\` (IVF) is
+the dial: both set how much of the index one query may explore before it has to answer. Explore
+more, find more of the true neighbors, take longer. Here is that curve as numbers, on one million
+768-dimension passages:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Index setting",
+    "Recall at 10",
+    "p50 query latency",
+    "Memory held"
+  ],
+  "rows": [
+    [
+      "No ANN index, compare against all 1M",
+      "100%",
+      "~800 ms",
+      "3.1 GB"
+    ],
+    [
+      "HNSW, efSearch 16",
+      "~85%",
+      "0.4 ms",
+      "3.2 GB"
+    ],
+    [
+      "HNSW, efSearch 64 (the usual default)",
+      "~97%",
+      "1.0 ms",
+      "3.2 GB"
+    ],
+    [
+      "HNSW, efSearch 256",
+      "~99.5%",
+      "3.5 ms",
+      "3.2 GB"
+    ],
+    [
+      "HNSW, efSearch 64, int8-quantized vectors",
+      "~95%",
+      "0.8 ms",
+      "0.9 GB"
+    ]
+  ],
+  "caption": "One million 768-dimension passages. The first row is what ANN is buying you: 800 ms down to 1 ms for three points of recall. efSearch is a query-time dial and never changes the index by a byte, so memory only moves in the last row, where quantizing each number down to one byte trades two points of recall for a quarter of the RAM."
+}
+\`\`\`
+
+Two things to take from that table. First, recall gets expensive fast at the top: efSearch 64 to 256
+costs 3.5x the latency to recover the last 2.5 points, and in a pipeline that reranks the top 50
+anyway, those points usually never reach the user. Second, memory is a separate dial from the other
+two. You move it by rebuilding: a smaller graph fan-out, or quantizing each dimension from a 4-byte
+float to a single byte. That is the real shape of the curve people mean by "recall, latency, memory".
 
 ### The thing you embed is a passage, not a document
 
@@ -3592,9 +3678,14 @@ const geospatialIndexingTeach = `
 ## "Find drivers near me" is a scaling trap
 
 The naive query, \`WHERE lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?\` or worse a full distance scan,
-cannot use a normal B-tree index effectively (two independent range predicates) and does not scale.
-Worse, distance on a sphere is not Euclidean. The real problem is turning a **2D nearest-neighbor
-query into a 1D or hierarchical key** you can index, shard, and range-scan.
+cannot use a normal B-tree index effectively and does not scale. A B-tree, the default database
+index, keeps one column's values in sorted order so the engine can jump to a value and walk the
+range next to it (Level 2 builds one in
+[B-tree vs LSM-tree](/learn/system-design/data-storage/sd-l2-btree-vs-lsm)). That is one sorted
+dimension, and this query ranges over two independent ones, so at most one of them gets index help
+and the other is filtered row by row. Worse, distance on a sphere is not Euclidean. The real problem
+is turning a **2D nearest-neighbor query into a 1D or hierarchical key** you can index, shard, and
+range-scan.
 
 \`\`\`cswidget
 {
@@ -5326,7 +5417,7 @@ export const systemDesignLevel3: DesignLevel = {
           practice: {
             id: "sd-l3-vector-hybrid-search-practice",
             prompt:
-              "Design the retrieval layer for a coding assistant's RAG over a company's 20M-file private codebase and docs, where a query might be 'how do we rotate service credentials' or an exact symbol like AuthTokenRefresher.refresh(), and answers must never leak one team's private repos to another. Lead with how you keep exact-symbol matching and per-repo access control correct.",
+              "Design the retrieval layer for a coding assistant's RAG (retrieval-augmented generation: find the relevant files first, then hand them to an LLM to answer from) over a company's 20M-file private codebase and docs, where a query might be 'how do we rotate service credentials' or an exact symbol like AuthTokenRefresher.refresh(), and answers must never leak one team's private repos to another. Lead with how you keep exact-symbol matching and per-repo access control correct.",
             thinkAbout: [
               "Why must exact-symbol matching be first-class rather than left to embeddings?",
               "Where must ACL filtering happen so no unauthorized chunk ever reaches ranking or the LLM?",
