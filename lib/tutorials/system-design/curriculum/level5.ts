@@ -3899,7 +3899,9 @@ add does not resurrect deleted data. A set that has absorbed 10 million adds and
 lifetime holds a tag per operation at roughly 24 bytes each, so about 240 MB of metadata guarding
 live contents that might be a few tens of megabytes, and none of it shrinks on its own. That is why
 **garbage collection** is part of the design rather than an afterthought, and it needs some
-coordination or a causal-stability threshold to know that a late update can never arrive again. And
+coordination or a causal-stability threshold (a point in the update history that every replica has
+confirmed it has seen, so nothing older can still be in flight toward you) to know that a late update
+can never arrive again. And
 CRDTs **cannot enforce global invariants**: "this username is globally unique" or "the balance never
 goes negative" require agreement, and agreement is exactly what CRDTs avoid. For invariants you need
 consensus.
@@ -3989,8 +3991,9 @@ tombstones are what hold the anchor points open for a concurrent insert beside a
 const failureDetectionTeach = `
 ## "Is that node dead?" You can never know for sure
 
-A dead node and a node that is merely slow (GC pause, network blip, overloaded NIC) look identical
-from the outside: both go quiet. This is the **impossibility at the heart of failure detection**, and
+A dead node and a node that is merely slow (a garbage-collection pause, where the runtime freezes the
+program for a moment to reclaim memory, or a network blip, or an overloaded network card) look
+identical from the outside: both go quiet. This is the **impossibility at the heart of failure detection**, and
 it forces a tradeoff you must be able to name.
 
 \`\`\`cswidget
@@ -4255,7 +4258,9 @@ primary from a slow one.
 a Raft/Paxos group directly. The primary holds a **lease**: a time-bounded grant ("you are leader
 until T+10s") it must renew. If renewals stop, the lease expires and a new election runs. Leases need
 no per-request coordination, but they carry a hidden assumption: **bounded clocks and bounded
-pauses**.
+pauses**. A healthy process freezes for reasons nobody scheduled, most often a **stop-the-world
+garbage-collection pause**: the runtime halting the whole program for a moment to reclaim memory,
+while every other node sees nothing but silence.
 
 \`\`\`cswidget
 {
@@ -4309,6 +4314,24 @@ was hit; a legal pause alone produced two active leaders.
       "feedback": "Right. Only the resource being written sees every write, so only it can enforce the rule. A monotonic fencing token plus a highest-seen check makes the zombie write bounce."
     }
   ]
+}
+\`\`\`
+
+The middle option is worth pricing, because tuning the lease is the first thing everyone reaches for.
+A holder normally renews at about a third of the lease, so the length sets both the renewal traffic
+and how long a shard has no writer after a real crash:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Lease length", "Renewals per leader per minute", "Dead leader leaves the shard unwritable for", "What a routine 800 ms pause does"],
+  "rows": [
+    ["2 seconds", "about 90", "up to 2 seconds", "Eats 40 percent of the lease: one slow renewal and a healthy leader is evicted for nothing"],
+    ["10 seconds", "about 18", "up to 10 seconds", "Absorbed: the pause is a quarter of a single renewal interval"],
+    ["60 seconds", "about 3", "up to 60 seconds", "Absorbed easily, but a real crash stalls every write on that shard for up to a minute"]
+  ],
+  "highlightCols": ["Dead leader leaves the shard unwritable for"],
+  "caption": "Every length is somebody's bad day: short leases fail over fast and evict healthy leaders that paused, long leases ride out pauses and leave a crashed leader's work stalled for a minute. And no length is a fix, because a pause longer than the lease reproduces the failure at any setting, which is the whole reason the next section moves the defense somewhere else."
 }
 \`\`\`
 
@@ -4516,14 +4539,34 @@ purely to survive lies rather than silence.
 \`\`\`
 
 The other cost is **messages**. Because a node cannot trust a single report, classic BFT makes
-everyone cross-check everyone: **O(n²)** messages per decision, versus Raft's near-linear cost.
+everyone cross-check everyone: **O(n²)** messages per decision, which means doubling the cluster
+quadruples the traffic, versus Raft's near-linear cost where the leader talks to each follower once.
 Protocols to name:
 
 - **PBFT** (Castro-Liskov 1999): the classic. Three phases (pre-prepare, prepare, commit), a primary
   that proposes, and a **view-change** protocol to depose a faulty primary. O(n²) messages.
 - **Tendermint** (Cosmos): BFT with a rotating proposer, suited to proof-of-stake chains.
 - **HotStuff** (Meta's former Diem): reduces message complexity to **linear O(n)** via threshold
-  signatures and adds **pipelining**. The modern reference.
+  signatures (one combined signature that proves a quorum already agreed, so the leader forwards a
+  single small proof instead of collecting and relaying every individual vote) and adds
+  **pipelining**. The modern reference.
+
+Big-O hides how fast that bites, so count the messages:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Cluster size n", "Liars it survives (f, since n is 3f+1)", "Votes needed (2f+1)", "PBFT messages per decision", "Raft or HotStuff messages per decision"],
+  "rows": [
+    [4, 1, 3, "about 16", "about 4"],
+    [7, 2, 5, "about 49", "about 7"],
+    [10, 3, 7, "about 100", "about 10"],
+    [100, 33, 67, "about 10,000", "about 100"]
+  ],
+  "highlightCols": ["PBFT messages per decision"],
+  "caption": "At 4 nodes the difference is 16 messages against 4, which nobody notices. At 100 nodes it is 10,000 against 100, on every single decision, and each message is signed and verified. That gap, not the extra hardware, is why classic BFT clusters stay small and why HotStuff's combined signature was worth inventing."
+}
+\`\`\`
 
 ### The threat-model decision
 
