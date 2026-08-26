@@ -3822,7 +3822,7 @@ The projection updates *after* the write commits, so there is a lag (usually mil
 
 Because projections are derived and idempotent, you can drop a read model and **replay** the event log to rebuild it. That is how you add a new read model months later, fix a projection bug, or migrate the read store: reset the offset to 0 and reprocess. This is the strongest operational reason to adopt CQRS.
 
-**Interview nuance:** CQRS and event sourcing are *often taught together but are independent.* You can do CQRS with a plain CRUD write model that emits events (or that a [change-data-capture stream](/learn/system-design/scaling-data/sd-l3-cdc-dual-write) like Debezium tails, meaning a reader that follows the database's own log of committed row changes and republishes each one as an event, which is Level 3's CDC lesson), no event store required. Coupling CQRS to full event sourcing "because they go together" doubles your complexity for no reason if you did not need the event log. Default to CQRS-with-CDC unless audit/temporal needs justify event sourcing too.
+**Interview nuance:** CQRS and event sourcing are *often taught together but are independent.* You can do CQRS with a plain CRUD write model and no event store: either the write model emits events itself, or a [change-data-capture stream](/learn/system-design/scaling-data/sd-l3-cdc-dual-write) like Debezium tails the database's own log of committed row changes and republishes each one as an event. Coupling CQRS to full event sourcing "because they go together" doubles your complexity for no reason if you did not need the event log. Default to CQRS-with-CDC unless audit/temporal needs justify event sourcing too.
 
 \`\`\`cswidget
 {
