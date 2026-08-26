@@ -69,6 +69,30 @@ beforeEach(() => {
   localStorage.clear()
 })
 
+describe("SignupPrompt dialog semantics", () => {
+  // The first version was a hand-rolled overlay: no role, no focus trap, no
+  // Escape — a screen reader was never told a modal opened, and keyboard
+  // focus stayed on the lock button underneath. The Radix Dialog the ui kit
+  // already ships provides all of it.
+  it("is a real dialog and Escape dismisses it", async () => {
+    const onDismiss = vi.fn()
+    render(
+      <SignupPrompt
+        sessionId="sess-1"
+        scenarioTitle="Two Sum"
+        onSignedIn={vi.fn()}
+        onDismiss={onDismiss}
+      />
+    )
+
+    const dialog = screen.getByRole("dialog")
+    expect(dialog).toBeTruthy()
+
+    fireEvent.keyDown(dialog, { key: "Escape" })
+    await waitFor(() => expect(onDismiss).toHaveBeenCalledTimes(1))
+  })
+})
+
 describe("SignupPrompt with the score withheld", () => {
   it("renders no score and reports the impression without one", () => {
     renderPrompt()
