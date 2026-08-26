@@ -3100,7 +3100,7 @@ Cache-aside (the app reads cache, on miss reads the DB and populates the cache) 
 
 A cache stampede happens when a hot key expires and thousands of concurrent requests all miss and hit the DB at once. Fix it with request coalescing (a single in-flight fetch per key, others wait for its result), a short randomized TTL jitter so keys do not all expire together, or serving stale-while-revalidate. A hot key is a single key so popular it saturates one node's CPU or network. Consistent hashing alone does not help because it is one key on one node, so replicate the hot entry across several nodes and randomize which replica a client reads, or add a small local in-process cache in front of the distributed tier.
 
-Replication gives availability: each shard has a primary and one or more replicas, with async replication for speed (and a small window of lost writes on failover) or sync for safety. On primary failure a sentinel or the cluster gossip promotes a replica.
+Replication gives availability: each shard has a primary and one or more replicas, with async replication for speed (and a small window of lost writes on failover) or sync for safety. On primary failure a sentinel (a small watchdog process whose only job is to notice a dead primary) or the cluster's own gossip promotes a replica. Gossip here means nodes periodically telling a few random peers what they believe about who is alive, so news of a failure spreads through the cluster without anyone appointing a central coordinator.
 
 \`\`\`csdiagram
 {
@@ -3801,11 +3801,30 @@ At-most-once means a message may be lost but never redelivered (fire and forget,
 
 Exactly-once is the hard one, and the crucial nuance is that exactly-once delivery over a network is impossible; what systems provide is exactly-once processing.
 
-**Interview nuance:** if you claim "exactly-once delivery," expect a challenge. The correct framing: we get at-least-once delivery from the broker plus idempotent consumers (dedupe on a message id or use an idempotency key) so that reprocessing a duplicate has no effect. Kafka's "exactly-once" is at-least-once delivery combined with idempotent producers (a producer id plus sequence number so the broker drops duplicate appends) and transactional writes that tie the consume-process-produce cycle to an atomic offset commit.
+**Interview nuance:** if you claim "exactly-once delivery," expect a challenge. The correct framing: we get at-least-once delivery from the broker plus idempotent consumers, meaning processing the same message twice leaves the same result as processing it once (dedupe on a message id or use an idempotency key, which [Level 1 works through in full](/learn/system-design/foundations/sd-l1-idempotency-retries)), so that reprocessing a duplicate has no effect. Kafka's "exactly-once" is at-least-once delivery combined with idempotent producers (a producer id plus sequence number so the broker drops duplicate appends) and transactional writes that tie the consume-process-produce cycle to an atomic offset commit.
 
 ## Consumer scaling
 
-Consumer groups: each partition is assigned to exactly one consumer in a group, so parallelism is capped at the partition count. Consumers track their position with committed offsets. When a consumer joins or dies, the group rebalances partition assignments. Two subtleties: commit the offset after processing (at-least-once) not before (which would be at-most-once and lose messages on crash), and backpressure is natural because a slow consumer just lags (its offset falls behind) rather than dropping data. A poison message that keeps failing goes to a dead-letter topic after N retries so it does not block the partition. Producers batch messages to trade latency for throughput.
+Consumer groups: each partition is assigned to exactly one consumer in a group, so parallelism is capped at the partition count. Consumers track their position with committed offsets. When a consumer joins or dies, the group rebalances partition assignments. Two subtleties: commit the offset after processing (at-least-once) not before (which would be at-most-once and lose messages on crash), and backpressure is natural because a slow consumer just lags (its offset falls behind) rather than dropping data. A poison message that keeps failing goes to a dead-letter topic after N retries so it does not block the partition.
+
+## Batching is the latency-throughput dial
+
+Producers batch messages to trade latency for throughput. A producer can send each message the instant your code hands it over, or it can wait a few milliseconds to collect more and send them as one request. Waiting costs every message in the batch that much delay, and it buys throughput, because the fixed per-request cost (a network round trip, a request header, a disk flush on the broker) is now split across the whole batch instead of paid once per message.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Messages per batch", "Added producer latency", "Broker throughput", "What the change bought"],
+  "rows": [
+    ["1 (batching off)", "0 ms", "~20K msgs/sec", "Baseline: every message pays its own round trip and header"],
+    ["10", "~1 ms", "~150K msgs/sec", "One round trip carries ten messages, so the fixed cost is split ten ways"],
+    ["100", "~5 ms", "~600K msgs/sec", "Roughly 30x the throughput for 5 ms of delay: the usual sweet spot"],
+    ["1,000", "~50 ms", "~900K msgs/sec", "Ten times the wait for about 1.5x more throughput: the curve has flattened"]
+  ],
+  "highlightCols": ["Added producer latency", "Broker throughput"],
+  "caption": "Illustrative figures for one broker and small messages; the shape is the point. Throughput climbs fast at first and then flattens, while the latency you pay keeps growing linearly, which is why batching is tuned to a latency budget rather than turned up to the maximum. A payments event stream might cap the wait at 1 ms; a log pipeline nobody reads in real time happily waits 100 ms."
+}
+\`\`\`
 
 \`\`\`
 producer --partition by key--> topic P0 [m0 m1 m2 ...]  (leader + ISR followers)
@@ -4061,7 +4080,7 @@ consumer group G: P0 -> C1, P1 -> C2   (one partition per consumer)
 const jobSchedulerTeach = `
 ## Fire each job exactly once despite crashes
 
-A distributed job scheduler fires jobs at their scheduled time (one-off or recurring) across a fleet of workers, and its defining challenge is firing each job exactly once even when workers crash mid-run. This is one of the hardest correctness problems in system design because "exactly once" collides with the reality that any worker can die or pause at any instant. The honest target is effectively-once through idempotency, not literal once-delivery.
+A distributed job scheduler fires jobs at their scheduled time (one-off or recurring) across a fleet of workers, and its defining challenge is firing each job exactly once even when workers crash mid-run. This is one of the hardest correctness problems in system design because "exactly once" collides with the reality that any worker can die or pause at any instant. The honest target is effectively-once through idempotency, not literal once-delivery: you cannot promise the job body runs a single time, so you make running it twice land the same result as running it once ([Level 1 taught this](/learn/system-design/foundations/sd-l1-idempotency-retries)).
 
 ## Storage and the "due now" query
 
