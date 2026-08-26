@@ -5124,7 +5124,7 @@ The ledger is the source of truth, and it must be double-entry and immutable. In
 
 ## Coordinating across systems with a saga
 
-A charge spans several systems (your wallet/ledger, an external provider like Stripe or Adyen, and the orders service), and you cannot hold a distributed ACID transaction across an external API. Use a saga (an orchestrated sequence of local transactions with compensating actions). The orchestrator: (1) reserves funds in the ledger as a pending entry, (2) calls the provider with an idempotency key, (3) on success posts the settled ledger entries and marks the order paid, (4) on failure posts a compensating reversal. State lives in a durable workflow so a crash resumes rather than orphans money.
+A charge spans several systems (your wallet/ledger, an external provider like Stripe or Adyen, and the orders service), and you cannot hold a distributed [ACID transaction](/learn/system-design/data-storage/sd-l2-relational-acid) across an external API. A transaction is one all-or-nothing unit of work: every step lands or none does. A single database can promise that about its own rows, and nobody can promise it about someone else's API. Use a [saga](/learn/system-design/distributed-core/sd-l5-sagas) instead: a run of ordinary local transactions, each paired with a compensating action that undoes it if a later step fails. The orchestrator: (1) reserves funds in the ledger as a pending entry, (2) calls the provider with an idempotency key, (3) on success posts the settled ledger entries and marks the order paid, (4) on failure posts a compensating reversal. State lives in a durable workflow so a crash resumes rather than orphans money.
 
 \`\`\`csdiagram
 {
@@ -5307,7 +5307,7 @@ A charge spans several systems (your wallet/ledger, an external provider like St
 }
 \`\`\`
 
-Providers confirm asynchronously via webhooks, which are themselves at-least-once, so webhook handlers must be idempotent too (dedup on the provider's event id). Reconcile daily by summing ledger entries and comparing to the provider's settlement report; any drift is an incident. Layer PCI scope reduction (never store raw PANs, tokenize via the provider) and fraud hooks on top.
+Providers confirm asynchronously via webhooks, which are themselves at-least-once, so webhook handlers must be idempotent too (dedup on the provider's event id). Reconcile daily by summing ledger entries and comparing to the provider's settlement report; any drift is an incident. Layer PCI scope reduction and fraud hooks on top. PCI is the card industry's security standard, and the cheapest way to satisfy it is to keep card data out of your systems entirely: never store raw PANs (the primary account numbers, the long digits on the front of the card), and let the provider hand you back a token that stands in for the card everywhere you would have kept the number.
 
 **Recap:** idempotency keys on every mutating call turn retries safe, an append-only double-entry ledger with derived balances gives auditability and reconciliation, and a saga with compensations plus idempotent webhook handling coordinates the provider, wallet, and orders without a distributed transaction.
 
@@ -5556,7 +5556,7 @@ If two requests both read \`available = 1\`, both decide "yes, buy," and both wr
 
 ## Reservation holds
 
-Real commerce does not charge instantly, so you need reservation holds. When a buyer adds a seat to their cart, you decrement inventory and create a hold with a TTL (say 10 minutes). The seat is unavailable to others during the hold. If the buyer completes checkout, the hold converts to a sale; if the TTL expires, a background sweeper (or a lazy check on next read) releases the seat back to inventory via an atomic increment. This prevents both oversell and permanent leakage from abandoned carts. Optimistic locking (version numbers, retry on conflict) works when contention is low; pessimistic locking or serialized queues are better for genuinely hot items where most optimistic attempts would fail and retry-storm.
+Real commerce does not charge instantly, so you need reservation holds. When a buyer adds a seat to their cart, you decrement inventory and create a hold with a TTL (say 10 minutes). The seat is unavailable to others during the hold. If the buyer completes checkout, the hold converts to a sale; if the TTL expires, a background sweeper (or a lazy check on next read) releases the seat back to inventory via an atomic increment. This prevents both oversell and permanent leakage from abandoned carts. Optimistic locking (version numbers, retry on conflict) works when contention is low; pessimistic locking or serialized queues are better for genuinely hot items where most optimistic attempts would fail and retry-storm. Put a number on "low" and "hot": when k buyers read the same row version in the same instant, exactly one commits and the other k-1 have to re-read and try again, so the first-try success rate is about 1 in k. At 5 simultaneous buyers per item that is 1 in 5 succeeding and a bit of wasted work; at 50 it is 1 in 50, with 49 attempts bouncing off and coming straight back, which is the retry storm. The crossover sits somewhere around a dozen concurrent buyers on one item: below it optimistic locking is free (no lock held, no queue to run), above it a pessimistic lock or one serialized queue per item does less total work, because each buyer waits once instead of failing repeatedly.
 
 \`\`\`cswidget
 {
@@ -5802,7 +5802,7 @@ RSS and Atom feeds sit between the two: polled like a sitemap, but small and ord
 
 ## Dedup at two levels
 
-URL dedup: before adding a URL to the frontier, check whether you have seen it, using a normalized URL (canonicalize scheme/host/case, strip tracking params, resolve relative links). At billions of URLs a hash set in memory is too big, so use a bloom filter (or scalable variant) for a fast "definitely new / probably seen" check backed by a durable seen-set store; a bloom filter's false positives cost you a few dropped new URLs, which is acceptable. Content dedup: many URLs return identical or near-identical content (mirrors, session-id URLs, print pages). Hash the content (or use MinHash/simhash shingling for near-duplicate detection) so you do not index the same page a million times. This also helps with crawler traps (infinite calendars, faceted-search URL explosions) which you additionally bound with max-depth and per-host URL caps.
+URL dedup: before adding a URL to the frontier, check whether you have seen it, using a normalized URL (canonicalize scheme/host/case, strip tracking params, resolve relative links). At billions of URLs a hash set in memory is too big, so use a bloom filter (or scalable variant) for a fast "definitely new / probably seen" check backed by a durable seen-set store; a bloom filter's false positives cost you a few dropped new URLs, which is acceptable. Price both sides at 10 billion URLs: an exact hash set is roughly 400 GB of RAM once you count the hashes and the table overhead, while a bloom filter tuned to a 1 percent false-positive rate needs about 10 bits per URL, so about 12 GB. The 33x saving is paid for by roughly 1 new URL in 100 being wrongly called "seen" and never crawled, and at web scale that is noise: anything worth having is linked from many pages, so the same URL usually arrives again from a different one. Content dedup: many URLs return identical or near-identical content (mirrors, session-id URLs, print pages). Hash the content (or compare shingles, which means chopping the page into overlapping runs of a few words and measuring how many runs two pages share, with MinHash or simhash making that comparison cheap) so you do not index the same page a million times. This also helps with crawler traps (infinite calendars, faceted-search URL explosions) which you additionally bound with max-depth and per-host URL caps.
 
 ## Fetching and freshness
 
@@ -6575,7 +6575,7 @@ A leaderboard looks trivial ("sort players by score") and is a trap, because the
 
 ## The sorted set
 
-The wrong instinct is \`SELECT ... ORDER BY score DESC LIMIT 10\` plus, for a player's rank, \`SELECT COUNT(*) WHERE score > my_score\`. Be precise about which half hurts. With an index on score the top ten is cheap: the database walks ten entries down the index and stops. The rank query has no such shortcut, because counting every score above yours touches a slice of the table that grows with the player base, on every request, while ten million scores keep moving under it. The right primitive is a Redis sorted set (ZSET). A ZSET keeps members ordered by score in a skip list, giving O(log n) inserts/updates (ZADD), O(log n + k) top-K reads (ZREVRANGE 0 k), and O(log n) rank lookup (ZREVRANK). That single structure answers both "top 10" and "my rank" without scanning everyone.
+The wrong instinct is \`SELECT ... ORDER BY score DESC LIMIT 10\` plus, for a player's rank, \`SELECT COUNT(*) WHERE score > my_score\`. Be precise about which half hurts. With an index on score the top ten is cheap: the database walks ten entries down the index and stops. The rank query has no such shortcut, because counting every score above yours touches a slice of the table that grows with the player base, on every request, while ten million scores keep moving under it. The right primitive is a Redis sorted set (ZSET). A ZSET keeps members ordered by score in a skip list, a sorted linked list with express lanes: extra layers above the list let a search jump far ahead and then drop down a level when it overshoots, which is where the log n comes from instead of walking every member. That gives O(log n) inserts/updates (ZADD), O(log n + k) top-K reads (ZREVRANGE 0 k), and O(log n) rank lookup (ZREVRANK). That single structure answers both "top 10" and "my rank" without scanning everyone.
 
 **Interview nuance:** the interviewer wants you to reject the SQL-sort-per-request answer and name the sorted set with its complexities. Saying "Redis ZSET, ZREVRANGE for top-K, ZREVRANK for my rank, both O(log n)" is the seniority signal.
 
@@ -6585,7 +6585,80 @@ A single ZSET has limits at tens of millions of members and high write rate, so 
 
 ## Hot counters and approximation
 
-A single hot key (global likes, total views, a mega-popular player's score) taking millions of increments/sec becomes a write hotspot and lock contention point. The fix is a sharded/distributed counter: split the logical counter into N sub-counters (\`counter:0..N-1\`), increment a random shard per write so writes fan out, and sum the N shards on read. This trades a slightly more expensive read for massive write parallelism.
+A single hot key (global likes, total views, a mega-popular player's score) taking millions of increments/sec becomes a write hotspot and lock contention point. The fix is a sharded/distributed counter: split the logical counter into N sub-counters (\`counter:0..N-1\`), increment a random shard per write so writes fan out, and sum the N shards on read. That trade is worth pricing rather than asserting, because both sides move with N: the write side divides by N and the read side multiplies by it.
+
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Splitting a hot counter: how many sub-counters, and what the read pays",
+  "predictPrompt": {
+    "question": "One counter is taking 500,000 increments a second, and a single Redis key handles roughly 100,000 a second before it becomes the bottleneck. Roughly how many sub-counters does the write side need?",
+    "options": [
+      "2 is plenty, the load is spread either way",
+      "Around 5, which is exactly the ratio",
+      "A few dozen, so each key sits well under its ceiling",
+      "Thousands, one per writer"
+    ]
+  },
+  "workedExample": "The initial settings are the un-sharded case: one key absorbing all 500,000 increments a second against a ceiling near 100,000, so the hottest key is 5x over budget and every extra writer just deepens the queue behind it. The readout says 5 sub-counters would only reach the ceiling, not clear it. Drag the shard count to 50 and the hottest key drops to 10,000 writes a second, comfortably under, while a read now fetches 50 keys and adds them up, about 2 ms of extra read cost. Push the shard count to 500 and the write side becomes trivial while the read passes 20 ms, which is the point where splitting further costs more than it buys. Then switch the ceiling to a locked database row (about 1,000 a second) and watch how many more shards the same traffic suddenly needs.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "writes_per_sec",
+      "label": "Increments per second on the one logical counter",
+      "min": 1000,
+      "max": 10000000,
+      "scale": "log",
+      "initial": 500000,
+      "unit": "writes/sec"
+    },
+    {
+      "kind": "slider",
+      "id": "shards",
+      "label": "Sub-counters (N)",
+      "min": 1,
+      "max": 500,
+      "scale": "linear",
+      "step": 1,
+      "initial": 1
+    },
+    {
+      "kind": "select",
+      "id": "ceiling",
+      "label": "What one key or row can take",
+      "options": [
+        { "label": "A database row behind a lock, about 1,000/sec", "value": 1000 },
+        { "label": "A Redis key on one core, about 100,000/sec", "value": 100000 }
+      ],
+      "initial": 1
+    }
+  ],
+  "outputs": [
+    {
+      "id": "writes_per_shard",
+      "label": "Increments per second on the hottest key",
+      "expr": "writes_per_sec / shards",
+      "format": "compact",
+      "unit": "writes/sec",
+      "sparkline": { "over": "shards" }
+    },
+    {
+      "id": "shards_needed",
+      "label": "Sub-counters just to reach the ceiling",
+      "expr": "ceil(writes_per_sec / ceiling)",
+      "format": "compact"
+    },
+    {
+      "id": "read_cost_ms",
+      "label": "Added read cost, one pipelined fetch per shard at about 0.04 ms",
+      "expr": "shards * 0.04",
+      "format": "number",
+      "unit": "ms"
+    }
+  ],
+  "caption": "The write side divides and the read side multiplies, which is the whole trade in one sentence. Sharding is not free and it is not linear either: the first ten sub-counters remove almost all of the contention, and the next four hundred mostly buy read latency. Pick N from the ceiling number, then stop."
+}
+\`\`\`
 
 Where exactness is not required, approximate structures are a big memory win. HyperLogLog counts unique items (unique players seen, unique visitors) with ~0.8 percent error in ~12 KB regardless of cardinality, versus gigabytes for an exact set. Count-Min Sketch estimates per-item frequencies and heavy hitters (approximate top-K of a stream) in fixed memory with bounded overcount. Use these when "about 4.2M unique" or "roughly the top trending items" is good enough.
 
@@ -8335,7 +8408,7 @@ A rejection from any layer returns 429. The concurrency layer's 429 carries \`X-
               "How do payouts and holds become balanced, auditable ledger events?",
             ],
             modelAnswerOutline: [
-              "Assumptions: funds are held between capture and payout, fees split per transaction, FX conversion happens at payout, regulators can demand a full trace of any dollar.",
+              "Assumptions: funds are held between capture and payout, fees split per transaction, FX (foreign exchange, swapping one currency for another) conversion happens at payout, regulators can demand a full trace of any dollar.",
               "**Model every party as accounts** in one double-entry ledger: a buyer funding account, a platform fee account, a seller payable account, and per-currency clearing accounts. A single purchase becomes a balanced set of entries: debit buyer funding, credit seller payable (minus fee), credit platform fee account, all in the transaction currency. Because entries are immutable and balanced, any dollar is traceable from capture to payout by following `txn_id` links, exactly what an audit needs.",
               "**Multi-currency:** never mix currencies in one account. Each account is single-currency, and FX is an explicit transaction that debits a source-currency clearing account and credits a target-currency clearing account at a recorded rate, so the conversion itself is an auditable, balanced ledger event rather than a hidden arithmetic step.",
               "**Payouts:** a scheduled job sums each seller's payable balance, applies holds/reserves for risk, creates a payout transaction (debit seller payable, credit an outbound clearing account), and hands it to the bank rail (ACH/SEPA/wire) with an idempotency key. The payout is pending until the rail confirms; a webhook settles or reverses it, and the ledger reflects each state transition as new entries, never edits.",
