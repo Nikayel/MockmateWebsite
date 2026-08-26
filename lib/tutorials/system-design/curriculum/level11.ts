@@ -3164,7 +3164,28 @@ Full fine-tuning updates all weights, which is expensive and produces a whole ne
 
 Capture production traces (inputs, chosen outputs, human corrections, thumbs), curate them, and use them to distill a smaller cheaper model or to improve the next adapter. Real usage becomes training data, so quality and cost improve over time. This flywheel is the durable moat.
 
-RAG index updates keep facts current continuously; fine-tuning requires periodic re-tuning to refresh baked-in knowledge, which is why you do not fine-tune for volatile facts. Whatever you train, you version the model and adapters, gate promotion behind eval, and keep rollback ready.
+RAG index updates keep facts current continuously; fine-tuning requires periodic re-tuning to refresh baked-in knowledge, which is why you do not fine-tune for volatile facts. Put one corpus through both and the reason becomes a number rather than a preference.
+
+\`\`\`
+a support corpus: 20,000 documents at about 1,000 tokens each = 20M tokens
+5 percent of it is edited each week, so 1M tokens of change per week
+embedding priced at $0.02 per million tokens
+
+RAG, re-embed only what changed
+  1M x $0.02/M            = $0.02 per week, run continuously
+  staleness window          minutes, the time to re-index one edited doc
+
+fine-tuning, bake the corpus into weights and refresh on a schedule
+  one adapter pass over the corpus, plus rebuilding and re-validating
+  the training set and re-running eval before promotion
+  staleness window          up to one full refresh interval
+\`\`\`
+
+The dollars are not the deciding row, and treating them as if they were is how this argument gets lost in interviews. Suppose a weekly adapter refresh cost you exactly nothing. The staleness windows still differ by four orders of magnitude, and the gap is not a delay, it is a wrongness: between refreshes a fine-tuned model does not decline to answer about the five percent that moved, it answers confidently from last week's weights, and nothing in the response marks it as stale. RAG's staleness is bounded by indexing lag, which you can drive to minutes for the price above. Fine-tuning's staleness is bounded by the retrain cadence you can actually staff, so a monthly cadence over weekly-moving facts is a system that is up to three weeks wrong, on purpose, forever.
+
+So the crossover is a frequency question rather than a size question. Ask how often the knowledge moves against how often you can afford to refresh weights. Facts that move weekly belong in an index. Things that have not moved in two years, your memo format, your product's tone, the schema you always emit, are exactly what weights are for, because refreshing them never comes up.
+
+Whatever you train, you version the model and adapters, gate promotion behind eval, and keep rollback ready.
 
 **Recap:** prompting for behavior, RAG for fresh/private knowledge, fine-tuning (via LoRA adapters, rarely full) for style/format/latency; they compose; drive continuous improvement with a data flywheel; and never fine-tune for knowledge that changes when RAG keeps it fresh.
 
@@ -6312,7 +6333,7 @@ Read the direction rather than the ordering. The list is moving away from what t
 const agentTracingTeach = `
 ## Three assumptions an agent trace breaks
 
-You already know distributed tracing on the request and response model: a span is a network call, the depth of the tree is fixed by your call graph, and the attribute you stare at is duration. An agent run breaks all three at once.
+You already know [distributed tracing](/learn/system-design/reliability-ops/sd-l7-three-pillars-otel) on the request and response model: a span is a network call, one timed step recorded with a parent so the steps reassemble into a tree, the depth of that tree is fixed by your call graph, and the attribute you stare at is duration. An agent run breaks all three at once.
 
 Depth is decided at runtime by the model rather than by your code, so the same endpoint produces a three-span trace for one user and a ninety-span trace for the next. One logical operation runs for minutes rather than milliseconds, so the trace is still open while the user is still waiting. And duration stops being the expensive axis, because tokens are money: a span that took 400 milliseconds can cost more than the span beside it that took 40 seconds.
 
@@ -6718,6 +6739,8 @@ One number is worth sharpening because it changes a practice rather than an opin
 
 ## An eval without error bars is an anecdote
 
+Your eval set is a sample, so the rate it reports is not the true rate, only a nearby one. The standard error is roughly how far apart those two can be: it is the typical distance between the number you measured on these items and the number you would get on every item you will ever serve. Small set, wide gap.
+
 \`\`\`
 binary metric, n items, observed rate p
   standard error = sqrt(p * (1 - p) / n)
@@ -6733,7 +6756,7 @@ and  cutting the interval to a quarter costs 16 times the items
 
 That last line is why sample size is not the lever people reach for twice. Two moves buy far more than more items does.
 
-**Paired analysis.** When you compare two models, run both on the same items and analyze the per-item difference rather than the two rates. The variance of a difference is the sum of the variances minus twice the covariance, and on a shared item set that covariance is large and positive, because an item that is hard for one model is usually hard for the other. Subtracting it removes most of the noise. This is the single biggest sample-size saving available in eval, and an unpaired comparison throws it away for nothing in return.
+**Paired analysis.** When you compare two models, run both on the same items and analyze the per-item difference rather than the two rates. The intuition first: most of the wobble in a score comes from which items happened to land in the set, and if both models face the same items, that wobble hits both of them the same way and cancels when you subtract. The formal version is that the variance of a difference is the sum of the variances minus twice the covariance, where covariance is just how much the two scores rise and fall together, and on a shared item set it is large and positive because an item that is hard for one model is usually hard for the other. Subtracting it removes most of the noise. This is the single biggest sample-size saving available in eval, and an unpaired comparison throws it away for nothing in return.
 
 **Clustered standard errors.** When items share a passage, a document, or a customer context, they are not independent observations. Ten questions about one document are closer to one observation than to ten, and treating them as ten understates your error bars. That is how a confident three-point improvement survives review and then fails to appear in production. Cluster the standard errors on whatever the items share.
 
