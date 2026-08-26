@@ -5783,7 +5783,8 @@ OOM-crashes, taking down everything including the in-flight work that was fine. 
 ### Why you cannot run hot
 
 As utilization (rho) approaches 100%, queue length and wait time do not rise linearly, they explode.
-A rough mental model from M/M/1 queues: average time in system scales like \`1 / (1 - rho)\`. At 50%
+A rough mental model comes from M/M/1 queues, the simplest queueing model there is (random arrivals,
+one server, one line): average time in system scales like \`1 / (1 - rho)\`. At 50%
 utilization latency is roughly 2x the service time; at 90% it is 10x; at 99% it is 100x. This is why
 you provision to run at 60 to 70% and treat the last 30% as headroom for spikes, not capacity to
 sell. A system run at 95% "efficient" utilization has a brutal tail.
@@ -6567,7 +6568,7 @@ export const systemDesignLevel1: DesignLevel = {
               "Design the API surface for Stripe-scale infrastructure: a public payments API used by millions of external developers, plus the internal fraud, ledger, and notification services behind it that must handle tens of thousands of charge requests per second. Choose paradigms per layer and justify against caching, debuggability, latency, and contract enforcement.",
             thinkAbout: [
               "What do millions of external developers need that internal services do not?",
-              "Which parts of a charge's fan-out should not block the request at all?",
+              "A charge fans out to several services at once. Which of those calls should not block the request at all?",
               "Why does GraphQL buy nothing for a small, stable set of payment resources?",
             ],
             modelAnswerOutline: [
