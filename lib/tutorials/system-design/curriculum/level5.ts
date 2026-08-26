@@ -25,7 +25,8 @@ the timer expires, and **A cannot tell which**:
 
 1. The request never reached B (lost on the way out). B did nothing.
 2. B received it, did the work, and the response was lost on the way back. B did the work.
-3. B is just slow (GC pause, overloaded, 200ms of queueing) and the response is still coming.
+3. B is just slow (a garbage-collection pause, where the runtime briefly freezes the whole program to
+   reclaim memory, or an overloaded box, or 200ms of queueing) and the response is still coming.
 4. B crashed before, during, or after the work.
 
 \`\`\`cswidget
@@ -162,10 +163,12 @@ lost.
 
 The fallacies (Deutsch, Gosling, at Sun) are the false assumptions that make people write code that
 ignores the four outcomes above. The load-bearing ones: the network is reliable (it is not), latency
-is zero (a cross-region round trip is 60 to 150ms), bandwidth is infinite (fan-out saturates links),
-topology is static (nodes and routes change constantly), and transport cost is zero (serialization
-and TLS are real CPU). Believing any of these produces a system that works in the demo and falls over
-in production.
+is zero (a cross-region round trip is 60 to 150ms), bandwidth is infinite (one write that has to
+reach thousands of followers, what Level 3 calls
+[fan-out](/learn/system-design/scaling-data/sd-l3-denorm-fanout), saturates the links), topology is
+static (nodes and routes change constantly), and transport cost is zero (serialization and TLS,
+turning objects into bytes and encrypting them, burn real CPU). Believing any of these produces a
+system that works in the demo and falls over in production.
 
 Theory pins this down. In a fully **asynchronous** model (unbounded message delay, no clocks) you
 cannot even reliably tell a dead node from a slow one, which is why consensus is impossible there
@@ -204,8 +207,10 @@ not, and clocks drift. That "occasionally not" is exactly where split-brain and 
 
 **Interview nuance:** the single most common junior mistake is treating a timeout as a definite
 failure and re-issuing a side effect, causing a double charge or duplicate order. The senior answer:
-make the operation **idempotent** (idempotency key, dedup on the receiver) so a retry is safe
-regardless of which of the four outcomes actually happened. Then retries become a
+make the operation **idempotent** (safe to repeat, so running it twice leaves the same result as
+running it once) with an idempotency key and dedup on the receiver, the mechanism Level 1 builds in
+[idempotency and retries](/learn/system-design/foundations/sd-l1-idempotency-retries), so a retry is
+safe regardless of which of the four outcomes actually happened. Then retries become a
 correctness-preserving tool instead of a bug.
 
 The design implication: every remote interaction must assume the worst. Requests get retried (so
@@ -634,7 +639,11 @@ tail-latency cost, not a philosophical one.
 - **Cassandra: PA/EL.** Available under partition, low-latency by default, with per-query tunable
   consistency (ONE is EL, QUORUM/ALL push toward EC).
 - **Spanner: PC/EC.** Consistent during a partition (minority steps down), and even normally it pays
-  for consistency: TrueTime commit-wait and Paxos quorum round trips on every commit.
+  for consistency: TrueTime commit-wait (deliberately waiting out the clock's uncertainty before
+  calling a write done) and Paxos quorum round trips on every commit. Both get a full lesson later in
+  this level:
+  [physical time, clock uncertainty and HLC](/learn/system-design/distributed-core/sd-l5-physical-time-hlc)
+  and [Raft and Paxos](/learn/system-design/distributed-core/sd-l5-raft-paxos).
 - **CockroachDB: PC/EC.** Same posture via Raft per-range and hybrid logical clocks: strongly
   consistent, paying quorum latency to be so.
 - **PA/EC** also exists (some tunable stores): available under partition but preferring consistency
