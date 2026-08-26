@@ -2651,9 +2651,9 @@ aimed at the single shard that owns it, past what one Redis command thread will 
 kills the hottest reads and shields Redis shards from hot keys.
 
 The cost of L1 is a second consistency layer: an invalidation now has to reach every app node's L1
-(via pub/sub or a short L1 TTL), or you accept a small staleness window locally. With a TTL the
-window IS the TTL, and that makes the tradeoff a dial you set rather than a risk you hope about. Same
-key, same 200k reads/sec, 40 app servers:
+(via pub/sub or a short L1 TTL), or you accept a small staleness window locally. With a TTL that
+window is exactly the TTL, which turns the tradeoff into a dial you set rather than a risk you hope
+stays small. Same key, same 200k reads/sec, 40 app servers:
 
 \`\`\`
 L1 TTL      shard sees            worst staleness a user can see
@@ -3029,10 +3029,9 @@ five seconds out of date, which is why this works for a landing page and not
 for a checkout total.
 \`\`\`
 
-Personalized or authenticated
-responses: never at a shared edge, or you leak one user's account page to another. Do personalization
-with **edge compute** (Cloudflare Workers, Lambda@Edge) that assembles a cached shell plus a small
-per-user fragment.
+Personalized or authenticated responses: never at a shared edge, or you leak one user's account page
+to another. Do personalization with **edge compute** (Cloudflare Workers, Lambda@Edge) that assembles
+a cached shell plus a small per-user fragment.
 
 Recap: use a pull CDN with an L1/L2/shield hierarchy so the shield coalesces misses down to ~1 fetch
 per object, prefer versioned URLs over purging, normalize cache keys, micro-cache semi-dynamic HTML
@@ -3289,19 +3288,20 @@ choose between paying for hot disk and deleting the data.
 every shard to sort 100,010 docs and is O(offset). Put a number on it, across 10 shards:
 
 \`\`\`
-                        each shard ranks   coordinator receives   returns
-  from: 0,      size 10        10                    100            10
-  from: 100000, size 10   100,010              1,000,100            10
-  search_after cursor           10                    100            10
+                         shard ranks   sent to coordinator   returned
+  from: 0,      size 10           10                   100         10
+  from: 100000, size 10      100,010             1,000,100         10
+  search_after cursor             10                   100         10
 
 the deep page does about 10,000x the work of the first page to hand back the
-same ten rows, and 999,990 of the merged hits are thrown away. search_after
-carries the last row's sort values ("score below X, id after Y"), so each shard
-resumes where it stopped and every page costs what page one cost.
+same ten rows, and all but ten of the million merged hits are thrown away.
+search_after carries the last row's sort values ("score below X, id after Y"),
+so each shard resumes where it stopped and every page costs what page one cost.
 \`\`\`
 
-Use \`search_after\` for deep result sets, and cap the max page. Also be ready to say why you would not make
-Elasticsearch your primary DB: weaker durability and consistency guarantees, and no transactions.
+Use \`search_after\` for deep result sets, and cap the max page. Also be ready to say why you would
+not make Elasticsearch your primary DB: weaker durability and consistency guarantees, and no
+transactions.
 
 Recap: search runs on a dedicated tier built on an inverted index plus an analysis pipeline, ranks
 with BM25 and boosting, separates scoring queries from cached filters, shards across primaries and
