@@ -1238,9 +1238,9 @@ single partition, capping you at one broker's throughput and one consumer.
 
 ### The key is correctness
 
-A producer computes the partition as \`hash(key) mod partition_count\`, where the hash function is
-murmur2 by default: feed it a key and it returns the same number every time, so the same key always
-lands on the same partition. So **all
+A producer computes the partition as \`hash(key) mod partition_count\`, where the hash function
+(murmur2 by default) turns a key into a number and hands back that same number for that same key
+every time. So **all
 records with the same key go to the same partition and are totally ordered relative to each other.**
 Correctness reduces to one question: which events must be seen in order relative to each other?
 Whatever that set is, it must share a key.
