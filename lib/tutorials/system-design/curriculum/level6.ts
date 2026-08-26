@@ -4192,7 +4192,7 @@ Operating a messaging tier comes down to two promises: an acknowledged message i
   "prompt": "A payments team ships an async pipeline. Producers get their acknowledgements, no service is throwing errors, dashboards are green, and every service's own latency panel looks normal. Eleven hours later a customer reports that yesterday's settlements never posted. What was almost certainly missing?",
   "options": [
     {
-      "label": "Consumer lag as a monitored signal, with an SLO on it",
+      "label": "Consumer lag as a monitored signal, with a target threshold to alert on",
       "correct": true,
       "feedback": "Right. Lag is the gap between the latest offset and the committed offset, and it is the one number that catches a consumer that has stopped keeping up. Nothing else in that list would have gone red: the producer really was acknowledged, and each service really was fast, because a stalled consumer is not slow, it is absent."
     },
@@ -4226,7 +4226,7 @@ For cross-region resilience you either stretch a cluster across regions (simple,
 
 ## The signals
 
-The primary health signal for a stream is **consumer lag**: the gap between the latest offset and the committed offset per partition. Rising lag means consumers are falling behind and end-to-end latency is growing, and it is the one number that turns into an SLO. Alongside it, watch **under-replicated partitions** (durability eroding, a replica has fallen out of sync), **dead-letter-queue depth** (poison messages piling up), and **end-to-end latency** measured with a trace that spans the async hop, not just per-service timings. Without lag and cross-hop tracing, async failures are silent: the producer got its ack, nobody is watching the consumer, and the first symptom is a stale downstream hours later.
+The primary health signal for a stream is **consumer lag**: the gap between the latest offset and the committed offset per partition. Rising lag means consumers are falling behind and end-to-end latency is growing, and it is the one number that turns into an SLO: a service level objective, the target you publicly promise for a signal and alert against when you miss it, such as lag under 60 seconds for 99 percent of every week. [Level 7 makes objectives precise](/learn/system-design/reliability-ops/sd-l7-sli-slo-sla); here it is enough that lag is the number the promise is written about. Alongside it, watch **under-replicated partitions** (durability eroding, a replica has fallen out of sync), **dead-letter-queue depth** (poison messages piling up), and **end-to-end latency** measured with a trace that spans the async hop, not just per-service timings. Without lag and cross-hop tracing, async failures are silent: the producer got its ack, nobody is watching the consumer, and the first symptom is a stale downstream hours later.
 
 ## Capacity math
 
