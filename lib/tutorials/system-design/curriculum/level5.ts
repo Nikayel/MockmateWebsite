@@ -2896,6 +2896,24 @@ round trips plus disk forces. A single-node commit holds a lock for microseconds
 for milliseconds to seconds across the fleet. Contended rows serialize behind it, so 2PC caps
 concurrency hard. This is why it does not survive at internet scale.
 
+Put numbers on it, because "caps concurrency" is not a design argument until it is a rate. One row
+can only be updated by one transaction at a time, so the lock-hold time is the whole story:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Commit path", "How long one row stays locked", "What the lock is waiting on", "Updates per second on that one row"],
+  "rows": [
+    ["Single-node commit", "about 100 microseconds", "One flush of the local log to disk", "about 10,000"],
+    ["2PC across 2 services, same datacenter", "about 4 ms", "2 round trips plus a log flush at each participant", "about 250"],
+    ["2PC across 2 regions", "about 200 ms", "2 cross-region round trips (60 to 150 ms each) plus log flushes", "about 5"],
+    ["2PC whose coordinator crashed after the votes", "as long as the outage", "A human or a failover, with the row untouchable meanwhile", "0 until it resolves"]
+  ],
+  "highlightCols": ["Updates per second on that one row"],
+  "caption": "Same protocol, same correctness, four throughput ceilings. Nothing here is a slow implementation: a lock held for 4 ms instead of 100 microseconds is 40 times fewer updates on the contended row, and the last row is why the blocking problem above is a throughput problem too. Uncontended rows are unaffected, which is why 2PC survives inside a cluster and dies on a popular row."
+}
+\`\`\`
+
 ### When the coordinator dies at each phase
 
 "The coordinator crashes" is not one failure, it is five, and only one of them is the famous one. The
@@ -3641,8 +3659,9 @@ Distinguish the operation types:
 
 One boundary to name and then hand off: **Kafka's "exactly-once semantics" (EOS)** convert
 at-least-once into effectively-once, but only *within a Kafka-to-Kafka pipeline*, never for external
-side effects like charging a card. Level 6's Kafka material owns that scoping in depth, so this lesson
-states it in one line and keeps its own distinct ground: fencing tokens.
+side effects like charging a card. Level 6's
+[Kafka internals](/learn/system-design/event-driven/sd-l6-kafka-internals) lesson owns that scoping in
+depth, so this lesson states it in one line and keeps its own distinct ground: fencing tokens.
 
 **Fencing tokens** protect against a different failure: a *stale* operation from a delayed or paused
 actor. A process pauses (long GC), is presumed dead, a new one takes over, then the old one wakes and
