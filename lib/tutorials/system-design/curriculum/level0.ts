@@ -510,12 +510,12 @@ easy to fake. "The system should be scalable and reliable" is filler: it is true
 changes no decision. A real NFR is quantified and testable. Compare "the feed should be fast" with
 "p99 feed load latency under 200ms." Only the second one tells you whether you need a cache, and only
 the second one can be verified against a dashboard. Two pieces of shorthand show up in almost every
-NFR you will ever write, so unpack them once here: **p99** means line every response time up slowest
-to fastest and take the one that 99 percent of requests beat, so it is the experience of your unluckiest
-users rather than your typical one ([Level 1 makes percentiles
-precise](/learn/system-design/foundations/sd-l1-latency-percentiles)), and **QPS** means queries per
-second, how many requests arrive each second ([a whole lesson later in this
-level](/learn/system-design/interview-method/sd-l0-qps-read-write)).
+NFR you will ever write, so unpack them once here. **p99** means line every response time up slowest
+to fastest and take the one that 99 percent of requests beat, so it describes the experience of your
+unluckiest users rather than your typical one, and
+[Level 1 makes percentiles precise](/learn/system-design/foundations/sd-l1-latency-percentiles).
+**QPS** means queries per second, how many requests arrive each second, and it gets
+[a whole lesson later in this level](/learn/system-design/interview-method/sd-l0-qps-read-write).
 
 \`\`\`cswidget
 {
@@ -657,9 +657,9 @@ use them like any other word.
   **asynchronous processing** for writes (handing the slow part to a background worker so the user's
   request can return right away, taught in
   [Level 6](/learn/system-design/event-driven/sd-l6-queue-pubsub-log)).
-- **Availability:** the number of **nines**, meaning how much of the year the system is allowed to be
-  down: 99.9% is about 8.8 hours, 99.99% is about 52 minutes, and each extra nine is ten times less
-  downtime ([Level 7](/learn/system-design/reliability-ops/sd-l7-availability-nines)). Lever:
+- **Availability:** the number of nines in the target above, where each extra nine means ten times
+  less downtime a year
+  ([Level 7](/learn/system-design/reliability-ops/sd-l7-availability-nines)). Lever:
   **replication** (keeping full copies of the data on other machines, taught in
   [Level 3](/learn/system-design/scaling-data/sd-l3-read-replicas)), running in more than one region,
   and removing every **single point of failure**, meaning any one box whose death takes the whole
@@ -1047,10 +1047,10 @@ for them. **Idempotency:** for creates, an idempotency key makes retries safe (t
 timed-out \`POST /links\` without creating duplicate codes for the same URL). **Pagination and auth:**
 any endpoint returning a list needs cursor-based pagination (\`?cursor=...&limit=25\`), where each page
 hands back a marker saying where the next page should start rather than a page number, so rows added
-meanwhile cannot shuffle the results ([Level
-1](/learn/system-design/foundations/sd-l1-pagination-errors) has the whole story), and any write or
-private read needs an auth token at the boundary. Mentioning where these live shows you have designed
-real APIs, not just toy ones.
+meanwhile cannot shuffle the results
+([Level 1](/learn/system-design/foundations/sd-l1-pagination-errors) has the whole story), and any
+write or private read needs an auth token at the boundary. Mentioning where these live shows you have
+designed real APIs, not just toy ones.
 
 \`\`\`cswidget
 {
