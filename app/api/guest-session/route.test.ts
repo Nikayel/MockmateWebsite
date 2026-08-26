@@ -93,6 +93,96 @@ describe("PUT /api/guest-session validation (API-3)", () => {
     expect(docUpdate).not.toHaveBeenCalled()
   })
 
+  // The schema's own security comment claimed "code and test-result payloads
+  // are length-bounded", but only finalCode was: sessionState.code, the three
+  // sessionState arrays, and feedback (z.unknown!) were open-ended, letting a
+  // hostile guest grow their doc toward Firestore's 1MB limit and park an
+  // arbitrary blob where /sessions and admin surfaces expect a string.
+  it("rejects an oversized sessionState.code", async () => {
+    const { PUT } = await importRoute()
+    const res = (await PUT(
+      put({
+        sessionId: SESSION_ID,
+        guestId: VALID_GUEST_ID,
+        sessionState: { code: "x".repeat(50001) },
+      })
+    )) as MockResponse
+    expect(res.status).toBe(400)
+    expect(docUpdate).not.toHaveBeenCalled()
+  })
+
+  it("rejects an absurd number of chat messages in sessionState", async () => {
+    const { PUT } = await importRoute()
+    const res = (await PUT(
+      put({
+        sessionId: SESSION_ID,
+        guestId: VALID_GUEST_ID,
+        sessionState: {
+          chatMessages: Array.from({ length: 101 }, () => ({ type: "user", message: "hi" })),
+        },
+      })
+    )) as MockResponse
+    expect(res.status).toBe(400)
+    expect(docUpdate).not.toHaveBeenCalled()
+  })
+
+  it("rejects a single megabyte-scale message element", async () => {
+    const { PUT } = await importRoute()
+    const res = (await PUT(
+      put({
+        sessionId: SESSION_ID,
+        guestId: VALID_GUEST_ID,
+        sessionState: {
+          interviewerMessages: [{ type: "ai", message: "x".repeat(20000) }],
+        },
+      })
+    )) as MockResponse
+    expect(res.status).toBe(400)
+    expect(docUpdate).not.toHaveBeenCalled()
+  })
+
+  it("rejects a non-string feedback value", async () => {
+    const { PUT } = await importRoute()
+    const res = (await PUT(
+      put({
+        sessionId: SESSION_ID,
+        guestId: VALID_GUEST_ID,
+        feedback: { injected: "object" },
+      })
+    )) as MockResponse
+    expect(res.status).toBe(400)
+    expect(docUpdate).not.toHaveBeenCalled()
+  })
+
+  it("rejects an oversized feedback string", async () => {
+    const { PUT } = await importRoute()
+    const res = (await PUT(
+      put({ sessionId: SESSION_ID, guestId: VALID_GUEST_ID, feedback: "x".repeat(20001) })
+    )) as MockResponse
+    expect(res.status).toBe(400)
+    expect(docUpdate).not.toHaveBeenCalled()
+  })
+
+  it("accepts a realistic resume save under the new bounds", async () => {
+    const { PUT } = await importRoute()
+    const res = (await PUT(
+      put({
+        sessionId: SESSION_ID,
+        guestId: VALID_GUEST_ID,
+        sessionState: {
+          code: "function twoSum() {}",
+          language: "javascript",
+          elapsedTime: 300,
+          chatMessages: [{ type: "user", message: "hint please" }],
+          interviewerMessages: [{ type: "ai", message: "Welcome" }],
+          testResults: [{ passed: true }],
+        },
+      })
+    )) as MockResponse
+    expect(res.status).toBe(200)
+    expect(docUpdate).toHaveBeenCalledTimes(1)
+  })
+
   it("accepts an in-range completion and preserves full test-result fields", async () => {
     const { PUT } = await importRoute()
     const res = (await PUT(

@@ -132,12 +132,26 @@ export const GenerateFeedbackSchema = z.object({
 // ============================================
 
 /**
+ * A sessionState array element (chat message, interviewer message, test
+ * result). Shapes vary by caller, so structure stays open — but size does
+ * not: a single unbounded element would otherwise let one "message" carry a
+ * megabyte toward Firestore's 1MB doc limit.
+ */
+const BoundedStateElement = z
+  .unknown()
+  .refine((element) => JSON.stringify(element ?? null).length <= 10000, {
+    message: "Element too large",
+  })
+
+/**
  * PUT /api/guest-session update/completion body.
  *
  * SECURITY (API-3): performance/efficiency scores are bounded to 0-100 and the
  * code and test-result payloads are length-bounded, so a guest cannot write
  * arbitrary values through the Admin-SDK write path (ownership is still checked
- * separately via guestId + sessionId).
+ * separately via guestId + sessionId). `feedback` is a string with a hard cap:
+ * both callers send prose, and this value is rendered on /sessions and admin
+ * surfaces after migration, so an arbitrary blob has no business here.
  *
  * Every field is OPTIONAL by design: guest resume writes `sessionState`, guest
  * completion writes the scores and results, and both rely on partial-field
@@ -150,17 +164,25 @@ export const GuestSessionUpdateSchema = z.object({
   guestId: z.string().min(1).optional(),
   sessionState: z
     .object({
-      code: z.string().optional(),
-      language: z.string().optional(),
+      code: z.string().max(50000, "Code too long").optional(),
+      language: z.string().max(50).optional(),
       elapsedTime: z.number().optional(),
-      chatMessages: z.array(z.unknown()).optional(),
-      interviewerMessages: z.array(z.unknown()).optional(),
-      testResults: z.array(z.unknown()).optional(),
+      chatMessages: z.array(BoundedStateElement).max(100, "Too many messages").optional(),
+      interviewerMessages: z.array(BoundedStateElement).max(100, "Too many messages").optional(),
+      testResults: z.array(BoundedStateElement).max(100, "Too many test results").optional(),
     })
     .optional(),
-  performanceScore: z.number().min(0, "Score must be 0-100").max(100, "Score must be 0-100").optional(),
-  efficiencyScore: z.number().min(0, "Score must be 0-100").max(100, "Score must be 0-100").optional(),
-  feedback: z.unknown().optional(),
+  performanceScore: z
+    .number()
+    .min(0, "Score must be 0-100")
+    .max(100, "Score must be 0-100")
+    .optional(),
+  efficiencyScore: z
+    .number()
+    .min(0, "Score must be 0-100")
+    .max(100, "Score must be 0-100")
+    .optional(),
+  feedback: z.string().max(20000, "Feedback too long").optional(),
   finalCode: z.string().max(50000, "Code too long").optional(),
   language: z.string().max(50).optional(),
   testResults: z.array(TestResultSchema.passthrough()).max(100, "Too many test results").optional(),
