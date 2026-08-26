@@ -3093,11 +3093,13 @@ These three are not interchangeable buzzwords; they sit at different points on a
 
 ## Data warehouse
 
-Snowflake, BigQuery, Redshift. **Schema-on-write**: data is validated, typed, and modeled into curated tables before it lands. You get strong BI performance, first-class SQL, fine-grained governance, ACID, and reliable joins. The cost is rigidity and price: warehouses are optimized for structured/tabular data, ingesting raw JSON, logs, images, or video is awkward and expensive per TB, and schema changes are work. Great when the workload is dashboards and known reports over clean tabular data.
+Snowflake, BigQuery, Redshift. **Schema-on-write**: data is validated, typed, and modeled into curated tables before it lands. You get strong **BI** performance (business intelligence: the dashboards and standing reports the business reads every morning), first-class SQL, fine-grained governance, ACID, and reliable joins. The cost is rigidity and price: warehouses are optimized for structured/tabular data, ingesting raw JSON, logs, images, or video is awkward and expensive per TB, and schema changes are work. Great when the workload is dashboards and known reports over clean tabular data.
 
 ## Data lake
 
-Files on S3/GCS/ADLS, usually Parquet/ORC/JSON. **Schema-on-read**: dump raw data cheaply now, impose structure at query time. Object storage is roughly 10x to 50x cheaper per TB than warehouse storage and holds any format, which is why ML and log workloads live here. The failure mode is the **data swamp**: with no catalog, no schema enforcement, and no ownership, the lake fills with undocumented files nobody trusts or can find, and every query becomes archaeology. A lake without governance is where data goes to die.
+Files on object storage (S3, GCS, ADLS), usually Parquet or ORC, columnar file formats that store a table one column at a time so a query touching 3 of 80 columns reads only those 3, or raw JSON. **Schema-on-read**: dump raw data cheaply now, impose structure at query time. Object storage is roughly 10x to 50x cheaper per TB than warehouse storage and holds any format, which is why ML and log workloads live here.
+
+Put list prices on that gap, because which kind of warehouse you mean decides whether it is real. Object storage runs about 23 dollars per TB per month, and roughly a tenth of that in cold tiers. A warehouse whose storage is welded to its compute nodes (older Redshift dense-compute, or an on-prem appliance) works out above 1,000 dollars per TB per month, because the only way to buy more disk is to buy another node: that is where the 50x comes from. A modern warehouse that separated storage from compute charges roughly 23 to 40 dollars per TB per month, so on that line it is nearly a tie, and the real spend moves to compute and to the modeling work every byte has to pass before it is allowed to land. At 50 TB of raw logs the lake is not mostly buying a cheaper storage bill, it is buying the right to keep data you have not modeled yet. The failure mode is the **data swamp**: with no catalog, no schema enforcement, and no ownership, the lake fills with undocumented files nobody trusts or can find, and every query becomes archaeology. A lake without governance is where data goes to die.
 
 ## Lakehouse
 
@@ -3368,7 +3370,37 @@ You cannot fix this with retries because you do not know which write succeeded. 
 }
 \`\`\`
 
-Because delivery is **at-least-once** (a connector can replay after a crash), downstream consumers must be **idempotent**: upsert by primary key into the search index and the Iceberg table so a redelivered event does not duplicate. Iceberg/Hudi upserts (merge-on-read or copy-on-write) handle this on the lake side.
+Because delivery is **at-least-once** (a connector can replay after a crash), downstream consumers must be **idempotent**: upsert by primary key into the search index and the Iceberg table so a redelivered event does not duplicate. Iceberg and Hudi give you two ways to apply that upsert to files that are supposed to be immutable, and they take opposite sides of a write-cost versus read-cost trade.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Upsert strategy",
+    "What one changed row writes",
+    "What a later read pays",
+    "Where it fits"
+  ],
+  "highlightCols": [
+    "What one changed row writes"
+  ],
+  "rows": [
+    [
+      "Copy-on-write",
+      "The whole data file holding that row is rewritten, so changing one row inside a 128 MB file writes 128 MB",
+      "Nothing extra. Readers open the current files and scan",
+      "Gold and BI tables: read constantly, rewritten in occasional batches"
+    ],
+    [
+      "Merge-on-read",
+      "A few KB of delta and delete records appended beside an untouched base file",
+      "Every read merges the base file with its deltas, and that cost climbs with each delta compaction has not folded back in",
+      "Bronze and silver CDC landing zones taking thousands of upserts a minute"
+    ]
+  ],
+  "caption": "Same table format, opposite bet. Copy-on-write pays at write time to keep reads clean; merge-on-read pays at read time to keep writes cheap. Compaction is the dial between them, which is why a merge-on-read table with compaction switched off degrades one small file at a time until the queries crawl, and why a CDC firehose landing straight into copy-on-write tables burns money rewriting the same files all day."
+}
+\`\`\`
 
 **Interview nuance:** candidates reach for 'exactly-once' here almost every time. The question that settles it is what happens when the connector restarts mid-batch, and whether the sink can tell a redelivery from a new event; a design that cannot answer both has not earned the phrase. Claiming true exactly-once across DB, Kafka, and a search index without idempotency is the tell of someone who has not run this in production.
 
@@ -3416,7 +3448,7 @@ A throughput-versus-latency tradeoff. **Batch** processes a bounded chunk (yeste
 
 ## Lambda architecture
 
-The first mainstream answer to "I need both fast and correct." It runs **two parallel layers**: a **batch layer** that reprocesses all history nightly to produce accurate, complete results, and a **speed layer** that processes the live stream for low-latency approximate results, with a serving layer merging the two so recent data comes from the speed layer and older data from the batch layer. It works and is self-correcting: the batch layer eventually overwrites any speed-layer approximation, so a wrong number is temporary rather than permanent.
+The first mainstream answer to "I need both fast and correct." The name is an unrelated collision: this Lambda is a data-processing pattern from 2011 and has nothing to do with AWS Lambda, the serverless product two lessons back. It runs **two parallel layers**: a **batch layer** that reprocesses all history nightly to produce accurate, complete results, and a **speed layer** that processes the live stream for low-latency approximate results, with a serving layer merging the two so recent data comes from the speed layer and older data from the batch layer. It works and is self-correcting: the batch layer eventually overwrites any speed-layer approximation, so a wrong number is temporary rather than permanent.
 
 \`\`\`cswidget
 {
