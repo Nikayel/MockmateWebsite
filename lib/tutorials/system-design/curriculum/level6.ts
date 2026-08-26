@@ -2884,6 +2884,49 @@ The dedup store is the general fallback, but two cheaper flavors come first when
 2. **Idempotent by design via state machines.** Model the aggregate as states with legal transitions (\`CREATED -> PAID -> SHIPPED\`). A command that tries an already-taken transition is a no-op, and a per-aggregate **expected version** (optimistic concurrency) rejects a replayed or stale command outright.
 3. **Enforced idempotency via a dedup store.** For everything else, the idempotency-key-plus-stored-result machinery above, guarded by the atomic check-and-set.
 
+The three are not equal in price. The first two cost nothing at runtime and nothing to operate; the third adds a write to a second store on every request, plus a TTL you have to size and a store you have to keep available. So the move is to sort each operation into the cheapest flavor it allows before you reach for the machinery.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "At-least-once delivery will redeliver every one of these. Sort each operation into the cheapest protection that actually makes the repeat safe.",
+  "buckets": [
+    "Already safe as written",
+    "Guard with a state machine",
+    "Needs a dedup store"
+  ],
+  "items": [
+    {
+      "label": "SET status = shipped for one order id",
+      "bucket": "Already safe as written",
+      "feedback": "Writing the same value again leaves the same state, so a redelivery costs nothing and no extra store is needed."
+    },
+    {
+      "label": "Upsert a user's profile row keyed by user_id",
+      "bucket": "Already safe as written",
+      "feedback": "An upsert on a stable id ends in the same row however many times it runs; this is the flavor to design for whenever you can."
+    },
+    {
+      "label": "INCR balance by 5 dollars",
+      "bucket": "Needs a dedup store",
+      "feedback": "An increment moves the value every single time it repeats and carries no stable id that would make the repeat a no-op, so it needs the key-plus-stored-result machinery and a TTL that covers the replay window."
+    },
+    {
+      "label": "Move an order from CREATED to PAID",
+      "bucket": "Guard with a state machine",
+      "feedback": "The transition is legal exactly once. A redelivered PAID command finds the order already past that state and becomes a no-op, and an expected-version check rejects a stale one outright, all without a second store."
+    },
+    {
+      "label": "Call a partner shipping API that mints a fresh label on every call",
+      "bucket": "Needs a dedup store",
+      "feedback": "You cannot make somebody else's API idempotent, and each call has a real external side effect, so record the idempotency key with the label it returned and hand the stored label back on a retry."
+    }
+  ],
+  "reveal": "Take the cheapest flavor the operation allows. A write that ends in the same state is safe with nothing, a command that is only legal once is safe behind a state machine plus an expected version, and only the leftovers, counters and external calls, pay for a dedup store and the TTL that goes with it."
+}
+\`\`\`
+
 **Interview nuance:** distinguish the idempotency key's *scope*. A client-supplied key dedups client retries of the same logical request. An event-id key dedups broker redeliveries. They are different keys guarding different duplicate sources, and a robust design often uses both.
 
 **Recap:** past the L5 key mechanics, the two production hazards are the concurrent-duplicate race (resolve it with an atomic check-and-set on a unique constraint, storing the *result* not a flag) and the dedup window (size the TTL to cover both the client-retry and broker-replay horizons); prefer naturally idempotent operations or state-machine transitions before falling back to a dedup store.
