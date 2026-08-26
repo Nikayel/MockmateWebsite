@@ -790,10 +790,15 @@ control.
 ### Why it is fast
 
 **Sequential disk writes:** appending to the end of a file is the one access pattern spinning disks
-and SSDs both love, so Kafka sustains hundreds of MB/s per broker. **Page cache:** Kafka writes to
-the OS page cache and lets the kernel flush, so recent data is served from RAM with no user-space
-copy. **Zero-copy:** on read, \`sendfile()\` moves bytes from page cache straight to the network
-socket without dragging them through the JVM heap. Add producer-side **batching and compression**
+and SSDs both love, so Kafka sustains hundreds of MB/s per broker. **Page cache:** the operating
+system already parks a copy of recently touched file data in spare RAM (that copy is the page
+cache), so Kafka writes there and lets the kernel decide when to push it down to disk, and a
+consumer reading near the tail gets answered out of RAM instead of waiting on a disk seek.
+**Zero-copy:** shipping those bytes to a consumer normally costs two more copies, first from that
+RAM copy into the Kafka process's own memory (Kafka is a Java program, so that memory is the JVM
+heap), then from there out to the network card. The \`sendfile()\` call hands the cached pages
+straight to the network socket instead, so neither copy happens. Add producer-side
+**batching and compression**
 (lz4/zstd, batches keyed by \`linger.ms\` and \`batch.size\`) and one cluster handles millions of
 events per second.
 
@@ -928,6 +933,52 @@ decide the trade:
 mean "just the leader" after followers drop out, so a leader crash still loses acknowledged writes.
 The durable combination is \`acks=all\` **and** \`min.insync.replicas>=2\` **and** RF>=3.
 
+Durability is a dial, and every notch on it is paid for in milliseconds per write, so price the
+notches instead of arguing about them. Assume RF=3 inside one region, where a round trip between
+brokers is on the order of a millisecond:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Producer setting",
+    "What the write waits for",
+    "What an acknowledged write can still lose",
+    "When it is the right call"
+  ],
+  "rows": [
+    [
+      "acks=0",
+      "nothing: the producer moves on immediately",
+      "anything in flight, including records no broker ever received",
+      "throwaway telemetry where a dropped record costs nothing"
+    ],
+    [
+      "acks=1",
+      "one leader write, roughly 1 to 2 ms",
+      "any record the leader acked before a follower copied it",
+      "location pings, logs, metrics: huge volume, a rare loss is survivable"
+    ],
+    [
+      "acks=all, min.insync.replicas=1",
+      "one follower round trip while the ISR is healthy, nothing once it shrinks to the leader",
+      "exactly what acks=1 loses, because all ISR can mean one copy",
+      "never on purpose: it reads durable and degrades to leader-only"
+    ],
+    [
+      "acks=all, min.insync.replicas=2",
+      "one extra round trip to a follower, single-digit ms",
+      "nothing acknowledged, until 2 of the 3 replicas die together",
+      "orders, payments, anything you cannot silently drop"
+    ]
+  ],
+  "highlightCols": [
+    "What an acknowledged write can still lose"
+  ],
+  "caption": "The durability dial priced per write. Going from acks=1 to the durable combination costs one extra in-region round trip, a few ms, which is why payments-adjacent topics take it and location pings do not. Row three is the trap: it charges the round trip while the ISR is full and protects nothing once the ISR shrinks."
+}
+\`\`\`
+
 \`\`\`csdiagram
 {
   "type": "topology",
@@ -1001,7 +1052,9 @@ partitions.
 
 Everything above describes a cluster, and a cluster is one latency domain as well as one failure
 domain. Replication inside it is a tight loop: followers fetch continuously and the ISR shrinks the
-moment one falls behind, which is fine over a rack-to-rack network and hostile over a WAN. Stretching
+moment one falls behind, which is fine over a rack-to-rack network and hostile over a WAN, a wide
+area network, meaning links that run between cities or countries rather than inside one building.
+Stretching
 a single cluster across datacenters puts every \`acks=all\` produce behind a cross-country round trip
 and makes ISR membership flap on ordinary WAN jitter.
 
@@ -1185,7 +1238,9 @@ single partition, capping you at one broker's throughput and one consumer.
 
 ### The key is correctness
 
-A producer computes the partition as \`hash(key) mod partition_count\` (default murmur2). So **all
+A producer computes the partition as \`hash(key) mod partition_count\`, where the hash function is
+murmur2 by default: feed it a key and it returns the same number every time, so the same key always
+lands on the same partition. So **all
 records with the same key go to the same partition and are totally ordered relative to each other.**
 Correctness reduces to one question: which events must be seen in order relative to each other?
 Whatever that set is, it must share a key.
@@ -1241,7 +1296,7 @@ Whatever that set is, it must share a key.
       "Most keys change partition, splitting their histories"
     ]
   },
-  "workedExample": "Keys here are message keys; colors are partitions. In mod-N mode, add a partition and read the remap: most keys now hash to a different partition, so an account's history continues somewhere new and per-key order is broken across the change. That is why partition counts are chosen generously up front. The ring view shows what Dynamo-style stores do instead; Kafka deliberately does not.",
+  "workedExample": "Keys here are message keys; colors are partitions. In mod-N mode, add a partition and read the remap: most keys now hash to a different partition, so an account's history continues somewhere new and per-key order is broken across the change. That is why partition counts are chosen generously up front. The ring view shows consistent hashing, the trick Level 3 teaches, where adding a node moves only a small slice of the keys; Kafka deliberately sticks with plain mod-N.",
   "initialNodes": 4,
   "maxNodes": 6,
   "keys": 48,
@@ -1265,6 +1320,13 @@ A second trap: **changing partition count breaks key-to-partition stability.** B
 partition than the old ones, so its historical order splits across two partitions for the migration
 window. That is why partition count is effectively immutable in practice; you over-provision up front.
 (Partitions can be added, never removed, and even adding reshuffles the hash.)
+
+Storage systems dodge that reshuffle with
+[consistent hashing](/learn/system-design/scaling-data/sd-l3-consistent-hashing), Level 3's scheme
+for assigning keys to servers so that adding one server moves only a small slice of the keys, and the
+ring view in the widget above is that scheme. Kafka does not use it. A producer has to work out the
+partition on its own from nothing but the key and the count, so the mapping stays plain mod-N and
+over-provisioning is the mitigation.
 
 ### The hot key
 
@@ -1307,6 +1369,13 @@ in order of preference:
   "caption": "The hot key acct_42 floods partition 3 while the others idle. Every mitigation trades ordering scope for throughput, and the third row is the honest answer when strict per-account order is a real requirement rather than a habit."
 }
 \`\`\`
+
+Put numbers on the middle row, using the same conservative 10 MB/s per partition the sizing division
+uses. Keyed by \`account_id\` alone, the celebrity account is one stream on one partition, so it tops
+out around 10 MB/s no matter how much hardware you buy. Salt it into k=8 sub-streams and it spreads
+over 8 partitions for roughly 80 MB/s, an 8x ceiling. The bill arrives downstream: something has to
+read all 8 sub-streams and merge them back into one account-level sequence by sequence number before
+any consumer can see that account in order, which is a stateful job you now own and operate.
 
 Every mitigation trades ordering scope for throughput. You either keep strict per-account order (one
 partition, capped throughput) or widen the key and downgrade to per-sub-stream order plus reassembly.
