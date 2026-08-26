@@ -859,7 +859,7 @@ The tuning tradeoff: shorter windows and lower burn-rate thresholds detect probl
 const goldenSignalsTeach = `
 ## A small, dependable set of numbers
 
-When you own a service at 3am and it is misbehaving, you do not have time to stare at forty dashboards. You need a small, dependable set of numbers that tells you *whether* the service is healthy and *which direction* it is failing. Google's SRE book distills this to the **four golden signals**: latency, traffic, errors, and saturation. Instrument these four for every service and you can answer "is it up, is it fast, is it failing, is it about to fall over?" without guessing.
+When you own a service at 3am and it is misbehaving, you do not have time to stare at forty dashboards. You need a small, dependable set of numbers that tells you *whether* the service is healthy and *which direction* it is failing. Google's SRE (site reliability engineering) book distills this to the **four golden signals**: latency, traffic, errors, and saturation. Instrument these four for every service and you can answer "is it up, is it fast, is it failing, is it about to fall over?" without guessing.
 
 ## What are the four golden signals?
 
@@ -1762,7 +1762,7 @@ The exponential part (\`base * 2^attempt\`) spaces retries further apart as fail
 const circuitBreakersTeach = `
 ## Three patterns of failure isolation
 
-[Level 1's resilience-primitives lesson](/learn/system-design/foundations/sd-l1-resilience-primitives) sketched the circuit-breaker state machine (Closed to Open to Half-Open) as a first pass. This lesson credits that and goes past the single breaker to what senior answers actually hinge on: how the breaker and the bulkhead cover different halves of the same failure, and how a service mesh (a proxy that sits next to every service and carries the calls between them, so rules like these become configuration instead of code, covered in [Level 9](/learn/system-design/modern-architecture/sd-l9-service-mesh)) configures both. Timeouts and retries stop one slow call from hanging forever; when a dependency is broadly failing you instead want to stop calling it at all, contain the damage to one part of your service, and serve something useful instead of an error. That is circuit breakers, bulkheads, and fallbacks: the three patterns of failure isolation.
+[Level 1's resilience-primitives lesson](/learn/system-design/foundations/sd-l1-resilience-primitives) sketched the circuit-breaker state machine (Closed to Open to Half-Open) as a first pass. This lesson credits that and goes past the single breaker to what senior answers actually hinge on: how the breaker and the bulkhead cover different halves of the same failure, and how a service mesh configures both. (A service mesh is a proxy that sits next to every service and carries the calls between them, so rules like these become configuration instead of code; it gets a full lesson in [Level 9](/learn/system-design/modern-architecture/sd-l9-service-mesh).) Timeouts and retries stop one slow call from hanging forever; when a dependency is broadly failing you instead want to stop calling it at all, contain the damage to one part of your service, and serve something useful instead of an error. That is circuit breakers, bulkheads, and fallbacks: the three patterns of failure isolation.
 
 ## Circuit breaker
 
