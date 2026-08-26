@@ -897,8 +897,8 @@ fleet still beats routing into an empty pool.
 Note where this ceiling lives. It bounds **passive ejection in the mesh**, and Kubernetes readiness
 has no equivalent: if all 500 pods fail their readiness probe the Endpoints list (the platform's list
 of pod addresses currently allowed to receive traffic) legitimately empties and the Service, the
-stable name callers dial, has nowhere to send anything. That asymmetry is why the two mechanisms get different
-jobs. Keep readiness a **local** question that a shared dependency cannot answer on your behalf, and
+stable name callers dial, has nowhere to send anything. That asymmetry is why the two mechanisms get
+different jobs. Keep readiness a **local** question that a shared dependency cannot answer on your behalf, and
 let capped passive ejection be what reacts to a downstream that really is failing requests.
 
 \`\`\`cswidget
@@ -1284,8 +1284,8 @@ popular middle ground: client-side benefits (no central-LB hop, locality, per-re
 retries, and **mTLS**, mutual TLS, where both ends present certificates so the caller proves who it
 is too, covered later in this level's
 [connection-management lesson](/learn/system-design/scaling-compute/sd-l4-tls-connection-mgmt)) with
-**central configuration**. The price is real operational complexity (a control
-plane and a sidecar per pod).
+**central configuration**. The price is real operational complexity (a control plane and a sidecar
+per pod).
 
 \`\`\`cswidget
 {
@@ -1522,9 +1522,9 @@ presence (PoPs, one building of your machines in one city) via **BGP**, the prot
 tell each other which blocks of addresses they can reach; Level 1's
 [network-stack lesson](/learn/system-design/foundations/sd-l1-network-stack) walks an announcement
 and a withdrawal through it route by route. The internet's routing fabric delivers each client's
-packets to the topologically nearest PoP announcing that prefix. Withdraw the BGP announcement at a failing PoP and traffic
-reconverges to the next-nearest one in seconds, with no DNS change and no client-side caching to wait
-out. **ECMP** spreads flows across equal-cost paths. The subtlety: plain ECMP rehashes flows when the
+packets to the topologically nearest PoP announcing that prefix. Withdraw the BGP announcement at a
+failing PoP and traffic reconverges to the next-nearest one in seconds, with no DNS change and no
+client-side caching to wait out. **ECMP** spreads flows across equal-cost paths. The subtlety: plain ECMP rehashes flows when the
 server set changes, which breaks in-flight connections. Production anycast load balancers do the same
 trick with the backend list: Google's **Maglev** uses **consistent hashing** so a backend change only
 remaps a small fraction of connections, and AWS's **Hyperplane** fleet behind NLB keeps flows pinned
