@@ -2264,7 +2264,7 @@ Availability starts with a simple rule: no component whose failure takes down th
 }
 \`\`\`
 
-The trap is that SPOFs hide. Engineers dutifully run three web servers, then route all of them through one load balancer, one database primary, one DNS name backed by one provider, and one config service that every pod reads on boot. Each of those is a SPOF that quietly undoes the redundant web tier. A real audit walks the request path and asks, at every hop, "if this single thing dies, does traffic stop?" Load balancers need a redundant pair (or a managed multi-node LB like AWS ALB/NLB); the DB primary needs replicas plus automated promotion; DNS needs multiple providers or at least multiple authoritative servers; the config store needs a quorum (etcd/ZooKeeper run 3 or 5 nodes for exactly this reason).
+The trap is that SPOFs hide. Engineers dutifully run three web servers, then route all of them through one load balancer, one database primary, one DNS name backed by one provider, and one config service that every pod reads on boot. Each of those is a SPOF that quietly undoes the redundant web tier. A real audit walks the request path and asks, at every hop, "if this single thing dies, does traffic stop?" Load balancers need a redundant pair (or a managed multi-node LB like AWS ALB/NLB); the DB primary needs replicas plus automated promotion; DNS needs multiple providers or at least multiple authoritative servers; the config store needs a quorum, meaning more than half of its nodes have to agree before an answer counts (etcd/ZooKeeper run 3 or 5 nodes for exactly this reason, and [Level 5's quorums lesson](/learn/system-design/distributed-core/sd-l5-quorums-tunable) works through the arithmetic).
 
 ## Two shapes of redundancy
 
@@ -2278,7 +2278,9 @@ Failover has to be *triggered* by something, and that something is health checki
 - **Readiness**: can this instance serve *right now*? (warmed caches, DB pool connected). If it fails, pull it from the LB pool but do not kill it.
 - **Deep / dependency check**: can it reach its critical dependencies? Useful but dangerous: if your health check calls the shared database and the database blips, *every* instance fails its check at once, the LB pulls them all, and a minor blip becomes a total outage.
 
-**Interview nuance:** the two failure modes interviewers probe are flapping and split-brain. Flapping is an instance that fails and recovers repeatedly, causing constant add/remove churn; you damp it with hysteresis (require N consecutive failures to eject, M consecutive successes to re-admit) and cooldowns. Split-brain is worse: during a network partition, a passive standby cannot tell "primary is dead" from "I just cannot reach the primary," promotes itself, and now you have two primaries taking writes. The fix is to never let a single node decide promotion. Use quorum-based leader election (Raft/Paxos, or a fencing token) so a minority side cannot win, and fence the old primary (STONITH, revoke its storage lease) before the new one takes over. Also plan failback: returning to the recovered primary is its own controlled operation, not automatic.
+**Interview nuance:** the two failure modes interviewers probe are flapping and split-brain. Flapping is an instance that fails and recovers repeatedly, causing constant add/remove churn; you damp it with hysteresis (require N consecutive failures to eject, M consecutive successes to re-admit) and cooldowns. Split-brain is worse: during a network partition, a passive standby cannot tell "primary is dead" from "I just cannot reach the primary," promotes itself, and now you have two primaries taking writes. The fix is to never let a single node decide promotion. Use quorum-based leader election (Raft/Paxos, or a fencing token) so a minority side cannot win, and fence the old primary before the new one takes over, which means revoking its storage lease so it physically cannot write (the industry's name for this is STONITH, Shoot The Other Node In The Head). Also plan failback: returning to the recovered primary is its own controlled operation, not automatic.
+
+The simulation below asks you to pick between two letters that [Level 5's CAP lesson](/learn/system-design/distributed-core/sd-l5-cap-correct) owns. **CP** means the side that cannot reach a majority refuses writes rather than risk being wrong. **AP** means both sides keep taking writes and you accept that the two copies now disagree.
 
 \`\`\`cswidget
 {
@@ -2498,6 +2500,57 @@ These numbers set your strategy, because recovery speed costs money. The industr
 - **Warm standby**: a scaled-down but fully functional copy runs in the DR region all the time. You fail over and scale up. RTO in minutes.
 - **Multi-site active/active**: full capacity live in two or more regions, traffic already flowing to both. A region loss is just a traffic shift. RTO/RPO near zero, and the most expensive by far.
 
+"Costs money" is the part interviewers make you put a number on, so price the rungs against one concrete footprint. Say the live region runs on 40,000 dollars a month of compute, storage, and data transfer. Here is what each rung adds on top of that bill, and what it buys:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Rung",
+    "Running in the second region while nothing is wrong",
+    "Added cost / month",
+    "RTO",
+    "RPO"
+  ],
+  "rows": [
+    [
+      "Backup & restore",
+      "Snapshots in object storage. No servers.",
+      "+800 (2%)",
+      "hours to days",
+      "one backup interval, often hours"
+    ],
+    [
+      "Pilot light",
+      "The database, replicating continuously. App fleet off.",
+      "+10,000 (25%)",
+      "tens of minutes",
+      "seconds to minutes"
+    ],
+    [
+      "Warm standby",
+      "A quarter-size copy of the whole stack, live.",
+      "+18,000 (45%)",
+      "minutes",
+      "seconds"
+    ],
+    [
+      "Multi-site active/active",
+      "A full-capacity second fleet, already serving.",
+      "+44,000 (110%)",
+      "near zero",
+      "near zero"
+    ]
+  ],
+  "highlightCols": [
+    "Added cost / month"
+  ],
+  "caption": "Illustrative numbers on a 40,000 dollar/month footprint, and the shape is what matters. Active/active more than doubles the bill because each region has to be big enough to carry all the traffic alone."
+}
+\`\`\`
+
+Read the cost column against the RTO column. Going from hours of recovery to minutes costs about 45 percent more. Buying those last few minutes down to near zero costs another 65 percent on top, which is why active/active has to be justified by revenue rather than by taste. Do that justification out loud: if a region dies once every two years and six hours of restoring costs the analytics team about 2,000 dollars an hour of lost work, the cheapest rung carries roughly 6,000 dollars a year of expected loss, against 528,000 dollars a year to keep the top rung running. For that system the bottom rung is the correct engineering answer, not the lazy one.
+
 The senior move is to **tier your systems** and apply a different rung to each. Your payment ledger might warrant warm standby; your recommendation model can live on backup & restore. Spending active/active money on a system whose users would not notice an hour of downtime is a classic waste.
 
 \`\`\`cswidget
@@ -2673,7 +2726,7 @@ For **active-active** multi-region (both regions take writes), you now have two 
 }
 \`\`\`
 
-Traffic steering sits on top: **GeoDNS** (route by client location, but DNS TTL caching makes failover slow), a **global load balancer / anycast** (AWS Global Accelerator, Cloudflare) that health-checks regions and shifts traffic in seconds. Health-based failover moves traffic off a dead region automatically.
+Traffic steering sits on top: **GeoDNS** (route by client location, but every answer carries a TTL, the number of seconds resolvers may reuse it before asking again, so failover waits for those cached answers to expire), or a **global load balancer** (AWS Global Accelerator, Cloudflare) that health-checks regions and shifts traffic in seconds. Those global load balancers ride on *anycast*: many locations answer to the same network address and the network hands each user to the nearest one, so moving traffic off a region is a routing change rather than a wait on caches you do not control. Health-based failover moves traffic off a dead region automatically.
 
 **Interview nuance:** two things separate strong answers. First, **cell-based and shuffle-sharding** thinking applies here: an active-active pair still shares a blast radius if a bad config or poison request replicates to both, so regions should fail independently and you must **test region evacuation** (actually drain a region) rather than assume it works. Second, do not claim multi-region gives strong consistency for free. It does not. You either pay cross-region latency (sync/Spanner) or accept eventual consistency and design conflict resolution. Saying "we go multi-region active-active and everything is consistent and fast" is the wrong turn interviewers wait for.
 
