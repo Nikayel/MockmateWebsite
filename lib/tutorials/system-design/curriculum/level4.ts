@@ -2883,8 +2883,10 @@ the burst that triggered it by minutes, so the design work is picking a signal t
 buying cover for the window before capacity lands. There are three layers, and interviewers want you
 to name them distinctly.
 
-**Horizontal Pod/instance autoscaling (HPA)** adds or removes replicas based on a metric. The default
-metric is **CPU or memory utilization**: target 60% CPU, add pods when the average climbs above that.
+**Horizontal Pod/instance autoscaling (HPA)** adds or removes replicas based on a metric, where a
+**pod** is one running copy of your app, so "add a pod" reads as "add another identical instance
+behind the balancer." The default metric is **CPU or memory utilization**: target 60% CPU, add pods
+when the average climbs above that.
 The problem is that CPU is a *lagging* signal: by the time CPU is pegged, requests are already
 queuing and your p99 is already blown. Better is to scale on a **leading business metric**:
 requests-per-second per pod, in-flight concurrency, or, best of all for async workers, **queue depth
@@ -3227,12 +3229,65 @@ to 70% utilization**: 20 instances at a 70% target becomes \`20 / 0.7 = ~29\` in
 
 ### Redundancy math
 
-You must survive failure of a whole **availability zone**, so you spread instances across (typically)
-3 AZs and size so that *losing one AZ still leaves enough capacity*. This is **N+1** thinking at the
-AZ level. If 29 instances serve peak at target utilization across 3 AZs, losing one removes a third
-of the fleet; to keep the surviving two AZs at or below target after a zone loss, provision ~50%
-more, so \`2/3\` of the fleet still covers 100% of peak. So ~29 becomes ~44 instances (roughly 15 per
-AZ).
+An **availability zone** (AZ) is one physically separate data-center site inside a cloud region, with
+its own power, cooling, and network feeds: near enough to its sibling zones for sub-millisecond
+links, independent enough that one can go dark without the others noticing. That independence is the
+whole reason to spread across zones. You must survive failure of a whole AZ, so you put instances in
+(typically) 3 of them and size so that *losing one AZ still leaves enough capacity*. This is **N+1**
+thinking at the AZ level. If 29 instances serve peak at target utilization across 3 AZs, losing one
+removes a third of the fleet; to keep the surviving two AZs at or below target after a zone loss,
+provision ~50% more, so \`2/3\` of the fleet still covers 100% of peak. So ~29 becomes ~44 instances
+(roughly 15 per AZ).
+
+That 1.5x is not a constant, it is \`N / (N - 1)\` for N zones, and the whole cost of redundancy sits
+in the first step:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "AZs you spread across",
+    "Share of the fleet one AZ loss removes",
+    "Redundancy multiplier N/(N-1)",
+    "Instances, starting from 29 at target",
+    "Standing idle capacity you pay for"
+  ],
+  "rows": [
+    [
+      "2",
+      "half",
+      "2 / 1 = 2.00x",
+      "58",
+      "29 instances: a second fleet doing nothing"
+    ],
+    [
+      "3",
+      "a third",
+      "3 / 2 = 1.50x",
+      "44",
+      "15 instances"
+    ],
+    [
+      "4",
+      "a quarter",
+      "4 / 3 = 1.33x",
+      "39",
+      "10 instances"
+    ],
+    [
+      "5",
+      "a fifth",
+      "5 / 4 = 1.25x",
+      "37",
+      "8 instances"
+    ]
+  ],
+  "highlightCols": [
+    "Instances, starting from 29 at target"
+  ],
+  "caption": "Moving from 2 zones to 3 takes 14 instances off the bill; moving from 4 to 5 takes 2. Three zones is the industry default because that is where the curve flattens, not because three is a magic number. Quote the multiplier, not the habit, and your sizing survives the follow-up question."
+}
+\`\`\`
 
 \`\`\`cswidget
 {
@@ -3619,6 +3674,46 @@ operations** get hard: global queries, a tenant that outgrows a cell, moving ten
 And the **cell router becomes the critical shared dependency** you must obsess over. The honest
 trade: higher cost and operational complexity for a hard ceiling on how many users any single failure
 can hurt.
+
+"More idle capacity" is worth pricing, because the interviewer will ask how much. Take a service
+whose peak needs 100 instances' worth of work, sized to the usual 70% utilization target, and let one
+tenth of the traffic spike to 1.5x:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Shape",
+    "Instances at a 70% target",
+    "What the spiking slice's users see",
+    "What the rest of the fleet can do about it"
+  ],
+  "rows": [
+    [
+      "One pool carrying all 100 units of work",
+      "143",
+      "Utilization drifts 70% to 73%. Nobody notices.",
+      "Nothing to do: the slack was pooled to begin with"
+    ],
+    [
+      "10 cells, each sized for its own 10 units",
+      "150, as 10 x 15",
+      "That cell hits 100% utilization and its p99 falls apart, for 10% of users",
+      "Sit at 67% and cannot lend a single instance without a rebalance"
+    ],
+    [
+      "10 cells, each sized to absorb a 1.5x spike",
+      "220, as 10 x 22",
+      "Utilization tops out near 68%. The spike is absorbed.",
+      "Sit at 45%, paying for headroom that only one cell will ever use"
+    ]
+  ],
+  "highlightCols": [
+    "Instances at a 70% target"
+  ],
+  "caption": "One pool absorbs that spike with 143 instances; ten cells need 220 to absorb it, because slack in a pool belongs to whoever needs it and slack in a cell belongs only to that cell. Roughly 50 percent more idle metal is what the hard ceiling on blast radius costs, and naming the number is what separates a candidate who has run cells from one who has read about them."
+}
+\`\`\`
 
 Recap: a cell is a self-contained stack serving a user subset behind a dumb HA router, so a bad
 deploy or tenant is contained to one cell's ~10%, while shuffle sharding assigns each tenant a random
