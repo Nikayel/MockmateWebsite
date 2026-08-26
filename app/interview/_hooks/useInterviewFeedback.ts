@@ -485,25 +485,40 @@ export function useInterviewFeedback(
           })
         }
       } else if (opts.currentSessionId && opts.isGuestMode && opts.guestId) {
-        try {
-          await fetch("/api/guest-session", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sessionId: opts.currentSessionId,
-              guestId: opts.guestId,
-              performanceScore: calculatedPerformanceScore,
-              feedback: feedbackText,
-              finalCode: opts.code,
-              language: opts.selectedLanguage,
-              testResults: opts.testResults,
-              timeComplexity: efficiencyData?.estimatedTimeComplexity,
-              spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
-              efficiencyScore: efficiencyData?.efficiencyScore,
-            }),
-          })
-        } catch (error) {
-          console.error("Error saving guest session completion:", error)
+        // Since the score lock, this PUT is the score's ONLY copy (local
+        // guest data deliberately stores none), so it cannot be
+        // fire-and-forget: one retry, and a failure event the funnel can
+        // see — a silent loss here means the migrated account's session
+        // arrives empty.
+        const putCompletion = async (): Promise<Response | null> => {
+          try {
+            return await fetch("/api/guest-session", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                sessionId: opts.currentSessionId,
+                guestId: opts.guestId,
+                performanceScore: calculatedPerformanceScore,
+                feedback: feedbackText,
+                finalCode: opts.code,
+                language: opts.selectedLanguage,
+                testResults: opts.testResults,
+                timeComplexity: efficiencyData?.estimatedTimeComplexity,
+                spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
+                efficiencyScore: efficiencyData?.efficiencyScore,
+              }),
+            })
+          } catch {
+            return null
+          }
+        }
+        let completionResponse = await putCompletion()
+        if (!completionResponse || !completionResponse.ok) {
+          completionResponse = await putCompletion()
+        }
+        if (!completionResponse || !completionResponse.ok) {
+          console.error("Guest completion PUT failed", completionResponse?.status)
+          trackEvent("guest_score_put_failed", { status: completionResponse?.status ?? 0 })
         }
       }
 

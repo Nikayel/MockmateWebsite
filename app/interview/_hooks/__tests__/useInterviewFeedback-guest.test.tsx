@@ -178,6 +178,27 @@ describe("proceedToFinalFeedback for a guest", () => {
     expect(body.performanceScore).toBe(100)
   })
 
+  it("retries a failed completion PUT once and reports the loss", async () => {
+    // Since the score lock, this PUT is the score's ONLY copy (localStorage
+    // deliberately stores none). A silent 429 here means the migrated
+    // account's session arrives empty, so the write gets one retry and a
+    // failure event the funnel can see.
+    const rejected = () => Promise.resolve({ ok: false, status: 429, json: async () => ({}) })
+    fetchMock.mockImplementationOnce(rejected).mockImplementationOnce(rejected)
+    const opts = buildOpts()
+    const { result } = renderHook(() => useInterviewFeedback(opts as never))
+
+    await act(async () => {
+      await result.current.proceedToFinalFeedback()
+    })
+
+    const putCalls = fetchMock.mock.calls.filter(([url]) => url === "/api/guest-session")
+    expect(putCalls).toHaveLength(2)
+    const failure = trackEvent.mock.calls.find(([name]) => name === "guest_score_put_failed")
+    expect(failure).toBeTruthy()
+    expect(failure?.[1]).toMatchObject({ status: 429 })
+  })
+
   it("still schedules the signup prompt", async () => {
     vi.useFakeTimers()
     const opts = buildOpts()

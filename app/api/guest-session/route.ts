@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
-import { guestSessionRateLimit } from "@/lib/rate-limit"
+import { guestApiRateLimit, guestSessionRateLimit } from "@/lib/rate-limit"
 import { SESSION } from "@/lib/constants"
 import { PRICING_CONFIG } from "@/lib/config"
 import {
@@ -212,8 +212,12 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    // SECURITY: Apply rate limiting (same as POST) to prevent abuse
-    const rateLimitResponse = await guestSessionRateLimit(request)
+    // Writes get their own per-minute bucket (rl:guest-api), NOT the 3/hour
+    // creation bucket: autosaves land every 30 seconds, so sharing the
+    // creation bucket meant any guest who worked more than a minute had
+    // exhausted it before the completion PUT — the score's only copy —
+    // arrived, and that write silently 429'd.
+    const rateLimitResponse = await guestApiRateLimit(request)
     if (rateLimitResponse) {
       return rateLimitResponse
     }
