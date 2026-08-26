@@ -72,7 +72,7 @@ A plain monolith is one codebase, one deploy, one database. It is the fastest wa
 
 A modular monolith keeps the single deploy and single database but enforces internal module boundaries: the Orders module talks to the Inventory module only through a defined interface, not by reaching into its tables. You get most of the maintainability benefit of services with none of the network cost, and you keep clean seams so you can split a module out later when you actually need to.
 
-Microservices split each capability into its own deployable service with its own datastore. The benefits are real but specific: independent deploy cadence, independent scaling (the search service can run 50 pods while checkout runs 5), fault isolation, and polyglot freedom. The costs are also real: network latency on every hop, no cross-service transactions (you need sagas), eventual consistency, distributed tracing to debug anything, and a large ops and cloud bill.
+Microservices split each capability into its own deployable service with its own datastore. The benefits are real but specific: independent deploy cadence, independent scaling (the search service can run 50 pods while checkout runs 5), fault isolation, and polyglot freedom. The costs are also real: network latency on every hop, no cross-service transactions, so a change that spans two services needs a [saga](/learn/system-design/distributed-core/sd-l5-sagas) (a chain of small local writes where every step carries its own undo), [eventual consistency](/learn/system-design/distributed-core/sd-l5-consistency-spectrum) (two services can disagree for a moment before they catch up), distributed tracing (stamping one id on a request so you can follow it across services) to debug anything, and a large ops and cloud bill.
 
 \`\`\`cswidget
 {
@@ -390,7 +390,46 @@ Synchronous request-response (REST or gRPC) is right when the caller needs the a
 
 ## Protocol choice
 
-For internal east-west traffic between services, gRPC with protobuf is the default: binary, strongly typed, HTTP/2 multiplexed, and much faster than JSON over HTTP/1. For external north-south traffic to browsers and third parties, REST or GraphQL over HTTP/JSON wins on ubiquity and tooling. So a common shape is REST at the edge, gRPC inside.
+For internal east-west traffic (service to service, inside your own network), gRPC with protobuf is the default: the message travels as compact binary rather than text, the field types are declared up front, and many calls share one HTTP/2 connection instead of queueing behind each other. For external north-south traffic (in from the outside world, so browsers and third parties, and back out again), REST or GraphQL over HTTP/JSON wins on ubiquity and tooling. So a common shape is REST at the edge, gRPC inside.
+
+"Faster" is worth pricing, because the part people quote is not the part that pays.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Same order object, one internal call",
+    "REST and JSON over HTTP/1.1",
+    "gRPC and protobuf over HTTP/2"
+  ],
+  "highlightCols": [
+    "gRPC and protobuf over HTTP/2"
+  ],
+  "rows": [
+    [
+      "Bytes on the wire",
+      "About 1 KB of text, field names repeated in every message",
+      "About 250 to 350 bytes, field numbers instead of names"
+    ],
+    [
+      "Encode plus decode, per hop",
+      "Roughly 10 to 30 microseconds",
+      "Roughly 3 to 8 microseconds"
+    ],
+    [
+      "Calls in flight per connection",
+      "One, so a client opens a pool and the rest wait",
+      "Many, multiplexed over a single connection"
+    ],
+    [
+      "Cost of a new connection",
+      "TCP handshake plus TLS on every fresh connection",
+      "Paid once, then amortized across every later call"
+    ]
+  ],
+  "caption": "On one 1 KB message the CPU saving is about 20 microseconds, which is noise next to the 1 to 5 ms the network hop costs anyway. The win shows up in volume: 3x fewer bytes across a fleet doing millions of internal calls a minute, and one multiplexed connection instead of a pool that makes calls wait on each other. That is why gRPC is an internal default and never an argument for rewriting a browser-facing API."
+}
+\`\`\`
 
 ## Orchestration vs choreography
 
@@ -3566,7 +3605,7 @@ export const systemDesignLevel9: DesignLevel = {
           practice: {
             id: "sd-l9-monolith-vs-microservices-practice",
             prompt:
-              "Design the migration path for a company like Prime Video that runs its video quality-monitoring pipeline as distributed steps, orchestrated by AWS Step Functions over Lambda functions that hand video frames to each other through S3, and is now paying too much for it. Recommend whether to consolidate and how, leading with the deliverable.",
+              "Design the migration path for a company like Prime Video that runs its video quality-monitoring pipeline as distributed steps and is now paying too much for it. The shape today: a hosted workflow runner (AWS Step Functions) calls one short-lived function (AWS Lambda) after another, and because each function keeps nothing in memory once it returns, every frame is written to object storage (S3) by one step and read back out by the next. Recommend whether to consolidate and how, leading with the deliverable.",
             thinkAbout: [
               "How do you confirm the cost is network/storage transfer, not compute?",
               "Which steps consolidate and which stay split?",
