@@ -1149,8 +1149,9 @@ that can be re-aggregated.
 const btreeVsLsmTeach = `
 ## Two engine families, one read-versus-write trade
 
-Most durable OLTP databases are built on one of two storage engine families, and the choice is
-fundamentally a read-versus-write tradeoff. Knowing which one sits under Postgres versus Cassandra is
+Most durable OLTP databases (the kind serving many small live reads and writes for users, rather
+than scanning millions of rows for a report) are built on one of two storage engine families, and
+the choice is fundamentally a read-versus-write tradeoff. Knowing which one sits under Postgres versus Cassandra is
 the difference between guessing at a database and reasoning about one.
 
 ### B+tree: page-granular writes, fast reads and ranges
@@ -1270,7 +1271,11 @@ size-tiered or leveled for anything you overwrite.
 ### Two LSM stores are not interchangeable: where the tail comes from
 
 "It is an LSM engine" does not finish the choice, because two engines implementing the same tree can
-behave very differently at p99. LSM tail latency has two sources, and they stack:
+behave very differently at p99. Percentile shorthand, if it is new: line every response time up from
+fastest to slowest, and p50 is the middle one while p99 is the time that only the slowest 1 in 100
+requests exceeds (p999 is the slowest 1 in 1000). Level 1 works through
+[why the tail is the number users feel](/learn/system-design/foundations/sd-l1-latency-percentiles).
+LSM tail latency has two sources, and they stack:
 
 - **Compaction contention.** A background merge is reading and writing hundreds of megabytes while
   your queries want the same disk and CPU. Every LSM engine has this.
@@ -1722,9 +1727,10 @@ the metal.
 
 Databases do not read or write individual rows from disk; they move fixed-size **pages** (Postgres
 8KB, InnoDB 16KB). A page holds many rows plus a header and a slot directory. This is why row layout
-matters: a **row-oriented** page stores whole rows together, great for "give me this order" (OLTP); a
-**column-oriented** layout stores each column contiguously across rows, great for "sum revenue over
-10M rows" (OLAP) because you read only the columns you need and they compress extremely well.
+matters: a **row-oriented** page stores whole rows together, great for "give me this order" (the
+small live lookups called OLTP); a **column-oriented** layout stores each column contiguously across
+rows, great for "sum revenue over 10M rows" (the big scan-and-aggregate work called OLAP) because you
+read only the columns you need and they compress extremely well.
 
 \`\`\`cswidget
 {
@@ -2066,7 +2072,7 @@ matters: a **row-oriented** page stores whole rows together, great for "give me 
 The database keeps hot pages in an in-memory **buffer pool** (the biggest knob in most databases,
 e.g. InnoDB \`innodb_buffer_pool_size\`). Reads check the buffer pool first; a hit is a memory
 access, a miss is a disk read that pulls the page in and evicts a cold one (usually via an LRU
-variant). Writes modify the page **in the buffer pool**, marking it **dirty**. Dirty pages are not
+variant: least recently used, meaning throw out whatever nobody has touched for the longest time). Writes modify the page **in the buffer pool**, marking it **dirty**. Dirty pages are not
 written to their data-file home immediately; they are flushed later, in batches, at a **checkpoint**.
 This is what lets a database absorb many writes to the same hot page as one eventual disk write.
 
