@@ -479,10 +479,16 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
           }
         }
 
-        // Proceed to post-interview discussion
+        // Proceed to post-interview discussion. For guests the phase flag
+        // still flips (it renders GuestFeedbackLock and arms the trial's
+        // auto-finalization) but the kickoff is skipped: its complexity
+        // analysis and /api/chat debrief are both auth-walled, and no guest
+        // surface renders the conversation it would build.
         setIsRunningTests(false)
         setShowPostInterviewDiscussion(true)
-        triggerPostInterviewDiscussion(data.results, data.summary)
+        if (user) {
+          triggerPostInterviewDiscussion(data.results, data.summary)
+        }
       }
     } catch (error) {
       console.error("Code submission error:", error)
