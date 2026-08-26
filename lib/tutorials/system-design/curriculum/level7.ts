@@ -947,6 +947,62 @@ They are complementary, not competing. RED tells you the checkout API's p99 doub
 
 The trap that quietly bankrupts observability budgets is **cardinality**. A metric's cost scales with the number of unique label combinations (time series), not the number of data points. Add a \`user_id\` label to a request counter and a service with 5 million users creates up to 5 million time series per metric; Prometheus will OOM and your bill explodes. Keep labels bounded: \`endpoint\`, \`method\`, \`status_class\` (2xx/4xx/5xx), \`region\`. Never put unbounded values (user id, order id, full URL with ids, raw error message) in a metric label. High-cardinality identifiers belong in logs and traces, not metrics.
 
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "What one more label costs",
+  "predictPrompt": {
+    "question": "A request counter already carries four bounded labels that multiply out to 400 time series. You add one more label holding the user id, and the service has 5 million users. How many series does that one counter hold now?",
+    "options": [
+      "Still about 400, since the new label reuses the existing series",
+      "About 5,000",
+      "About 5 million",
+      "About 2 billion"
+    ]
+  },
+  "workedExample": "At the initial values, four bounded labels give 400 series, and one more label with 3 values (cache hit, miss, bypass) multiplies that to 1,200 series holding about 3.6 MB. Labels multiply, they never add. Now drag the second slider to 5,000,000, which is what a user id label means, and read both lines: one metric becomes 2 billion series and the memory it pins is measured in terabytes.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "bounded",
+      "label": "Series from the bounded labels you already have",
+      "min": 10,
+      "max": 5000,
+      "scale": "log",
+      "initial": 400,
+      "unit": "series"
+    },
+    {
+      "kind": "slider",
+      "id": "values",
+      "label": "Distinct values on the label you want to add",
+      "min": 2,
+      "max": 5000000,
+      "scale": "log",
+      "initial": 3
+    }
+  ],
+  "outputs": [
+    {
+      "id": "series_total",
+      "label": "Time series from this one metric",
+      "expr": "bounded * values",
+      "format": "compact",
+      "sparkline": {
+        "over": "values"
+      }
+    },
+    {
+      "id": "series_memory",
+      "label": "Memory the metrics store pins for them",
+      "expr": "series_total * 3000",
+      "format": "bytes"
+    }
+  ],
+  "caption": "About 3 KB of memory per active series is the usual rule of thumb, and the count is a product, not a sum. That is the whole reason an unbounded id goes on a log line or a trace span instead of a metric label."
+}
+\`\`\`
+
 The other common wrong turn is building **dashboards nobody watches** instead of signal-based alerting. A wall of graphs does not page anyone. Alert on symptoms the golden signals expose (error rate over budget, p99 over SLO, saturation climbing), keep dashboards for diagnosis after the page fires, and delete the ones that have not been opened in a quarter.
 
 **Recap:** instrument latency, traffic, errors, saturation on every service; use RED for request-driven services and USE for resources; split success vs error latency; treat saturation as your early warning; and guard cardinality by keeping unbounded ids out of metric labels.
@@ -1298,7 +1354,7 @@ Observability rests on three kinds of telemetry, and the skill is knowing which 
 
 ## Context propagation ties traces together
 
-The thing that makes traces work across service boundaries is **context propagation**. Each incoming request carries a \`traceparent\` header (the W3C Trace Context standard) holding the trace id and the parent span id. Each service reads it, starts a child span, and passes the updated header to its own downstream calls. That shared trace id is also what you stamp onto every log line and (as an *exemplar*) onto metrics, so you can pivot: a metric spike -> an exemplar trace id -> the full trace -> the correlated logs for exactly that request. Without propagated context, "why is it slow?" is unanswerable in a distributed system, which is the single most common wrong turn in this space.
+The thing that makes traces work across service boundaries is **context propagation**. Each incoming request carries a \`traceparent\` header (the W3C Trace Context standard) holding the trace id and the parent span id. Each service reads it, starts a child span, and passes the updated header to its own downstream calls. That shared trace id is also what you stamp onto every log line and hang onto metrics as an *exemplar*, one real trace id sampled onto that metric bucket as a worked example of the requests it counted, so you can pivot: a metric spike -> an exemplar trace id -> the full trace -> the correlated logs for exactly that request. Without propagated context, "why is it slow?" is unanswerable in a distributed system, which is the single most common wrong turn in this space.
 
 ## OpenTelemetry
 
