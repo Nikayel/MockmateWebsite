@@ -33,6 +33,7 @@ async function importRoute() {
   }))
   vi.doMock("@/lib/rate-limit", () => ({
     guestSessionRateLimit: vi.fn(() => Promise.resolve(null)),
+    guestApiRateLimit: vi.fn(() => Promise.resolve(null)),
   }))
 
   return import("./route")
