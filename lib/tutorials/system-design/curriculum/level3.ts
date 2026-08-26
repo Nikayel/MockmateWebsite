@@ -105,8 +105,10 @@ how you take a CPU-bound primary from "melting" to "comfortable" in an afternoon
 throughput exceeds one leader (every replica already does all the writes, so more replicas do not
 help), or (b) the **dataset** no longer fits or fits poorly on one node. Both force **sharding**.
 Replicas also do not remove the leader as a single point of failure for writes: you need automated
-failover (Patroni, Orchestrator, or a managed service) to promote a follower, and that introduces its
-own split-brain and lost-write risks.
+failover (a watchdog that notices the leader is gone and promotes a follower in its place, either an
+open-source one like Patroni or Orchestrator or the equivalent built into a managed database
+service), and that introduces its own risks: split-brain, where two nodes both believe they are the
+leader and each accepts writes, and lost writes the old leader had acked but never shipped.
 
 \`\`\`csdiagram
 {
@@ -250,7 +252,8 @@ dataset size outgrow one leader.
 const replicationTopologiesTeach = `
 ## Each topology buys a capability by exposing an anomaly
 
-Once one leader is not enough (you need multi-region writes, or you want no write SPOF), you choose
+Once one leader is not enough (you need multi-region writes, or you want no write **SPOF**, meaning
+no single point of failure: no one node whose crash stops every write in the system), you choose
 among three **replication topologies**, and each one buys a capability by exposing a specific class
 of anomaly. Knowing which anomaly you are signing up for is the whole skill.
 
@@ -295,7 +298,10 @@ then **R + W > N** guarantees the read set and write set overlap on at least one
 the latest acked write. Common config is N=3, W=2, R=2. Tuning W and R trades consistency against
 availability and latency: W=1 is fast but weakly durable, R=1 can read stale data. Amazon DynamoDB is
 a common false friend here: despite the name, each partition is a replication group with a single
-leader elected via Multi-Paxos, only that leader serves writes and strongly consistent reads, and the
+leader elected via Multi-Paxos (a consensus algorithm, the procedure a group of servers runs to agree
+on one value even when some of them crash, worked through in
+[Level 5](/learn/system-design/distributed-core/sd-l5-raft-paxos)), only that leader serves writes
+and strongly consistent reads, and the
 only client-facing knob is a boolean choice between eventual and strong reads, not tunable N/W/R. The
 2007 Dynamo paper is this family's ancestor; the DynamoDB product built from it is not a member.
 
@@ -452,11 +458,17 @@ base document, character ids in brackets:  H[h1] e[e1] l[l1] l[l2] o[o1]
 That is why a notes or document product answers "how do you merge concurrent edits" with a sequence
 CRDT rather than last-write-wins: LWW would keep one of the two paragraphs and drop the other.
 
-**Interview nuance:** do not answer with a CAP binary ("CP or AP"). Reason with **PACELC**: if there
-is a **P**artition, choose **A**vailability or **C**onsistency; **E**lse (normal operation) choose
-**L**atency or **C**onsistency. Dynamo-style stores are PA/EL; a single-leader RDBMS is PC/EC. Then
+**Interview nuance:** do not answer with a CAP binary ("CP or AP"). CAP is the older shorthand: when
+a network fault splits the cluster into pieces that cannot reach each other, each piece either keeps
+answering and risks handing back something wrong (**A**vailability, an "AP" system) or refuses to
+answer rather than risk it (**C**onsistency, a "CP" system). Reason with **PACELC** instead, because
+it also covers the case that happens every day, when nothing is broken: if there is a **P**artition,
+choose **A**vailability or **C**onsistency; **E**lse (normal operation) choose **L**atency or
+**C**onsistency. Dynamo-style stores are PA/EL; a single-leader relational database is PC/EC. Then
 name the **concrete anomaly** a user sees ("two edits from two regions, one silently overwrites the
-other under LWW"), which shows you reason about data, not letters.
+other under LWW"), which shows you reason about data, not letters. Level 5 states both properly:
+[what CAP actually claims](/learn/system-design/distributed-core/sd-l5-cap-correct) and
+[PACELC](/learn/system-design/distributed-core/sd-l5-pacelc).
 
 \`\`\`csdiagram
 {
