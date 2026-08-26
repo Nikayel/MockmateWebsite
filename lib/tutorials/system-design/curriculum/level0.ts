@@ -36,9 +36,14 @@ Three facts change the architecture more than anything else you will ask:
 
 - **Actors and use cases:** who uses this, and what are the two or three things they do?
 - **Scale:** roughly how many daily active users? This sets whether you need one database or a
-  sharded fleet.
+  sharded fleet (many databases, each holding one slice of the data, which
+  [Level 3 covers properly](/learn/system-design/scaling-data/sd-l3-partitioning-strategies)).
 - **Read/write ratio:** a feed is read-heavy (you load far more than you post), which pushes you
-  toward caching and fan-out on write. A logging system is the opposite.
+  toward caching (keeping a ready copy of hot data somewhere fast so you skip the slow trip to the
+  database) and fan-out on write (copying each new post into every follower's timeline the moment it
+  is posted, so reads stay cheap). A logging system is the opposite. Both levers get a whole lesson
+  later: [caching in Level 1](/learn/system-design/foundations/sd-l1-cdn-caching-foundations) and
+  [fan-out in Level 3](/learn/system-design/scaling-data/sd-l3-denorm-fanout).
 
 You are not gathering trivia. Each answer eliminates whole branches of the design tree.
 
@@ -84,8 +89,12 @@ You are not gathering trivia. Each answer eliminates whole branches of the desig
 ### 3. Restate, then commit
 
 Play the interviewer back their own problem in one sentence ("So: a home-timeline service for tens of
-millions of daily users, read-heavy, eventual consistency is fine for the feed"). If they agree, you
-have a shared contract and you move. If they correct you, you just avoided designing the wrong system.
+millions of daily users, read-heavy, eventual consistency is fine for the feed"). Eventual consistency
+means a new post may take a few seconds to reach everybody's timeline, and saying so out loud tells the
+interviewer you will not pay for instant agreement the product does not need;
+[Level 5 makes it precise](/learn/system-design/distributed-core/sd-l5-consistency-spectrum). If they
+agree, you have a shared contract and you move. If they correct you, you just avoided designing the
+wrong system.
 
 \`\`\`cswidget
 {
@@ -500,7 +509,13 @@ must do it, and they are where most of the architecture is actually decided. The
 easy to fake. "The system should be scalable and reliable" is filler: it is true of every system and
 changes no decision. A real NFR is quantified and testable. Compare "the feed should be fast" with
 "p99 feed load latency under 200ms." Only the second one tells you whether you need a cache, and only
-the second one can be verified against a dashboard.
+the second one can be verified against a dashboard. Two pieces of shorthand show up in almost every
+NFR you will ever write, so unpack them once here: **p99** means line every response time up slowest
+to fastest and take the one that 99 percent of requests beat, so it is the experience of your unluckiest
+users rather than your typical one ([Level 1 makes percentiles
+precise](/learn/system-design/foundations/sd-l1-latency-percentiles)), and **QPS** means queries per
+second, how many requests arrive each second ([a whole lesson later in this
+level](/learn/system-design/interview-method/sd-l0-qps-read-write)).
 
 \`\`\`cswidget
 {
@@ -624,14 +639,46 @@ sits on a path of other services, and the request only succeeds if every one of 
 
 ### The categories worth walking every time
 
-- **Scalability:** target DAU and peak QPS. Lever: horizontal sharding, stateless services behind a
-  load balancer.
-- **Latency:** p99 targets, split by read and write path. Lever: caching and CDN for reads, async
-  processing for writes.
-- **Availability:** the number of nines. Lever: replication, multi-region, no single points of failure.
-- **Durability:** can you ever lose committed data? Lever: replication factor, write-ahead logs,
-  quorum writes.
-- **Consistency:** strong or eventual, and where. Lever: this is your CAP/PACELC stance.
+Five categories, and each one names a **lever**: the change to the design that a number in that
+category forces. The lever names are the working vocabulary of the rest of this course, so here each
+one gets a plain-words meaning and a link to the lesson that teaches it properly. Read them once, then
+use them like any other word.
+
+- **Scalability:** target DAU (daily active users) and peak QPS. Lever: **horizontal sharding**
+  (splitting the data across many machines so each one holds a slice, taught in
+  [Level 3](/learn/system-design/scaling-data/sd-l3-partitioning-strategies)) plus **stateless
+  services behind a load balancer** (app servers that keep nothing of their own on disk, so a traffic
+  cop out front can hand a request to whichever one is free, taught in
+  [Level 1](/learn/system-design/foundations/sd-l1-load-balancing)).
+- **Latency:** p99 targets, split by read and write path. Lever: **caching** (a ready copy of hot
+  data in memory so a read skips the database) and a **CDN**, short for content delivery network
+  (rented machines spread around the world holding copies of your files close to each visitor), both
+  taught in [Level 1](/learn/system-design/foundations/sd-l1-cdn-caching-foundations), plus
+  **asynchronous processing** for writes (handing the slow part to a background worker so the user's
+  request can return right away, taught in
+  [Level 6](/learn/system-design/event-driven/sd-l6-queue-pubsub-log)).
+- **Availability:** the number of **nines**, meaning how much of the year the system is allowed to be
+  down: 99.9% is about 8.8 hours, 99.99% is about 52 minutes, and each extra nine is ten times less
+  downtime ([Level 7](/learn/system-design/reliability-ops/sd-l7-availability-nines)). Lever:
+  **replication** (keeping full copies of the data on other machines, taught in
+  [Level 3](/learn/system-design/scaling-data/sd-l3-read-replicas)), running in more than one region,
+  and removing every **single point of failure**, meaning any one box whose death takes the whole
+  system down.
+- **Durability:** can you ever lose committed data? Lever: how many copies each write must land on, a
+  **write-ahead log** (the database appends every change to a journal file before applying it, so a
+  crash loses nothing, taught in
+  [Level 2](/learn/system-design/data-storage/sd-l2-physical-storage-wal)), and **quorum writes** (a
+  majority of the copies must confirm before the write counts as done, taught in
+  [Level 5](/learn/system-design/distributed-core/sd-l5-quorums-tunable)).
+- **Consistency:** strong (every reader sees the newest write immediately) or eventual (copies may
+  disagree for a few seconds, then catch up), and where. Lever: your **CAP/PACELC stance**. CAP says
+  that when the network splits your servers into groups that cannot reach each other, you get exactly
+  two options and must pick one: keep answering with data that may be stale (**AP**), or refuse to
+  answer rather than risk being wrong (**CP**). PACELC adds the ordinary case: even with no split at
+  all, you are trading latency against consistency every time you read a copy instead of the original.
+  Both are made precise in Level 5
+  ([CAP](/learn/system-design/distributed-core/sd-l5-cap-correct),
+  [PACELC](/learn/system-design/distributed-core/sd-l5-pacelc)).
 
 \`\`\`cswidget
 {
@@ -661,8 +708,11 @@ sits on a path of other services, and the request only succeeds if every one of 
 The consistency stance is the one interviewers probe hardest. For a feed, take an explicit position:
 "I favor availability over strong consistency. If a follower sees a new tweet a few seconds late, that
 is fine; if the feed is unavailable, that is not. So per PACELC, I choose AP during a partition and,
-even without a partition, I trade consistency for latency by serving from replicas and caches." That is
-a defensible stance with a reason, which is what scores. Saying "it should be consistent and available"
+even without a partition, I trade consistency for latency by serving from replicas and caches." In
+plain words that sentence says: when the network splits I keep serving, from whatever copy I can reach,
+even if it is a few seconds behind, and I make that same choice on a normal day too because a fast
+slightly-old feed beats a slow perfectly-fresh one. That is a defensible stance with a reason, which is
+what scores. Saying "it should be consistent and available"
 fails, because CAP says you cannot have both under a partition and the interviewer will make you pick.
 
 Split read-path and write-path SLAs, because they are genuinely different systems. The read path
@@ -946,8 +996,9 @@ tradeoff is the point.
 
 REST over HTTP is the right default for a public-facing API: it is cacheable, universally understood,
 and works through any client. Use gRPC for internal service-to-service calls where you control both
-ends and want lower latency and typed contracts (a Protobuf schema, binary framing, HTTP/2
-multiplexing). Use a streaming protocol (WebSocket, Server-Sent Events, or gRPC streaming) when the
+ends and want lower latency and typed contracts (it sends a compact binary format instead of JSON text,
+over a connection that carries many calls at once, which
+[Level 1's HTTP versions lesson](/learn/system-design/foundations/sd-l1-http-versions) unpacks). Use a streaming protocol (WebSocket, Server-Sent Events, or gRPC streaming) when the
 server must push, like a live location feed or a chat. State which and why: "REST for the public create
 and redirect endpoints, gRPC between the API gateway and the internal link service."
 
@@ -970,7 +1021,7 @@ and redirect endpoints, gRPC between the API gateway and the internal link servi
     {
       "label": "API gateway calling the internal pricing service, both ends owned by you",
       "bucket": "gRPC",
-      "feedback": "You control both ends, so typed Protobuf contracts, binary framing, and HTTP/2 multiplexing beat REST's universality."
+      "feedback": "You control both ends, so a typed contract sent as compact binary over one shared connection beats REST's universality."
     },
     {
       "label": "Pushing the driver's live location to the rider's map every second",
@@ -994,7 +1045,10 @@ and redirect endpoints, gRPC between the API gateway and the internal link servi
 Two boundary concerns belong in the API sketch because they are easy to forget and interviewers look
 for them. **Idempotency:** for creates, an idempotency key makes retries safe (the client can retry a
 timed-out \`POST /links\` without creating duplicate codes for the same URL). **Pagination and auth:**
-any endpoint returning a list needs cursor-based pagination (\`?cursor=...&limit=25\`), and any write or
+any endpoint returning a list needs cursor-based pagination (\`?cursor=...&limit=25\`), where each page
+hands back a marker saying where the next page should start rather than a page number, so rows added
+meanwhile cannot shuffle the results ([Level
+1](/learn/system-design/foundations/sd-l1-pagination-errors) has the whole story), and any write or
 private read needs an auth token at the boundary. Mentioning where these live shows you have designed
 real APIs, not just toy ones.
 
@@ -3990,16 +4044,16 @@ export const systemDesignLevel0: DesignLevel = {
               "List 4-5 non-functional requirements for a 100M-DAU feed system as quantified, testable statements and name the design lever each one forces.",
             thinkAbout: [
               "Which NFRs actually change your architecture, and which are generic filler?",
-              "What is your explicit CAP/PACELC stance for this system and why?",
+              "When the network splits, would you rather show slightly stale data or show an error? That answer, said out loud with a reason, is your CAP/PACELC stance.",
               "How do read-path and write-path SLAs differ here?",
             ],
             modelAnswerOutline: [
               "State assumptions first: 100M DAU, read-heavy at roughly 100:1, global, a few seconds of feed staleness acceptable. Rough math: tens of feed loads per user per day is on the order of 50k peak read QPS and maybe 500 write QPS.",
-              "**p99 feed-load latency under 200ms.** Forces a read-through cache (Redis) holding precomputed timelines plus a CDN for media, because a database query per feed load cannot hit that tail at 50k QPS.",
+              "**p99 feed-load latency under 200ms.** Forces a read-through cache (Redis, a store that keeps data in memory and answers in about a millisecond) holding precomputed timelines plus a CDN for media, because a database query per feed load cannot hit that tail at 50k QPS.",
               "**Sustain 50k peak read QPS (2-3x the average).** Forces horizontal sharding of the timeline store and a stateless app tier behind a load balancer so reads scale independently of writes.",
               "**99.99% availability (about 52 minutes of downtime per year).** Forces multi-region deployment with replication and automatic failover, and eliminating single points of failure. 99.9% would be 8.7 hours, unacceptable for a global consumer feed.",
-              "**Durability: a post, once acknowledged, is never lost.** Forces replicated quorum writes (for example Cassandra with replication factor 3) plus a write-ahead log, so a single node failure cannot drop a committed post.",
-              "**Eventual consistency for the feed with bounded staleness of a few seconds.** The explicit PACELC stance: AP during a partition, and even without one favor latency over consistency by serving replicas and caches. Forces asynchronous fan-out through a queue like Kafka rather than synchronous timeline updates.",
+              "**Durability: a post, once acknowledged, is never lost.** Forces replicated quorum writes (for example Cassandra, a database that stores every row on several machines, with replication factor 3) plus a write-ahead log, so a single node failure cannot drop a committed post.",
+              "**Eventual consistency for the feed with bounded staleness of a few seconds.** The explicit PACELC stance: AP during a partition, and even without one favor latency over consistency by serving replicas and caches. Forces asynchronous fan-out through a queue like Kafka (a durable waiting line that holds the work until a background worker picks it up) rather than synchronous timeline updates.",
               "Split the paths deliberately: read path p99 under 200ms and heavily cached; write path acknowledges the post durably in under 500ms, then fans out asynchronously so the writer never waits on millions of follower timelines.",
               "Common wrong turn: listing 'scalable, reliable, fast, consistent' with no numbers (forces no decisions), or claiming strong consistency and high availability together, which CAP forbids under partition.",
             ],
@@ -4015,7 +4069,7 @@ export const systemDesignLevel0: DesignLevel = {
             ],
             modelAnswerOutline: [
               "Open by naming the inversion: payments flip a feed's priorities. Correctness beats availability, and a lost or double-charged transaction is a business-ending failure, not a cosmetic glitch. Assumptions: 5,000 TPS peak, global, strict regulatory and audit requirements.",
-              "**Strong consistency and exactly-once semantics on every charge.** The opposite of the feed's AP stance: per PACELC choose CP, rejecting a payment during a partition rather than risking a double charge. Forces a transactional store (PostgreSQL or Spanner) with idempotency keys on every charge request so retries never double-charge.",
+              "**Strong consistency and exactly-once semantics on every charge.** The opposite of the feed's AP stance: per PACELC choose CP, rejecting a payment during a partition rather than risking a double charge. Forces a transactional store (PostgreSQL, or Spanner when the same account must stay consistent across regions) with idempotency keys on every charge request so retries never double-charge.",
               "**Zero tolerance for losing a committed transaction.** Forces synchronous replication with quorum acknowledgement and a durable write-ahead log before returning success. Never acknowledge a charge that is not persisted on multiple replicas.",
               "**p99 charge latency under 500ms.** Payments can be slower than a feed read because correctness dominates, but users still abandon slow checkouts. Forces an efficient synchronous write path and connection pooling, not caching (you cannot cache a money movement).",
               "**Sustain 5,000 TPS with headroom to 15,000 for peaks (Black Friday).** Forces horizontal partitioning by merchant or account and careful hot-partition handling, since large merchants concentrate volume.",
