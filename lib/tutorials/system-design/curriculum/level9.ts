@@ -611,7 +611,7 @@ Kubernetes schedules those images onto nodes and keeps the declared state true:
 
 ## Scheduling controls
 
-Every container should set resource **requests** (what the scheduler reserves) and **limits** (the hard ceiling). Requests plus limits determine the **QoS class**: \`Guaranteed\` (requests == limits) is evicted last, \`BestEffort\` (nothing set) is evicted first under node pressure. Use **affinity/anti-affinity** and **taints/tolerations** to spread replicas across zones, and a **PodDisruptionBudget** so a voluntary drain never takes more than N Pods down at once.
+Every container should set resource **requests** (what the scheduler reserves) and **limits** (the hard ceiling). Requests plus limits determine the **QoS class**: \`Guaranteed\` (requests == limits) is evicted last, \`BestEffort\` (nothing set) is evicted first under node pressure. Placement is then controlled from both ends. **Affinity/anti-affinity** is a rule the Pod carries about the company it keeps: anti-affinity across the replicas of one Deployment is what spreads them over separate nodes and separate zones (a zone is one physically separate data-center building inside a cloud region) instead of stacking them on one machine that can die all at once. **Taints/tolerations** is the mirror image, a rule the node carries: a tainted node repels every Pod except the ones whose spec explicitly says it tolerates that taint, which is how a GPU pool or a system node stays free of ordinary web Pods. Add a **PodDisruptionBudget** so a voluntary drain (a node emptied on purpose, for an upgrade or a scale-down) never takes more than N Pods down at once.
 
 \`\`\`cswidget
 {
@@ -692,6 +692,50 @@ Every container should set resource **requests** (what the scheduler reserves) a
     }
   ],
   "caption": "Setting requests equal to limits buys the Guaranteed QoS class and an honest node, and pays for it in packing density. Setting them far apart buys density and pays for it in CPU throttling that hits well-behaved pods alongside the greedy one."
+}
+\`\`\`
+
+The other three controls are easy to mix up, because all three sound like "where do my Pods go". They answer different questions, so sort them by who writes the rule and what it decides.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "k8s-placement-controls",
+  "prompt": "Sort each requirement into the control that delivers it.",
+  "buckets": [
+    "Affinity / anti-affinity",
+    "Taint / toleration",
+    "PodDisruptionBudget"
+  ],
+  "items": [
+    {
+      "label": "Keep the 12 checkout replicas on 12 different nodes",
+      "bucket": "Affinity / anti-affinity",
+      "feedback": "Anti-affinity between the replicas of one Deployment is the rule that refuses to stack them, so losing a node costs one replica instead of all of them."
+    },
+    {
+      "label": "Keep the expensive GPU nodes free of ordinary web Pods",
+      "bucket": "Taint / toleration",
+      "feedback": "The node repels everything by default, and only the training job whose spec tolerates the taint may land there. Affinity cannot do this: it would need every other Pod in the cluster to opt out by hand."
+    },
+    {
+      "label": "Never let a node upgrade remove more than 2 of the 12 replicas at once",
+      "bucket": "PodDisruptionBudget",
+      "feedback": "A PDB is the only one of the three that bounds a voluntary eviction. It does not place anything: it makes the drain wait until removing the next Pod is safe."
+    },
+    {
+      "label": "Put the sidecar cache on the same node as the API Pod that reads it",
+      "bucket": "Affinity / anti-affinity",
+      "feedback": "The attracting half of the same rule. Affinity pulls Pods together, anti-affinity pushes them apart, and both are written on the Pod."
+    },
+    {
+      "label": "Let the logging agent, and only the logging agent, run on the control-plane nodes",
+      "bucket": "Taint / toleration",
+      "feedback": "Control-plane nodes ship tainted for exactly this reason, and the agent carries the matching toleration. A toleration is permission to land, never a demand to."
+    }
+  ],
+  "reveal": "Affinity is written on the Pod and describes the company it wants (or refuses) to keep. A taint is written on the node and repels every Pod that does not carry the matching toleration. A PodDisruptionBudget places nothing at all: it caps how many Pods a voluntary drain may take out at once, which is what keeps a routine node upgrade from becoming an outage."
 }
 \`\`\`
 
@@ -921,7 +965,7 @@ A service mesh manages **east-west** traffic: service-to-service calls inside th
 
 - **Security:** automatic **mTLS** between services (zero-trust: every call authenticated and encrypted, no plaintext on the wire), plus authorization policy (service A may call service B).
 - **Traffic control:** retries, timeouts, circuit breaking, and **traffic splitting / shifting** (send 5 percent to v2 for a canary) without touching app code.
-- **Observability:** uniform L7 telemetry, golden metrics, and distributed-trace context for every hop, whatever language each service is written in.
+- **Observability:** uniform L7 telemetry, golden metrics, and distributed-trace context for every hop, whatever language each service is written in. L4 and L7 are the layers [Level 4 splits load balancers by](/learn/system-design/scaling-compute/sd-l4-lb-l4-l7): L4 sees only the connection (addresses and ports), L7 opens the HTTP request and can read the path, the method, and the headers.
 
 ## The sidecar model and its tax
 
@@ -974,14 +1018,14 @@ one 16 vCPU node packed with 30 Pods
 
 Two decisions fall out. **The tax scales with Pod count, not with request rate.** That reservation is charged against node capacity the moment the Pod schedules, so a fleet of many small, mostly idle services pays the most per unit of useful work, and the same rightsizing and bin-packing argument that applies to your application containers applies to the proxies beside them.
 
-**The migration is worth it at one end of that table and not the other.** At a few hundred Pods the sidecar bill is small enough that it will never be the argument that wins, so if you decline a mesh at that size, decline it on operational grounds (a proxy fleet to run, upgrade, and debug) rather than pretending the money decided it. At thousands of Pods it is a five-figure monthly line plus per-traversal latency compounding on every deep call path, and that is where a sidecarless data plane pays for its own migration.
+**The migration is worth it at one end of that table and not the other.** At a few hundred Pods the sidecar bill is small enough that it will never be the argument that wins, so if you decline a mesh at that size, decline it on operational grounds (a proxy fleet to run, upgrade, and debug) rather than pretending the money decided it. At thousands of Pods it is a five-figure monthly line plus per-traversal latency compounding on every deep call path, and that is where a sidecarless data plane pays for its own migration. Every mesh has two halves, and it is worth separating them before the next section: the **data plane** is the path your traffic physically flows through (the proxies), and the **control plane** is the separate brain that hands those proxies their certificates, routes, and policy without ever touching a request itself. Sidecarless changes the data plane, which is the expensive half, because it is the one you pay for per Pod.
 
 ## The sidecarless / ambient shift
 
 The 2024 to 2025 shift is meshes that cut this tax:
 
 - **Istio Ambient** splits the mesh into a per-node L4 component (ztunnel) handling mTLS for all Pods on the node, plus an optional per-namespace L7 proxy (waypoint) only where you need retries/splitting. The ztunnels carry traffic to each other over **HBONE**, an mTLS tunnel that keeps each workload's own identity on the connection, so per-connection mTLS survives even though most Pods pay no per-Pod proxy.
-- **Cilium** takes a different route to the same goal. It enforces identity-based L3/L4 policy in the kernel via **eBPF**, does mutual authentication in its agent using SPIFFE workload identities (off the datapath, because eBPF does not perform a TLS handshake), and gets confidentiality from transparent node-to-node encryption with **WireGuard** or **IPsec**. The result is authenticated, encrypted east-west traffic with no per-Pod proxy at all, but it is not per-connection mTLS. That is the eBPF-plus-WireGuard posture. Cilium 1.19 added ztunnel transparent encryption (also beta), a per-node Rust proxy with SPIRE as CA that does give per-connection mTLS pod to pod, so "Cilium means no per-connection mTLS" stopped being true in March 2026.
+- **Cilium** takes a different route to the same goal. It enforces identity-based L3/L4 policy in the kernel via **eBPF**, a facility that lets small verified programs run inside the operating system's own networking code, so the packet is allowed or dropped where it already is instead of being handed up to a proxy process first. That is why there is no per-Pod container to pay for. It does mutual authentication in its agent using SPIFFE workload identities (off the datapath, because eBPF does not perform a TLS handshake), and gets confidentiality from transparent node-to-node encryption with **WireGuard** or **IPsec**. The result is authenticated, encrypted east-west traffic with no per-Pod proxy at all, but it is not per-connection mTLS. That is the eBPF-plus-WireGuard posture. Cilium 1.19 added ztunnel transparent encryption (also beta), a per-node Rust proxy with SPIRE as CA that does give per-connection mTLS pod to pod, so "Cilium means no per-connection mTLS" stopped being true in March 2026.
 
 The win is fewer proxies, lower per-Pod memory, and lower latency for the common L4 path. Put the earlier arithmetic through it: those 5,000 Pods sit on maybe 170 nodes, so ambient replaces 5,000 sidecars with 170 ztunnels, and even at a couple of times a sidecar's reservation each that is roughly 34 vCPU rather than 500, which is about 1,100 dollars a month rather than 16,000, plus waypoints only in the namespaces that genuinely need L7. Roughly an order of magnitude, which is the kind of gap that justifies a migration on its own. Maturity differs by implementation, and the difference matters in an interview: Istio's ambient mode went GA in 1.24 (November 2024), while Cilium's mutual authentication is still beta. Either way this is the direction of new adoption. **Gateway API** is the converging standard for both north-south and (via GAMMA) east-west config, which lets you swap the underlying implementation with less lock-in than the older bespoke CRDs.
 
@@ -1546,7 +1590,7 @@ Databases, caches, queues, and blob stores are attached by **URL and credentials
 
 ## Design for failure
 
-In a cloud-native world instances vanish routinely: spot reclamation, autoscale scale-in, node drains, zone loss. So health checks, retries, and graceful shutdown are **required, not optional**, and logs must stream to **stdout** as an event stream for the platform to collect (never written to a local file that dies with the instance).
+In a cloud-native world instances vanish routinely, and the warning you get ranges from short to none: spot reclamation (a deeply discounted VM the cloud provider is allowed to take back the moment it wants the capacity, and you get about two minutes' notice), autoscale scale-in and node drains (deliberate, seconds of notice through SIGTERM), and zone loss (no notice whatsoever). So health checks, retries, and graceful shutdown are **required, not optional**, and logs must stream to **stdout** as an event stream for the platform to collect (never written to a local file that dies with the instance).
 
 **Interview nuance:** the highest-signal move is to walk a specific legacy service through the checklist and name the concrete change per factor: "session is in local memory -> move to Redis; uploads go to local disk -> move to S3; config is a baked-in \`app.conf\` -> move to env vars." That specificity is what separates a strong answer from reciting the factor names.
 
