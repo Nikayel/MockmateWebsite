@@ -2428,8 +2428,9 @@ because that is what the interviewer is actually scoring.
 ### The prime directive
 
 Reach a COMPLETE working design before you add any complexity. A simple design that satisfies every
-functional requirement beats an elaborate half-design every time. Do not shard, add Kafka, or optimize
-the cache until the plain version works end to end.
+functional requirement beats an elaborate half-design every time. Do not split the data across
+machines, bolt on a queue between services, or optimize the cache until the plain version works end to
+end.
 
 Two skills make the clock work in practice. First, **exit criteria**. Each phase has a concrete
 condition that tells you it is done and you may move on. Without one you drift. When you have a read
@@ -2576,16 +2577,23 @@ Almost every system begins as the same skeleton:
 That is a complete, working system for a huge class of problems. Only now do you add components, and
 only with a reason tied to a requirement:
 
-- A **gateway / reverse proxy** (Envoy, NGINX) when you need auth, rate limiting, or TLS termination
-  in one place.
+- A **gateway / reverse proxy** (Envoy, NGINX), the single front door every request passes through,
+  when you want authentication, rate limiting, or TLS termination (decrypting the secure connection
+  once at this box instead of on every server behind it) done in one place rather than in each
+  service. [Level 1](/learn/system-design/foundations/sd-l1-reverse-proxy-gateway) builds one.
 - A **cache** (Redis) when reads dominate and repeat, to cut datastore load and tail latency.
-- A **message queue** (Kafka, SQS) when work is async, spiky, or must survive a consumer being down.
-- A **CDN** (CloudFront) when you serve static or geographically distributed content.
+- A **message queue** (Kafka, SQS), a waiting line that holds work until a background worker takes
+  it, when work is async, spiky, or must survive a consumer being down
+  ([Level 6](/learn/system-design/event-driven/sd-l6-queue-pubsub-log)).
+- A **CDN** (CloudFront), rented machines around the world holding copies of your files near each
+  visitor, when you serve static or geographically distributed content
+  ([Level 1](/learn/system-design/foundations/sd-l1-cdn-caching-foundations)).
 - An **object store** (S3) for large blobs (images, video, files) that do not belong in a row.
-- A **search index** (Elasticsearch) when you need full-text or faceted queries the primary store
+- A **search index** (Elasticsearch) when you need full-text search, or faceted queries (filtering by
+  several attributes at once, like price and brand and rating together), that the primary store
   cannot serve.
-- A **geospatial index** (Redis geo commands, or an in-memory QuadTree) when the query is "what is
-  near this point" and it is asked at a rate the primary store cannot serve.
+- A **geospatial index** (Redis geo commands, or a purpose-built tree held in memory) when the query
+  is "what is near this point" and it is asked at a rate the primary store cannot serve.
 
 The discipline is that you say why each box exists. "I am adding Redis here because reads are 10x
 writes and the same hot keys repeat, so caching cuts p99 and datastore QPS." A box without a
@@ -2599,15 +2607,17 @@ place. Take a scooter-share fleet: every scooter reports its position every few 
 ask "what is within 500 meters of me". A relational store can express that query:
 
 \`\`\`
--- on the primary database, with the PostGIS extension
+-- on the primary database, with the PostGIS extension (it teaches SQL about points on a map)
 UPDATE scooters SET loc = POINT(-122.41, 37.77) WHERE id = 42;   -- one durable row write per ping
 SELECT id FROM scooters
  WHERE status = 'available'
-   AND ST_DWithin(loc, POINT(-122.41, 37.77), 500);
+   AND ST_DWithin(loc, POINT(-122.41, 37.77), 500);   -- within 500 meters of this point
 \`\`\`
 
-It fails on rate, not on syntax. Every ping is a durable write to a single primary with an on-disk
-index update, and the fleet pings whether or not anyone is searching, so the write load is set by the
+It fails on rate, not on syntax. Every ping is a durable write to a single primary, meaning the row
+is saved to disk before the write is acknowledged, and saving that row also rewrites the sorted
+lookup structure the database keeps for the location column, which costs a little time on every
+single ping. The fleet pings whether or not anyone is searching, so the write load is set by the
 fleet size rather than by demand.
 
 An in-memory geospatial index answers the same question out of RAM, and the position update is a
@@ -2619,11 +2629,12 @@ GEOSEARCH scooters:sf FROMLONLAT -122.41 37.77 BYRADIUS 500 m ASC COUNT 20
   -> scooter:42, scooter:88, scooter:17     (nearest first)
 \`\`\`
 
-The key name is half the design. The index is partitioned into a grid of geographic cells (a geohash
-or S2 grid, one key per cell), so a search reads the caller's cell plus its neighbors instead of
-scanning the whole fleet, and each shard owns a region. Partitioning by scooter id would not work,
-because "near this point" does not follow id ranges. An in-memory QuadTree sharded by region is the
-other common shape of the same box.
+The key name is half the design. The map is chopped into cells, like squares drawn on graph paper,
+and each scooter is filed under the cell it is currently sitting in, one key per cell. A search then
+reads the caller's own cell plus the ring of cells around it instead of scanning the whole fleet, and
+each server owns a block of neighboring cells. Filing them by scooter id instead would not work,
+because "near this point" does not follow id order: the two scooters on your street have unrelated
+ids and would land on different servers.
 
 Like every other box, it enters with a requirement behind it: a proximity query at a rate the primary
 store cannot absorb. It is not free either, because nothing in RAM is durable, so the thing that must
@@ -2727,8 +2738,10 @@ ordered by the clients' clocks -> B, then A
 \`\`\`
 
 The chat service is already assigning a message id on the way through, so give it the ordering job
-too. The conversation is the partition key, which means exactly one partition owns conversation c-77,
-and that one authority hands out a sequence number per conversation as messages arrive:
+too. The conversation is the partition key, meaning the field you split the data by, so exactly one
+server owns conversation c-77 and every message in it goes through that server
+([Level 3](/learn/system-design/scaling-data/sd-l3-partitioning-strategies) is the whole lesson). That
+one authority hands out a sequence number per conversation as messages arrive:
 
 \`\`\`
 partition owning c-77, next_seq = 41
@@ -2799,7 +2812,10 @@ Look at what the requirements and your QPS numbers stress:
 - High **availability** with a single primary points to a single point of failure that needs
   replication or failover.
 - **Write-heavy** load past one node's capacity points to sharding and its partition-key choice.
-- **Tail latency** (p99) under fanout points to precomputation, async work, or backpressure.
+- **Tail latency** (the p99: the slowest 1 percent of requests) under fanout points to
+  precomputation, async work, or
+  [backpressure](/learn/system-design/scaling-compute/sd-l4-load-shedding-backpressure), which is a
+  busy service telling its callers to slow down instead of quietly falling further behind.
 
 You name the bottleneck out loud: "My tightest NFR is redirect availability, and my design has the
 datastore as a single point of failure, so that is where I will dive."
@@ -2873,6 +2889,42 @@ CDN egress    500M users x 50 views/day x 150 KB
               = ~110 PB/month, ~10 USD/TB     = ~1.1M USD a month
 feed cache    500M feeds x 200 entries x ~64 B
               = ~6.4 TB of RAM, ~5 USD/GB     = ~32k USD a month
+\`\`\`
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Cost line",
+    "Where the number comes from",
+    "USD a month",
+    "Share of the bill"
+  ],
+  "rows": [
+    [
+      "Blob storage",
+      "200 TB of new photos a day, about 73 PB after a year, billed once at ~20 USD/TB-month",
+      "~1,500,000",
+      "~57%"
+    ],
+    [
+      "CDN egress",
+      "500M users x 50 views x 150 KB, about 110 PB a month at ~10 USD/TB",
+      "~1,100,000",
+      "~42%"
+    ],
+    [
+      "Feed cache",
+      "500M feeds x 200 entries x ~64 B, about 6.4 TB of RAM at ~5 USD/GB-month",
+      "~32,000",
+      "~1%"
+    ]
+  ],
+  "highlightCols": [
+    "Share of the bill"
+  ],
+  "caption": "The box a candidate is usually proudest of drawing is the 1 percent line. Halving the cached feed saves about 16,000 dollars against a bill near 2.6 million, while aging old blobs onto an archive tier attacks the 57 percent line, which is why a cost answer is a ranking with a winner rather than a list."
+}
 \`\`\`
 
 That ranking changes what you say in the last two minutes. Trimming precomputed feeds from 200 posts
