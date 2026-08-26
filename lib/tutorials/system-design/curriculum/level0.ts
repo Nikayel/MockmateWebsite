@@ -3159,9 +3159,10 @@ const tradeoffArticulationTeach = `
 ## A fact is not a decision
 
 The single fastest way to sound junior is to name a technology without naming what you gave up to get
-it. "I'll use Cassandra" is a fact. "I'll use Cassandra because I need multi-region writes and can
-tolerate read-repair latency, which costs me easy cross-partition transactions" is a decision.
-Staff-level interviewers grade the second sentence, not the first.
+it. "I'll use Cassandra" is a fact. "I'll use Cassandra because I need writes accepted in several
+regions at once, and I can live with a row read right after a write briefly showing the old value,
+which costs me the ability to change two rows in one all-or-nothing step" is a decision. Staff-level
+interviewers grade the second sentence, not the first.
 
 \`\`\`cswidget
 {
@@ -3179,7 +3180,7 @@ Staff-level interviewers grade the second sentence, not the first.
       "feedback": "Naming a technology is a fact. Nothing was weighed and nothing was given up."
     },
     {
-      "label": "I'll use Cassandra for multi-region writes, accepting read-repair latency and giving up easy cross-partition transactions",
+      "label": "I'll use Cassandra for writes in several regions at once, accepting briefly stale reads and giving up all-or-nothing changes across rows",
       "bucket": "Decision",
       "feedback": "A lens, a commitment, and a named cost. This is the sentence staff-level interviewers grade."
     },
@@ -3213,21 +3214,54 @@ it:
   you could restore it? A ledger row has to survive. A position ping that a new one replaces every few
   seconds does not, and paying for durability on it costs write throughput and buys nothing.
 - **SQL vs NoSQL, normalize vs denormalize, cache vs recompute**: each is a spend-here-to-save-there
-  trade.
+  trade. Have the worked version of the last one ready, because it is the one people wave at. Storing
+  a post's like count in the post row makes every read one lookup and makes every like two writes,
+  the like itself plus the stored number it has to keep true. Counting the likes at read time is
+  always correct and costs one aggregate query per view. At 100 reads per write, storing wins by
+  about 100x the work; at 1 read per write it is pure overhead you now have to keep honest.
 
 The durability lens is the one candidates skip, because "store it durably" always sounds like the
 responsible answer. Run it on the geospatial index from the high-level design lesson. The same query
 has two homes, and they trade different things:
 
-\`\`\`
-Durable, on the primary store              In memory, in a cell-partitioned geo index
-  UPDATE ... SET loc = POINT(x, y)           GEOADD   things:cell-9q8y x y thing:42
-  SELECT ... WHERE ST_DWithin(...)           GEOSEARCH things:cell-9q8y FROMLONLAT x y BYRADIUS 2 km
-  survives a restart, every write            answers from RAM, survives nothing: a restart is
-  is a WAL write on one primary              empty until every reporter checks in again
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "The same proximity query, two homes",
+    "Durable, on the primary store",
+    "In memory, in a cell-partitioned index"
+  ],
+  "rows": [
+    [
+      "What one position update does",
+      "Appends the change to the database journal on one primary, then saves the row, before the write is acknowledged",
+      "Overwrites one entry in memory on the server that owns that map cell"
+    ],
+    [
+      "Cost of that update, off the latency ladder",
+      "About 1 ms, paid by every vehicle every few seconds whether or not anyone is searching",
+      "About 100 ns, roughly 10,000x cheaper"
+    ],
+    [
+      "Survives a restart",
+      "Yes, that is what you are paying for",
+      "No: the index is empty until every vehicle has reported in again"
+    ],
+    [
+      "So the real cost is",
+      "Write throughput, and at fleet scale it is the thing that breaks first",
+      "A gap of seconds after a restart when a search misses vehicles that exist"
+    ]
+  ],
+  "highlightCols": [
+    "In memory, in a cell-partitioned index"
+  ],
+  "caption": "Priced with the constants from the latency lesson, durability on this write costs about 10,000x what the in-memory version does, and buys the one thing memory cannot give you. Whether that is a bargain depends entirely on how long a position is worth anything."
+}
 \`\`\`
 
-Neither line is a decision yet. It becomes one when you say how long a stale position is worth
+Neither column is a decision yet. It becomes one when you say how long a stale position is worth
 anything, what an empty index for a few seconds after a restart actually costs, and which data in the
 same system (the trip, the receipt, the dispute) has the opposite answer and therefore belongs in a
 different store.
@@ -3389,6 +3423,46 @@ Token bucket: capacity 100, refilling at 100 tokens per 60s (1.67 per second).
 Three different answers to the same "100 per minute", and the difference is the shape of what they
 admit at the edges plus what they cost to store. Which of those costs your system can pay is the part
 you commit to out loud.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Algorithm",
+    "State kept per key",
+    "What it admits at the edges",
+    "Entries held for 1M live keys",
+    "Reach for it when"
+  ],
+  "rows": [
+    [
+      "Fixed window",
+      "One integer that expires itself",
+      "Up to 2x the limit across a boundary: 200 requests in about two seconds",
+      "~1M",
+      "A short 2x burst is harmless and you want the cheapest thing that works"
+    ],
+    [
+      "Sliding-window log",
+      "One timestamp per request in the window, so up to 100 at this limit",
+      "Exact, no boundary burst: the window moves with the clock instead of jumping",
+      "~100M",
+      "The burst is the thing that hurts and you can pay 100x the memory to remove it"
+    ],
+    [
+      "Token bucket",
+      "Two numbers: tokens left and last refill time",
+      "A burst up to the full 100 after idle time, then settles at the refill rate of 1.67 per second",
+      "~2M",
+      "The usual default: one knob for burst size, one for the sustained rate"
+    ]
+  ],
+  "highlightCols": [
+    "Entries held for 1M live keys"
+  ],
+  "caption": "Exactness is bought with memory, and the price is about 100x per key. That single sentence, said with the numbers attached, is the senior move in this comparison, because it turns three names you memorized into a choice you can defend."
+}
+\`\`\`
 
 \`\`\`cswidget
 {
