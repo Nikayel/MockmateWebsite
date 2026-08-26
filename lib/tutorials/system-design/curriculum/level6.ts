@@ -3205,7 +3205,7 @@ A watermark is the engine's assertion "I believe I have now seen all events with
 
 ## Fault-tolerant state
 
-Aggregations are stateful (a per-user counter lives somewhere). Flink keeps this in an embedded **RocksDB** state backend on each task's local disk, and periodically takes a **checkpoint**: a consistent snapshot of all operator state plus the source offsets, written to durable storage (S3/HDFS) using the Chandy-Lamport barrier algorithm. On failure it restores the last checkpoint and rewinds Kafka to the checkpointed offsets, giving **exactly-once** *state* semantics (each event affects state once, even though it may be reprocessed). Kafka Streams does the same idea with a compacted *changelog topic* backing each local store.
+Aggregations are stateful (a per-user counter lives somewhere). Flink keeps this in an embedded **RocksDB** state backend on each task's local disk, and periodically takes a **checkpoint**: a consistent snapshot of all operator state plus the source offsets, written to durable storage (S3/HDFS). Taking that snapshot without stopping the job is the Chandy-Lamport barrier algorithm: the source slips a marker into the stream, and each operator saves its own state at the moment the marker passes it, so the pieces all describe the same instant even though nothing ever paused. On failure it restores the last checkpoint and rewinds Kafka to the checkpointed offsets, giving **exactly-once** *state* semantics (each event affects state once, even though it may be reprocessed). Kafka Streams does the same idea with a compacted *changelog topic* backing each local store.
 
 \`\`\`cswidget
 {
@@ -3232,7 +3232,49 @@ Aggregations are stateful (a per-user counter lives somewhere). Flink keeps this
 
 ## Engine choice
 
-*Flink*: richest event-time/state/CEP support, true exactly-once via checkpoints, best for complex low-latency work. *Kafka Streams*: a library (no cluster), great when you already live in Kafka and want per-partition local state. *Spark Structured Streaming*: micro-batch, best if you already run Spark and can tolerate slightly higher latency. Joins matter too: *stream-stream* joins need windowed state on both sides; *stream-table* joins enrich events against a materialized **KTable** (a changelog folded into current-value-per-key).
+Three engines cover almost every answer, and the choice trades how much the engine does for how much of it you have to run. Read the row whose infrastructure you already own before the row with the longest feature list.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Engine",
+    "Typical latency",
+    "What its state support buys",
+    "What you have to run",
+    "Best fit"
+  ],
+  "rows": [
+    [
+      "Flink",
+      "tens of ms, record by record",
+      "The richest event-time and state support, exactly-once state via checkpoints, and CEP (complex event processing: matching a pattern across the stream, such as three failed logins followed by a password change)",
+      "A cluster of its own: job manager, task managers, and checkpoint storage",
+      "Complex low-latency work whose correctness depends on event time"
+    ],
+    [
+      "Kafka Streams",
+      "tens of ms, record by record",
+      "Per-partition local state backed by a compacted changelog topic, with no pattern-matching engine",
+      "Nothing extra: it is a library inside your own service, deployed and scaled like the rest of it",
+      "You already live in Kafka and want stateful processing without standing up a second platform"
+    ],
+    [
+      "Spark Structured Streaming",
+      "hundreds of ms to seconds, because it runs micro-batches",
+      "Full Spark SQL, and the same code your batch jobs already use; state handling is coarser",
+      "A Spark cluster, which you may already be running for batch",
+      "You already run Spark and seconds of latency is acceptable"
+    ]
+  ],
+  "highlightCols": [
+    "What you have to run"
+  ],
+  "caption": "Engine choice is latency and state richness against operational footprint. Flink buys the most and costs a platform to operate; Kafka Streams buys per-partition state for the price of a library; Spark buys reuse of the batch stack and pays for it in seconds of latency."
+}
+\`\`\`
+
+Joins matter too: *stream-stream* joins need windowed state on both sides; *stream-table* joins enrich events against a materialized **KTable** (a changelog folded into current-value-per-key).
 
 **Recap:** aggregate by event time, use watermarks to bound lateness and fire windows, keep local state fault-tolerant via RocksDB plus checkpoints/changelogs for exactly-once, and never drop late data silently.
 
@@ -3521,6 +3563,53 @@ Two requests both read Account #42 at version 100 and both try to append. To pre
 
 Event sourcing adds real complexity: eventual consistency in read models, replay tooling, schema/upcasting discipline, and a steeper mental model for the whole team. If an entity is simple CRUD with no audit or temporal need (a user's display-name preference), event sourcing is over-engineering. Reach for it where history *is* the product: ledgers, order lifecycles, inventory, anything audited.
 
+Count the pieces, because that is what the complexity actually is. CRUD stores one row and runs one \`UPDATE\`. The event-sourced version of the same entity is an append-only event table, a fold function, snapshots plus the job that writes them, an expected-version conflict path with retries, at least one projection per read shape plus the tooling to rebuild it, and an upcaster for every old event version still sitting in the log. That is six moving parts where there was one, every one of them something a new engineer has to learn before they can safely add a field, and every read of the entity is now eventually consistent. That price is trivially worth paying for a ledger a regulator will audit, and absurd for a display-name preference whose history nobody will ever open.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "prompt": "Six entities, one question each time: is the history of this thing something somebody will actually ask about? Sort each one.",
+  "buckets": [
+    "Event-source it",
+    "Plain CRUD is fine"
+  ],
+  "items": [
+    {
+      "label": "A payment ledger a regulator can audit line by line",
+      "bucket": "Event-source it",
+      "feedback": "The audit trail is the requirement, not a nice-to-have, and appending immutable facts gives it for free instead of bolting on a second history table that can drift from the real one."
+    },
+    {
+      "label": "The order lifecycle: created, paid, packed, shipped, returned",
+      "bucket": "Event-source it",
+      "feedback": "Support and operations ask what happened and when, all day long. A status column answers only the last question and throws away the sequence that everybody actually needs."
+    },
+    {
+      "label": "A shopping cart, where the product team wants to know which items shoppers add and then remove before checkout",
+      "bucket": "Event-source it",
+      "feedback": "The removals are the question being asked, and a current-state cart deletes exactly that evidence. Here the events are the product insight, not just an audit artifact."
+    },
+    {
+      "label": "Warehouse inventory that has to reconcile against a physical stock count",
+      "bucket": "Event-source it",
+      "feedback": "When the shelf and the number disagree, the receipts, picks, and adjustments that produced the number are the reconciliation. A single count column tells you only that you are wrong."
+    },
+    {
+      "label": "A user's display-name preference",
+      "bucket": "Plain CRUD is fine",
+      "feedback": "Nobody will ever ask what this was last Tuesday. One column and one UPDATE, and you skip the six moving parts and the eventual consistency that come with the pattern."
+    },
+    {
+      "label": "A lookup table of country dial codes the app loads at startup",
+      "bucket": "Plain CRUD is fine",
+      "feedback": "Reference data that changes once a year and has no per-user story attached to it. Fold machinery here is cost with no matching question."
+    }
+  ],
+  "reveal": "One test decides it: will somebody ask what happened, in what order, and why? Auditors, support, reconciliation, and analytics on abandoned carts all ask exactly that, so the log is the answer and its complexity earns its keep. When the only question anybody ever asks is what the value is right now, a column answers it and event sourcing is a tax with no return."
+}
+\`\`\`
+
 **Recap:** store immutable events as truth and fold them to derive state, bound replay with snapshots, guard writes with expected-version optimistic concurrency, correct by appending (never editing), and use it only where audit/temporal value justifies the complexity.
 
 \`\`\`cswidget
@@ -3733,7 +3822,7 @@ The projection updates *after* the write commits, so there is a lag (usually mil
 
 Because projections are derived and idempotent, you can drop a read model and **replay** the event log to rebuild it. That is how you add a new read model months later, fix a projection bug, or migrate the read store: reset the offset to 0 and reprocess. This is the strongest operational reason to adopt CQRS.
 
-**Interview nuance:** CQRS and event sourcing are *often taught together but are independent.* You can do CQRS with a plain CRUD write model that emits events (or that a change-data-capture stream like Debezium tails), no event store required. Coupling CQRS to full event sourcing "because they go together" doubles your complexity for no reason if you did not need the event log. Default to CQRS-with-CDC unless audit/temporal needs justify event sourcing too.
+**Interview nuance:** CQRS and event sourcing are *often taught together but are independent.* You can do CQRS with a plain CRUD write model that emits events (or that a [change-data-capture stream](/learn/system-design/scaling-data/sd-l3-cdc-dual-write) like Debezium tails, meaning a reader that follows the database's own log of committed row changes and republishes each one as an event, which is Level 3's CDC lesson), no event store required. Coupling CQRS to full event sourcing "because they go together" doubles your complexity for no reason if you did not need the event log. Default to CQRS-with-CDC unless audit/temporal needs justify event sourcing too.
 
 \`\`\`cswidget
 {
@@ -5079,7 +5168,7 @@ unchanged since launch. The pod autoscaler targets total consumer lag under 500k
           practice: {
             id: "sd-l6-cqrs-practice",
             prompt:
-              "Design the CQRS read-side for Amazon-scale product search: a write model that ingests 100k catalog updates/sec from thousands of seller and inventory services, fanning out to multiple denormalized read models (full-text search, per-region price/availability, a recommendations feature store) while keeping each independently rebuildable and handling seller read-your-writes.",
+              "Design the CQRS read-side for Amazon-scale product search: a write model that ingests 100k catalog updates/sec from thousands of seller and inventory services, fanning out to multiple denormalized read models (full-text search, per-region price/availability, a recommendations feature store, meaning the store of precomputed inputs a recommendation model reads while it serves) while keeping each independently rebuildable and handling seller read-your-writes.",
             thinkAbout: [
               "Why is a single partitioned event log the right fan-out backbone?",
               "How do consistency requirements differ across the read models?",
