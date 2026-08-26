@@ -199,6 +199,25 @@ describe("proceedToFinalFeedback for a guest", () => {
     expect(failure?.[1]).toMatchObject({ status: 429 })
   })
 
+  it("treats an already-completed 409 as saved, not as a loss", async () => {
+    // The server refuses duplicate completion writes with 409. That means
+    // the score IS saved — retrying is pointless and a failure event would
+    // be a false alarm in the funnel.
+    fetchMock.mockImplementationOnce(() =>
+      Promise.resolve({ ok: false, status: 409, json: async () => ({}) })
+    )
+    const opts = buildOpts()
+    const { result } = renderHook(() => useInterviewFeedback(opts as never))
+
+    await act(async () => {
+      await result.current.proceedToFinalFeedback()
+    })
+
+    const putCalls = fetchMock.mock.calls.filter(([url]) => url === "/api/guest-session")
+    expect(putCalls).toHaveLength(1)
+    expect(trackEvent.mock.calls.find(([name]) => name === "guest_score_put_failed")).toBeFalsy()
+  })
+
   it("still schedules the signup prompt", async () => {
     vi.useFakeTimers()
     const opts = buildOpts()

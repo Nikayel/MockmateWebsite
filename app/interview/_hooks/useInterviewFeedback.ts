@@ -512,11 +512,21 @@ export function useInterviewFeedback(
             return null
           }
         }
+        const isAlreadySaved = (response: Response | null) =>
+          // 409 means the server refused a DUPLICATE completion write — the
+          // score is already stored, so this is success, not a loss.
+          response !== null && response.status === 409
         let completionResponse = await putCompletion()
-        if (!completionResponse || !completionResponse.ok) {
+        if (
+          !isAlreadySaved(completionResponse) &&
+          (!completionResponse || !completionResponse.ok)
+        ) {
           completionResponse = await putCompletion()
         }
-        if (!completionResponse || !completionResponse.ok) {
+        if (
+          !isAlreadySaved(completionResponse) &&
+          (!completionResponse || !completionResponse.ok)
+        ) {
           console.error("Guest completion PUT failed", completionResponse?.status)
           trackEvent("guest_score_put_failed", { status: completionResponse?.status ?? 0 })
         }

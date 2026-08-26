@@ -101,6 +101,22 @@ export async function POST(request: NextRequest) {
         (doc) => !doc.data().completed_at && !doc.data().feedback
       )
       if (incompleteSession) {
+        // A returning guest may have picked a DIFFERENT problem. The doc must
+        // describe what they are actually solving: PUT's whitelist can never
+        // touch scenario fields, and migration carries this doc into the new
+        // account as-is — a completion stamped onto a doc still naming the
+        // old problem shows the wrong title next to the score forever.
+        const existingData = incompleteSession.data()
+        if (scenarioId && existingData.scenario_id !== scenarioId) {
+          await incompleteSession.ref.update({
+            topic: scenarioTitle,
+            type: scenarioType,
+            pattern: pattern || scenarioType,
+            scenario_id: scenarioId,
+            difficulty,
+            updated_at: new Date().toISOString(),
+          })
+        }
         return NextResponse.json({
           sessionId: incompleteSession.id,
           message: "Returning existing session",
@@ -260,6 +276,14 @@ export async function PUT(request: NextRequest) {
 
     if (sessionData?.user_id !== guestId || !sessionData?.is_guest) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 })
+    }
+
+    // A completed trial's score is written exactly once. Without this guard
+    // any later PUT carrying performanceScore (a replayed request, a stray
+    // client retry) silently overwrote the real result and refreshed
+    // completed_at.
+    if (performanceScore !== undefined && sessionData?.completed_at) {
+      return NextResponse.json({ error: "Session already completed" }, { status: 409 })
     }
 
     // Build update data
