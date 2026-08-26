@@ -295,7 +295,7 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
 
         toast.success("Free trial started.", {
           description:
-            "Run the tests, submit, and see your score. Sign up to unlock the AI interviewer.",
+            "Run the tests and submit. Your score and the written review unlock with a free account.",
         })
       } catch (error) {
         console.error("Error creating guest session:", error)

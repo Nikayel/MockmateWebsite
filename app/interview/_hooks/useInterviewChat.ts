@@ -449,9 +449,10 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
           )
         }
 
-        // The guest wall is a pitch, not a dead end: it names what unlocks, the
-        // real free-plan terms, and a link that returns the guest to this exact
-        // session (login honors ?redirect=interview). Rendered via
+        // The guest wall is a pitch, not a dead end: it names what unlocks and
+        // the real free-plan terms. It must not promise a return to this exact
+        // session: the login flow lands on the scenario browser or the
+        // sessions page, not back inside a live interview. Rendered via
         // MarkdownRenderer, so the link is live inside the chat bubble.
         if (!firebaseUser) {
           trackEvent("guest_chat_walled", { scenario_id: selectedScenario?.id })
@@ -462,8 +463,9 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
               type: "ai",
               message:
                 "This is where the interviewer comes in, and it needs a free account: one click " +
-                "with Google or GitHub, 8 full AI sessions a month, no card required. You'll land " +
-                "right back in this session.\n\n**[Create a free account](/login?redirect=interview)**\n\n" +
+                "with Google or GitHub, 8 full AI sessions a month, no card required. Your code " +
+                "and progress here carry over to your account.\n\n" +
+                "**[Create a free account](/login?redirect=interview)**\n\n" +
                 "Until then, Run Tests and Submit work right now, and the free courses in " +
                 "[Learn](/learn) never use interview sessions.",
             },

@@ -18,18 +18,23 @@ import { describe, expect, it, vi } from "vitest"
 import { GuestFeedbackLock } from "../GuestFeedbackLock"
 
 describe("GuestFeedbackLock", () => {
-  it("tells the guest their score and feedback are ready behind sign-in", () => {
+  it("tells the guest their results are ready behind a free account", () => {
     render(<GuestFeedbackLock onSignIn={() => {}} scenarioTitle="Two Sum" />)
 
     expect(screen.getByRole("heading", { name: /scored/i })).toBeTruthy()
-    expect(screen.getByRole("button", { name: /sign in/i })).toBeTruthy()
+    // "Create a free account", not "sign in": the guest has no account yet,
+    // and every other surface uses the create-account verb.
+    expect(screen.getByText(/create a free account/i)).toBeTruthy()
+    // The button sells the bundle, not the number the guest can already
+    // compute from their own test results.
+    expect(screen.getByRole("button", { name: /unlock your results/i })).toBeTruthy()
   })
 
   it("fires onSignIn when the guest asks for their results", () => {
     const onSignIn = vi.fn()
     render(<GuestFeedbackLock onSignIn={onSignIn} scenarioTitle="Two Sum" />)
 
-    fireEvent.click(screen.getByRole("button", { name: /sign in/i }))
+    fireEvent.click(screen.getByRole("button", { name: /unlock your results/i }))
 
     expect(onSignIn).toHaveBeenCalledTimes(1)
   })
@@ -52,7 +57,7 @@ describe("GuestFeedbackLock", () => {
     )
 
     expect(screen.getByRole("button", { name: /try again/i })).toBeTruthy()
-    expect(screen.queryByText(/sign in with a free account/i)).toBeNull()
+    expect(screen.queryByText(/create a free account/i)).toBeNull()
     expect(container.textContent).not.toMatch(/\d+\s*%/)
 
     fireEvent.click(screen.getByRole("button", { name: /try again/i }))

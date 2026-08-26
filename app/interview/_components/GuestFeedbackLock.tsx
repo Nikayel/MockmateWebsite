@@ -39,10 +39,13 @@ export function GuestFeedbackLock({ onSignIn, scenarioTitle, retry }: GuestFeedb
         <p className="text-muted-foreground mt-2 text-sm">
           {retry
             ? `${scenarioTitle} is submitted and saved, and your sign-in worked. Connecting the session to your new account failed, likely a network hiccup.`
-            : `${scenarioTitle} is submitted and saved. Sign in with a free account to see your score, the full feedback breakdown, and your code review.`}
+            : // Review-first, score last: the guest just watched their tests
+              // run, so a 10/10 guest can already compute the number. The
+              // review and the breakdown are the assets they cannot.
+              `${scenarioTitle} is submitted and saved. Create a free account to see the full review of your code, your score, and where you lost points.`}
         </p>
         <Button onClick={onSignIn} className="mt-6 w-full">
-          {retry ? "Try again" : "Sign in to see your score"}
+          {retry ? "Try again" : "Unlock your results"}
         </Button>
         <div className="text-muted-foreground mt-4 flex justify-center gap-4 text-xs">
           <span className="flex items-center gap-1">

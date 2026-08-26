@@ -176,10 +176,10 @@ export function SignupPrompt({
             {/* Value prop - what the sign-in reveals */}
             <div className="border-border/50 bg-muted/50 rounded-lg border p-3">
               <p className="text-muted-foreground text-sm font-medium">
-                Sign in free to see your results
+                Create your free account to see your results
               </p>
               <p className="text-muted-foreground mt-0.5 text-xs">
-                Your score, the full feedback breakdown, and your code review are saved to this
+                The full feedback breakdown, your code review, and your score are saved to this
                 session and unlock with a free account.
               </p>
             </div>
