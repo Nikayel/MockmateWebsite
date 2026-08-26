@@ -4344,13 +4344,27 @@ For a cron job, on completion compute the next run and reschedule. Clock skew ac
 const distributedLockTeach = `
 ## Why a distributed lock is hard to get right
 
-**The short answer.** A distributed lock cannot get its safety from elapsed time, which is Martin Kleppmann's critique of Redlock: a plain TTL lock is unsafe at any expiry, because a paused holder can outlive it. What actually closes the hole is a fencing token: a monotonically increasing number the protected resource checks on every write, rejecting anything lower than the one it has already accepted.
+**The short answer.** A distributed lock cannot get its safety from elapsed time, which is Martin Kleppmann's critique of Redlock (Redis's own multi-node locking algorithm): a plain TTL lock, one that just carries a time to live and lets it run out, is unsafe at any expiry, because a paused holder can outlive it. What actually closes the hole is a fencing token: a monotonically increasing number the protected resource checks on every write, rejecting anything lower than the one it has already accepted.
 
 A distributed lock lets processes on different machines agree that only one of them is inside a critical section at a time. The naive build is a single command: set a key if it does not already exist, with an expiry so that a dead holder cannot deadlock everyone else. It is unsafe, and not in a way any amount of tuning removes. The expiry is where it breaks: it is a bet that a holder which has gone quiet is dead, and a holder can go quiet without dying (a long garbage collection, a scheduler preemption, a network partition). None of those has a bound to tune the TTL against, so expiry cannot survive an unbounded pause, and that is a correctness hole rather than a knob.
 
 The fix is a fencing token. Every grant carries a monotonically increasing number, every write to the protected resource carries the number its holder was granted, and the resource remembers the highest number it has accepted and rejects anything lower. The paused holder's late write arrives with a stale token and is refused. Consensus makes the lock state correct, fencing makes the critical section correct, and a design needs both.
 
-That is the substance of **Martin Kleppmann's critique** of the Redlock algorithm: safety cannot be derived from timing assumptions. A lock that treats elapsed clock time as evidence that it is still held breaks the moment a clock jumps or a process pauses for longer than the validity window, with no node having failed at all. Redis's author published a rebuttal, and the disagreement is largely about which system model is fair to assume, but the practical rule survives it. If losing the lock costs only efficiency, say a background job that runs twice, an expiry-based lock is a reasonable tool. If it costs correctness, say a double payment or a corrupted file, you need linearizable lock state plus a fencing token at the resource, because fencing is the only defence that assumes nothing about time.
+That is the substance of **Martin Kleppmann's critique** of the Redlock algorithm: safety cannot be derived from timing assumptions. A lock that treats elapsed clock time as evidence that it is still held breaks the moment a clock jumps or a process pauses for longer than the validity window, with no node having failed at all. Redis's author published a rebuttal, and the disagreement is largely about which system model is fair to assume, but the practical rule survives it. If losing the lock costs only efficiency, say a background job that runs twice, an expiry-based lock is a reasonable tool. If it costs correctness, say a double payment or a corrupted file, you need linearizable lock state plus a fencing token at the resource, because fencing is the only defence that assumes nothing about time. Linearizable is the strong end of [Level 5's consistency spectrum](/learn/system-design/distributed-core/sd-l5-consistency-spectrum): every read sees the latest committed write, so the several copies of the lock state behave as if there were only one.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Lock design", "Safe when the holder pauses?", "Safe when the lock store fails over?", "What it costs", "Reach for it when"],
+  "rows": [
+    ["Single-node key with a TTL", "No: the expiry fires while the holder is only paused, so two clients are inside at once", "No: replication is async, so a failover can lose the key and grant it twice", "One round trip, about 1 ms", "Losing the lock costs efficiency only: a nightly report that runs twice, a cache warmed twice"],
+    ["Consensus-backed lease (etcd, ZooKeeper)", "Still no: the lease expires on a long pause just as a TTL does", "Yes: a majority has to agree, so losing a minority of nodes loses nothing", "A majority round trip, roughly 5 to 20 ms per acquire", "The lock state itself has to survive node failure without ever being granted twice"],
+    ["Consensus lease plus a fencing token", "Yes: the woken holder's write carries a stale number and the resource refuses it", "Yes", "The lease cost plus one number the protected resource stores and compares", "Losing the lock costs correctness: a double payment, a corrupted file"]
+  ],
+  "highlightCols": ["Safe when the holder pauses?"],
+  "caption": "The first row is not a broken lock, it is a cheap one, and the pause column is what decides whether cheap is allowed. Notice that consensus alone does not fix the pause: it makes the lock STATE correct, while only the fencing token makes the critical SECTION correct, which is why the strong answer names both."
+}
+\`\`\`
 
 A coordination service (ZooKeeper, etcd, Consul) gives a cluster the primitives it cannot build safely on its own: mutual exclusion (a distributed lock), leader election, and shared configuration that stays correct across process pauses and network partitions. The interview tests whether you understand why a naive lock is unsafe and how leases, fencing tokens, watches, and consensus combine into a correct one.
 
@@ -4389,9 +4403,9 @@ It looks like a lock: SET key if not exists, with an expiry so a dead holder doe
 
 ## Consensus, leases, fencing, watches
 
-Build on a store whose state is replicated by a consensus protocol (Raft in etcd and Consul, Zab in ZooKeeper). A write commits only when a majority (quorum) of nodes agree, so the lock state is linearizable and survives minority failures. Under a partition only the majority side can make progress. This is the CP corner of CAP: during a partition the minority side becomes unavailable rather than returning possibly-wrong state.
+Build on a store whose state is replicated by a consensus protocol (Raft in etcd and Consul, Zab in ZooKeeper). A write commits only when a majority ([quorum](/learn/system-design/distributed-core/sd-l5-quorums-tunable)) of nodes agree, so the lock state is linearizable and survives minority failures. Under a partition only the majority side can make progress. This is the CP corner of [CAP](/learn/system-design/distributed-core/sd-l5-cap-correct): when the network splits, a system either keeps answering or refuses rather than risk being wrong, and a lock refuses, so during a partition the minority side becomes unavailable rather than returning possibly-wrong state.
 
-A client holds a lock via a session with a TTL that it must renew by heartbeat. If the client dies or partitions away, it stops heartbeating, the session lease expires, and the lock is released automatically. ZooKeeper models this as an ephemeral znode; etcd as a lease attached to the key.
+A client holds a lock via a session with a TTL that it must renew by heartbeat. If the client dies or partitions away, it stops heartbeating, the session lease expires, and the lock is released automatically. ZooKeeper models this as an ephemeral znode (a znode is one entry in ZooKeeper's small tree of coordination data, and ephemeral means it vanishes the moment the session behind it ends); etcd as a lease attached to the key.
 
 Fencing tokens are what make leasing safe. Each lock grant includes a monotonically increasing token (etcd's key revision, ZooKeeper's zxid). Every write the lock holder makes to the protected resource carries its token, and the resource remembers the highest token it has accepted and rejects any lower one. So when a paused old holder wakes up and tries to write with an old token, the resource fences it off.
 
@@ -4531,7 +4545,7 @@ Level 5 works the same mechanism from the other side, where the thing being held
 const codeSandboxTeach = `
 ## The isolation boundary is the core decision
 
-A code execution sandbox (an online judge like LeetCode, a CI runner, or this platform's own code runner) runs untrusted user code safely at scale. The defining decision is the isolation boundary: how strong a wall you put between hostile code and your host and other users. Assume the code is actively hostile (fork bombs, network exfiltration, kernel-escape attempts), because at contest scale someone will try.
+A code execution sandbox (an online judge like LeetCode, a CI runner, or this platform's own code runner) runs untrusted user code safely at scale. The defining decision is the isolation boundary: how strong a wall you put between hostile code and your host and other users. Assume the code is actively hostile: fork bombs (a loop that starts new processes until the machine has no room for anything else), network exfiltration (sneaking stolen data out over the network), and kernel-escape attempts (breaking out of the box into the operating system underneath). At contest scale someone will try all three.
 
 \`\`\`cswidget
 {
@@ -4558,7 +4572,7 @@ A code execution sandbox (an online judge like LeetCode, a CI runner, or this pl
 
 ## The isolation spectrum
 
-From weakest and cheapest to strongest and heaviest: a plain OS process with rlimits is trivially escapable and unacceptable for hostile code. A container (Docker) is convenient and starts fast but shares the host kernel, so a kernel vulnerability is a full escape; a container alone is not a security boundary for hostile code. A hardened container (seccomp to whitelist syscalls, AppArmor or SELinux, non-root user, read-only filesystem, dropped capabilities) is a reasonable middle ground that shrinks the attack surface dramatically. gVisor puts a user-space kernel between the code and the host kernel, intercepting syscalls so a kernel bug is much harder to reach, at some performance cost. A microVM (Firecracker) or Kata Containers gives each submission its own tiny virtual machine with its own guest kernel and hardware-virtualization isolation, which is near-VM strength but boots in roughly 125 ms, making it the strong default for untrusted code.
+From weakest and cheapest to strongest and heaviest: a plain OS process with rlimits is trivially escapable and unacceptable for hostile code. A container (Docker) is convenient and starts fast but shares the host kernel, so a kernel vulnerability is a full escape; a container alone is not a security boundary for hostile code. A hardened container is a reasonable middle ground: keep the container, then bolt on extra operating-system rules that block the risky moves. A syscall whitelist (seccomp) lets the code ask the kernel for only a short list of things, so an exotic kernel call it wants to attack is refused before it runs. A mandatory access-control profile (AppArmor or SELinux) fixes which files and devices it may touch at all. Running as a non-root user on a read-only filesystem with its admin powers dropped (Linux calls those powers capabilities: mounting disks, changing the clock, opening raw network sockets) removes the tools an escape would need. Together these shrink the attack surface dramatically without paying for a virtual machine. gVisor puts a user-space kernel between the code and the host kernel, intercepting syscalls so a kernel bug is much harder to reach, at some performance cost. A microVM (Firecracker) or Kata Containers gives each submission its own tiny virtual machine with its own guest kernel and hardware-virtualization isolation, which is near-VM strength but boots in roughly 125 ms, making it the strong default for untrusted code.
 
 \`\`\`csdiagram
 {
@@ -4838,6 +4852,27 @@ Offer at-least-once. Persist every event first, enqueue a delivery task, and mar
 ## Retries, signing, ordering
 
 On a failure (non-2xx, timeout, connection error) retry with exponential backoff plus jitter over a long window: seconds, then minutes, then hours, up to a day or more, with a capped attempt count. Backoff lets a down endpoint recover without a thundering herd, and jitter prevents all retries for a mass event from firing in lockstep. Use a per-attempt timeout (a few seconds) so a hung endpoint does not tie up a worker.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Attempt", "Wait before it", "Elapsed since the event"],
+  "rows": [
+    ["1", "none, delivered immediately", "0"],
+    ["2", "10 sec", "10 sec"],
+    ["3", "40 sec", "50 sec"],
+    ["4", "2 min 40 sec", "3.5 min"],
+    ["5", "10 min 40 sec", "14 min"],
+    ["6", "43 min", "57 min"],
+    ["7", "2 hr 50 min", "3 hr 47 min"],
+    ["8", "6 hr (the cap)", "9 hr 47 min"],
+    ["9", "6 hr", "15 hr 47 min"],
+    ["10", "6 hr", "21 hr 47 min, then dead-letter"]
+  ],
+  "highlightCols": ["Elapsed since the event"],
+  "caption": "One concrete schedule: start at 10 seconds, multiply by 4 each time, cap the wait at 6 hours, stop after 10 attempts. That is what seconds, then minutes, then hours, up to a day actually means as a schedule, and the two halves earn their keep separately. Early attempts are seconds apart because most failures are a blip. The cap exists because uncapped doubling would put attempt 10 a week out, long after the customer fixed their endpoint and stopped waiting. Real jitter shifts each wait by a random 20 percent or so, which is invisible here but is what stops a million events for one endpoint retrying in lockstep."
+}
+\`\`\`
 
 Sign each payload so the consumer can verify it really came from you and was not tampered with. Compute an HMAC-SHA256 over the raw body plus a timestamp using a per-customer secret, and send it in a header. The consumer recomputes and compares. Include the timestamp and reject old ones to prevent replay attacks, and support secret rotation with an overlap window.
 
