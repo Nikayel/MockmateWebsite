@@ -3990,8 +3990,8 @@ tombstones are what hold the anchor points open for a concurrent insert beside a
 const failureDetectionTeach = `
 ## "Is that node dead?" You can never know for sure
 
-A dead node and a node that is merely slow (a garbage-collection pause, where the runtime freezes the
-program for a moment to reclaim memory, or a network blip, or an overloaded network card) look
+A dead node and a node that is merely slow (stalled by a garbage-collection pause, stuck behind a
+network blip, or starved by an overloaded network card) look
 identical from the outside: both go quiet. This is the **impossibility at the heart of failure
 detection**, and it forces a tradeoff you must be able to name.
 
