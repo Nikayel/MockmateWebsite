@@ -4600,8 +4600,10 @@ Envoy are the canonical examples. A reverse proxy is content-aware (L7) but does
 
 An **API gateway** is a reverse proxy that also owns application-edge policy. On top of routing and
 TLS it does: **authentication and authorization** (validate the JWT or session, reject anonymous
-calls before they reach a service), **rate limiting and quotas** (per-API-key token buckets),
-**request and response transformation** (rewrite headers, translate protocols), and sometimes
+calls before they reach a service), **rate limiting and quotas** (each API key gets a bucket of
+tokens that refills at its allowed rate, a request spends one token, and a request arriving at an
+empty bucket is refused), **request and response transformation** (rewrite headers, translate
+protocols), and sometimes
 **aggregation** (fan one client call out to several services and merge). Kong, AWS API Gateway,
 Apigee, and Envoy-plus-control-plane are typical. The value is that a request is authenticated,
 rate-limited, and validated once at the door, so internal services can trust it and stay focused on
@@ -4652,6 +4654,55 @@ limits, TLS, routing, WAF). Keep *business* concerns in the service (domain vali
 authorization like "can this user edit this specific document," pricing rules). Auth token
 *validation* is edge work; deciding *what this user may do to this resource* is service work.
 
+### Where you set the limit is the whole trade-off
+
+"Rate limiting" sounds like a switch you turn on. It is a number, and picking it wrong fails in both
+directions, so put real traffic behind it. Suppose each API key is allowed 60 requests a second with
+a bucket that can save up to 120 tokens while the key is idle:
+
+\`\`\`
+partner sending a steady 45/s all day        -> 0 refused; the limit is invisible to them
+partner idle 3s, then 150 calls at once      -> 120 admitted instantly from saved tokens,
+                                                the other 30 admitted over the next half second
+runaway script at 4,000/s                    -> 60 admitted, 3,940 refused per second, and each
+                                                refusal costs one counter lookup at the door
+                                                instead of a database query in a service
+\`\`\`
+
+Now move the number and watch both failure modes. Set it to 12 and your best paying partner gets
+refused every afternoon, which is an outage you caused and they report. Set it to 4,000 and the
+runaway's traffic reaches your services anyway, which is the exact thing the gateway existed to
+prevent. The bucket depth matters just as much as the rate: with no saved tokens, that honest partner
+who batches 150 calls together gets 90 of them refused for being bursty rather than for being
+abusive. Return \`429\` with a \`Retry-After\` header so a well-behaved client backs off instead of
+hammering, and expect the interviewer to ask which algorithm counts the requests, which
+[Level 4's rate-limiting algorithms lesson](/learn/system-design/scaling-compute/sd-l4-rate-limit-algorithms)
+answers properly.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "predict",
+  "prompt": "You must set one per-API-key limit for a public search API. Measured over a week: a typical key peaks at 12 requests per second, your busiest legitimate partner peaks at 45, and one runaway script hit 4,000. Where do you set it?",
+  "options": [
+    {
+      "label": "12 per second, which is where the typical key already peaks",
+      "feedback": "A limit tuned to the typical caller is an outage for the top of the distribution. Your busiest legitimate partner peaks at 45, so this refuses their traffic every day, and they experience it as your API being broken."
+    },
+    {
+      "label": "60 per second, just above the busiest real caller",
+      "correct": true,
+      "feedback": "Right. The limit's job is to stop the runaway, not to police your best customer. At 60 the runaway is refused 3,940 times a second for the price of one counter lookup each, while every legitimate key never discovers the limit exists. Pair it with a bucket deep enough to absorb an honest burst (say 120 saved tokens) so a client that batches calls is not punished for arriving in a clump, and return 429 with Retry-After so it backs off instead of retrying immediately."
+    },
+    {
+      "label": "4,000 per second, above anything ever seen",
+      "feedback": "A ceiling nothing can reach is not a limit. The runaway's 4,000 requests a second all pass through to your services, which is the load the gateway was put there to absorb."
+    }
+  ],
+  "reveal": "Say the number out loud in your design write, and say what it is derived from: measured peak of the busiest legitimate caller, plus headroom, plus a burst allowance. A rate limit with no measurement behind it is either a customer incident or decoration."
+}
+\`\`\`
+
 ### BFFs and the mesh
 
 The **BFF (backend-for-frontend)** pattern is a gateway variant: instead of one general gateway, you
@@ -4664,7 +4715,10 @@ For internal, service-to-service concerns, a **service mesh** (Istio, Linkerd) i
 tool than the gateway. Each service gets a proxy: a per-pod sidecar (Envoy for Istio's sidecar mode,
 its own Rust micro-proxy for Linkerd), or, in Istio's ambient mode, a shared per-node proxy with no
 sidecar at all. Either way, that proxy handles mTLS between services, retries, timeouts, circuit
-breaking, and traffic-shifting, controlled centrally without changing app code. Mental model: the
+breaking (when a dependency starts failing, stop calling it for a while and fail fast instead of
+piling up on it, which
+[resilience primitives](/learn/system-design/foundations/sd-l1-resilience-primitives) works through
+later in this level), and traffic-shifting, controlled centrally without changing app code. Mental model: the
 **gateway is north-south** (client to system), the **mesh is east-west** (service to service). Add a
 **WAF** and **DDoS protection** at the very edge, in front of the gateway, to filter malicious traffic
 before it costs you anything.
