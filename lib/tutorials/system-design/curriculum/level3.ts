@@ -2239,7 +2239,8 @@ product:42 expires at t=0, 3000 concurrent readers
 \`\`\`
 
 **The hot key, and the in-process L1 cache.** The second gap is volume rather than expiry. Every
-request for one key hashes to one Redis shard, so a single viral SKU can saturate that shard while
+request for one key hashes to one Redis shard, so a single viral SKU (one specific product listing,
+one row in the catalog) can saturate that shard while
 the value is present the entire time. Coalescing does nothing here, because nothing is missing. The
 standard answer is an **in-process near cache (L1)** on each app server: a small map holding the few
 hottest keys with a sub-second TTL, so most reads for a hot key never leave the process.
@@ -2360,7 +2361,7 @@ and kick off one async refresh.
 {
   "type": "check",
   "kind": "predict",
-  "prompt": "A flash-sale SKU is read 500K times per second. The value is sitting in cache, nowhere near expiry, but the one Redis shard that owns the key is at 100% CPU. Does singleflight coalescing fix this?",
+  "prompt": "A flash-sale SKU (one specific product listing) is read 500K times per second. The value is sitting in cache, nowhere near expiry, but the one Redis shard that owns the key is at 100% CPU. Does singleflight coalescing fix this?",
   "options": [
     {
       "label": "Yes, it collapses the 500K reads into one",
@@ -2641,11 +2642,30 @@ primary dies, so a node failure is a brief blip. The design principle that makes
 **cache is disposable**. The source of truth is the database, so losing a cache node loses only
 performance, never data, as long as the application falls through to the DB on a miss.
 
-**Tiering.** A remote cache is a network hop, too slow for the very hottest keys at high QPS. So you
-add an **L1 near cache** in the app process (a local LRU) in front of the **L2 remote cache**
-(Redis). L1 kills the hottest reads and shields Redis shards from hot keys. The cost of L1 is a
-second consistency layer: an invalidation now has to reach every app node's L1 (via pub/sub or a
-short L1 TTL), or you accept a small staleness window locally.
+**Tiering.** A remote cache is a network hop, too slow for the very hottest keys at high QPS. Put
+numbers on "too slow": a round trip to a Redis node in the same data center runs about 0.5 ms, while
+reading the same value from a map inside the app process runs about 1 microsecond, roughly 500 times
+cheaper. And the hop is not just latency, it is load: 200k reads/sec for one key is 200k packets/sec
+aimed at the single shard that owns it, past what one Redis command thread will serve. So you add an
+**L1 near cache** in the app process (a local LRU) in front of the **L2 remote cache** (Redis). L1
+kills the hottest reads and shields Redis shards from hot keys.
+
+The cost of L1 is a second consistency layer: an invalidation now has to reach every app node's L1
+(via pub/sub or a short L1 TTL), or you accept a small staleness window locally. With a TTL the
+window IS the TTL, and that makes the tradeoff a dial you set rather than a risk you hope about. Same
+key, same 200k reads/sec, 40 app servers:
+
+\`\`\`
+L1 TTL      shard sees            worst staleness a user can see
+-------     ------------------    ------------------------------
+none        200,000 reads/sec     0 (always current)
+1 s         40 reads/sec          1 s
+10 s        4 reads/sec           10 s
+\`\`\`
+
+Each server re-asks Redis once per TTL, so load falls with the TTL and staleness rises with it, in
+lockstep. One second is the right price for a follower count or a view counter; it is the wrong
+price for an account balance, which should not sit in L1 at all.
 
 **Consistency and operational hazards.** Keep L2 in sync with the DB via **invalidate-on-write**,
 **versioned keys** (\`user:123:v7\`, so a stale value is simply never read), or a **short TTL
