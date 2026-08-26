@@ -1749,8 +1749,8 @@ Gateway, Envoy-based gateways, Apigee, or a Netflix Zuul-style edge service.
 
 Draw the boundary carefully. The gateway handles **north-south** traffic (client to system).
 Service-to-service **east-west** traffic is the job of a **service mesh** (Istio with Envoy sidecars,
-or Linkerd with its own Rust micro-proxy), which handles mTLS, retries, and load balancing *between*
-services. Routing internal calls through the public gateway is a common design error. Business logic
+or Linkerd with its own Rust micro-proxy), which handles **mTLS** (mutual TLS: both ends present
+certificates, so each service proves who it is), retries, and load balancing *between* services. Routing internal calls through the public gateway is a common design error. Business logic
 belongs *inside services*, not in either the gateway or the mesh.
 
 \`\`\`cswidget
@@ -2274,8 +2274,8 @@ long-run rate. This is what most APIs want: allow natural bursts, cap sustained 
 
 **Leaky bucket** is the opposite intent: it smooths output. Requests enter a queue and drain at a
 fixed rate, so downstream sees a perfectly steady stream. Use it when the thing you protect cannot
-absorb bursts at all (a payment processor with a hard TPS ceiling). The cost is added latency and a
-queue to manage.
+absorb bursts at all (a payment processor with a hard ceiling on TPS, transactions per second, the
+same idea as RPS for anything that settles money). The cost is added latency and a queue to manage.
 
 \`\`\`cswidget
 {
