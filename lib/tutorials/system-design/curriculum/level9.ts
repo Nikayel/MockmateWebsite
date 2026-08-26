@@ -2183,7 +2183,41 @@ Two properties fall out of that shape and are worth holding on to. Each rendered
 
 Instead of a review board that manually approves each deploy, you encode policy: **OPA/Gatekeeper or Kyverno** admission policies reject a manifest that has no resource limits, runs as root, or pulls an unsigned image. Templates bake in the right defaults. The paved road is faster than going around it, so people stay on it.
 
-**Interview nuance:** supply-chain security belongs in the platform, not bolted on. Generate an **SBOM** at build, sign images with **cosign**, and attach **SLSA** provenance so the admission controller can verify "this image came from our pipeline, unmodified" before it runs.
+**Interview nuance:** supply-chain security belongs in the platform, not bolted on. Generate an **SBOM** (software bill of materials: the list of every library and version baked into the image) at build, sign images with **cosign** (a signature proving this exact image is the one you published and nothing swapped it since), and attach **SLSA** provenance (a signed record of which pipeline, which commit, and which build steps produced it) so the admission controller, the checkpoint that inspects every object before the cluster will accept it, can verify "this image came from our pipeline, unmodified" before it runs.
+
+The three get quoted together as one acronym pile, which hides that they answer three different questions.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Control",
+    "The question it answers",
+    "When it is checked"
+  ],
+  "highlightCols": [
+    "The question it answers"
+  ],
+  "rows": [
+    [
+      "SBOM",
+      "What is inside this image? Every library and version, so the morning a vulnerability is published in some common library you answer 'do we ship that?' by query instead of by archaeology",
+      "Written at build, kept beside the artifact, queried whenever you need it"
+    ],
+    [
+      "cosign signature",
+      "Is this the exact image we published, or did something replace it downstream?",
+      "Verified at admission, before the cluster is willing to start the Pod"
+    ],
+    [
+      "SLSA provenance",
+      "Which pipeline, which source commit, and which build steps produced it?",
+      "Attached at build, verified at admission next to the signature"
+    ]
+  ],
+  "caption": "None of the three substitutes for another. An SBOM with no signature is a contents list anyone could have written. A signature with no provenance proves who published the image but not that it came from reviewed source. Provenance with no signature is a claim with nothing binding it to the bytes you are about to run."
+}
+\`\`\`
 
 **Interview nuance:** the failure mode to name is the **ticket-queue platform team**. If shipping still means filing a Jira ticket and waiting two days for the platform team to click deploy, you built a bottleneck, not a platform. Platform-as-product means self-service by default; the team's success metric is adoption and lead time, not tickets closed.
 
