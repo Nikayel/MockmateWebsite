@@ -1064,7 +1064,7 @@ Meeting the latency budget is mostly a feature-fetch problem, not a model-math p
 const ragArchitectureTeach = `
 ## RAG grounds the model in data you control
 
-Grounding a model in data you control is a design axis rather than a settled default. There are three positions on it: retrieve before inference, which is RAG; let the agent search at runtime through tools, holding only lightweight identifiers (file paths, saved queries, links) until it needs the data; or run a hybrid, which is what current guidance recommends. RAG is the pre-inference position, and it exists because an LLM does not know your private data and hallucinates confidently when it does not know something. It grounds the model by retrieving relevant passages from your own corpus at query time and stuffing them into the prompt with instructions to answer only from that context and to cite it. The model becomes a reasoning-and-phrasing engine over evidence you control, not an oracle. Increasingly that retrieval is a tool an agent calls several times inside one run rather than a single step before generation, and the pipeline below is what each of those calls runs. There are two halves: an offline ingestion pipeline and an online query path.
+Grounding a model in data you control is a design axis rather than a settled default. There are three positions on it: retrieve before inference, which is RAG; let the agent search at runtime through tools, holding only lightweight identifiers (file paths, saved queries, links) until it needs the data; or run a hybrid, which is what current guidance recommends. An agent here just means a loop in which the model itself decides to call a search function, reads what comes back, and decides again, and a tool is one such function offered to it with a declared name and arguments; [LLM Agents and Orchestration](/learn/system-design/specialized-systems/sd-l11-llm-agents) builds that loop properly later in this module. RAG is the pre-inference position, and it exists because an LLM does not know your private data and hallucinates confidently when it does not know something. It grounds the model by retrieving relevant passages from your own corpus at query time and stuffing them into the prompt with instructions to answer only from that context and to cite it. The model becomes a reasoning-and-phrasing engine over evidence you control, not an oracle. Increasingly that retrieval is a tool an agent calls several times inside one run rather than a single step before generation, and the pipeline below is what each of those calls runs. There are two halves: an offline ingestion pipeline and an online query path.
 
 \`\`\`cswidget
 {
@@ -1117,7 +1117,7 @@ You parse each source document (PDF, HTML, Confluence, tickets) into clean text,
 
 ## Access control at retrieval time
 
-You never filter after generation, because the model has already seen forbidden text. You attach the user's group memberships to the query and filter candidates by the ACL metadata on each chunk before assembly, ideally as a pre-filter inside the vector query so you do not retrieve what the user cannot read. Retrieval is the security boundary.
+You never filter after generation, because the model has already seen forbidden text. You attach the user's group memberships to the query and filter candidates by the ACL metadata on each chunk before assembly, ACL being the access control list, the stored answer to "who is allowed to see this chunk," ideally as a pre-filter inside the vector query so you do not retrieve what the user cannot read. Retrieval is the security boundary.
 
 That gives three rungs, not two. A vector store holds vectors in named collections, and most stores support **multi-tenant partitioning**: disjoint subsets of vectors inside one collection, where a query names the subset it searches and cannot see outside it. The name differs by vendor. Pinecone calls them namespaces, Milvus partitions, Weaviate tenants; Qdrant has no separate object and does it with payload-based partitioning instead. Here is the same question asked three ways, on a corpus holding records for every patient.
 
@@ -1649,7 +1649,7 @@ That is not a toy result. DistServe measures the same crossing on a real model: 
 
 ## Two SLOs, and one pool has one knob
 
-Because the phases are different machines, they answer to different service levels. **Time to first token (TTFT)** is prefill's number and scales with prompt length. **Time per output token (TPOT)**, the same quantity the serving lesson calls inter-token latency, is decode's number and is what streaming feels like. A single pool has one scheduler and one batch policy, so tuning it for throughput fills the batch with prefill work and misses TTFT, while tuning it for TTFT admits prompts eagerly and leaves the GPU underfed.
+Because the phases are different machines, they answer to different service levels. An SLO is a service level objective, the promise you publish about a number and the share of requests that must hit it, and [Level 7's SLI, SLO and SLA lesson](/learn/system-design/reliability-ops/sd-l7-sli-slo-sla) is where it came from. **Time to first token (TTFT)** is prefill's number and scales with prompt length. **Time per output token (TPOT)**, the same quantity the serving lesson calls inter-token latency, is decode's number and is what streaming feels like. A single pool has one scheduler and one batch policy, so tuning it for throughput fills the batch with prefill work and misses TTFT, while tuning it for TTFT admits prompts eagerly and leaves the GPU underfed.
 
 The metric that makes that decidable is **goodput**: the maximum request rate a fleet sustains while still meeting its SLO attainment target, for example ninety percent of requests meeting both TTFT and TPOT. Raw requests per second counts requests you served badly. Goodput counts only the ones you served inside the contract, which is why a change can raise throughput and lower goodput at the same time, and why the fleet you size on throughput is the wrong fleet.
 
@@ -2879,7 +2879,25 @@ loop (controller enforces limits):
   until model emits "final answer" OR a bound is hit
 \`\`\`
 
-The controller is the load-bearing component. Without hard bounds on step count, cumulative token spend, and wall-clock time, a confused agent will loop forever calling the same tool, quietly spending hundreds of dollars. Every production agent has these three governors, plus a cost budget per task that aborts and returns a partial or escalates to a human when exceeded. Interview nuance: the first thing a strong candidate names is the bound, not the reasoning strategy.
+The controller is the load-bearing component. Without hard bounds on step count, cumulative token spend, and wall-clock time, a confused agent will loop forever calling the same tool, and the bill does not climb in a straight line. Every step re-sends the whole conversation so far, so step 200 pays for the 199 steps before it. Put numbers on one runaway run.
+
+\`\`\`
+one step re-sends everything: 8,000 tokens of system prompt and tool
+schemas, plus about 2,000 more tokens of tool output and reasoning per
+step already taken. input priced at $3 per million tokens.
+
+cost of a run that reaches n steps
+  = 3 / 1,000,000  x  ( 8,000n + 1,000 x n x (n + 1) )
+
+  n =  40 steps      1.96M tokens        $5.88
+  n = 200 steps     41.8M tokens       $125.40
+  n = 900 steps    818.1M tokens     $2,454.30     (one hour at 4s/step)
+
+the n-squared term is the whole story: double MAX_STEPS and the
+worst case roughly quadruples
+\`\`\`
+
+Forty steps is a rounding error and nine hundred is a page in the finance review, and one broken loop with no step cap gets from the first to the second in an hour without erroring once. That is also why MAX_STEPS is the governor that does the real work: a wall-clock bound stops the run eventually, but it stops it at whatever the quadratic has already reached. Every production agent has these three governors, plus a cost budget per task that aborts and returns a partial or escalates to a human when exceeded. Interview nuance: the first thing a strong candidate names is the bound, not the reasoning strategy.
 
 ## Tools, idempotency, memory
 
