@@ -16,7 +16,10 @@ A synchronous call blocks the caller until the callee returns. The caller's late
 every hop, and the caller's availability is the product of every downstream's availability. Chain
 five services at 99.9 percent each synchronously and your effective availability is about 99.5
 percent, because any one being down fails the whole request. Async breaks that chain by putting a
-broker between producer and consumer.
+broker between producer and consumer: a separate service that takes the message, stores it, and
+holds it until a consumer is ready to read it, so the sender never waits for the receiver. The
+[next lesson](/learn/system-design/event-driven/sd-l6-queue-pubsub-log) takes the broker apart into
+its three shapes.
 
 Async buys you three specific decouplings, and naming them is how you sound senior:
 
@@ -486,7 +489,9 @@ const brokerSelectionTeach = `
 
 The senior move is to name the decision drivers, then match the workload to the cheapest tool that
 satisfies them. Kafka is a superb distributed log, but it is also operationally heavy (partitions,
-consumer groups, rebalancing, retention tuning, and a KRaft controller quorum to run). If you do
+consumer groups, rebalancing, retention tuning, and a controller quorum to run: a few extra servers
+whose only job is to agree on which broker owns what, a
+[quorum in Level 5's sense](/learn/system-design/distributed-core/sd-l5-quorums-tunable)). If you do
 not need what it gives, you are paying its tax for nothing.
 
 \`\`\`cswidget
@@ -506,7 +511,7 @@ not need what it gives, you are paying its tax for nothing.
     },
     {
       "label": "Pulsar, since it supports both queue and log semantics in one system",
-      "feedback": "Pulsar is an even heavier deployment; its multi-tenancy and compute/storage split are not requirements here."
+      "feedback": "Pulsar is an even heavier deployment; nothing here needs its per-customer isolation or its split of serving from storage."
     }
   ]
 }
@@ -544,7 +549,7 @@ The drivers to reason about out loud:
       "Log / stream",
       "Kafka, Pulsar, Kinesis",
       "High throughput, per-partition ordering, retention, replay",
-      "Partitions, consumer groups, rebalancing, retention tuning, a KRaft quorum to run"
+      "Partitions, consumer groups, rebalancing, retention tuning, a controller quorum to run"
     ],
     [
       "Queue",
@@ -583,8 +588,10 @@ zero-ops managed queue for work distribution and decoupling on AWS; Kafka is a d
 for high-throughput streaming and multi-consumer fan-out.
 
 **Pulsar** is the classic "why not Kafka" foil: it separates compute (brokers) from storage
-(BookKeeper), so you scale serving and storage independently, and it has first-class multi-tenancy,
-geo-replication, and tiered storage built in, supporting both queue and log semantics in one system.
+(BookKeeper), so you scale serving and storage independently, and it has first-class multi-tenancy
+(many separate customers sharing one cluster without being able to disturb each other, each with its
+own quotas and retention), geo-replication, and tiered storage built in, supporting both queue and
+log semantics in one system.
 The cost is a more complex deployment. Choose it when multi-tenancy or independent compute/storage
 scaling is a real requirement, not by default. **NATS and Redis Streams** cover the low-latency,
 lightweight end when you want simple pub/sub or a small stream with minimal ops.
