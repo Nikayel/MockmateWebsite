@@ -3,7 +3,7 @@
  * Ensures rate limiting works correctly for API protection
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 
 // Create a mock Map to simulate the rate limit store
 const mockRateLimitStore = new Map<string, { count: number; resetTime: number }>()
@@ -11,9 +11,9 @@ const mockRateLimitStore = new Map<string, { count: number; resetTime: number }>
 // Helper to create mock rate limiter
 function createMockRateLimiter(config: { interval: number; maxRequests: number }) {
   return async (request: any): Promise<any> => {
-    const forwarded = request.headers.get('x-forwarded-for')
-    const realIp = request.headers.get('x-real-ip')
-    const identifier = forwarded?.split(',')[0].trim() || realIp || 'unknown'
+    const forwarded = request.headers.get("x-forwarded-for")
+    const realIp = request.headers.get("x-real-ip")
+    const identifier = forwarded?.split(",")[0].trim() || realIp || "unknown"
     const now = Date.now()
 
     const entry = mockRateLimitStore.get(identifier)
@@ -30,11 +30,11 @@ function createMockRateLimiter(config: { interval: number; maxRequests: number }
       const retryAfter = Math.ceil((entry.resetTime - now) / 1000)
       return {
         status: 429,
-        data: { error: 'Too many requests. Please try again later.', retryAfter },
+        data: { error: "Too many requests. Please try again later.", retryAfter },
         headers: new Map([
-          ['Retry-After', retryAfter.toString()],
-          ['X-RateLimit-Limit', config.maxRequests.toString()],
-          ['X-RateLimit-Remaining', '0'],
+          ["Retry-After", retryAfter.toString()],
+          ["X-RateLimit-Limit", config.maxRequests.toString()],
+          ["X-RateLimit-Remaining", "0"],
         ]),
       }
     }
@@ -50,7 +50,7 @@ const chatRateLimit = createMockRateLimiter({ interval: 60000, maxRequests: 20 }
 const apiRateLimit = createMockRateLimiter({ interval: 60000, maxRequests: 30 })
 const feedbackRateLimit = createMockRateLimiter({ interval: 60000, maxRequests: 5 })
 
-describe('Rate Limiting', () => {
+describe("Rate Limiting", () => {
   beforeEach(() => {
     // Clear the mock store before each test
     mockRateLimitStore.clear()
@@ -61,13 +61,13 @@ describe('Rate Limiting', () => {
     vi.useRealTimers()
   })
 
-  describe('rateLimit factory', () => {
-    it('should allow requests under the limit', async () => {
+  describe("rateLimit factory", () => {
+    it("should allow requests under the limit", async () => {
       const limiter = createMockRateLimiter({ interval: 60000, maxRequests: 5 })
 
       const mockRequest = {
         headers: {
-          get: (name: string) => (name === 'x-forwarded-for' ? '192.168.1.1' : null),
+          get: (name: string) => (name === "x-forwarded-for" ? "192.168.1.1" : null),
         },
       }
 
@@ -78,12 +78,12 @@ describe('Rate Limiting', () => {
       }
     })
 
-    it('should block requests over the limit', async () => {
+    it("should block requests over the limit", async () => {
       const limiter = createMockRateLimiter({ interval: 60000, maxRequests: 3 })
 
       const mockRequest = {
         headers: {
-          get: (name: string) => (name === 'x-forwarded-for' ? '192.168.1.2' : null),
+          get: (name: string) => (name === "x-forwarded-for" ? "192.168.1.2" : null),
         },
       }
 
@@ -97,15 +97,15 @@ describe('Rate Limiting', () => {
       const result = await limiter(mockRequest as any)
       expect(result).not.toBeNull()
       expect(result?.status).toBe(429)
-      expect(result?.data.error).toContain('Too many requests')
+      expect(result?.data.error).toContain("Too many requests")
     })
 
-    it('should reset after interval expires', async () => {
+    it("should reset after interval expires", async () => {
       const limiter = createMockRateLimiter({ interval: 60000, maxRequests: 2 })
 
       const mockRequest = {
         headers: {
-          get: (name: string) => (name === 'x-forwarded-for' ? '192.168.1.3' : null),
+          get: (name: string) => (name === "x-forwarded-for" ? "192.168.1.3" : null),
         },
       }
 
@@ -125,18 +125,18 @@ describe('Rate Limiting', () => {
       expect(result).toBeNull()
     })
 
-    it('should track different IPs separately', async () => {
+    it("should track different IPs separately", async () => {
       const limiter = createMockRateLimiter({ interval: 60000, maxRequests: 2 })
 
       const mockRequest1 = {
         headers: {
-          get: (name: string) => (name === 'x-forwarded-for' ? '192.168.1.10' : null),
+          get: (name: string) => (name === "x-forwarded-for" ? "192.168.1.10" : null),
         },
       }
 
       const mockRequest2 = {
         headers: {
-          get: (name: string) => (name === 'x-forwarded-for' ? '192.168.1.11' : null),
+          get: (name: string) => (name === "x-forwarded-for" ? "192.168.1.11" : null),
         },
       }
 
@@ -151,14 +151,14 @@ describe('Rate Limiting', () => {
       expect(result2).toBeNull()
     })
 
-    it('should use x-real-ip as fallback', async () => {
+    it("should use x-real-ip as fallback", async () => {
       const limiter = createMockRateLimiter({ interval: 60000, maxRequests: 2 })
 
       const mockRequest = {
         headers: {
           get: (name: string) => {
-            if (name === 'x-forwarded-for') return null
-            if (name === 'x-real-ip') return '10.0.0.1'
+            if (name === "x-forwarded-for") return null
+            if (name === "x-real-ip") return "10.0.0.1"
             return null
           },
         },
@@ -170,11 +170,11 @@ describe('Rate Limiting', () => {
     })
   })
 
-  describe('Pre-configured rate limiters', () => {
-    it('executeRateLimit should allow 10 requests per minute', async () => {
+  describe("Pre-configured rate limiters", () => {
+    it("executeRateLimit should allow 10 requests per minute", async () => {
       const mockRequest = {
         headers: {
-          get: (name: string) => (name === 'x-forwarded-for' ? '10.0.0.100' : null),
+          get: (name: string) => (name === "x-forwarded-for" ? "10.0.0.100" : null),
         },
       }
 
@@ -189,10 +189,10 @@ describe('Rate Limiting', () => {
       expect(result?.status).toBe(429)
     })
 
-    it('chatRateLimit should allow 20 requests per minute', async () => {
+    it("chatRateLimit should allow 20 requests per minute", async () => {
       const mockRequest = {
         headers: {
-          get: (name: string) => (name === 'x-forwarded-for' ? '10.0.0.101' : null),
+          get: (name: string) => (name === "x-forwarded-for" ? "10.0.0.101" : null),
         },
       }
 
@@ -205,10 +205,10 @@ describe('Rate Limiting', () => {
       expect(result?.status).toBe(429)
     })
 
-    it('feedbackRateLimit should allow 5 requests per minute (strictest)', async () => {
+    it("feedbackRateLimit should allow 5 requests per minute (strictest)", async () => {
       const mockRequest = {
         headers: {
-          get: (name: string) => (name === 'x-forwarded-for' ? '10.0.0.102' : null),
+          get: (name: string) => (name === "x-forwarded-for" ? "10.0.0.102" : null),
         },
       }
 
@@ -221,10 +221,10 @@ describe('Rate Limiting', () => {
       expect(result?.status).toBe(429)
     })
 
-    it('apiRateLimit should allow 30 requests per minute (most lenient)', async () => {
+    it("apiRateLimit should allow 30 requests per minute (most lenient)", async () => {
       const mockRequest = {
         headers: {
-          get: (name: string) => (name === 'x-forwarded-for' ? '10.0.0.103' : null),
+          get: (name: string) => (name === "x-forwarded-for" ? "10.0.0.103" : null),
         },
       }
 
@@ -238,30 +238,30 @@ describe('Rate Limiting', () => {
     })
   })
 
-  describe('Rate limit response', () => {
-    it('should include Retry-After header', async () => {
+  describe("Rate limit response", () => {
+    it("should include Retry-After header", async () => {
       const limiter = createMockRateLimiter({ interval: 60000, maxRequests: 1 })
 
       const mockRequest = {
         headers: {
-          get: (name: string) => (name === 'x-forwarded-for' ? '10.0.0.200' : null),
+          get: (name: string) => (name === "x-forwarded-for" ? "10.0.0.200" : null),
         },
       }
 
       await limiter(mockRequest as any)
       const result = await limiter(mockRequest as any)
 
-      expect(result?.headers.get('Retry-After')).toBeDefined()
-      expect(result?.headers.get('X-RateLimit-Limit')).toBe('1')
-      expect(result?.headers.get('X-RateLimit-Remaining')).toBe('0')
+      expect(result?.headers.get("Retry-After")).toBeDefined()
+      expect(result?.headers.get("X-RateLimit-Limit")).toBe("1")
+      expect(result?.headers.get("X-RateLimit-Remaining")).toBe("0")
     })
 
-    it('should include retryAfter in response body', async () => {
+    it("should include retryAfter in response body", async () => {
       const limiter = createMockRateLimiter({ interval: 60000, maxRequests: 1 })
 
       const mockRequest = {
         headers: {
-          get: (name: string) => (name === 'x-forwarded-for' ? '10.0.0.201' : null),
+          get: (name: string) => (name === "x-forwarded-for" ? "10.0.0.201" : null),
         },
       }
 
@@ -274,30 +274,50 @@ describe('Rate Limiting', () => {
   })
 })
 
-describe('parseGuestSessionLimit (event-window override)', () => {
-  it('defaults to 3 when the env var is unset or empty', async () => {
-    const { parseGuestSessionLimit } = await import('../rate-limit')
+describe("parseGuestApiLimit (guest write bucket override)", () => {
+  // The guest PUT bucket is per-IP. Behind one NAT (career-fair table,
+  // lecture-hall demo) several concurrent guests share 15/min, and the
+  // completion PUT carries the score's only copy - the same event scenario
+  // GUEST_SESSION_LIMIT_PER_HOUR exists for on the creation bucket.
+  it("defaults to 15 when the env var is unset or invalid", async () => {
+    const { parseGuestApiLimit } = await import("../rate-limit")
+    expect(parseGuestApiLimit(undefined)).toBe(15)
+    expect(parseGuestApiLimit("")).toBe(15)
+    expect(parseGuestApiLimit("abc")).toBe(15)
+    expect(parseGuestApiLimit("0")).toBe(15)
+    expect(parseGuestApiLimit("5000")).toBe(15)
+  })
+
+  it("accepts a valid in-range integer for event windows", async () => {
+    const { parseGuestApiLimit } = await import("../rate-limit")
+    expect(parseGuestApiLimit("60")).toBe(60)
+  })
+})
+
+describe("parseGuestSessionLimit (event-window override)", () => {
+  it("defaults to 3 when the env var is unset or empty", async () => {
+    const { parseGuestSessionLimit } = await import("../rate-limit")
     expect(parseGuestSessionLimit(undefined)).toBe(3)
-    expect(parseGuestSessionLimit('')).toBe(3)
+    expect(parseGuestSessionLimit("")).toBe(3)
   })
 
-  it('accepts a valid in-range integer (event mode)', async () => {
-    const { parseGuestSessionLimit } = await import('../rate-limit')
-    expect(parseGuestSessionLimit('50')).toBe(50)
-    expect(parseGuestSessionLimit('1')).toBe(1)
-    expect(parseGuestSessionLimit('1000')).toBe(1000)
+  it("accepts a valid in-range integer (event mode)", async () => {
+    const { parseGuestSessionLimit } = await import("../rate-limit")
+    expect(parseGuestSessionLimit("50")).toBe(50)
+    expect(parseGuestSessionLimit("1")).toBe(1)
+    expect(parseGuestSessionLimit("1000")).toBe(1000)
   })
 
-  it('falls back to the default on zero, negative, or out-of-range values', async () => {
-    const { parseGuestSessionLimit } = await import('../rate-limit')
-    expect(parseGuestSessionLimit('0')).toBe(3)
-    expect(parseGuestSessionLimit('-2')).toBe(3)
-    expect(parseGuestSessionLimit('5000')).toBe(3)
+  it("falls back to the default on zero, negative, or out-of-range values", async () => {
+    const { parseGuestSessionLimit } = await import("../rate-limit")
+    expect(parseGuestSessionLimit("0")).toBe(3)
+    expect(parseGuestSessionLimit("-2")).toBe(3)
+    expect(parseGuestSessionLimit("5000")).toBe(3)
   })
 
-  it('falls back to the default on non-numeric or non-integer values', async () => {
-    const { parseGuestSessionLimit } = await import('../rate-limit')
-    expect(parseGuestSessionLimit('abc')).toBe(3)
-    expect(parseGuestSessionLimit('12.5')).toBe(3)
+  it("falls back to the default on non-numeric or non-integer values", async () => {
+    const { parseGuestSessionLimit } = await import("../rate-limit")
+    expect(parseGuestSessionLimit("abc")).toBe(3)
+    expect(parseGuestSessionLimit("12.5")).toBe(3)
   })
 })

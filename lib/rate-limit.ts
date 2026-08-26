@@ -693,12 +693,29 @@ export const guestSessionRateLimit = rateLimit({
   prefix: "rl:guest",
 })
 
-// Guest API rate limit - for chat/execute during guest sessions
+/**
+ * Guest write-bucket limit per minute per IP. Default 15 covers one guest's
+ * 30-second autosaves plus the completion PUT with room to spare — but the
+ * bucket is per-IP, and the completion PUT carries the score's only copy, so
+ * a NAT'd room (career-fair table, lecture-hall demo) needs the same event
+ * override the creation bucket has. Set GUEST_API_LIMIT_PER_MINUTE (e.g. 120)
+ * for the event, unset after. Read once at boot.
+ */
+export function parseGuestApiLimit(raw: string | undefined): number {
+  const DEFAULT_LIMIT = 15
+  const MAX_LIMIT = 1000
+  if (!raw) return DEFAULT_LIMIT
+  const parsed = Number(raw)
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > MAX_LIMIT) return DEFAULT_LIMIT
+  return parsed
+}
+
+// Guest API rate limit - guest session writes (autosave + completion PUT)
 // More lenient than session creation but still limited
 export const guestApiRateLimit = rateLimit({
   interval: 60 * 1000, // 1 minute
   uniqueTokenPerInterval: 500,
-  maxRequests: 15, // Slightly lower than authenticated users
+  maxRequests: parseGuestApiLimit(process.env.GUEST_API_LIMIT_PER_MINUTE),
   prefix: "rl:guest-api",
 })
 
