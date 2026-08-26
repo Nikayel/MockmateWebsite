@@ -915,9 +915,9 @@ const sessionGuaranteesTeach = `
 
 Level 3's [replication lag and session guarantees](/learn/system-design/scaling-data/sd-l3-replication-lag-session)
 lesson introduced the four **client-centric session guarantees** (from the Bayou system) and how to
-implement them. This lesson credits that treatment and
-adds the theory frame the interview rewards: where these per-client promises sit on the consistency
-spectrum from the previous lesson, and why they are the pragmatic default for user-facing reads.
+implement them. This lesson credits that treatment and adds the theory frame the interview rewards:
+where these per-client promises sit on the consistency spectrum from the previous lesson, and why
+they are the pragmatic default for user-facing reads.
 
 A self-contained recap of the four, since nothing here is corrupted (a read just hit a replica that
 lags the primary, and each guarantee cures one symptom of that lag):
@@ -3901,10 +3901,9 @@ live contents that might be a few tens of megabytes, and none of it shrinks on i
 **garbage collection** is part of the design rather than an afterthought, and it needs some
 coordination or a causal-stability threshold (a point in the update history that every replica has
 confirmed it has seen, so nothing older can still be in flight toward you) to know that a late update
-can never arrive again. And
-CRDTs **cannot enforce global invariants**: "this username is globally unique" or "the balance never
-goes negative" require agreement, and agreement is exactly what CRDTs avoid. For invariants you need
-consensus.
+can never arrive again. And CRDTs **cannot enforce global invariants**: "this username is globally
+unique" or "the balance never goes negative" require agreement, and agreement is exactly what CRDTs
+avoid. For invariants you need consensus.
 
 \`\`\`cswidget
 {
@@ -3993,8 +3992,8 @@ const failureDetectionTeach = `
 
 A dead node and a node that is merely slow (a garbage-collection pause, where the runtime freezes the
 program for a moment to reclaim memory, or a network blip, or an overloaded network card) look
-identical from the outside: both go quiet. This is the **impossibility at the heart of failure detection**, and
-it forces a tradeoff you must be able to name.
+identical from the outside: both go quiet. This is the **impossibility at the heart of failure
+detection**, and it forces a tradeoff you must be able to name.
 
 \`\`\`cswidget
 {
