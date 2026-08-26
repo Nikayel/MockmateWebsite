@@ -162,6 +162,23 @@ jobs:
           path: artifacts/seo-audit/
           if-no-files-found: warn
 
+      # The guest-trial e2e rides the same built server, for the same reason the
+      # SEO gate does: the only expensive things it needs (the build, the boot)
+      # just happened. It runs the PRE-AUTH guest journey only: the dummy env
+      # makes the guest-session POST 500, which the flow tolerates by design
+      # ("Your progress will still be saved locally"), and the score-lock
+      # journey this protects is exactly the one that shipped broken on
+      # 2026-08-25 while every unit suite stayed green. bugfix-journey.spec.ts
+      # is NOT run here: it needs an authenticated session and a live AI
+      # backend (see its header).
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Guest trial e2e (built server)
+        run: npx playwright test e2e/guest-trial-journey.spec.ts
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:4256
+
       - name: Stop built server
         if: always()
         run: kill "$(cat /tmp/seo-audit-server.pid)" 2>/dev/null || true

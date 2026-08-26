@@ -13,6 +13,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css}\"",
     "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
     "check:theme": "node scripts/check-theme-tokens.mjs",
     "start": "next start",
     "test": "vitest run",
