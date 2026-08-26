@@ -649,7 +649,7 @@ key "ne" -> trie walk n->e (O(2)) -> node holds cached top-10:
 const newsFeedTeach = `
 ## The whole interview hinges on "fan-out"
 
-A home timeline shows a user the recent posts of everyone they follow, newest first, in under 200ms. The entire problem is a read-vs-write cost tradeoff, and the whole interview hinges on the word "fan-out."
+A home timeline shows a user the recent posts of everyone they follow, newest first, in under 200ms. The entire problem is a read-vs-write cost tradeoff, and the whole interview hinges on the word "fan-out": who pays to spread a new post out to everyone who should see it, the writer or the reader. [Level 3 introduced fan-out](/learn/system-design/scaling-data/sd-l3-denorm-fanout); this lesson decides it under real numbers.
 
 ## Fan-out-on-write (push)
 
@@ -1137,7 +1137,7 @@ Media is immutable and read far more than written, the perfect CDN workload. Ser
 
 The timeline is the same hybrid fan-out: push post ids to normal followers' timelines, pull for celebrity accounts, store ids not bodies, hydrate metadata in a batch, and resolve media keys to CDN links at render time.
 
-Likes and comment counts on a viral post get millions of increments. A single \`UPDATE ... SET like_count = like_count + 1\` row is a hot-row contention nightmare. Shard the counter across N sub-counters and sum them, or maintain an approximate count in Redis flushed periodically. Exact like counts are not worth serializing every write.
+Likes and comment counts on a viral post get millions of increments. A single \`UPDATE ... SET like_count = like_count + 1\` row is a hot-row contention nightmare: every increment waits for the row lock the previous one holds, so at roughly 1ms per locked update that one row tops out near 1,000 likes/sec no matter how many servers you add. Shard the counter across N sub-counters (\`likes:{post}:0\` through \`likes:{post}:99\`, each write picking one at random) and sum them: 100 rows means 100 locks in parallel, so about 100K likes/sec, paid for with 100 reads per display or one cached sum. Or maintain an approximate count in Redis flushed to the database every few seconds, which absorbs any burst and leaves the number a few seconds stale. Exact like counts are not worth serializing every write.
 
 **Interview nuance:** estimate to show you can size it. 100M photos/day at 2MB average is 200TB/day of new media before replication, so ~600TB/day at 3x replication, or roughly 250 to 300TB/day erasure coded (parity shards instead of whole copies), which is the choice you make for cold media. Read bandwidth dwarfs write bandwidth, which is the whole reason a CDN is non-negotiable.
 
@@ -1191,7 +1191,7 @@ Chat is a real-time delivery problem at massive concurrency. WhatsApp famously r
 
 ## Connection layer
 
-Messaging needs the server to push to the client the instant a message arrives, so you hold persistent connections, WebSocket (or MQTT, which Facebook Messenger adopted for battery efficiency on mobile; WhatsApp itself ran a customized binary variant of XMPP, an XML-based messaging protocol). A tier of connection servers each hold hundreds of thousands to millions of open sockets. A user is connected to exactly one connection server at a time; a routing layer (a session registry in Redis mapping \`user_id -> connection_server\`) knows where each user is. When Alice sends to Bob, the system looks up Bob's connection server and forwards the message there over an internal pub/sub backplane (Kafka or a Redis pub/sub / a dedicated message bus).
+Messaging needs the server to push to the client the instant a message arrives, so you hold persistent connections, WebSocket (or MQTT, a lightweight publish/subscribe protocol built for devices on a battery and a flaky signal, which Facebook Messenger adopted for battery efficiency on mobile; WhatsApp itself ran a customized binary variant of XMPP, an XML-based messaging protocol). A tier of connection servers each hold hundreds of thousands to millions of open sockets. A user is connected to exactly one connection server at a time; a routing layer (a session registry in Redis mapping \`user_id -> connection_server\`) knows where each user is. When Alice sends to Bob, the system looks up Bob's connection server and forwards the message there over an internal pub/sub backplane (Kafka or a Redis pub/sub / a dedicated message bus).
 
 \`\`\`csdiagram
 {
@@ -1548,7 +1548,7 @@ Ingestion just validates and enqueues, returning fast. Workers consume from the 
 }
 \`\`\`
 
-Every request carries an idempotency key (event id + user + channel). Before sending, check whether that key was already delivered (a dedup store in Redis with a TTL, or a unique constraint). Delivery pipelines retry constantly (a worker crashes after sending but before recording success, a queue redelivers), and without idempotency a retry sends the same push twice. The dedup check is what makes at-least-once delivery machinery feel exactly-once to the user.
+Every request carries an idempotency key (event id + user + channel). Idempotent means safe to repeat: doing it twice leaves the same result as doing it once, which [Level 1 covers in full](/learn/system-design/foundations/sd-l1-idempotency-retries). Before sending, check whether that key was already delivered (a dedup store in Redis with a TTL, or a unique constraint). Delivery pipelines retry constantly (a worker crashes after sending but before recording success, a queue redelivers), and without idempotency a retry sends the same push twice. The dedup check is what makes at-least-once delivery machinery feel exactly-once to the user.
 
 ## Templates, preferences, tracking
 
