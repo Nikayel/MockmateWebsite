@@ -4083,8 +4083,11 @@ name, because it is what makes sketches composable across time windows:
 \`\`\`
 
 Rollup tables are maintained the same way when the product wants the number to be seconds old rather
-than a nightly batch: a stream processor, **Kafka Streams** or **Flink**, keeps a windowed aggregation
-over the event stream and writes only the small result.
+than a nightly batch: a **stream processor**, a job that runs forever and folds each event in as it
+lands rather than scanning a table afterwards, keeps a windowed aggregation over the event stream and
+writes only the small result. **Kafka Streams** and **Flink** are the two standard ones, Kafka being
+the durable, ordered log those events arrive on
+([Level 6](/learn/system-design/event-driven/sd-l6-kafka-internals)).
 
 \`\`\`
 -- Flink SQL: joins per stream over a 60-second window, advancing every 5 seconds
@@ -4353,7 +4356,10 @@ deleted."
 database transaction** as your business write, insert a row into an \`outbox\` table describing the
 event (\`{id, aggregate_id, type: OrderPlaced, payload, created_at}\`). The business change and the
 intent-to-publish commit together or not at all. A separate **relay** process reads unpublished
-outbox rows and publishes them to a message broker (Kafka), marking them sent.
+outbox rows and publishes them to a message broker (a durable waiting line that events sit in until
+each consumer has read them, so the sender never waits on the receiver: Kafka is the usual choice,
+and [Level 6](/learn/system-design/event-driven/sd-l6-queue-pubsub-log) is about little else),
+marking them sent.
 
 **Log-based change data capture (CDC):** rather than write an outbox by hand, tap the database's own
 replication log, which already records every committed change durably and in order. **Debezium**
