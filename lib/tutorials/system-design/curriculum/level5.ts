@@ -4195,10 +4195,10 @@ and SWIM's random direct/indirect probes plus infection-style gossip to keep per
 const leaderElectionFencingTeach = `
 ## One leader, guaranteed, even when the network lies
 
-A **fencing token** is a number that only ever goes up, handed out with each leadership grant and
-stamped on every write, which storage rejects if it is lower than the highest token it has already
-seen. Election alone cannot stop split-brain, because an election only appoints a successor: nothing
-in it reaches back and stops what the previous leader still has in flight.
+**The short answer.** A **fencing token** is a monotonically increasing number, stamped on every
+write, that storage rejects once a higher one has already landed. Leader election alone cannot stop
+split-brain: an election only appoints a successor, it does not reach back to stop what the previous
+leader still has in flight.
 
 Many systems need a **single active primary**: one node that owns writes, holds a lock, or
 coordinates work. The hard part is not electing one, it is guaranteeing there is *never* a second one
@@ -4266,7 +4266,7 @@ was hit; a legal pause alone produced two active leaders.
 }
 \`\`\`
 
-### What is a fencing token, and where is it enforced?
+### Fencing token: what it is and where it's enforced
 
 Leases alone cannot fix this, because the paused leader's problem is that its own view of "do I still
 hold the lease" is stale. The fix lives at the **resource**. Every time leadership is granted, the

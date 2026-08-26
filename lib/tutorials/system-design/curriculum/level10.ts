@@ -4325,6 +4325,8 @@ For a cron job, on completion compute the next run and reschedule. Clock skew ac
 const distributedLockTeach = `
 ## Why a distributed lock is hard to get right
 
+**The short answer.** A distributed lock cannot get its safety from elapsed time, which is Martin Kleppmann's critique of Redlock: a plain TTL lock is unsafe at any expiry, because a paused holder can outlive it. What actually closes the hole is a fencing token: a monotonically increasing number the protected resource checks on every write, rejecting anything lower than the one it has already accepted.
+
 A distributed lock lets processes on different machines agree that only one of them is inside a critical section at a time. The naive build is a single command: set a key if it does not already exist, with an expiry so that a dead holder cannot deadlock everyone else. It is unsafe, and not in a way any amount of tuning removes. The expiry is where it breaks: it is a bet that a holder which has gone quiet is dead, and a holder can go quiet without dying (a long garbage collection, a scheduler preemption, a network partition). None of those has a bound to tune the TTL against, so expiry cannot survive an unbounded pause, and that is a correctness hole rather than a knob.
 
 The fix is a fencing token. Every grant carries a monotonically increasing number, every write to the protected resource carries the number its holder was granted, and the resource remembers the highest number it has accepted and rejects anything lower. The paused holder's late write arrives with a stale token and is refused. Consensus makes the lock state correct, fencing makes the critical section correct, and a design needs both.

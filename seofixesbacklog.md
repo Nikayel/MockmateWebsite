@@ -730,3 +730,57 @@ The page carrying the cluster's phrase in its title has never been crawled, and 
 for the cluster is the one that does not target it. A third page would be a third claimant. Settle
 which URL owns "l4 vs l7 load balancing" first (this is the same duplicate-intent question as
 SEO-31), differentiate the other, and only then judge whether a concept page adds anything.
+
+---
+
+## Closures and corrections, 2026-08-25
+
+Appended rather than edited into the items above, per this file's own append-only rule. An item
+closed here stays where it is; read the two together.
+
+### Closed as shipped
+
+**SEO-04 — leader election and fencing's striking-distance page.** Picked up 2026-08-25 with two of
+the three asks already live: the cross-links to `sd-l5-2pc-3pc` and `sd-l10-distributed-lock` carry
+keyword anchors in both directions, and both exact phrases already sat inside section headings. Only
+the answer-first block did not yet exist in that shape: the lesson's opening paragraph already stated
+the fencing-token definition and the election-alone gap, but ran 64 words with no visual break from
+the paragraph around it. Rewrote it into a 52-word block labeled **The short answer.**, the same
+lead-in `sd-l1-concurrency-models` already uses for its own opening definition, so the convention is
+now shared rather than one-off. Reworded the fencing heading from a question ("What is a fencing
+token, and where is it enforced?") to lead with the exact phrase ("Fencing token: what it is and
+where it's enforced"); "Split brain on a 3-2 partition" already led with its exact phrase and was left
+alone. `lib/tutorials/system-design/curriculum/level5.ts`.
+
+**SEO-07 — distributed lock's Redlock and fencing answer.** The bidirectional cross-link to
+`sd-l5-leader-election-fencing` already existed on both pages. Added a 61-word **The short answer.**
+block as the new second paragraph of `sd-l10-distributed-lock`, naming Redlock and the fencing-token
+fix together in the lesson's first breath instead of three paragraphs in: every fact in it was already
+established lower in the same lesson, only reordered and compressed to the top.
+`lib/tutorials/system-design/curriculum/level10.ts`.
+
+**SEO-06 — 2PC vs 3PC.** Checked against the live lesson 2026-08-25 and both asks were already met, as
+of `5690d84ea` on 2026-08-16: `sd-l5-2pc-3pc`'s title has carried both "2PC" and "3PC" inside the
+first 40 characters since the lesson was authored (`863be6172`, 2026-07-05), and a "2PC vs 3PC vs
+consensus" table has sat directly under that heading, before any interactive widget, since the
+2026-08-16 ship. That ship's own closure log did not record it against this item. No content changed
+today.
+
+**SEO-08 — isolation levels.** Checked against the live lesson 2026-08-25 and both asks were already
+met, also as of `b38bfc674` on 2026-08-16: `sd-l2-isolation-levels` opens on the question heading
+"What are the four transaction isolation levels?", one short paragraph, then the anomaly-by-level
+table (dirty read / non-repeatable read / phantom read, yes/no per level), with a prose definition
+list of the four levels directly under it. Same gap as SEO-06: shipped 2026-08-16, never logged
+against this item. No content changed today.
+
+### Not picked up: no backlog item exists
+
+The brief that produced this round also named `sd-l6-retries-dlq-backpressure` and
+`sd-l1-concurrency-models` as candidates for the same treatment "if the specs are clear." Neither has
+an SEO-NN entry anywhere in this file, so there is no Evidence/Do/Accept to follow, which is a
+stronger gap than the ambiguity this file's items sometimes carry. This file's own rule already
+covers it: "An item without acceptance criteria is not ready to start." Both are genuinely in range on
+a 2026-07-28 to 2026-08-24 pull (`sd-l6-retries-dlq-backpressure`: 20 impressions at position 11.45,
+1 click; `sd-l1-concurrency-models`: 12 impressions at position 11.92, 1 click), so they are worth a
+numbered item with real Evidence, Do, and Accept before an agent edits either lesson. Nothing in
+either lesson changed.
