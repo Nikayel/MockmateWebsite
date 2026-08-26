@@ -437,7 +437,16 @@ application meaning: this is a \`POST /orders\`, this is \`Authorization: Bearer
 IP routing has a property that surprises people the first time they meet it: an address is not a
 place. A network can announce the same prefix from many sites at once, and every router on the
 internet independently installs whichever announcement is closest to it. That is **anycast**, and it
-is how CDNs, public resolvers, and DDoS scrubbers work.
+is how CDNs, public resolvers, and DDoS scrubbers work. A CDN is a content delivery network: machines
+spread around the world holding copies of your files close to users, and it gets
+[a lesson of its own later in this level](/learn/system-design/foundations/sd-l1-cdn-caching-foundations).
+
+Four labels in the trace below are worth spelling out before you read it. A **POP** (point of
+presence) is one building full of your machines in one city. \`198.51.100.0/24\` names a block of 256
+addresses, and the \`/24\` is what says so: the first 24 of the address's 32 bits are fixed, the last
+8 are free. **BGP** is the protocol networks use to announce to each other which blocks of addresses
+they can reach. And **AS path length** counts how many separate networks a packet crosses on the way,
+so the smallest number is the closest route.
 
 \`\`\`
 # One prefix, 198.51.100.0/24, announced over BGP from three POPs.
@@ -550,7 +559,7 @@ pinned to the same backend: the 4-tuple is the only identity it has.
     {
       "label": "A session cookie",
       "bucket": "Only an L7 proxy can act on it",
-      "feedback": "Cookies ride in HTTP headers, invisible at L4. Cookie-based sticky sessions need an L7 proxy."
+      "feedback": "Cookies ride in HTTP headers, invisible at L4. Cookie-based sticky sessions, meaning pinning one user to one server for the length of their visit, need an L7 proxy."
     }
   ]
 }
@@ -604,7 +613,8 @@ Your app calls the OS stub resolver, which asks a recursive resolver (your ISP's
 returns the nameservers for \`.com\` (the TLD), the TLD returns the authoritative nameservers for
 \`example.com\`, and the authoritative server (Route 53, NS1, Cloudflare) returns the actual A
 record. Caching happens at every hop: the browser caches, the OS caches, the recursive resolver
-caches, each keyed by TTL. That is the whole point and the whole problem.
+caches, each keyed by **TTL** (time to live: how many seconds a saved answer may be handed out again
+before somebody has to go ask for a fresh one). That is the whole point and the whole problem.
 
 \`\`\`cswidget
 {
@@ -727,11 +737,18 @@ caches, each keyed by TTL. That is the whole point and the whole problem.
 
 Record types you must know: **A** (name to IPv4), **AAAA** (name to IPv6), **CNAME** (alias one name
 to another, cannot exist at the zone apex or alongside other records), **NS** (delegation), and
-provider **ALIAS/ANAME** records, which behave like a CNAME but are legal at the apex
-(\`example.com\` itself) because the provider resolves them server-side and returns an A record.
+provider **ALIAS/ANAME** records, which behave like a CNAME but are legal at the apex because the
+provider resolves them server-side and returns an A record. The **zone apex** is the bare domain
+itself, \`example.com\` with nothing in front of it, as opposed to a subdomain like
+\`www.example.com\`.
 
-**Interview nuance:** "why can't I CNAME my apex to my load balancer?" is a real, common gotcha.
-Answer: the apex needs SOA/NS records that a CNAME would forbid coexisting with; use ALIAS/ANAME.
+**Interview nuance:** "why can't I CNAME my apex to my load balancer?" is a real, common gotcha. (A
+load balancer is the traffic cop that spreads incoming requests across many identical servers; it
+gets [its own lesson later in this level](/learn/system-design/foundations/sd-l1-load-balancing).)
+Answer: a CNAME is an exclusive alias, so a name holding one is allowed to hold nothing else, and the
+apex is required to hold two records of its own: **SOA** (start of authority, the record naming which
+nameserver is in charge of this zone) and **NS** (which nameservers answer for it). Those two rules
+collide, so use ALIAS/ANAME.
 
 \`\`\`cswidget
 {
@@ -776,7 +793,7 @@ checks**: the authoritative server stops handing out a region's IP when its heal
 Without health checks, plain round-robin DNS will keep sending one in N users to a dead box.
 
 The hard limit: DNS load balancing has no per-request awareness. It cannot see server load, cannot do
-sticky sessions, cannot retry. It steers at the granularity of "which IP do I hand back," resolved
+sticky sessions (pinning one user to one server for the length of their visit), cannot retry. It steers at the granularity of "which IP do I hand back," resolved
 once and cached. So DNS gets a user to the right region or the right LB, and a real L4/L7 load
 balancer takes over from there.
 
@@ -1055,9 +1072,9 @@ SFU, N participants:    uploads per client = 1,       server forwards N * (N - 1
 \`\`\`
 
 The cost did not vanish, it moved to a machine provisioned for it that you can scale horizontally. An
-SFU forwards packets without decoding them, unlike an MCU which re-encodes everything into one
-composite stream and adds latency doing it, so the extra hop stays cheap: client to nearest POP is a
-short RTT, and POP to POP rides a backbone.
+SFU forwards packets without decoding them, unlike an **MCU** (Multipoint Control Unit), which
+re-encodes everything into one composite stream and adds latency doing it, so the extra hop stays
+cheap: client to nearest POP is a short RTT, and POP to POP rides a backbone.
 
 **Interview nuance:** at scale, watch **TIME_WAIT** and ephemeral-port exhaustion. A client that
 opens and closes connections rapidly leaves each in TIME_WAIT (about 60s) holding an ephemeral port;
@@ -1127,7 +1144,7 @@ rotation (ACME/Let's Encrypt, AWS ACM) as part of a TLS design.
     {
       "label": "No; 0-RTT early data is replayable",
       "correct": true,
-      "feedback": "Right, so only idempotent requests may ride it. A captured 'POST /charge' replayed five times is five charges, and nothing in the protocol stops that, because the saved round trip is exactly the exchange that would have proved freshness. Allow 0-RTT for GETs, or for writes guarded by an idempotency key, and never for raw non-idempotent writes."
+      "feedback": "Right, so only idempotent requests may ride it, meaning requests that are safe to repeat: doing one twice leaves the same result as doing it once. A captured 'POST /charge' replayed five times is five charges, and nothing in the protocol stops that, because the saved round trip is exactly the exchange that would have proved freshness. Allow 0-RTT for GETs, or for writes guarded by an idempotency key (a unique id the client attaches so the server recognizes a repeat and does the work only once), and never for raw non-idempotent writes."
     },
     {
       "label": "No; 0-RTT only works on a first connection",
@@ -1145,7 +1162,8 @@ rotation (ACME/Let's Encrypt, AWS ACM) as part of a TLS design.
   first flight, before the handshake completes, saving a full round trip. The caveat that
   interviewers will push on: **0-RTT early data is replayable**. An attacker who captures it can
   resend it, so you must only allow 0-RTT for idempotent requests (GET, or writes guarded by an
-  idempotency key). Never let a non-idempotent \`POST /charge\` ride on 0-RTT.
+  idempotency key). Never let a non-idempotent \`POST /charge\` ride on 0-RTT. Both ideas get a whole
+  lesson later in this level: [idempotency and retries](/learn/system-design/foundations/sd-l1-idempotency-retries).
 - **Connection reuse**: the cheapest handshake is the one you do not do. Keep connections warm so you
   handshake once and reuse.
 
@@ -1279,12 +1297,17 @@ reaches:
   request (it must be an L4 LB). Maximum confidentiality, but you lose L7 routing and pay crypto on
   every app server.
 - **Re-encrypt inside the mesh**: terminate at the edge for routing, then open a fresh TLS connection
-  to the backend. This is the common enterprise answer: edge features plus encrypted internal hops.
+  to the backend. A **service mesh** is a small proxy running right next to every service, taking over
+  every connection in and out on that service's behalf, which is why it is the natural place to hang
+  this second hop of encryption. That proxy family gets its own lesson later in this level:
+  [reverse proxies and the API gateway](/learn/system-design/foundations/sd-l1-reverse-proxy-gateway).
+  This is the common enterprise answer: edge features plus encrypted internal hops.
 
 **mTLS** (mutual TLS) extends this: not only does the client verify the server, the server verifies
 the client's certificate too. This gives cryptographic **service-to-service identity**, the backbone
-of zero-trust architectures and service meshes (Istio, Linkerd) where "is this caller really the
-orders service" cannot rely on network location. Each service gets a short-lived cert from an
+of service meshes (Istio, Linkerd) and of zero-trust architectures, which assume the internal network
+is already hostile so every caller proves who it is instead of being trusted for coming from inside.
+That matters here because "is this caller really the orders service" cannot rely on network location. Each service gets a short-lived cert from an
 internal CA, and the mesh rotates them automatically.
 
 That identity has to be written down somewhere, and the somewhere is the certificate itself. The
@@ -1296,7 +1319,9 @@ document. It is an ordinary X.509 cert whose subject happens to be a service rat
 # what a settlement service presents on every outbound and inbound connection
 Subject Alternative Name:  URI:spiffe://bank.example/ns/payments/sa/settlement
 Not Before:                2026-08-14 09:00:00
-Not After:                 2026-08-14 10:00:00     # one hour, rotated by the issuer (SPIRE)
+Not After:                 2026-08-14 10:00:00     # one hour, then the issuer (SPIRE, the software
+                                                   # that mints and rotates these certs) hands out a
+                                                   # fresh one
 \`\`\`
 
 Two things follow from naming the workload in the cert rather than inferring it from an address.
@@ -1704,8 +1729,13 @@ Walk it:
 9. **App cache (Redis/Memcached)**: before hitting the database, check the cache. A **hit** returns
    in ~1ms and skips the DB. A **miss** falls through to the database (cache-aside), then populates
    the cache.
-10. **Database / downstream services**: the authoritative read/write, plus any fan-out to other
-    microservices (each its own network hop with its own timeout).
+10. **Database / downstream services**: the authoritative read/write, plus any **fan-out** to other
+    microservices (one app split into many small separately deployed services). Fan-out means this
+    one request triggers several more calls that must all come back before you can answer, each its
+    own network hop with its own timeout. It is also what turns a rare slow call into a common one,
+    which is the point of
+    [latency and percentiles](/learn/system-design/foundations/sd-l1-latency-percentiles) later in
+    this level.
 11. **Response path**: serialize (JSON/Protobuf), compress (gzip/brotli), set **cache headers**
     (Cache-Control, ETag) that decide what the browser and CDN may cache next time, the CDN fills its
     cache on the way out, and the client renders.
