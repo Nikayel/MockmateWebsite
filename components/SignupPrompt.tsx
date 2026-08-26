@@ -26,6 +26,16 @@ interface SignupPromptProps {
    * marker this component sets before opening the popup.
    */
   onSignedIn: (user: FirebaseUser) => Promise<void> | void
+  /**
+   * Fires synchronously at the provider click, before the popup opens.
+   * Firebase commits the new user via onAuthStateChanged before the popup
+   * promise resolves, so a loading cover keyed on popup success starts one
+   * frame too late; keyed on the click it cannot.
+   */
+  onAuthAttempt?: () => void
+  /** Fires when an announced attempt ends without a sign-in (popup closed,
+   *  auth error), so the page can drop the cover onAuthAttempt raised. */
+  onAuthAborted?: () => void
 }
 
 /**
@@ -41,6 +51,8 @@ export function SignupPrompt({
   scenarioTitle,
   onDismiss,
   onSignedIn,
+  onAuthAttempt,
+  onAuthAborted,
 }: SignupPromptProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [authProvider, setAuthProvider] = useState<"github" | "google" | null>(null)
@@ -59,6 +71,7 @@ export function SignupPrompt({
 
   const handleAuth = async (provider: "github" | "google") => {
     try {
+      onAuthAttempt?.()
       setIsLoading(true)
       setAuthProvider(provider)
       trackEvent("signup_prompt_click", { provider, sessionId })
@@ -108,12 +121,19 @@ export function SignupPrompt({
         localStorage.removeItem("auth_redirect")
 
         await onSignedIn(result.user)
+      } else if (result.status !== "redirecting") {
+        // Anything that is neither a sign-in nor a page-unloading redirect
+        // ended the attempt without a user.
+        onAuthAborted?.()
+        setIsLoading(false)
+        setAuthProvider(null)
       }
     } catch (error) {
       console.error("Auth failed:", error)
       toast.error("Sign up failed", {
         description: error instanceof Error ? error.message : "Please try again",
       })
+      onAuthAborted?.()
       setIsLoading(false)
       setAuthProvider(null)
     }

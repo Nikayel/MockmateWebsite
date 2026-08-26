@@ -65,6 +65,8 @@ import { createBugfixEvidenceEvent, type BugfixEvidenceEvent } from "@/lib/bugfi
 import { useInterviewTimer } from "./_hooks/useInterviewTimer"
 import { useInterviewModes } from "./_hooks/useInterviewModes"
 import { useGuestQuota, isUsageBlocked } from "./_hooks/useGuestQuota"
+import { confirmGuestSessionMigration, getGuestId } from "@/lib/guest-session"
+import { resolveResultSurface, type GuestConversionPhase } from "./_lib/resolve-result-surface"
 import { useCodeExecution } from "./_hooks/useCodeExecution"
 import { useInterviewPhaseTracking } from "./_hooks/useInterviewPhaseTracking"
 import { useInterviewChat } from "./_hooks/useInterviewChat"
@@ -207,6 +209,10 @@ function InterviewPageContent() {
     refreshUsageLimit,
   } = useGuestQuota()
   const [showSignupPrompt, setShowSignupPrompt] = useState(false)
+  // Lifecycle of a guest's post-trial sign-in (see resolveResultSurface).
+  // Tracked separately from isGuestMode because useSessionReopen calls
+  // exitGuestMode() the moment auth lands, mid-conversion.
+  const [guestConversion, setGuestConversion] = useState<GuestConversionPhase>("idle")
 
   // Chat states
   const [interviewerMessages, setInterviewerMessages] = useState<ChatMessage[]>([])
@@ -1408,25 +1414,45 @@ function InterviewPageContent() {
       // Cover the migrate window with the loading state so the feedback view
       // never flashes its empty shell between modal-close and stream-start.
       // useFeedbackStreaming resets this when the stream completes or errors.
+      setGuestConversion("covering")
       setIsGeneratingFeedback(true)
       try {
         const staged = lastFeedbackRequestRef.current
-        const idToken = await signedInUser.getIdToken()
-        if (guestId && currentSessionId) {
-          await upgradeGuestSession({ guestId, sessionId: currentSessionId, idToken })
+        // useSessionReopen calls exitGuestMode() as soon as auth lands, which
+        // nulls the guestId state — so a retry after a failed migrate must
+        // fall back to the durable copy in guest storage.
+        const migrateGuestId = guestId ?? getGuestId()
+        if (!migrateGuestId || !currentSessionId) {
+          // Fail closed: streaming an unmigrated session spends the AI call
+          // and then 403s at persist (migrate-before-stream invariant).
+          throw new Error("We could not find your trial session to connect")
         }
+        const idToken = await signedInUser.getIdToken()
+        await upgradeGuestSession({
+          guestId: migrateGuestId,
+          sessionId: currentSessionId,
+          idToken,
+        })
+        // The session now belongs to the account; retire the guest identity
+        // so nothing re-runs migration or re-enters guest mode with it.
+        confirmGuestSessionMigration()
         setShowSignupPrompt(false)
         if (staged) {
           staged.userId = signedInUser.uid
           streamingFeedback.startStreaming(staged)
+          setGuestConversion("idle")
         } else {
           // Nothing staged (defensive): the migrated session still has its
           // stored score and code — land there rather than on a blank view.
           setIsGeneratingFeedback(false)
-          if (currentSessionId) router.push(`/sessions/${currentSessionId}`)
+          setGuestConversion("idle")
+          router.push(`/sessions/${currentSessionId}`)
         }
       } catch (error) {
         setIsGeneratingFeedback(false)
+        // The lock returns with retry semantics; the signed-in feedback view
+        // would be an empty shell since nothing streamed.
+        setGuestConversion("failed")
         throw error // SignupPrompt surfaces this as its "Sign up failed" toast.
       }
     },
@@ -1938,6 +1964,13 @@ function InterviewPageContent() {
   // Determine if we should hide the header (during interview mode)
   const isInterviewMode = !showScenarioBrowser && (isInterviewStarted || selectedScenario !== null)
   const isResultView = showFeedback || showPostInterviewDiscussion
+  // One tested decision for the whole result region (see resolve-result-surface).
+  const resultSurface = resolveResultSurface({
+    showFeedback,
+    showPostInterviewDiscussion,
+    hasUser: !!user,
+    guestConversion,
+  })
 
   // Guest banner visibility guard (kept in page).
   const hasGuestBanner = isGuestMode && !showFeedback
@@ -2057,7 +2090,7 @@ function InterviewPageContent() {
                   - Tab-based: One panel at a time (Miller's Law)
                   - Reduces simultaneous information processing
               ═══════════════════════════════════════════════════════════════ */}
-              {!showFeedback && !showPostInterviewDiscussion ? (
+              {resultSurface === "workspace" ? (
                 <InterviewLayoutGrid
                   focusMode={focusMode}
                   selectedScenario={selectedScenario}
@@ -2118,16 +2151,28 @@ function InterviewPageContent() {
                   userProfile={cachedUserProfile}
                   onActivePanelChange={setActivePanel}
                 />
-              ) : !user ? (
+              ) : resultSurface === "guest_lock" ? (
                 // Guests never stream AI feedback, so the regular feedback
                 // view here was a shell of empty sections (its fallback
                 // caption "Review feedback for details" dead-clicked in the
                 // wild). The locked panel states the truth instead: the
-                // session is scored and saved, and sign-in reveals it. Once
-                // the guest authenticates, `user` flips and the branch below
-                // renders the real view fed by the post-signup stream.
+                // session is scored and saved, and sign-in reveals it. After
+                // a successful sign-in the resolver hands the slot to the
+                // real view fed by the post-signup stream; after a FAILED
+                // migration it returns here with retry semantics, wired
+                // straight to the signed-in user instead of the modal.
                 <GuestFeedbackLock
-                  onSignIn={() => setShowSignupPrompt(true)}
+                  retry={guestConversion === "failed"}
+                  onSignIn={
+                    guestConversion === "failed" && firebaseUser
+                      ? () => {
+                          void handleGuestSignedIn(firebaseUser).catch(() => {
+                            // handleGuestSignedIn already set the failed
+                            // state; the rethrow only matters to the modal.
+                          })
+                        }
+                      : () => setShowSignupPrompt(true)
+                  }
                   scenarioTitle={selectedScenario?.title || "Your session"}
                 />
               ) : (
@@ -2201,12 +2246,26 @@ function InterviewPageContent() {
       {/* Guest User Signup Prompt - shown after feedback. No performanceScore
           condition: a guest's score never enters page state (it is what the
           sign-in reveals), so gating on it would keep this modal from ever
-          rendering. */}
-      {isGuestMode && showFeedback && showSignupPrompt && (
+          rendering. The guestConversion clause keeps the modal mounted
+          through the conversion itself: useSessionReopen flips isGuestMode
+          off the moment auth lands, which would otherwise unmount the modal
+          mid-migration and strand its loading/failure UI. */}
+      {(isGuestMode || guestConversion !== "idle") && showFeedback && showSignupPrompt && (
         <SignupPrompt
           sessionId={currentSessionId || ""}
           scenarioTitle={selectedScenario?.title || ""}
           onSignedIn={handleGuestSignedIn}
+          onAuthAttempt={() => {
+            // The cover must start at the provider click: Firebase commits
+            // the new user before the popup promise resolves, and this is
+            // the only hook that runs before that commit.
+            setGuestConversion("covering")
+            setIsGeneratingFeedback(true)
+          }}
+          onAuthAborted={() => {
+            setGuestConversion("idle")
+            setIsGeneratingFeedback(false)
+          }}
           onDismiss={() => {
             setShowSignupPrompt(false)
             // Note: markFreeTrialUsed() is already called in SignupPrompt component

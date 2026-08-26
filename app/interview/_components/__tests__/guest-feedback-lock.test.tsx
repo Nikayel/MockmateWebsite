@@ -40,4 +40,22 @@ describe("GuestFeedbackLock", () => {
     expect(container.textContent).not.toMatch(/\d+\s*%/)
     expect(screen.queryByText(/review feedback for details/i)).toBeNull()
   })
+
+  it("offers a retry when the account link failed after sign-in", () => {
+    // A guest whose sign-in succeeded but whose migration call failed is
+    // signed in with nothing to show. The panel must say the session is safe
+    // and hand them a retry, never the default "create an account" pitch
+    // (they already have one).
+    const onSignIn = vi.fn()
+    const { container } = render(
+      <GuestFeedbackLock onSignIn={onSignIn} scenarioTitle="Two Sum" retry />
+    )
+
+    expect(screen.getByRole("button", { name: /try again/i })).toBeTruthy()
+    expect(screen.queryByText(/sign in with a free account/i)).toBeNull()
+    expect(container.textContent).not.toMatch(/\d+\s*%/)
+
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }))
+    expect(onSignIn).toHaveBeenCalledTimes(1)
+  })
 })

@@ -98,6 +98,60 @@ describe("SignupPrompt with the score withheld", () => {
     expect(click?.[1]).not.toHaveProperty("score")
   })
 
+  it("announces the auth attempt at the click, before the popup can resolve", async () => {
+    // Firebase commits the new user via onAuthStateChanged before the popup
+    // promise resolves, so any cover keyed on popup success renders one frame
+    // of the signed-in view with a wrong 0% first. The page can only cover
+    // that frame if it hears about the attempt at the click itself.
+    const order: string[] = []
+    const onAuthAttempt = vi.fn(() => {
+      order.push("attempt")
+    })
+    signInWithGoogle.mockImplementationOnce(async () => {
+      order.push("popup")
+      return { status: "signed-in", user: popupUser }
+    })
+    createOrUpdateProfile.mockImplementationOnce(async () => {
+      order.push("profile")
+    })
+    const onSignedIn = vi.fn(async () => {
+      order.push("signedIn")
+    })
+    render(
+      <SignupPrompt
+        sessionId="sess-1"
+        scenarioTitle="Two Sum"
+        onSignedIn={onSignedIn}
+        onAuthAttempt={onAuthAttempt}
+      />
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: /google/i }))
+
+    await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1))
+    expect(order).toEqual(["attempt", "popup", "profile", "signedIn"])
+  })
+
+  it("aborts the cover when the popup attempt fails", async () => {
+    const onAuthAttempt = vi.fn()
+    const onAuthAborted = vi.fn()
+    signInWithGoogle.mockRejectedValueOnce(new Error("Sign-in canceled"))
+    render(
+      <SignupPrompt
+        sessionId="sess-1"
+        scenarioTitle="Two Sum"
+        onSignedIn={vi.fn()}
+        onAuthAttempt={onAuthAttempt}
+        onAuthAborted={onAuthAborted}
+      />
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: /google/i }))
+
+    await waitFor(() => expect(onAuthAborted).toHaveBeenCalledTimes(1))
+    expect(onAuthAttempt).toHaveBeenCalledTimes(1)
+  })
+
   it("leaves the /login migration flow intact when the popup is blocked", async () => {
     signInWithGitHub.mockResolvedValueOnce({ status: "redirecting" })
     const onSignedIn = renderPrompt()
