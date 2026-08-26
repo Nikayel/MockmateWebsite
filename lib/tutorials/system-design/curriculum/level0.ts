@@ -1487,9 +1487,14 @@ const qpsReadWriteTeach = `
 
 The single most decision-shaping number in an estimate is the read:write ratio. It tells you which
 path to optimize, and optimizing the wrong path is one of the most common ways to lose a design round.
-A 100:1 read-heavy system (a social feed, a product catalog) wants caches, read replicas, and
-denormalized read models. A write-heavy or balanced system (an analytics ingest pipeline, a metrics
-store) wants write batching, append-only logs, and horizontally sharded write paths.
+A 100:1 read-heavy system (a social feed, a product catalog) wants caches,
+[read replicas](/learn/system-design/scaling-data/sd-l3-read-replicas) (extra copies of the database
+that answer reads so the original is left free to take writes), and denormalized read models
+(the same fact stored again in a shape the read already wants, so no expensive joining-together
+happens at read time, which
+[Level 2 covers](/learn/system-design/data-storage/sd-l2-normalization-denorm)). A write-heavy or
+balanced system (an analytics ingest pipeline, a metrics store) wants write batching, append-only
+logs, and horizontally sharded write paths.
 
 Start by converting DAU to QPS with explicit arithmetic, exactly as in Fermi estimation. Then compute
 reads and writes separately and take the ratio.
@@ -1680,7 +1685,9 @@ a senior signal.
 Access is Zipfian: a small number of hot keys (viral posts, celebrity accounts, trending products)
 take a hugely disproportionate share of traffic. Your design must survive the hot key, not just the
 average. A hot key can saturate a single cache node or shard even when the fleet-wide average looks
-fine, so you plan for replication of hot keys or request coalescing.
+fine, so you plan for replication of hot keys (keeping that one key on several nodes so the load
+splits) or request coalescing (when a thousand requests all want the same missing key, one of them
+goes and fetches it while the rest wait for that single answer).
 
 \`\`\`cswidget
 {
@@ -1787,8 +1794,10 @@ Two multipliers people get wrong, and they get them wrong in opposite directions
   13.5 TB provisioned. Object storage is the exception that catches people out. S3-class services
   replicate and erasure-code internally and bill for one logical copy, so multiplying a blob estimate
   by 3 overstates the bill by 3x.
-- **Index and overhead.** Secondary indexes, B-tree overhead, and free space commonly add 20 to 50% on
-  top of raw row size for databases.
+- **Index and overhead.** Secondary indexes (extra lookup structures the database keeps beside your
+  rows so a query does not scan all of them, built as a
+  [B-tree](/learn/system-design/data-storage/sd-l2-btree-vs-lsm) in most databases) and the free space
+  left for future rows commonly add 20 to 50% on top of raw row size.
 
 ### Price the lever, because the price is what decides
 
@@ -1826,6 +1835,48 @@ dollars a month, less than an afternoon of your time, so tiering is a footnote a
 interview minutes on it is a mistake. At 36.5 PB it is over 600,000 dollars a month, about 7.5 million
 a year, and a candidate who never raises it has walked past the dominant line item in their own
 design. Magnitude, not principle, decides whether a cost lever is worth naming.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "The identical tiering lever",
+    "Metadata service, 12 TB",
+    "Media service, 36.5 PB"
+  ],
+  "rows": [
+    [
+      "All on standard object storage",
+      "~240 USD a month",
+      "~730,000 USD a month"
+    ],
+    [
+      "Newest 5% standard, the rest archived",
+      "~35 USD a month",
+      "~106,000 USD a month"
+    ],
+    [
+      "Saving",
+      "~205 USD a month",
+      "~624,000 USD a month"
+    ],
+    [
+      "Share of the bill removed",
+      "about 85%",
+      "about 85%"
+    ],
+    [
+      "Worth interview minutes?",
+      "No: name it in one clause and move on",
+      "Yes: it is the largest line in the design"
+    ]
+  ],
+  "highlightCols": [
+    "Media service, 36.5 PB"
+  ],
+  "caption": "The percentage saved is identical in both columns, which is exactly why the percentage cannot tell you whether to raise the lever. Only the absolute number can, so estimate the bill before deciding a cost argument is worth your minutes."
+}
+\`\`\`
 
 Name the catch beside the saving, or the number is only half an argument. Archive tiers buy that 10x
 and charge for it in restore time of minutes to hours, per-GB retrieval fees, and a minimum storage
@@ -2169,7 +2220,8 @@ disk seeks, and why you keep chatty request sequences within one region.
 **Interview nuance:** the practical takeaway interviewers want is not the exact nanoseconds but the
 design consequence. "Cross-region is ~100 ms, so a synchronous read-your-writes across regions will
 feel slow; I will serve reads from a regional replica and replicate asynchronously" is the sentence
-that earns the point.
+that earns the point. Read-your-writes is the promise that a user immediately sees the change they
+just made, and buying it across an ocean means every read waits for that ~100 ms crossing.
 
 <details>
 <summary>Units, time, and object sizes</summary>
