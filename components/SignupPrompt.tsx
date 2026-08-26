@@ -26,9 +26,9 @@ interface SignupPromptProps {
    * Fires after a successful in-page (popup) sign-in, with the freshly
    * authenticated user. The interview page owns what happens next — migrate
    * the guest session to the new account, then start the deferred feedback
-   * stream. The popup-blocked path never fires this: it round-trips through
-   * /login, which runs migration itself off the pending_guest_migration
-   * marker this component sets before opening the popup.
+   * stream. The popup-blocked path never fires this: it returns to
+   * /interview as a cold load, where useRedirectSignInReturn consumes the
+   * pending_guest_migration marker this component sets before the popup.
    */
   onSignedIn: (user: FirebaseUser) => Promise<void> | void
   /**
