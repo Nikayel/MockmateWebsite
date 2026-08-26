@@ -793,9 +793,9 @@ checks**: the authoritative server stops handing out a region's IP when its heal
 Without health checks, plain round-robin DNS will keep sending one in N users to a dead box.
 
 The hard limit: DNS load balancing has no per-request awareness. It cannot see server load, cannot do
-sticky sessions (pinning one user to one server for the length of their visit), cannot retry. It steers at the granularity of "which IP do I hand back," resolved
-once and cached. So DNS gets a user to the right region or the right LB, and a real L4/L7 load
-balancer takes over from there.
+sticky sessions (pinning one user to one server for the length of their visit), cannot retry. It
+steers at the granularity of "which IP do I hand back," resolved once and cached. So DNS gets a user
+to the right region or the right LB, and a real L4/L7 load balancer takes over from there.
 
 Recap: DNS resolves through a cached recursive-to-authoritative chain, TTL trades failover speed for
 query load but never gives instant failover because of resolver caching, and GeoDNS/latency/weighted
@@ -1307,8 +1307,8 @@ reaches:
 the client's certificate too. This gives cryptographic **service-to-service identity**, the backbone
 of service meshes (Istio, Linkerd) and of zero-trust architectures, which assume the internal network
 is already hostile so every caller proves who it is instead of being trusted for coming from inside.
-That matters here because "is this caller really the orders service" cannot rely on network location. Each service gets a short-lived cert from an
-internal CA, and the mesh rotates them automatically.
+That matters here because "is this caller really the orders service" cannot rely on network location.
+Each service gets a short-lived cert from an internal CA, and the mesh rotates them automatically.
 
 That identity has to be written down somewhere, and the somewhere is the certificate itself. The
 convention meshes follow is **SPIFFE**: a URI naming the workload goes in the certificate's Subject
@@ -4718,10 +4718,10 @@ sidecar at all. Either way, that proxy handles mTLS between services, retries, t
 breaking (when a dependency starts failing, stop calling it for a while and fail fast instead of
 piling up on it, which
 [resilience primitives](/learn/system-design/foundations/sd-l1-resilience-primitives) works through
-later in this level), and traffic-shifting, controlled centrally without changing app code. Mental model: the
-**gateway is north-south** (client to system), the **mesh is east-west** (service to service). Add a
-**WAF** and **DDoS protection** at the very edge, in front of the gateway, to filter malicious traffic
-before it costs you anything.
+later in this level), and traffic-shifting, controlled centrally without changing app code. Mental
+model: the **gateway is north-south** (client to system), the **mesh is east-west** (service to
+service). Add a **WAF** and **DDoS protection** at the very edge, in front of the gateway, to filter
+malicious traffic before it costs you anything.
 
 The failure mode to avoid: the gateway becoming a **logic monolith**. It is tempting to keep adding
 "just one more" business rule to the gateway until it holds pricing logic, feature flags, and
