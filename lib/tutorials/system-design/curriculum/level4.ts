@@ -59,10 +59,12 @@ must be **stateless**.
 - **Durable data:** to the database, which is a separate scaling problem.
 
 Once state is externalized, nodes become **cattle, not pets.** A pet is a hand-tuned server with a
-name you nurse back to health. Cattle are interchangeable and disposable: provisioned from an
-immutable image or IaC (a baked AMI, a container, Terraform), and when one misbehaves you kill it and
-boot a replacement rather than debugging it live. Autoscaling groups, Kubernetes deployments, and
-rolling deploys all assume this.
+name you nurse back to health. Cattle are interchangeable and disposable: built from a file rather
+than set up by hand, which is what **infrastructure as code (IaC)** means. The file might be a baked
+**AMI** (an Amazon Machine Image: a saved snapshot of a fully configured machine), a container image,
+or a Terraform script that declares the machines you want. When one misbehaves you kill it and boot a
+replacement rather than debugging it live. Autoscaling groups, Kubernetes deployments, and rolling
+deploys all assume this.
 
 **Interview nuance:** do not over-apply "scale out everything." Scale-up still wins for tiers that
 are genuinely hard to shard: a single-writer relational database, an in-memory analytics engine,
@@ -307,6 +309,53 @@ per-request CPU and latency cost (AWS **ALB**, **Nginx**, **HAProxy**, **Envoy**
       "feedback": "Headers, cookies, and per-route policy all require parsing the request first."
     }
   ]
+}
+\`\`\`
+
+**Put a number on "a higher per-request CPU and latency cost."** Forwarding a packet at L4 is a
+lookup and a copy: roughly **5 microseconds** of CPU per request, and well under half a millisecond
+of added delay. An L7 proxy has to read the bytes off the connection, parse the headers, match a
+route, and re-frame the response, which costs **50 to 150 microseconds** of CPU and adds **1 to 3
+milliseconds** per hop. Both are ballpark production figures, and ballpark is all an interview needs,
+because what decides the design is the ratio (about 20x) rather than the digits.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Where 100k requests/sec go",
+    "CPU per request",
+    "Added latency",
+    "Cores spent just moving traffic",
+    "Routing features you get"
+  ],
+  "rows": [
+    [
+      "All of it through L4",
+      "~5 microseconds",
+      "under 0.5 ms",
+      "100,000 x 5 microseconds = 0.5 of a core",
+      "None: no path routing, no TLS termination, no rate limits"
+    ],
+    [
+      "All of it through L7",
+      "~100 microseconds",
+      "1 to 3 ms",
+      "100,000 x 100 microseconds = 10 cores",
+      "All of them, paid for on every request including the traffic that uses none of them"
+    ],
+    [
+      "L4 edge, L7 for the 30 percent that needs features",
+      "~5 microseconds, plus ~100 on that 30 percent",
+      "1 to 3 ms on that 30 percent only",
+      "0.5 + 3 = ~3.5 cores",
+      "All of them, on the requests that actually use them"
+    ]
+  ],
+  "highlightCols": [
+    "Cores spent just moving traffic"
+  ],
+  "caption": "Six cores of standing capacity, at one site, at this one traffic level, is what the phrase 'higher per-request cost' is hiding. It is also why nobody argues about the 1 to 3 ms: the latency is affordable, the CPU multiplied by every request is what you feel."
 }
 \`\`\`
 
@@ -798,7 +847,10 @@ answer that names the trigger without the ceiling has described half the mechani
 - \`max_ejection_percent\` (default 10): the ceiling on what fraction of the pool may be ejected at
   once. Past it the detector simply refuses to eject, however bad the next host looks.
 
-Run a 500-pod fleet through a 10-second blip in a shared auth service, both ways:
+A **pod** is one running copy of your app, the unit the Kubernetes platform starts, watches, and
+replaces; read it as "one instance" everywhere it appears below, and see
+[Level 9's containers lesson](/learn/system-design/modern-architecture/sd-l9-containers-k8s) for the
+platform itself. Run a 500-pod fleet through a 10-second blip in a shared auth service, both ways:
 
 \`\`\`csdiagram
 {
@@ -843,8 +895,9 @@ balances across ALL hosts, healthy or not, on the reasoning that spraying traffi
 fleet still beats routing into an empty pool.
 
 Note where this ceiling lives. It bounds **passive ejection in the mesh**, and Kubernetes readiness
-has no equivalent: if all 500 pods fail their readiness probe the Endpoints list legitimately empties
-and the Service has nowhere to send anything. That asymmetry is why the two mechanisms get different
+has no equivalent: if all 500 pods fail their readiness probe the Endpoints list (the platform's list
+of pod addresses currently allowed to receive traffic) legitimately empties and the Service, the
+stable name callers dial, has nowhere to send anything. That asymmetry is why the two mechanisms get different
 jobs. Keep readiness a **local** question that a shared dependency cannot answer on your behalf, and
 let capped passive ejection be what reacts to a downstream that really is failing requests.
 
@@ -987,9 +1040,15 @@ balancing decision**: a central load balancer, or each client.
 - **Self-registration:** each instance **registers** itself on startup and sends periodic
   **heartbeats** (Consul, etcd, Netflix Eureka). If heartbeats stop, the registry marks it gone. On
   graceful shutdown it deregisters.
-- **Platform-managed:** the orchestrator maintains it for you. In **Kubernetes**, a **Service** is a
-  stable name/VIP, and the control plane keeps its **Endpoints / EndpointSlices** in sync with the
-  pods that pass their **readiness** probe.
+- **Platform-managed:** the orchestrator (the software that runs your fleet) maintains the registry
+  for you. In **Kubernetes**: one running copy of your app is a **pod**, the **control plane** is the
+  management software that starts pods and tracks which ones are alive, a **Service** is a stable
+  name plus a **VIP** (virtual IP: one address that stands in for many backend machines), and
+  **Endpoints / EndpointSlices** are that Service's live list of pod addresses. The control plane
+  keeps that list in sync with the pods that pass their **readiness** probe, so the registry updates
+  itself as instances come and go. The platform gets a whole lesson in
+  [Level 9](/learn/system-design/modern-architecture/sd-l9-containers-k8s); here it is simply one way
+  to run a registry.
 
 **Health-based removal** keeps discovery honest. The registry advertises only instances that pass
 **active health checks** or are heartbeating, combined with **readiness** so a new instance receives
@@ -1222,7 +1281,10 @@ minutes, which is the failure mode to avoid.
 
 A **service mesh** (Istio with Envoy sidecars, or Linkerd with its own Rust micro-proxy) is the
 popular middle ground: client-side benefits (no central-LB hop, locality, per-request balancing,
-retries, mTLS) with **central configuration**. The price is real operational complexity (a control
+retries, and **mTLS**, mutual TLS, where both ends present certificates so the caller proves who it
+is too, covered later in this level's
+[connection-management lesson](/learn/system-design/scaling-compute/sd-l4-tls-connection-mgmt)) with
+**central configuration**. The price is real operational complexity (a control
 plane and a sidecar per pod).
 
 \`\`\`cswidget
@@ -3687,7 +3749,7 @@ export const systemDesignLevel4: DesignLevel = {
           practice: {
             id: "sd-l4-lb-l4-l7-practice",
             prompt:
-              "Choose the load-balancing layers for Cloudflare-scale edge traffic terminating tens of millions of concurrent TLS connections across hundreds of PoPs, where a single PoP or LB node failure must not drop the service, and justify where TLS terminates.",
+              "Choose the load-balancing layers for Cloudflare-scale edge traffic terminating tens of millions of concurrent TLS connections across hundreds of PoPs (points of presence: small edge sites full of servers, placed near users in cities worldwide), where a single PoP or LB node failure must not drop the service, and justify where TLS terminates.",
             thinkAbout: [
               "What does consistent hashing at the L4 tier protect during L7 fleet changes?",
               "Why terminate TLS at the PoP rather than at origin?",
@@ -3892,7 +3954,7 @@ driven by the largest guilds.
               "Assumptions: a polyglot microservice fleet behind autoscaling, where instance IP and port change constantly and stale routing causes user-visible errors.",
               "**Discovery:** a service registry as the source of truth. On Kubernetes, lean on the platform-managed path: a Service gives a stable name and the control plane keeps EndpointSlices in sync with pods that pass readiness, so instances appear only when warm and disappear on termination. Off Kubernetes, use Consul or etcd with self-registration: instances register on startup and heartbeat, and stop being advertised when heartbeats lapse. Explicitly avoid hardcoded IPs and long-TTL DNS: the classic sources of 'traffic to a terminated instance.'",
               "**Health-based removal:** active health checks (short interval, unhealthy after 2-3 consecutive failures) plus readiness gating for new instances plus passive outlier ejection for instances that fail real requests but probe green. With second-scale intervals and registry watch/push, a terminated or failing instance is out of every caller's view within seconds: the metric that actually matters.",
-              "**LB decision: client-side via a service mesh** (Istio with Envoy sidecars, or Linkerd with its own Rust micro-proxy). It removes the central-LB hop, enables locality-aware and least-request routing (same-zone traffic cuts latency and cross-AZ cost), gives retries, circuit breaking, and mTLS uniformly, and keeps balancing logic out of each service's code (the sidecar handles it) while configuration stays central. The accepted tradeoff: running the mesh control plane and a sidecar per pod, and a dependence on fast endpoint propagation.",
+              "**LB decision: client-side via a service mesh** (Istio with Envoy sidecars, or Linkerd with its own Rust micro-proxy). It removes the central-LB hop, enables locality-aware and least-request routing (keeping traffic inside one zone cuts both latency and the per-gigabyte charge clouds levy on traffic that crosses between zones), gives retries, circuit breaking, and mTLS uniformly, and keeps balancing logic out of each service's code (the sidecar handles it) while configuration stays central. The accepted tradeoff: running the mesh control plane and a sidecar per pod, and a dependence on fast endpoint propagation.",
               "**Fallbacks:** gRPC client-side LB backed by etcd for a gRPC-heavy fleet, or server-side LB (ALB/Envoy behind a stable VIP) when dumb clients and central control are worth the extra hop.",
               "Common wrong turn: hardcoding instance addresses or relying on long-TTL DNS, so terminated instances keep getting traffic and callers see connection errors during every scale-in and deploy.",
             ],
@@ -3900,7 +3962,7 @@ driven by the largest guilds.
           practice: {
             id: "sd-l4-service-discovery-practice",
             prompt:
-              "Design service discovery and load balancing for a Netflix-scale fleet of thousands of instances across three AWS regions and multiple availability zones, where deploys and autoscaling churn instances continuously, cross-AZ traffic is a real cost line, and a single instance failure must be invisible within seconds. Justify client-side vs server-side.",
+              "Design service discovery and load balancing for a Netflix-scale fleet of thousands of instances across three AWS regions and multiple availability zones (an availability zone, or AZ, is one physically separate data-center site inside a region, and cloud providers bill per gigabyte for traffic that crosses between them), where deploys and autoscaling churn instances continuously, cross-AZ traffic is a real cost line, and a single instance failure must be invisible within seconds. Justify client-side vs server-side.",
             thinkAbout: [
               "What can a zone-aware client do that a central LB cannot express as cheaply?",
               "Why does client-side passive detection beat waiting for a registry update?",
