@@ -75,6 +75,7 @@ import { useInterviewMetrics } from "./_hooks/useInterviewMetrics"
 import { useInterviewSessionStart } from "./_hooks/useInterviewSessionStart"
 import { useInterviewSessionReset } from "./_hooks/useInterviewSessionReset"
 import { useSessionReopen } from "./_hooks/useSessionReopen"
+import { useRedirectSignInReturn } from "./_hooks/useRedirectSignInReturn"
 import { useInterviewAutosave } from "./_hooks/useInterviewAutosave"
 import { useSessionRestore } from "./_hooks/useSessionRestore"
 import { usePostInterviewDiscussion } from "./_hooks/usePostInterviewDiscussion"
@@ -1237,13 +1238,23 @@ function InterviewPageContent() {
     []
   )
 
+  // The popup-blocked sign-in fallback returns to THIS page as a cold load;
+  // this hook finishes it (profile, analytics, migration, landing). Its
+  // pending flag gates the reopen effect below so the reopen path cannot
+  // exit guest mode and restart an interview mid-handoff.
+  const { redirectReturnPending } = useRedirectSignInReturn({
+    firebaseUser,
+    initialized,
+    router,
+  })
+
   useSessionReopen({
     router,
     searchParams,
     firebaseUser,
     authLoading,
     initialized,
-    authCheckComplete,
+    authCheckComplete: authCheckComplete && !redirectReturnPending,
     user,
     selectedLanguage,
     consoleLogs,

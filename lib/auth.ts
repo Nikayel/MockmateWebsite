@@ -324,6 +324,21 @@ function markRedirectSignInStarted(): void {
 }
 
 /**
+ * Peeks at the redirect marker without consuming it. Lets a page decide, in a
+ * lazy state initializer before any auth effects run, whether this load is a
+ * redirect return leg — the interview page uses it to hold its session-reopen
+ * effect back until the return-leg handler has finished.
+ */
+export function hasRedirectSignInInFlight(): boolean {
+  if (typeof window === "undefined") return false
+  try {
+    return localStorage.getItem(REDIRECT_IN_FLIGHT_KEY) === "1"
+  } catch {
+    return false
+  }
+}
+
+/**
  * Reads and clears the redirect marker. Returns true when this page load is the
  * return leg of a redirect sign-in, so the caller knows to run the same
  * post-sign-in work a popup flow would have done.
