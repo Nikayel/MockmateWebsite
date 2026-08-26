@@ -840,6 +840,23 @@ availability: shopping-cart-scale and like-count-scale systems live here.
 leaders, quorums, or waiting, which costs latency and availability. The design skill is picking the
 *weakest* model that is still correct for the specific data.
 
+That cost is not a mood, it is round trips, and round trips are milliseconds you can put in a budget:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": ["Model", "What a read waits for", "Typical read inside one region", "Typical read across three regions"],
+  "rows": [
+    ["Eventual", "Nothing: the nearest copy answers immediately", "1 to 5 ms", "1 to 5 ms, the copy is next door"],
+    ["Causal", "A check that this copy already holds the writes the read depends on", "2 to 10 ms", "2 to 10 ms, plus a wait whenever the local copy is behind"],
+    ["Sequential", "Its turn in one order everybody agrees on", "5 to 20 ms", "50 to 150 ms"],
+    ["Linearizable", "A leader or a majority of copies, before anyone sees an answer", "10 to 30 ms", "100 to 200 ms"]
+  ],
+  "highlightCols": ["Typical read across three regions"],
+  "caption": "Order of magnitude, not a benchmark. Each rung up buys its extra promise with another round trip, and once the copies sit in different regions that round trip is 60 to 150 ms of pure geography, which no amount of faster hardware shortens. A 20 ms read budget therefore rules out the bottom two rows before anyone argues about correctness."
+}
+\`\`\`
+
 \`\`\`cswidget
 {
   "type": "check",
@@ -896,8 +913,9 @@ separate from ACID isolation, and always reach for the weakest model that is sti
 const sessionGuaranteesTeach = `
 ## Placing session guarantees on the consistency spectrum
 
-Level 3's "Replication Lag & Session Guarantees" lesson introduced the four **client-centric session
-guarantees** (from the Bayou system) and how to implement them. This lesson credits that treatment and
+Level 3's [replication lag and session guarantees](/learn/system-design/scaling-data/sd-l3-replication-lag-session)
+lesson introduced the four **client-centric session guarantees** (from the Bayou system) and how to
+implement them. This lesson credits that treatment and
 adds the theory frame the interview rewards: where these per-client promises sit on the consistency
 spectrum from the previous lesson, and why they are the pragmatic default for user-facing reads.
 
@@ -4911,7 +4929,7 @@ export const systemDesignLevel5: DesignLevel = {
           practice: {
             id: "sd-l5-logical-clocks-practice",
             prompt:
-              "Design conflict detection and resolution for a collaborative note-taking app like Notion or Apple Notes syncing across a laptop, phone, and tablet that all edit the same note offline and reconnect, at a scale of millions of devices. Explain why plain vector clocks keyed on devices are a trap here and what you use instead.",
+              "Design conflict detection and resolution for a collaborative note-taking app like Notion or Apple Notes syncing across a laptop, phone, and tablet that all edit the same note offline and reconnect, at a scale of millions of devices. Explain why plain vector clocks keyed on devices are a trap here and what you use instead. One tool you have not met yet, and the one this scenario wants: a CRDT (conflict-free replicated data type) is a data structure whose merge rule is built into the type itself, so any two copies that have seen the same edits end up identical with nobody coordinating, and a text CRDT gives every character its own id so concurrent inserts merge in one order every device agrees on. This level gives CRDTs a full lesson later; here you only need that one property.",
             thinkAbout: [
               "What happens to a device-keyed vector when the device population is huge and churning?",
               "What converts 'concurrent edit' into automatic convergence instead of a sibling to reconcile?",
@@ -4977,7 +4995,7 @@ export const systemDesignLevel5: DesignLevel = {
             supplied: {
               label: "Incident timeline: settlement ledger",
               body: `
-**System:** the settlement ledger, a Cassandra keyspace at RF=3 per region across us-east, eu-west and ap-south. Each API host stamps its own write with \`USING TIMESTAMP\`, taken from that host's system clock, and conflicting writes to a row resolve by keeping the highest stamp. Reads and writes both run at LOCAL_QUORUM.
+**System:** the settlement ledger, a Cassandra keyspace at RF=3 per region (three copies of every row in each region) across us-east, eu-west and ap-south. Each API host stamps its own write with \`USING TIMESTAMP\`, taken from that host's system clock, and conflicting writes to a row resolve by keeping the highest stamp. Reads and writes both run at LOCAL_QUORUM: each write waits for 2 of the 3 local copies to acknowledge it and each read is answered by 2 of the 3, and since 2 plus 2 is more than 3, every read is guaranteed to touch at least one copy that took part in the last successful write.
 
 **Reported symptom:** Monday's reconciliation flags 1,412 ledger rows from the previous 9 days whose exported balance equals the value from before the last acknowledged update. Support has 37 matching tickets, all of the form "the correction showed, then the old amount came back".
 
