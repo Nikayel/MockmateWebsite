@@ -1459,10 +1459,15 @@ The ring is a pure function of the node set, so every client and routing proxy h
 set or two of them will send the same key to different nodes. Distributing it is a real design
 decision with two standard answers.
 
-**A coordination service.** Each node registers an ephemeral entry in etcd or ZooKeeper, clients
-watch that prefix, and any change pushes a new membership list to every watcher. Strongly consistent,
-so everyone sees the same list in the same order. The cost is a consensus cluster you now operate,
-sitting on the path of every routing change.
+**A coordination service.** Each node registers an **ephemeral entry** in etcd or ZooKeeper: an entry
+the service deletes by itself the moment that node stops sending heartbeats, so a crash erases the
+node from the list with nobody having to notice. Clients **watch** the shared key prefix those
+entries sit under, which means they hold an open subscription instead of polling, so any join or
+departure pushes a fresh membership list to every watcher within milliseconds. Strongly consistent,
+so everyone sees the same list in the same order. The cost is a consensus cluster you now operate
+(three or five servers running an agreement protocol, covered in
+[Level 5](/learn/system-design/distributed-core/sd-l5-raft-paxos)), sitting on the path of every
+routing change.
 
 **Gossip.** No registry at all. Every node holds its own view of the cluster (each node, its state,
 and a heartbeat version), and once a second it picks a few random peers and exchanges views, keeping
@@ -1837,8 +1842,11 @@ Two patterns make sagas safe under real-world **at-least-once** delivery:
 - **The outbox pattern.** The problem: you must both write the DB row *and* publish an event, but
   they are separate systems, so a crash between them loses one. The fix: in the **same local
   transaction**, write the business row and an "outbox" row; a separate relay reads the outbox and
-  publishes to Kafka, marking rows sent. Now the DB write and the intent-to-publish are atomic, and
-  the relay retries publishing idempotently. This is how you drive a saga's next step reliably.
+  publishes to Kafka (a durable, ordered log of events that one service appends to and others read
+  from at their own pace, taught in
+  [Level 6](/learn/system-design/event-driven/sd-l6-kafka-internals)), marking rows sent. Now the DB
+  write and the intent-to-publish are atomic, and the relay retries publishing idempotently. This is
+  how you drive a saga's next step reliably.
 
 \`\`\`cswidget
 {
