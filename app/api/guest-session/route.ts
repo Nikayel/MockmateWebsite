@@ -43,6 +43,40 @@ function isValidGuestId(guestId: string | null): boolean {
 }
 
 /**
+ * Fields the GET response exposes to an unauthenticated caller holding
+ * guestId+sessionId. The stored document also carries performance_score,
+ * feedback, and test_results, which since the score lock are exactly what
+ * sign-in is traded for: returning them here would let a guest read their
+ * withheld score by pasting this URL, without ever signing in. The two
+ * consumers, useSessionReopen and useSessionRestore, only read session_state,
+ * completed_at, and feedback_status, so those are all this projects.
+ */
+interface GuestSessionGetFields {
+  session_state?: unknown
+  completed_at?: unknown
+  feedback_status?: unknown
+}
+
+const GUEST_SESSION_GET_FIELDS: Array<keyof GuestSessionGetFields> = [
+  "session_state",
+  "completed_at",
+  "feedback_status",
+]
+
+function projectGuestSessionForGet(
+  sessionData: FirebaseFirestore.DocumentData | undefined
+): GuestSessionGetFields {
+  const projected: GuestSessionGetFields = {}
+  if (!sessionData) return projected
+  for (const field of GUEST_SESSION_GET_FIELDS) {
+    if (field in sessionData) {
+      projected[field] = sessionData[field]
+    }
+  }
+  return projected
+}
+
+/**
  * POST /api/guest-session
  * Create a new guest session
  */
@@ -193,6 +227,14 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    // Same write-bucket PUT uses (rl:guest-api): this read is unauthenticated
+    // but scoped to guestId+sessionId, and since the score lock it can return
+    // a withheld score, so it must not be freely repeatable either.
+    const rateLimitResponse = await guestApiRateLimit(request)
+    if (rateLimitResponse) {
+      return rateLimitResponse
+    }
+
     const { searchParams } = new URL(request.url)
     const sessionId = searchParams.get("sessionId")
     const guestId = searchParams.get("guestId")
@@ -219,7 +261,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      session: sessionData,
+      session: projectGuestSessionForGet(sessionData),
     })
   } catch (error) {
     logger.error("Failed to get guest session", { error })

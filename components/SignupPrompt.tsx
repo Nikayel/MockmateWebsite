@@ -88,8 +88,9 @@ export function SignupPrompt({
       trackEvent("signup_prompt_click", { provider, sessionId })
 
       // Set up the redirect-flow fallback BEFORE the popup: if it is blocked,
-      // auth continues through /login, which consumes both markers to migrate
-      // the session and land the user on their results.
+      // auth continues back to /interview as a cold load, where
+      // useRedirectSignInReturn consumes both markers to migrate the session
+      // and land the user on their results.
       const guestId = getGuestId()
       if (guestId) {
         localStorage.setItem(
@@ -134,8 +135,12 @@ export function SignupPrompt({
         localStorage.removeItem("auth_redirect")
       } else if (result.status !== "redirecting") {
         // Anything that is neither a sign-in nor a page-unloading redirect
-        // ended the attempt without a user.
+        // ended the attempt without a user. auth_redirect must go with it:
+        // left behind, it hijacks the destination of this guest's next
+        // /login visit. pending_guest_migration survives on purpose, so
+        // that later visit can still migrate the guest identity.
         onAuthAborted?.()
+        localStorage.removeItem("auth_redirect")
         setIsLoading(false)
         setAuthProvider(null)
       }
@@ -147,8 +152,12 @@ export function SignupPrompt({
       if (!signedIn) {
         // Only a pre-auth failure aborts the cover. After a successful
         // sign-in, the page's onSignedIn failure path owns the state (it
-        // shows the retry lock), and an abort would overwrite it.
+        // shows the retry lock), and an abort would overwrite it. Same
+        // reasoning for auth_redirect: it must not survive a closed popup
+        // or a failed attempt, but a post-sign-in failure still needs it
+        // (and pending_guest_migration) for the /login retry.
         onAuthAborted?.()
+        localStorage.removeItem("auth_redirect")
       }
       setIsLoading(false)
       setAuthProvider(null)

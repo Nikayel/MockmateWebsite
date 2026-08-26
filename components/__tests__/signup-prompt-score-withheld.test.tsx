@@ -206,6 +206,33 @@ describe("SignupPrompt with the score withheld", () => {
     expect(onAuthAttempt).toHaveBeenCalledTimes(1)
   })
 
+  it("clears the stale auth_redirect when the popup is closed, but keeps the migration marker", async () => {
+    // A closed popup must not leave auth_redirect pointing at this trial's
+    // results: the guest's next /login visit could get hijacked toward a
+    // session they never finished. pending_guest_migration survives so a
+    // later /login visit still migrates the guest identity.
+    signInWithGoogle.mockRejectedValueOnce(new Error("Sign-in canceled"))
+    renderPrompt()
+
+    fireEvent.click(screen.getByRole("button", { name: /google/i }))
+
+    await waitFor(() => expect(localStorage.getItem("auth_redirect")).toBeNull())
+    expect(localStorage.getItem("pending_guest_migration")).not.toBeNull()
+  })
+
+  it("also clears auth_redirect on a resolved outcome that is neither signed-in nor redirecting", async () => {
+    // Defensive branch: signInWithGoogle/GitHub only ever resolve "signed-in"
+    // or "redirecting" today, but this component still guards a stray third
+    // outcome, and it must not leave the stale marker behind either.
+    signInWithGoogle.mockResolvedValueOnce({ status: "cancelled" } as never)
+    renderPrompt()
+
+    fireEvent.click(screen.getByRole("button", { name: /google/i }))
+
+    await waitFor(() => expect(localStorage.getItem("auth_redirect")).toBeNull())
+    expect(localStorage.getItem("pending_guest_migration")).not.toBeNull()
+  })
+
   it("leaves the /login migration flow intact when the popup is blocked", async () => {
     signInWithGitHub.mockResolvedValueOnce({ status: "redirecting" })
     const onSignedIn = renderPrompt()
