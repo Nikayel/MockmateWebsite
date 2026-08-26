@@ -1518,8 +1518,11 @@ some misbehaving resolvers ignore short TTLs entirely. So DNS failover is never 
 single fact is the most-probed point in this topic.
 
 **Anycast** steers at the network layer. You announce the *same* IP address from many points of
-presence via BGP. The internet's routing fabric delivers each client's packets to the topologically
-nearest PoP announcing that prefix. Withdraw the BGP announcement at a failing PoP and traffic
+presence (PoPs, one building of your machines in one city) via **BGP**, the protocol networks use to
+tell each other which blocks of addresses they can reach; Level 1's
+[network-stack lesson](/learn/system-design/foundations/sd-l1-network-stack) walks an announcement
+and a withdrawal through it route by route. The internet's routing fabric delivers each client's
+packets to the topologically nearest PoP announcing that prefix. Withdraw the BGP announcement at a failing PoP and traffic
 reconverges to the next-nearest one in seconds, with no DNS change and no client-side caching to wait
 out. **ECMP** spreads flows across equal-cost paths. The subtlety: plain ECMP rehashes flows when the
 server set changes, which breaks in-flight connections. Production anycast load balancers do the same
@@ -1795,7 +1798,11 @@ belongs *inside services*, not in either the gateway or the mesh.
 One generic API rarely fits every client. A mobile app on a slow network wants a small, denormalized
 payload in one round trip; a web SPA wants richer data; a partner API needs stable, versioned
 contracts. A single endpoint serving all three leads to **over-fetching** (mobile downloads fields it
-never renders) or **under-fetching** (five calls to build one screen). A **BFF** is a thin gateway
+never renders) or **under-fetching** (five calls to build one screen). Under-fetching is the one worth
+costing out: on a phone where a round trip runs about 100 ms, five calls the client has to make one
+after another is **500 ms** of blank screen, while one aggregated response is **100 ms** plus the
+five fan-out calls the aggregator makes inside the data center, where each round trip is nearer 1 ms.
+Same services, same data, a 5x difference in when the screen paints. A **BFF** is a thin gateway
 *per client type*: \`bff-mobile\`, \`bff-web\`, \`bff-partner\`. Each aggregates and shapes exactly
 what its client needs and is owned by that client's team, so a mobile change does not ripple through
 the web contract. GraphQL is one way to give clients field-level selection and reduce the need for
@@ -1939,8 +1946,17 @@ many hand-written BFFs, at the cost of its own query-cost and caching complexity
 ### The two big risks
 
 First, the gateway is a **single point of failure and a latency tax**: every request pays one extra
-hop, and if it is down the whole product is down. So it must be horizontally scaled, stateless,
-health-checked, and kept fast (offload heavy work, cache authz decisions and hot responses). Second,
+hop, and if it is down the whole product is down. Price that hop rather than repeating the phrase. A
+gateway sitting in the same region as the services adds about **1 to 5 ms** per request: a fraction
+of a millisecond of network time each way, plus parsing headers, verifying a token, and a rate-limit
+lookup. Against a 200 ms p99 budget that is one to two percent, which is why nearly everyone pays it
+happily. It stops being cheap in exactly two situations, and both are design choices rather than laws
+of nature. A chatty client that makes 20 calls to paint one screen pays the tax 20 times (20 x 3 ms =
+**60 ms** of pure gateway), which is the case a BFF exists to collapse. And a gateway that calls an
+auth service on every request instead of verifying a signed token locally turns one hop into two,
+**20 to 30 ms**, which is the case caching authz decisions exists to collapse. So it must be
+horizontally scaled, stateless, health-checked, and kept fast (offload heavy work, cache authz
+decisions and hot responses). Second,
 and worse, the gateway can rot into a **god-object**: teams keep adding "just one more" piece of
 business logic until the edge holds orchestration and domain rules that belong in services. Then
 every service change requires a gateway change, deploys serialize on one component, and you have
@@ -2192,9 +2208,13 @@ the default: HTTP/2 carries roughly half of Cloudflare's edge requests, HTTP/1.x
 HTTP/3 close to a fifth, so most of the fleet still needs the TCP-based pinning fixes above even with
 QUIC in the mix.
 
-**C10k / C10M.** Holding 100K-plus concurrent connections needs **event-driven** proxies
-(epoll/kqueue, nginx/Envoy) rather than thread-per-connection, plus OS tuning (file-descriptor
-limits, ephemeral port range, TCP buffers, SO_REUSEPORT).
+**C10k / C10M.** The names are shorthand for holding ten thousand, or ten million, connections open
+on one machine at once. Holding 100K-plus of them needs **event-driven** proxies (nginx or Envoy,
+built on the kernel's epoll and kqueue interfaces, which let one thread watch thousands of sockets and
+wake only for the few with traffic) rather than one operating-system thread parked per connection,
+plus OS tuning (file-descriptor limits, ephemeral port range, TCP buffers, SO_REUSEPORT). Level 1's
+[server-concurrency lesson](/learn/system-design/foundations/sd-l1-concurrency-models) works the
+memory arithmetic that kills the thread-per-connection version.
 
 **Interview nuance:** if you say "terminate gRPC at our L7 load balancer" without mentioning stream
 pinning, expect "then why did your new pods get no traffic after a scale-up?" Naming client-side LB
