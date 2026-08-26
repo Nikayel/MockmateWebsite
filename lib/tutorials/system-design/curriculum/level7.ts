@@ -3030,6 +3030,72 @@ A deploy is a change to a running system, and most outages are self-inflicted by
 }
 \`\`\`
 
+The three columns above are the trade-off, and it stays vague until you put numbers on it. Blast radius is not a feeling: it is how many bad responses you serve, which is traffic multiplied by the minutes you take to notice, multiplied by the share of the fleet you exposed.
+
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "What a bad build costs under each strategy",
+  "predictPrompt": {
+    "question": "A 200-pod fleet serves about 40,000 requests a second. A bad build ships and takes 12 minutes to catch. During a rolling deploy, where roughly half the fleet is on the new version while you roll, about how many responses does it ruin?",
+    "options": [
+      "About 290,000",
+      "About 1.4 million",
+      "About 14 million",
+      "About 140 million"
+    ]
+  },
+  "workedExample": "At the initial values, 200 pods serving roughly 200 requests a second each is 40,000 requests a second. About half the fleet runs the new version while a rolling deploy is in flight, so 12 minutes of detection ruins about 14 million responses. Send the same bad build to a 1 percent canary instead and the same 12 minutes ruin about 288,000, which is fifty times fewer, and the extra hardware for that canary is one pod. The third line prices the other lever: at roughly 0.15 dollars per pod-hour, keeping a second full fleet warm for blue-green costs about 30 dollars an hour, which is what instant rollback is actually priced at. Now drag detection down to 2 minutes and see how much of the canary's advantage was really about noticing faster.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "pods",
+      "label": "Fleet size",
+      "min": 4,
+      "max": 500,
+      "scale": "log",
+      "initial": 200,
+      "unit": "pods"
+    },
+    {
+      "kind": "slider",
+      "id": "detect",
+      "label": "Minutes from bad build live to traffic off it",
+      "min": 1,
+      "max": 60,
+      "scale": "linear",
+      "step": 1,
+      "initial": 12
+    }
+  ],
+  "outputs": [
+    {
+      "id": "rolling_hit",
+      "label": "Bad responses served, rolling deploy",
+      "expr": "pods * 200 * 60 * detect * 0.5",
+      "format": "compact",
+      "sparkline": {
+        "over": "detect"
+      }
+    },
+    {
+      "id": "canary_hit",
+      "label": "Bad responses served, 1 percent canary",
+      "expr": "pods * 200 * 60 * detect * 0.01",
+      "format": "compact"
+    },
+    {
+      "id": "green_cost",
+      "label": "Second fleet kept warm for blue-green",
+      "expr": "pods * 0.15",
+      "format": "number",
+      "unit": "dollars/hour"
+    }
+  ],
+  "caption": "Blast radius is a product: traffic times minutes times the share of the fleet you exposed. A canary divides the first line by fifty, faster alerting divides the minutes, and blue-green buys the minutes back at the price on the third line."
+}
+\`\`\`
+
 \`\`\`cswidget
 {
   "type": "check",
@@ -3145,7 +3211,7 @@ Expand/contract migrates schema in ordered, individually-safe steps so that at n
 
 Each arrow is a separately deployable, separately reversible step. You never combine "add new" with "drop old" in one deploy, because that is exactly the destructive change that makes rollback impossible.
 
-For the physical DDL on a large hot table, a naive \`ALTER TABLE\` can lock the table and stall writes. **Online schema-change tools** (gh-ost, pt-online-schema-change for MySQL) build a shadow table, backfill it while capturing live changes via triggers or the binlog, and swap it in with a brief atomic rename, so the table stays writable throughout. On Postgres the same step looks different: \`ADD COLUMN ... NULL\` is metadata-only and never rewrites the table, so the risk moves to the backfill, which you run as batched \`UPDATE\`s over key ranges with a short \`lock_timeout\` (the setting that makes a statement give up quickly instead of queueing on a lock and blocking every writer behind it). Backfills must be **throttled** (chunked, watching replica lag), **idempotent** (safe to re-run), and **restartable** (checkpoint progress) because a multi-hour backfill will get interrupted.
+For the physical DDL on a large hot table, a naive \`ALTER TABLE\` can lock the table and stall writes. **Online schema-change tools** (gh-ost, pt-online-schema-change for MySQL) build a shadow table, backfill it while capturing live changes via triggers or the binlog (MySQL's running record of every write, which these tools tail so nothing written during the copy is missed), and swap it in with a brief atomic rename, so the table stays writable throughout. On Postgres the same step looks different: \`ADD COLUMN ... NULL\` is metadata-only and never rewrites the table, so the risk moves to the backfill, which you run as batched \`UPDATE\`s over key ranges with a short \`lock_timeout\` (the setting that makes a statement give up quickly instead of queueing on a lock and blocking every writer behind it). Backfills must be **throttled** (chunked, watching replica lag), **idempotent** (safe to re-run), and **restartable** (checkpoint progress) because a multi-hour backfill will get interrupted.
 
 \`\`\`cswidget
 {
@@ -3632,6 +3698,8 @@ Roles exist to separate coordination from fixing, because the person elbow-deep 
 ## Mitigate before you diagnose
 
 **The response flow prioritizes mitigation over diagnosis:** detect -> triage/declare severity -> **mitigate (stop the bleeding)** -> then root-cause. During an active incident, restoring service beats understanding it. If a bad deploy is suspected, roll it back first and investigate after; if a region is unhealthy, fail traffic away first. Chasing the root cause while users are down is a classic and expensive mistake. Diagnosis is what the postmortem is for; mitigation is what the incident is for.
+
+Price that ordering once and you will never argue about it again. Take a checkout flow where every minute down costs about 8,000 dollars in abandoned orders, a rollback that takes 4 minutes, and a diagnosis that takes 40. Mitigate first and the outage is 2 minutes of triage plus the 4-minute rollback, about 48,000 dollars, and the 40 minutes of diagnosis then happen with users served and nobody's pulse elevated. Diagnose first and the outage is 46 minutes, about 368,000 dollars. Same engineers, same fix, same understanding at the end of the day, 320,000 dollars apart on the order alone. And if the rollback turns out not to have been the cause, you bought that information for 4 minutes instead of 40.
 
 \`\`\`csdiagram
 {
