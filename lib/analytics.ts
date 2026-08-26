@@ -116,21 +116,34 @@ export function trackEvent(eventName: string, params?: Record<string, any>) {
 
 /**
  * Track user signup
+ *
+ * `method` is the GA4-recognized dimension for the sign_up event (the OAuth
+ * provider, e.g. "google"). `signInMethod` is a second, CodeSparring-specific
+ * dimension for HOW that sign-in reached completion: "popup" for the in-page
+ * flow, or "redirect" for the popup-blocked fallback that returns as a cold
+ * load. It rides in its own field rather than overloading `method`, so a
+ * popup-blocked convert is distinguishable in the funnel without disturbing
+ * the provider breakdown GA4's built-in reports already key off `method` for.
  */
-export function trackSignup(method: string, userId: string) {
+export function trackSignup(method: string, userId: string, signInMethod?: "popup" | "redirect") {
   trackEvent("sign_up", {
     method,
     user_id: userId,
+    ...(signInMethod ? { sign_in_method: signInMethod } : {}),
   })
 }
 
 /**
  * Track user login
+ *
+ * See {@link trackSignup} for why `signInMethod` is a separate field from
+ * `method`.
  */
-export function trackLogin(method: string, userId: string) {
+export function trackLogin(method: string, userId: string, signInMethod?: "popup" | "redirect") {
   trackEvent("login", {
     method,
     user_id: userId,
+    ...(signInMethod ? { sign_in_method: signInMethod } : {}),
   })
 }
 

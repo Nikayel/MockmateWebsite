@@ -116,10 +116,10 @@ function LoginPageContent() {
       const redirectProvider =
         firebaseUser.providerData[0]?.providerId === "github.com" ? "github" : "google"
       if (redirectIsNewUser) {
-        trackSignup(redirectProvider, firebaseUser.uid)
+        trackSignup(redirectProvider, firebaseUser.uid, "redirect")
         reportFunnelEvent("signup")
       } else {
-        trackLogin(redirectProvider, firebaseUser.uid)
+        trackLogin(redirectProvider, firebaseUser.uid, "redirect")
         reportFunnelEvent("login")
       }
       setAuthStatus("authenticating")

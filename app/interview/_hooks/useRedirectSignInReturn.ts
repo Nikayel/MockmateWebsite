@@ -74,10 +74,10 @@ export function useRedirectSignInReturn(
       const provider =
         firebaseUser.providerData[0]?.providerId === "github.com" ? "github" : "google"
       if (isNewUser) {
-        trackSignup(provider, firebaseUser.uid)
+        trackSignup(provider, firebaseUser.uid, "redirect")
         reportFunnelEvent("signup")
       } else {
-        trackLogin(provider, firebaseUser.uid)
+        trackLogin(provider, firebaseUser.uid, "redirect")
         reportFunnelEvent("login")
       }
 

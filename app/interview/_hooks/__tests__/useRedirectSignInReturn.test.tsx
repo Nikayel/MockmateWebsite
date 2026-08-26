@@ -109,7 +109,11 @@ describe("useRedirectSignInReturn", () => {
       null,
       null
     )
-    expect(trackSignup).toHaveBeenCalledWith("google", "user-new")
+    // Path-tagged conversions: this leg completes as a cold load returning
+    // from a popup-blocked sign-in, so it must tag itself "redirect" — the
+    // dimension that makes a popup-blocked convert distinguishable from an
+    // in-page popup one in the funnel.
+    expect(trackSignup).toHaveBeenCalledWith("google", "user-new", "redirect")
     expect(migrateGuestSessionsOnLogin).toHaveBeenCalledWith({ idToken: "token-1" })
     expect(opts.router.replace).toHaveBeenCalledWith("/sessions/sess-9")
     // Pending stays up through the navigation so the reopen effect never runs.

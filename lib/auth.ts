@@ -456,10 +456,10 @@ async function signInWithProvider(
     // counter is the consent-independent aggregate (name only, no identity).
     const isNewUser = result.user.metadata.creationTime === result.user.metadata.lastSignInTime
     if (isNewUser) {
-      trackSignup(provider, result.user.uid)
+      trackSignup(provider, result.user.uid, "popup")
       reportFunnelEvent("signup")
     } else {
-      trackLogin(provider, result.user.uid)
+      trackLogin(provider, result.user.uid, "popup")
       reportFunnelEvent("login")
     }
 
