@@ -20,7 +20,10 @@ import { useAuth } from "@/lib/auth-context"
 import { motion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
 import Link from "next/link"
-import { getGuestId, confirmGuestSessionMigration, getGuestSessionData } from "@/lib/guest-session"
+import { getGuestId } from "@/lib/guest-session"
+import { hasPendingGuestMigration, migrateGuestSessionsOnLogin } from "@/lib/guest-migration"
+import { trackLogin, trackSignup } from "@/lib/analytics"
+import { reportFunnelEvent } from "@/lib/metrics/funnel-client"
 import { SparraLoader } from "@/components/brand/SparraLoader"
 
 function getLoginErrorMessage(error: unknown): string {
@@ -105,6 +108,20 @@ function LoginPageContent() {
     // Handing control to the "authenticating" state runs the same post-sign-in
     // work a popup flow does.
     if (consumeRedirectSignIn()) {
+      // The popup path tracks sign-ups inside signInWithPopup; the redirect
+      // leg completes here as a cold load and used to report nothing, so a
+      // popup-blocked convert looked like a failed click in the funnel.
+      const redirectIsNewUser =
+        firebaseUser.metadata.creationTime === firebaseUser.metadata.lastSignInTime
+      const redirectProvider =
+        firebaseUser.providerData[0]?.providerId === "github.com" ? "github" : "google"
+      if (redirectIsNewUser) {
+        trackSignup(redirectProvider, firebaseUser.uid)
+        reportFunnelEvent("signup")
+      } else {
+        trackLogin(redirectProvider, firebaseUser.uid)
+        reportFunnelEvent("login")
+      }
       setAuthStatus("authenticating")
       return
     }
@@ -150,56 +167,31 @@ function LoginPageContent() {
             isNewUser ? getAttribution() : null
           )
 
-          // Check for pending guest session migration
-          const pendingMigration = localStorage.getItem("pending_guest_migration")
-          const guestIdFromStorage = getGuestId()
-
-          if (pendingMigration || guestIdFromStorage) {
-            try {
-              let migrationGuestId = guestIdFromStorage
-              let migrationSessionId = null
-
-              // Parse pending migration data if available
-              if (pendingMigration) {
-                const migrationData = JSON.parse(pendingMigration)
-                migrationGuestId = migrationData.guestId || guestIdFromStorage
-                migrationSessionId = migrationData.sessionId
-              }
-
-              if (migrationGuestId) {
-                const token = await firebaseUser.getIdToken()
-                const migrationResponse = await fetch("/api/guest-session/migrate", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                  },
-                  body: JSON.stringify({
-                    guestId: migrationGuestId,
-                    sessionId: migrationSessionId,
-                  }),
-                })
-
-                const migrationResult = await migrationResponse.json()
-
-                if (migrationResponse.ok && migrationResult.migrated > 0) {
-                  toast.success("Your trial session has been saved!", {
-                    description: "View it in your sessions history.",
-                  })
-                  confirmGuestSessionMigration()
-
-                  // If there was a specific session, redirect to it
-                  const guestSessionData = getGuestSessionData()
-                  if (guestSessionData?.sessionId) {
-                    storeRedirectPath(`/sessions/${guestSessionData.sessionId}`)
-                  }
-                }
-              }
-            } catch {
-              // Non-blocking - don't fail login if migration fails
-            } finally {
-              // Clean up migration markers
-              localStorage.removeItem("pending_guest_migration")
+          // Guest session migration. The module owns the marker lifecycle
+          // (retry markers survive transient failures); the page only decides
+          // what to SAY, which depends on whether a surface promised this
+          // visitor a recovered session (SignupPrompt marker or the
+          // trial-used wall headline).
+          let migratedSessionId: string | null = null
+          const promisedRecovery = hasPendingGuestMigration() || isTrialUsed
+          if (hasPendingGuestMigration() || getGuestId()) {
+            const token = await firebaseUser.getIdToken()
+            const migration = await migrateGuestSessionsOnLogin({ idToken: token })
+            if (migration.status === "migrated") {
+              migratedSessionId = migration.sessionId
+              toast.success("Your trial session has been saved!", {
+                description: migratedSessionId
+                  ? "Opening your results..."
+                  : "View it in your sessions history.",
+              })
+            } else if (migration.status === "gone" && promisedRecovery) {
+              toast.error("We couldn't recover your trial session", {
+                description: "It may have expired. Your new account is ready to use.",
+              })
+            } else if (migration.status === "transient" && promisedRecovery) {
+              toast.warning("We couldn't connect your trial session yet", {
+                description: "We'll retry the next time you sign in.",
+              })
             }
           }
 
@@ -255,8 +247,14 @@ function LoginPageContent() {
           // Mark as complete
           setAuthStatus("complete")
 
-          // User is authenticated, redirect them
-          router.push(getStoredRedirectPath() ?? safeRedirect)
+          // User is authenticated, redirect them. A freshly migrated trial
+          // session outranks any stored destination: it is the thing the
+          // sign-in was sold on. getStoredRedirectPath still runs either way
+          // because reading it is what clears it.
+          const storedPath = getStoredRedirectPath()
+          router.push(
+            migratedSessionId ? `/sessions/${migratedSessionId}` : (storedPath ?? safeRedirect)
+          )
         } catch (profileError: unknown) {
           // Do NOT redirect past this.
           //
@@ -545,7 +543,7 @@ function LoginPageContent() {
               </h1>
               <p className="text-muted-foreground text-sm">
                 {isTrialUsed
-                  ? "Create a free account to keep your score: 8 full AI sessions a month, no card required."
+                  ? "Create a free account to see your score and full report: 8 full AI sessions a month, no card required."
                   : "Sign in to sit your next round."}
               </p>
             </motion.div>
