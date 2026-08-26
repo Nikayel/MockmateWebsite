@@ -4059,9 +4059,11 @@ The cost is joins on read. Joins are perfectly fine when they are indexed and bo
 of B-tree seeks, and Postgres or MySQL will serve that in single-digit milliseconds even at hundreds
 of millions of rows. Joins fail to scale in two situations. First, when the join fan-out is large and
 unbounded (joining a user to all of their events across years). Second, and this is the one that
-actually forces the issue, **when the tables live on different shards**: a cross-shard join means a
-scatter-gather across the network, and that does not scale. Once your data is sharded, you must
-co-locate or denormalize.
+actually forces the issue, **when the tables live on different shards**, meaning the rows have been
+split across separate machines with each machine holding one slice. A join across that boundary has
+to ask every machine and stitch the replies back together (a **scatter-gather**), so its cost grows
+with the number of machines rather than with the rows you wanted, and that does not scale. Once your
+data is sharded, you must co-locate or denormalize.
 
 \`\`\`cswidget
 {
@@ -4100,6 +4102,96 @@ time, which is the right trade only when reads vastly outnumber writes.
 names the specific query, the read/write ratio, and the scale trigger: "this order-history query runs
 20k times per second, product data changes maybe once a day, so I denormalize the display fields into
 the order row and accept a rare backfill on rename."
+
+That sentence is really an arithmetic claim, so do the arithmetic. Both sides can be counted in the
+same rough unit: one indexed row touch, meaning one B-tree seek plus the page it lands on.
+
+\`\`\`cswidget
+{
+  "type": "calc",
+  "title": "Lookups a join pays on every read against row writes a copy pays on every change",
+  "predictPrompt": {
+    "question": "The order-history page runs 20k times a second and shows 20 line items. Product rows change 3 times a day, and each product already appears in 200k stored order rows. Which side of the trade is bigger, and by how much?",
+    "options": [
+      "The fan-out, because one rename rewrites 200,000 rows",
+      "The join, by roughly 100 times",
+      "The join, by roughly 50,000 times",
+      "They land within the same order of magnitude"
+    ]
+  },
+  "workedExample": "The normalized schema pays on every single read: 20,000 page views a second times 20 line items is 400,000 product lookups a second, and it pays that every second forever. The denormalized schema pays only when a copied fact changes: 3 renames a day, each rewriting the 200,000 order rows carrying that product's name, is 600,000 row writes spread across 86,400 seconds, about 7 a second. That is the roughly 57,000-to-1 gap that makes copying obviously right here, and it is the number to say out loud instead of 'joins are slow'. Now drag the renames slider: around 170,000 changes a day the two columns meet, and past that the fan-out costs more than the join it saves, which is why you never denormalize a field that churns.",
+  "inputs": [
+    {
+      "kind": "slider",
+      "id": "read_qps",
+      "label": "Order-history page reads",
+      "min": 10,
+      "max": 200000,
+      "scale": "log",
+      "initial": 20000,
+      "unit": "reads/sec"
+    },
+    {
+      "kind": "slider",
+      "id": "items_per_page",
+      "label": "Line items rendered per page",
+      "min": 1,
+      "max": 100,
+      "scale": "linear",
+      "step": 1,
+      "initial": 20,
+      "unit": "items"
+    },
+    {
+      "kind": "slider",
+      "id": "changes_per_day",
+      "label": "Product rows whose copied fields change",
+      "min": 1,
+      "max": 1000000,
+      "scale": "log",
+      "initial": 3,
+      "unit": "changes/day"
+    },
+    {
+      "kind": "slider",
+      "id": "copies_per_product",
+      "label": "Stored order rows already carrying one product's fields",
+      "min": 100,
+      "max": 50000000,
+      "scale": "log",
+      "initial": 200000,
+      "unit": "rows"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "join_lookups",
+      "label": "Product lookups the join pays, per second",
+      "expr": "read_qps * items_per_page",
+      "format": "compact",
+      "unit": "lookups/sec"
+    },
+    {
+      "id": "fanout_writes",
+      "label": "Row writes keeping the copies in sync, per second",
+      "expr": "changes_per_day * copies_per_product / 86400",
+      "format": "compact",
+      "unit": "writes/sec"
+    },
+    {
+      "id": "payoff",
+      "label": "Read work avoided for every unit of write work added",
+      "expr": "join_lookups / fanout_writes",
+      "format": "compact",
+      "unit": "x",
+      "sparkline": {
+        "over": "changes_per_day"
+      }
+    }
+  ],
+  "caption": "Denormalizing shortens every read and bills the writer instead. Above 1x you are buying more than you pay for, below 1x the copies cost more than the join they replaced, and the crossover moves with how often the copied field changes, not with how big the table is."
+}
+\`\`\`
 
 The managed middle ground is a **materialized view** (or a summary table). You keep the source of
 truth normalized, and the database maintains a precomputed, denormalized copy for you, refreshing it
@@ -4881,6 +4973,57 @@ timestamp preserves history and audit trails and lets you undo, at the cost of e
 \`WHERE deleted_at IS NULL\`; a hard delete reclaims space and simplifies queries but loses the
 record. Pick soft delete when history or recovery matters, hard delete for high-churn or
 privacy-mandated erasure.
+
+Put rough numbers on that choice so it stops being a matter of taste. Take a 100M-row table
+averaging 200 bytes a row, with 20 percent of the rows soft-deleted. Those tombstones keep about
+4 GB of rows alive plus their entries in every index, so a scan walks about 1.25 entries for each
+live row it returns, and a query that forgets \`AND deleted_at IS NULL\` quietly reports numbers that
+include the dead. A partial index (\`CREATE INDEX ... WHERE deleted_at IS NULL\`) buys the scan cost
+back, though not the forgotten-filter bug. The hard delete reclaims the 4 GB and keeps every query
+one clause shorter, and pays for it by making "who cancelled this, and when" permanently
+unanswerable.
+
+\`\`\`cswidget
+{
+  "type": "check",
+  "kind": "classify",
+  "id": "soft-vs-hard-delete",
+  "prompt": "Sort each row into the delete it should get. Ask what a reader would need six months later, and what it costs to keep the row until then.",
+  "buckets": [
+    "Soft delete: keep the row, mark it",
+    "Hard delete: remove the row",
+    "Neither: append a reversing entry"
+  ],
+  "items": [
+    {
+      "label": "A customer cancels an order that already shipped",
+      "bucket": "Soft delete: keep the row, mark it",
+      "feedback": "Order history is audit-relevant and support will be asked about this order for years. A cancelled_at timestamp keeps the story; the row is low-churn, so the tombstone costs almost nothing."
+    },
+    {
+      "label": "A price quote that expires 15 minutes after it is written, 40M a day",
+      "bucket": "Hard delete: remove the row",
+      "feedback": "Nothing here is worth auditing, and at 40M rows a day the tombstones become the table: within a week the dead rows outnumber the live ones and every index scan pays for them. Delete outright, or expire the partition."
+    },
+    {
+      "label": "A user invokes a legal right to erasure of their personal data",
+      "bucket": "Hard delete: remove the row",
+      "feedback": "A deleted_at flag erases nothing: the name and email are still sitting in the table and in every backup and index. Erasure means the bytes go, which usually means a hard delete plus a documented backup expiry."
+    },
+    {
+      "label": "An account under active fraud investigation asks to close",
+      "bucket": "Soft delete: keep the row, mark it",
+      "feedback": "The investigation needs exactly the history the delete would destroy, and the close request is itself evidence. Mark it closed, hide it from the product, and keep every row."
+    },
+    {
+      "label": "A 2,500 dollar transfer was posted to the wrong account",
+      "bucket": "Neither: append a reversing entry",
+      "feedback": "This is the ledger shape below. Soft-deleting makes the balance depend on a WHERE clause, and hard-deleting hides the mistake; the honest move is a new entry that cancels the old one so both the error and the fix stay visible."
+    }
+  ],
+  "reveal": "The question is never 'do we like keeping history'. It is what a reader needs later, how fast the table churns, and whether the law lets you keep the bytes at all. Say those three out loud in the design write, then pick."
+}
+\`\`\`
 
 ### One table shape where neither delete is right: the ledger
 
