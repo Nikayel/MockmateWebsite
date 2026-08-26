@@ -4132,7 +4132,7 @@ Query patterns you must support: time-range scans, tag filters (served by an inv
 const chunkingStrategyTeach = `
 ## A chunk is a standalone claim, not a slice of a document
 
-The RAG architecture lesson gave you the working baseline: split at 300 to 800 tokens with 10 to 20 percent overlap, embed each piece, index it. That baseline is a starting point, and underneath it sits the decision that sets your ceiling. A chunk plays two roles at once. It is the **retrieval unit**, so it has to be findable by a query written by someone who has never seen the document. It is also the **context-budget unit**, so eight of them have to fit in a prompt with room left over for an answer. Those two roles pull opposite ways: retrievability wants each chunk to carry enough surrounding detail to identify itself, and the budget wants each chunk small and dense. Every technique in this lesson is a different way to buy the first without paying for it in the second.
+The [RAG architecture lesson](/learn/system-design/specialized-systems/sd-l11-rag-architecture) gave you the working baseline: split at 300 to 800 tokens with 10 to 20 percent overlap, embed each piece, index it. That baseline is a starting point, and underneath it sits the decision that sets your ceiling. A chunk plays two roles at once. It is the **retrieval unit**, so it has to be findable by a query written by someone who has never seen the document. It is also the **context-budget unit**, so eight of them have to fit in a prompt with room left over for an answer. Those two roles pull opposite ways: retrievability wants each chunk to carry enough surrounding detail to identify itself, and the budget wants each chunk small and dense. Every technique in this lesson is a different way to buy the first without paying for it in the second.
 
 ## The orphaned claim
 
@@ -4535,7 +4535,7 @@ Routing needs a signal, and the signal is a parse-quality score computed at inge
 const queryUnderstandingTeach = `
 ## The query is not a good search key
 
-The RAG architecture lesson's query path starts at "embed query". That first box hides an assumption: that what the user typed is a usable search key. It usually is not, and the reason is structural rather than a matter of users being careless.
+The query path in the [RAG architecture lesson](/learn/system-design/specialized-systems/sd-l11-rag-architecture) starts at "embed query". That first box hides an assumption: that what the user typed is a usable search key. It usually is not, and the reason is structural rather than a matter of users being careless.
 
 \`\`\`
 what the user typed:
