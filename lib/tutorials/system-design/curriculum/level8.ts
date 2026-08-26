@@ -31,7 +31,7 @@ Authentication answers one question: who is this request from? Keep it strictly 
     {
       "label": "Hash each password with argon2id and a per-user salt",
       "correct": true,
-      "feedback": "Right. argon2id is a slow, memory-hard key derivation function, so tuning it to cost 50 to 100 ms per guess makes offline cracking economically hopeless, and a unique per-user salt kills precomputed rainbow tables. Add a pepper held in a KMS and the dump alone can never be cracked."
+      "feedback": "Right. argon2id is a slow, memory-hard key derivation function, so tuning it to cost 50 to 100 ms per guess makes offline cracking economically hopeless, and a unique per-user salt means no single prebuilt table of hashes can be reused against every account at once. Add a pepper, one more secret that lives outside the database, and the dump alone can never be cracked."
     }
   ]
 }
@@ -41,7 +41,7 @@ Authentication answers one question: who is this request from? Keep it strictly 
 
 The core rule: never store a password, store a verifier you cannot reverse. Use a memory-hard key derivation function: argon2id (preferred today), scrypt, or bcrypt. These are slow and memory-heavy on purpose so an attacker with your hashes cannot brute force billions of guesses per second on a GPU. A fast hash like MD5 or SHA-256 is the classic disqualifying answer: SHA-256 is designed to be fast, so a leaked SHA-256 table of 100M users is cracked at tens of billions per GPU, and hundreds of billions on a multi-GPU rig of guesses per second. Tune argon2id to something like 19 MiB memory, 2 iterations, parallelism 1, then raise it until a single verify costs roughly 50 to 100 ms on your hardware. That latency is invisible per login but murders offline cracking.
 
-Every password gets a unique random per-user salt, stored alongside the hash. Salt defeats precomputed rainbow tables and means two users with the same password get different hashes. A pepper is an optional secret added to every hash that lives outside the database (in a KMS or app config), so a database-only dump still lacks the pepper needed to crack anything. Salt is per-user and public; pepper is global and secret.
+Every password gets a unique random per-user salt, stored alongside the hash. Salt defeats precomputed rainbow tables (giant prebuilt lookup tables that map a hash straight back to the password that produced it, so the attacker looks the answer up instead of guessing) and means two users with the same password get different hashes. A pepper is an optional secret added to every hash that lives outside the database, in a KMS (a key management service: a separate hardened service that holds keys and secrets so a copy of the database never contains them, and which [secrets and key management](/learn/system-design/security-privacy/sd-l8-secrets-kms) covers later in this level) or app config, so a database-only dump still lacks the pepper needed to crack anything. Salt is per-user and public; pepper is global and secret.
 
 \`\`\`cswidget
 {
@@ -351,7 +351,7 @@ The uncomfortable truth: account recovery is the real attack surface. Attackers 
 
 ## Stop credential stuffing without leaking who exists
 
-Defend against credential stuffing (attackers replaying passwords leaked from other sites) without leaking who exists. Check new passwords against known-breached lists using the Have I Been Pwned k-anonymity API (send a 5-char hash prefix, never the password). Throttle and add exponential backoff per account and per IP, add CAPTCHA on suspicious volume, and return the exact same generic error and timing for "wrong password" and "no such user." Any difference in message, status code, or response time is a user-enumeration oracle. Use a constant-time comparison for tokens and codes so timing does not leak how many characters matched.
+Defend against credential stuffing (attackers replaying passwords leaked from other sites) without leaking who exists. Check new passwords against known-breached lists using the Have I Been Pwned k-anonymity API: you send a 5-char hash prefix and never the password itself, so your query looks identical to every other query sharing that prefix and the service cannot tell which password you asked about (the general form of that trick, hiding a row in a crowd of at least k lookalikes, is [k-anonymity](/learn/system-design/security-privacy/sd-l8-pii-dsar-privacy), later in this level). Throttle and add exponential backoff per account and per IP, add CAPTCHA on suspicious volume, and return the exact same generic error and timing for "wrong password" and "no such user." Any difference in message, status code, or response time is a user-enumeration oracle. Use a constant-time comparison for tokens and codes, meaning one that always checks every character instead of stopping at the first wrong one. A naive comparison bails out the moment it hits a mismatch, so a guess that gets four characters right takes measurably longer to be rejected than one that gets none, and an attacker can rebuild the token one character at a time from the timing alone.
 
 **Recap:** hash passwords with a memory-hard KDF plus per-user salt (and a KMS pepper) so a DB dump is useless, layer MFA with SMS as the weak factor, harden account recovery because it is the real attack surface, and stop credential stuffing with breach checks and throttling while never revealing whether an account exists.
 
@@ -791,7 +791,7 @@ The four roles: the resource owner (the user), the client (the app requesting ac
 ## Grant selection, the thing you must get right
 
 - Web apps, single-page apps, and mobile/native apps: Authorization Code + PKCE. SPAs and mobile are public clients (they cannot hold a secret), so PKCE is what protects them.
-- Machine-to-machine (a backend service calling an API with no user present): Client Credentials grant. The service authenticates with its own client ID and secret (or mTLS) and gets a token representing itself.
+- Machine-to-machine (a backend service calling an API with no user present): Client Credentials grant. The service authenticates with its own client ID and secret (or mTLS, mutual TLS, where both ends of the connection present a certificate so each one proves who it is instead of only the server proving it, taken apart in [encryption in transit and mTLS](/learn/system-design/security-privacy/sd-l8-encryption-transit-mtls) later in this level) and gets a token representing itself.
 - Input-constrained devices (smart TVs, CLIs, IoT): Device Authorization grant. The device shows a code and URL, the user approves on their phone, and the device polls for the token.
 
 \`\`\`cswidget
@@ -4625,7 +4625,7 @@ export const systemDesignLevel8: DesignLevel = {
               "Design the OAuth architecture for a fintech platform like Plaid that connects to thousands of banks and exposes an API consumed by thousands of third-party developer apps, where you are simultaneously an OAuth client (to banks) and an OAuth provider (to your customers).",
             thinkAbout: [
               "How do the two OAuth roles (client to banks, provider to developers) differ?",
-              "Why do sender-constrained tokens (FAPI/mTLS) matter on the bank leg?",
+              "Why do sender-constrained tokens (mTLS-bound, as the bank-grade FAPI profile of OAuth requires) matter on the bank leg?",
               "How does cascading revocation flow through the whole chain?",
             ],
             modelAnswerOutline: [
