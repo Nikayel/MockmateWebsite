@@ -2629,11 +2629,11 @@ Attackers take username/password pairs leaked from other breaches (billions are 
 
 ## Bot management, Sybil, and card testing
 
-**Bot management** is detecting automation itself. Signals: **device fingerprinting** (TLS/JA3 fingerprint, browser and header entropy, canvas fingerprint), **behavioral signals** (mouse movement, typing cadence, time-on-form, since bots fill a form in 50 ms), and **invisible challenges** that run before you ever show a CAPTCHA. These feed a **risk score**, not a binary verdict.
+**Bot management** is detecting automation itself. Signals: **device fingerprinting** (a TLS handshake fingerprint, JA3, which hashes the exact set and order of options a client offers when it opens a connection, so one bot toolkit looks identical across every IP address it rents, plus browser and header entropy and canvas fingerprint), **behavioral signals** (mouse movement, typing cadence, time-on-form, since bots fill a form in 50 ms), and **invisible challenges** that run before you ever show a CAPTCHA. These feed a **risk score**, not a binary verdict.
 
 **Fake-account / Sybil defense.** One attacker creating thousands of accounts to farm signup bonuses, post spam, or launder fraud. You cannot stop account creation, so you raise its cost and reduce its value: **phone/email verification** (a phone number costs more to acquire than an email), **per-identity and per-device velocity limits** (N accounts per device per day), **reputation and aging** (new accounts have limited privileges until they build trust), and rejecting disposable-email and VOIP-number ranges.
 
-**Card testing** on checkout: fraudsters validate stolen card numbers by running many tiny authorizations. Defend with velocity limits per card/BIN/device, 3-D Secure step-up, and blocking the classic "many $1 auths, high decline rate" pattern.
+**Card testing** on checkout: fraudsters validate stolen card numbers by running many tiny authorizations. Defend with velocity limits counted per card, per issuing bank (the BIN, the leading six to eight digits that say which bank issued the card, so a whole batch of stolen numbers from one bank is throttled together), and per device, plus 3-D Secure step-up and blocking the classic "many $1 auths, high decline rate" pattern.
 
 \`\`\`cswidget
 {
@@ -2703,6 +2703,19 @@ The unifying idea is that every event gets a risk score from a pipeline of **fea
 \`\`\`
 
 **Interview nuance:** the tradeoff to name explicitly is **friction versus conversion**. A hard block on anything suspicious kills signups and revenue and generates support tickets from real users. The senior move is graduated friction: invisible checks for the 95% who are clearly fine, a light challenge for the ambiguous middle, hard action only for high-confidence abuse. State the metric: you are optimizing fraud caught per unit of legitimate-user friction, not fraud caught in isolation.
+
+Run that metric once and the gap is not a matter of taste. Say 100,000 signups a day, 3 percent of them fraudulent, and a model that puts 12 percent of all sessions (12,000) in the ambiguous middle band, which is where 2,400 of the 3,000 fraudulent signups land alongside 9,600 real people:
+
+\`\`\`
+Hard-block the whole band:  2,400 fraud stopped, 9,600 real signups lost
+                            = 0.25 fraud stopped per real signup lost
+
+Challenge the whole band:   85% of the 9,600 real users finish the challenge  -> 1,440 lost
+                            5% of the 2,400 bots finish it                    -> 2,280 stopped
+                            = 1.58 fraud stopped per real signup lost
+\`\`\`
+
+The challenge stops 95 percent as much fraud (2,280 against 2,400) while costing 15 percent as many real signups (1,440 against 9,600), which is a 6x better number on the metric you just named. Notice the honest part: 120 bots got through. Graduated friction is not the strongest filter available, it is the one whose collateral damage is small enough to leave on by default, with hard blocks and manual review kept for the high-confidence tail.
 
 ## When the abuse is a race: admission control at the edge
 
@@ -2993,7 +3006,7 @@ You draw a **data-flow diagram** with **trust boundaries** (where data crosses f
 }
 \`\`\`
 
-Each STRIDE category maps to a defense property, so the exercise systematically surfaces gaps instead of relying on whoever remembers to think about security. You prioritize the resulting threats (likelihood x impact, or DREAD) and only mitigate what matters.
+Each STRIDE category maps to a defense property, so the exercise systematically surfaces gaps instead of relying on whoever remembers to think about security. You prioritize the resulting threats (likelihood x impact, or DREAD, which scores each threat on damage, reproducibility, exploitability, affected users, and discoverability) and only mitigate what matters.
 
 \`\`\`cswidget
 {
@@ -4990,7 +5003,7 @@ export const systemDesignLevel8: DesignLevel = {
           practice: {
             id: "sd-l8-ddos-rate-abuse-practice",
             prompt:
-              "Design abuse defense for a serverless GraphQL API (AWS Lambda + API Gateway) powering a startup's mobile app at 5k QPS, where a single crafted GraphQL query can fan out into hundreds of resolver calls and every invocation costs money. Lead with how you stop query-cost abuse and denial-of-wallet on a pay-per-invocation stack.",
+              "Design abuse defense for a serverless GraphQL API (AWS Lambda + API Gateway) powering a startup's mobile app at 5k QPS, where a single crafted GraphQL query can fan out into hundreds of resolver calls and every invocation costs money. Two defenses you have not met yet are the ones this shape needs: a query complexity budget, where every field carries a cost weight, the server adds up what a query is asking for before it runs anything, and rejects the request if the total (or the nesting depth) is over budget; and persisted queries, where the server will only run operations from an allowlist the client registered ahead of time, so an arbitrary expensive query is never accepted at all. Lead with how you stop query-cost abuse and denial-of-wallet (running up the victim's bill rather than taking the service down) on a pay-per-invocation stack.",
             thinkAbout: [
               "Why does a plain QPS limit fail to stop GraphQL cost abuse?",
               "How do query depth/complexity limits and persisted queries close the surface?",
