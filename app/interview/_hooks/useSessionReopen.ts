@@ -1,4 +1,4 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react"
+import { useEffect, useRef, type Dispatch, type SetStateAction } from "react"
 import type { User as FirebaseUser } from "firebase/auth"
 import type { ReadonlyURLSearchParams } from "next/navigation"
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime"
@@ -96,6 +96,13 @@ export interface UseSessionReopenOptions {
  * all state/refs stay in the page and are injected via `opts`.
  */
 export function useSessionReopen(opts: UseSessionReopenOptions) {
+  // One-shot latch for guest rehydration, keyed by session id. The page
+  // writes ?session&scenario into the URL right after a trial starts, and
+  // Next syncs native replaceState into useSearchParams — a dep of this
+  // effect — so without the latch the guest branch re-ran seconds into every
+  // trial and repainted the live editor with the server's stale autosave.
+  const guestRehydratedSessionRef = useRef<string | null>(null)
+
   // Check authentication and usage limit, handle session reopening
   useEffect(() => {
     const checkAuth = async () => {
@@ -118,10 +125,14 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
           const guestSessionId = opts.searchParams?.get("session")
           const guestScenarioId = opts.searchParams?.get("scenario")
           if (guestSessionId && guestScenarioId) {
-            if (opts.isShowingCompletedSession(guestSessionId)) {
+            if (
+              opts.isShowingCompletedSession(guestSessionId) ||
+              guestRehydratedSessionRef.current === guestSessionId
+            ) {
               opts.setIsLoading(false)
               return
             }
+            guestRehydratedSessionRef.current = guestSessionId
 
             const scenario = await getScenarioById(guestScenarioId)
             let sessionState: Record<string, any> | null = null

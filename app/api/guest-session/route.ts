@@ -114,6 +114,11 @@ export async function POST(request: NextRequest) {
             pattern: pattern || scenarioType,
             scenario_id: scenarioId,
             difficulty,
+            // The previous problem's autosave goes with it: clients
+            // rehydrate whatever session_state they find, and the old
+            // problem's code/chat painted over the new statement is worse
+            // than starting clean.
+            session_state: null,
             updated_at: new Date().toISOString(),
           })
         }

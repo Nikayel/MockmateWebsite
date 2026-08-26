@@ -113,6 +113,10 @@ describe("POST /api/guest-session reusing an incomplete session", () => {
       scenario_id: "dsa-three-sum",
       topic: "3Sum",
       difficulty: "medium",
+      // The old problem's autosave must go with it: the client rehydrates
+      // whatever session_state it finds, and problem A's code/chat painted
+      // over problem B's statement is worse than starting clean.
+      session_state: null,
     })
   })
 

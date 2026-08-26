@@ -194,6 +194,30 @@ describe("useSessionReopen for a guest mid-trial refresh", () => {
     expect(codeArg).toMatch(/function solution/)
   })
 
+  it("rehydrates a session only once, not on every searchParams identity change", async () => {
+    // The page writes ?session&scenario into the URL right after a trial
+    // starts, and Next syncs that into useSearchParams — which is in this
+    // effect's dep array. Without a latch the guest branch re-ran seconds
+    // into every trial and repainted the editor with the server's stale
+    // autosave (or starter code), wiping whatever was just typed.
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ session: { session_state: null } }),
+    }))
+    vi.stubGlobal("fetch", fetchSpy)
+    const opts = buildGuestOpts()
+
+    const { rerender } = renderHook((props) => useSessionReopen(props as never), {
+      initialProps: opts,
+    })
+    await flush()
+    rerender({ ...opts, searchParams: new URLSearchParams("session=sess-1&scenario=dsa-two-sum") })
+    await flush()
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(opts.setCode).toHaveBeenCalledTimes(1)
+  })
+
   it("drops the params of a submitted trial instead of spinning on them", async () => {
     vi.stubGlobal(
       "fetch",
