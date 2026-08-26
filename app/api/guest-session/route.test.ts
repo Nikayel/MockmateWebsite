@@ -126,7 +126,10 @@ describe("PUT /api/guest-session validation (API-3)", () => {
     expect(docUpdate).not.toHaveBeenCalled()
   })
 
-  it("rejects a single megabyte-scale message element", async () => {
+  it("truncates a megabyte-scale message element instead of failing the whole save", async () => {
+    // Rejection here was a footgun: one oversized element made EVERY
+    // subsequent autosave 400 silently, so the server copy went stale for
+    // the rest of the trial. Truncation keeps the save alive and bounded.
     const { PUT } = await importRoute()
     const res = (await PUT(
       put({
@@ -137,8 +140,34 @@ describe("PUT /api/guest-session validation (API-3)", () => {
         },
       })
     )) as MockResponse
-    expect(res.status).toBe(400)
-    expect(docUpdate).not.toHaveBeenCalled()
+    expect(res.status).toBe(200)
+    expect(docUpdate).toHaveBeenCalledTimes(1)
+    const saved = docUpdate.mock.calls[0][0] as {
+      session_state: { interviewer_messages: Array<{ message: string }> }
+    }
+    expect(saved.session_state.interviewer_messages[0].message.length).toBeLessThan(3000)
+  })
+
+  it("truncates an oversized top-level test result the same way", async () => {
+    // The completion payload's test results had a count cap but no element
+    // bound, unlike sessionState — the same oversized element that broke
+    // autosaves would have 400'd the completion write, losing the score.
+    const { PUT } = await importRoute()
+    const res = (await PUT(
+      put({
+        sessionId: SESSION_ID,
+        guestId: VALID_GUEST_ID,
+        performanceScore: 100,
+        testResults: [{ passed: true, description: "big", error: "x".repeat(20000) }],
+      })
+    )) as MockResponse
+    expect(res.status).toBe(200)
+    expect(docUpdate).toHaveBeenCalledTimes(1)
+    const saved = docUpdate.mock.calls[0][0] as {
+      test_results: Array<{ passed: boolean; error: string }>
+    }
+    expect(saved.test_results[0].passed).toBe(true)
+    expect(saved.test_results[0].error.length).toBeLessThan(3000)
   })
 
   it("rejects a non-string feedback value", async () => {

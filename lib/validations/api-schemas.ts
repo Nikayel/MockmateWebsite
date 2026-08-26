@@ -132,16 +132,35 @@ export const GenerateFeedbackSchema = z.object({
 // ============================================
 
 /**
- * A sessionState array element (chat message, interviewer message, test
- * result). Shapes vary by caller, so structure stays open — but size does
- * not: a single unbounded element would otherwise let one "message" carry a
- * megabyte toward Firestore's 1MB doc limit.
+ * Size-bound an array element (chat message, interviewer message, test
+ * result) by TRUNCATING oversized string fields rather than rejecting.
+ * Rejection was a footgun: one oversized element failed the whole body, so
+ * every later autosave 400'd silently and the completion write (the score's
+ * only copy) died with it. Truncation keeps writes alive while still keeping
+ * a single element from carrying a megabyte toward Firestore's 1MB doc cap.
  */
-const BoundedStateElement = z
-  .unknown()
-  .refine((element) => JSON.stringify(element ?? null).length <= 10000, {
-    message: "Element too large",
-  })
+const MAX_ELEMENT_JSON_CHARS = 10000
+const MAX_ELEMENT_STRING_CHARS = 2000
+function truncateOversizedElement(element: unknown): unknown {
+  if (JSON.stringify(element ?? null).length <= MAX_ELEMENT_JSON_CHARS) return element
+  if (element && typeof element === "object" && !Array.isArray(element)) {
+    const trimmed: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(element)) {
+      trimmed[key] =
+        typeof value === "string" && value.length > MAX_ELEMENT_STRING_CHARS
+          ? value.slice(0, MAX_ELEMENT_STRING_CHARS) + "...[truncated]"
+          : value
+    }
+    if (JSON.stringify(trimmed).length <= MAX_ELEMENT_JSON_CHARS) {
+      return { ...trimmed, truncated: true }
+    }
+  }
+  // Degenerate shapes (huge arrays, deep nesting) that string-trimming cannot
+  // shrink are replaced outright rather than stored.
+  return { truncated: true }
+}
+
+const BoundedStateElement = z.unknown().transform(truncateOversizedElement)
 
 /**
  * PUT /api/guest-session update/completion body.
@@ -185,7 +204,16 @@ export const GuestSessionUpdateSchema = z.object({
   feedback: z.string().max(20000, "Feedback too long").optional(),
   finalCode: z.string().max(50000, "Code too long").optional(),
   language: z.string().max(50).optional(),
-  testResults: z.array(TestResultSchema.passthrough()).max(100, "Too many test results").optional(),
+  testResults: z
+    .array(
+      TestResultSchema.passthrough().transform(
+        // Same element bound as sessionState: a giant error/actual blob must
+        // not 400 the completion write that carries the score.
+        (element) => truncateOversizedElement(element) as z.infer<typeof TestResultSchema>
+      )
+    )
+    .max(100, "Too many test results")
+    .optional(),
   timeComplexity: z.string().max(100).optional(),
   spaceComplexity: z.string().max(100).optional(),
 })
