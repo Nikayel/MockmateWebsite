@@ -5469,7 +5469,7 @@ from **decision drivers** to a **storage family**, then defend against the runne
     {
       "label": "Numbers and access patterns first, and only then a storage family",
       "correct": true,
-      "feedback": "Right. 'Scale' with no number attached is not a decision driver. What the interviewer wants named is QPS now and in two years, the query shapes you actually run and by what key, the p99 latency budget, and whether a stale read causes a real bug or a cosmetic one. A single well-indexed relational box comfortably serves tens of thousands of QPS, so the burden of proof sits on whoever wants to leave it."
+      "feedback": "Right. 'Scale' with no number attached is not a decision driver. What the interviewer wants named is QPS (queries per second, the count of requests arriving each second) now and in two years, the query shapes you actually run and by what key, the p99 latency budget, and whether a stale read causes a real bug or a cosmetic one. A single well-indexed relational box comfortably serves tens of thousands of QPS, so the burden of proof sits on whoever wants to leave it."
     },
     {
       "label": "Which NoSQL product: MongoDB versus DynamoDB is the decision",
@@ -5484,7 +5484,8 @@ from **decision drivers** to a **storage family**, then defend against the runne
 \`\`\`
 
 The drivers, roughly in the order they decide things: **access patterns** (what queries do you
-actually run, and by what key), **read/write ratio and volume** (QPS now and in two years),
+actually run, and by what key), **read/write ratio and volume**
+([QPS](/learn/system-design/interview-method/sd-l0-qps-read-write) now and in two years),
 **consistency needs** (does a stale read cause a real bug or just a cosmetic one), **scale** (does
 the working set fit one big node or not), **latency target** (p99 budget), and **query complexity**
 (joins, aggregations, ad hoc filters, full-text, geospatial). Two more sit underneath: **operational
@@ -5507,7 +5508,8 @@ multi-row ACID).
   and retention.
 - **Vector (pgvector, Pinecone, Milvus):** nearest-neighbor search over embeddings.
 - **Columnar / OLAP (Snowflake, BigQuery, ClickHouse):** large analytical scans and aggregations,
-  kept separate from your OLTP store.
+  the scan-and-add-up work called OLAP, kept separate from the OLTP store that serves your users'
+  small live reads and writes.
 
 \`\`\`cswidget
 {
@@ -5552,9 +5554,61 @@ multi-row ACID).
 ### NewSQL: the family people miss
 
 **NewSQL / distributed SQL (Spanner, CockroachDB, TiDB)** gives you **horizontal scale plus ACID and
-SQL** by auto-sharding data across nodes and using consensus (Raft/Paxos) to keep replicas
-consistent. The tradeoff versus a single Postgres is higher write latency per transaction (a commit
-needs a cross-node quorum) and operational complexity. So: choose NewSQL when you have genuinely
+SQL** by splitting the rows across many machines for you and having those machines vote on the
+current value before a write counts. The voting is called **consensus** (Raft and Paxos are the two
+famous recipes for it), and its job is to keep the several full copies of each row, its **replicas**,
+from ever disagreeing. Both ideas get proper lessons later:
+[copies of the data in Level 3](/learn/system-design/scaling-data/sd-l3-read-replicas) and
+[the voting algorithms in Level 5](/learn/system-design/distributed-core/sd-l5-raft-paxos).
+The tradeoff versus a single Postgres is higher write latency per transaction (a commit needs a
+cross-node **quorum**: it waits for a majority of the copies to answer, and each answer is a network
+round trip) and operational complexity.
+
+That latency is not a vague warning, it is arithmetic you can quote:
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Where the copies of a row live",
+    "What a commit waits for",
+    "Commit latency",
+    "Updates one row can absorb, one after another"
+  ],
+  "rows": [
+    [
+      "One Postgres on one machine",
+      "an fsync of the WAL to local disk",
+      "~1 ms",
+      "~1,000 per second"
+    ],
+    [
+      "Three copies in one datacenter",
+      "a majority to answer over the local network, ~0.5 ms each way",
+      "~2 to 5 ms",
+      "~200 to 500 per second"
+    ],
+    [
+      "Three copies in nearby regions",
+      "a majority, one of them about 30 ms away",
+      "~30 to 70 ms",
+      "~15 to 30 per second"
+    ],
+    [
+      "Copies on several continents",
+      "a majority across links of 100 ms or more",
+      "~150 ms",
+      "~6 per second"
+    ]
+  ],
+  "highlightCols": [
+    "Commit latency"
+  ],
+  "caption": "Different rows still commit in parallel, so total throughput scales with machines. What does not scale is one row's chain of updates: it is capped at one commit per round trip, which is why a globally replicated counter is a bad idea and a globally replicated money transfer is worth 150 ms."
+}
+\`\`\`
+
+So: choose NewSQL when you have genuinely
 outgrown one node **and** still need transactions and SQL, because the alternative is **app-level
 sharding** of MySQL/Postgres, where you hand-roll routing, cross-shard joins, resharding, and
 distributed transactions in application code. That is a large, permanent tax. NewSQL buys back most
@@ -5707,11 +5761,19 @@ data in sync, so you justify each store, you do not collect them.
 }
 \`\`\`
 
-**Interview nuance:** Reason with **PACELC**, not a CAP one-liner. CAP only speaks about behavior
-during a partition; PACELC adds the normal case: even when there is no partition (Else), you still
-trade **Latency** against **Consistency**. Spanner chooses consistency and pays latency; Dynamo
-chooses availability and latency and gives you eventual consistency. Naming PACELC signals you know
-CAP is not the whole story.
+**Interview nuance:** Reason with **PACELC**, not a CAP one-liner. Take both names in plain words
+first. **CAP** describes the moment the network splits and two groups of your machines can no longer
+reach each other (a **network partition**, which is a different thing from the data partitions
+earlier in this level). Each side then either keeps answering, risking a stale or conflicting value
+(availability), or refuses to answer rather than be wrong (consistency). You do not get to skip that
+choice; the split happens whether you planned for it or not. CAP only speaks about behavior during
+such a partition, and partitions are rare. **PACELC** adds the ordinary day: Else, when there is no
+partition, you still trade **Latency** against **Consistency**, because checking with the other
+copies before answering costs the round trips in the table above. Level 5 gives each its own lesson:
+[what CAP actually says](/learn/system-design/distributed-core/sd-l5-cap-correct) and
+[the else-case in PACELC](/learn/system-design/distributed-core/sd-l5-pacelc). Spanner chooses
+consistency and pays latency; Dynamo chooses availability and latency and gives you eventual
+consistency. Naming PACELC signals you know CAP is not the whole story.
 
 Recap: Drive from access pattern, consistency, scale, and query shape to a family, default to boring
 well-indexed relational, reach for NewSQL only when you have outgrown one node yet still need SQL and
