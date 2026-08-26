@@ -2305,7 +2305,9 @@ local fsync survives a crash, and only a synchronous standby survives the machin
 const keyValueTeach = `
 ## The simplest database, and the discipline it forces
 
-A key-value store is the simplest possible database: a distributed hash map. You \`GET(key)\`, you
+A key-value store is the simplest possible database: a hash map, the dictionary structure you already
+know from code, living on a server instead of inside your process (and usually spread over several
+servers, which Level 3 covers). You \`GET(key)\`, you
 \`PUT(key, value)\`, you \`DELETE(key)\`. There is no query language over the value, no \`WHERE\`
 clause, no join. Because the access path is a hash lookup, point reads and writes are O(1) and the
 fastest thing in your architecture: Redis serves reads in tens of microseconds in-process and
@@ -2324,7 +2326,11 @@ Namespace with a prefix and a delimiter so different data types never collide:
 \`session:{sessionId}\`, \`user:123:profile\`, \`ratelimit:{userId}:{minuteBucket}\`. Composite keys
 co-locate related lookups. The danger is **hot keys**: a single key that takes a wildly
 disproportionate share of traffic (a global counter, a celebrity's profile) becomes a hotspot on
-whichever shard owns it. You fight this by sharding the key (\`counter:{shard}\` summed across N
+whichever shard owns it. A **shard** is one machine's slice of the keys: the store splits the
+keyspace across its servers, and any single key lives on exactly one of them, so all of that traffic
+lands on one box while its neighbors idle
+([Level 3 makes sharding a lesson](/learn/system-design/scaling-data/sd-l3-partitioning-strategies)).
+You fight this by splitting the key itself (\`counter:{shard}\` summed across N
 shards) or by fronting the hot key with a client-side or local cache.
 
 \`\`\`cswidget
@@ -2359,8 +2365,10 @@ a system of record, then losing data on a restart.
 
 ### TTL, eviction, and the rich data structures
 
-Every session and counter should carry an expiry (\`SET key val EX 3600\`) so stale data
-self-cleans. When memory fills, Redis evicts by policy: \`allkeys-lru\` for a pure cache,
+Every session and counter should carry an expiry, a **TTL** (time to live: the key deletes itself
+that many seconds after it was written), so stale data self-cleans: \`SET key val EX 3600\` gives the
+key one hour. When memory fills, Redis evicts by policy: \`allkeys-lru\` for a pure cache (LRU is
+least recently used, meaning throw out whatever nobody has asked for in the longest time),
 \`volatile-lru\` to only evict keys that have a TTL, \`noeviction\` to fail writes instead of
 dropping data (what you want for a source of truth).
 
@@ -2780,10 +2788,18 @@ const wideColumnTeach = `
 Wide-column stores (Cassandra, ScyllaDB, HBase, Bigtable) are the write-heavy workhorse of
 internet-scale systems: message history, activity feeds, event logs, time-series, and anything
 ingesting a firehose of writes that must never block. The mental model is not a spreadsheet of
-columns. It is a **distributed, sorted map of maps**: data is grouped into **partitions** (spread
-across the cluster by a hash of the partition key), and within a partition, rows are **sorted** by
-clustering columns. Get those two concepts right and this family is straightforward; get them wrong
-and it falls over.
+columns, and two words have to land before it makes sense. A **cluster** is simply several computers
+running the same database software and splitting the data between them; each of those computers is a
+**node**. A **partition** is the slice of the data that one node owns, and which slice a given row
+belongs to is decided by feeding its **partition key** (say the conversation id) through a hash
+function, a fixed recipe that turns any value into a number, and giving the row to whichever node
+owns that number's range. Level 3 turns all of this into a full lesson on
+[how data gets split across machines](/learn/system-design/scaling-data/sd-l3-partitioning-strategies).
+
+With that in hand: the model is a **distributed, sorted map of maps**. Data is grouped into
+partitions (spread across the cluster by a hash of the partition key), and within a partition, rows
+are **sorted** by clustering columns. Get those two concepts right and this family is straightforward;
+get them wrong and it falls over.
 
 **Why it is write-optimized.** Cassandra uses an **LSM tree**. A write appends to a commit log and an
 in-memory memtable and returns immediately: no in-place update, no read-before-write. Memtables flush
@@ -2876,13 +2892,17 @@ partition by \`conversation_id\` so all of a conversation's messages live togeth
 }
 \`\`\`
 
-**Consistency is tunable per query.** Cassandra is a Dynamo-style AP system with **tunable
-consistency**: you choose how many replicas must acknowledge. \`ONE\` (fast, may read stale),
-\`QUORUM\` (majority). If reads and writes both use QUORUM on replication factor 3, read-quorum (2)
-plus write-quorum (2) overlap by at least one replica, so a read always sees the latest acknowledged
-write (read-your-writes freshness) for that key while tolerating one node down. That is **quorum
-consistency**, not linearizability: the overlap does not order concurrent writes, which can land on
-different quorums and produce conflicting versions that still need reconciling.
+**Consistency is tunable per query.** When a node is unreachable, Cassandra would rather keep
+answering than refuse in case the answer is stale, and it hands you the dial. Every row is stored on
+several nodes at once, and each of those full copies is a **replica**; **tunable consistency** means
+you choose how many replicas must acknowledge before the database calls a read or a write done.
+\`ONE\` (fast, may read stale), \`QUORUM\` (a majority of them). If reads and writes both use QUORUM
+on replication factor 3 (three copies of every row), read-quorum (2) plus write-quorum (2) overlap by
+at least one replica, so a read always sees the latest acknowledged write (read-your-writes
+freshness) for that key while tolerating one node down. That is **quorum consistency**, not
+**linearizability** (every reader seeing every write in one single true order): the overlap does not
+order concurrent writes, which can land on different quorums and produce conflicting versions that
+still need reconciling.
 
 \`\`\`cswidget
 {
@@ -3203,11 +3223,70 @@ datastore, its operational burden, and its scaling weaknesses. "Show a user's di
 indexed query. Only when depth grows, the patterns get variable-length, or path/relationship queries
 dominate does the graph engine earn its place.
 
-**Interview nuance:** The tradeoff interviewers want you to name is **horizontal scaling**. Graphs
-are hard to shard because a good partition would cut edges, and the whole point is fast
-edge-following, so a traversal that crosses partitions pays a network hop per boundary and the
-index-free-adjacency advantage evaporates. Native graph databases often prefer to scale up (bigger
-machine, replicas for read scaling) rather than out. So the honest position is: graph databases are
+**Interview nuance:** The tradeoff interviewers want you to name is **horizontal scaling**: growing
+by adding more machines rather than by buying one bigger machine. Graphs are hard to shard (to cut
+into slices, one per machine) because any good slicing would cut edges, and the whole point is fast
+edge-following, so a traversal that crosses a boundary pays a network round trip and the
+index-free-adjacency advantage evaporates.
+
+Put the two hops side by side, using the
+[standard latency numbers](/learn/system-design/interview-method/sd-l0-latency-numbers). A hop to a
+neighbor already in this machine's memory is a pointer read, about 100 nanoseconds. A hop to a
+neighbor that lives on another machine is a round trip across the datacenter network, about 0.5 ms,
+which is roughly 5,000 times longer. So a 4-hop traversal that stays local spends well under a
+microsecond hopping, while the same 4 hops crossing a boundary each time spend about 2 ms of pure
+waiting before the engine does any real work.
+
+\`\`\`csdiagram
+{
+  "type": "table",
+  "columns": [
+    "Traversal",
+    "Hops inside one machine",
+    "Hops crossing to another machine",
+    "Time spent just hopping"
+  ],
+  "rows": [
+    [
+      "Direct friends, 1 hop",
+      1,
+      0,
+      "~100 ns"
+    ],
+    [
+      "Friends of friends, 2 hops",
+      2,
+      0,
+      "~200 ns"
+    ],
+    [
+      "Fraud ring, 4 hops, partitioned well",
+      3,
+      1,
+      "~0.5 ms: the single crossing is the whole bill"
+    ],
+    [
+      "Fraud ring, 4 hops, a cut edge every hop",
+      0,
+      4,
+      "~2 ms, and every crossing can also queue behind other traffic"
+    ],
+    [
+      "Fraud ring, 6 hops, a cut edge every hop",
+      0,
+      6,
+      "~3 ms, so depth now costs milliseconds per level"
+    ]
+  ],
+  "highlightCols": [
+    "Time spent just hopping"
+  ],
+  "caption": "One local hop is a pointer read; one hop across a partition boundary is a network round trip about 5,000 times slower. That ratio, not storage, is why a graph engine would rather run on one bigger machine than on more of them."
+}
+\`\`\`
+
+Native graph databases often prefer to scale up (bigger machine, replicas, meaning extra full copies
+of the data, to spread reads) rather than out. So the honest position is: graph databases are
 unbeatable for deep-traversal query complexity but weaker on raw horizontal write scale than
 Cassandra. Recommendation and fraud systems at extreme scale often precompute or use specialized
 graph-processing systems rather than a single serving graph database.
