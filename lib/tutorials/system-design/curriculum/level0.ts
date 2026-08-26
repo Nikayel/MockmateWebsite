@@ -3817,9 +3817,16 @@ set, often the 20% that serves 80%), and server count (QPS / per-box throughput)
 <details>
 <summary>The component palette</summary>
 
-Pull from these without inventing: load balancer, API gateway, app/service tier, cache (Redis),
-message queue (Kafka), CDN, object store (S3), search index (Elasticsearch), and database with
-replicas and shards. When you need a box, it is almost always one of these.
+Pull from these without inventing, and each one links to the lesson that teaches it properly:
+[load balancer](/learn/system-design/foundations/sd-l1-load-balancing),
+[API gateway](/learn/system-design/foundations/sd-l1-reverse-proxy-gateway), app/service tier,
+[cache](/learn/system-design/foundations/sd-l1-cdn-caching-foundations) (Redis),
+[message queue](/learn/system-design/event-driven/sd-l6-queue-pubsub-log) (Kafka),
+[CDN](/learn/system-design/foundations/sd-l1-cdn-caching-foundations), object store (S3),
+search index (Elasticsearch), and a database with
+[replicas](/learn/system-design/scaling-data/sd-l3-read-replicas) and
+[shards](/learn/system-design/scaling-data/sd-l3-partitioning-strategies). When you need a box, it is
+almost always one of these.
 
 </details>
 
