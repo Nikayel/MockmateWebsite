@@ -5286,11 +5286,11 @@ The monitoring that separates them is the same labeled query set from step 4, re
 const toolProtocolMcpTeach = `
 ## Why a tool needs a protocol and not just a schema
 
-The LLM Agents lesson described a tool as a typed schema you validate a model's call against. That was the whole story while every agent talked only to tools its own team wrote. It stops being the whole story the moment tools are published by people you do not employ.
+The [LLM Agents lesson](/learn/system-design/specialized-systems/sd-l11-llm-agents) described a tool as a typed schema you validate a model's call against. That was the whole story while every agent talked only to tools its own team wrote. It stops being the whole story the moment tools are published by people you do not employ.
 
-The reason is arithmetic. With M agent frameworks and N tool providers, a per-vendor function-calling schema means M times N integrations, each maintained by someone with no reason to care about the other M minus 1. A protocol collapses that to M plus N: every tool provider implements the protocol once, every agent speaks it once. That is the same argument that produced ODBC and LSP, and it is why the Model Context Protocol (MCP) exists.
+The reason is arithmetic. With M agent frameworks and N tool providers, a per-vendor function-calling schema means M times N integrations, each maintained by someone with no reason to care about the other M minus 1. A protocol collapses that to M plus N: every tool provider implements the protocol once, every agent speaks it once. That is the same argument that produced ODBC (one way for any program to talk to any database) and LSP (one way for any editor to talk to any language's tooling), and it is why the Model Context Protocol (MCP) exists.
 
-What standardizing buys beyond the schema is the part worth designing against. A schema tells the model what arguments a function takes. A protocol adds runtime discovery (the agent asks a server what it offers instead of being compiled against a fixed list), a transport contract, a versioning rule so a server can change without breaking every client, and an authorization model, which a bare JSON schema does not have at all. Messages are JSON-RPC 2.0.
+What standardizing buys beyond the schema is the part worth designing against. A schema tells the model what arguments a function takes. A protocol adds runtime discovery (the agent asks a server what it offers instead of being compiled against a fixed list), a transport contract, a versioning rule so a server can change without breaking every client, and an authorization model, which a bare JSON schema does not have at all. Messages are JSON-RPC 2.0: each one is a small JSON object naming a method to run, its arguments, and an id the reply comes back stamped with, so several calls can be in flight on one connection without the answers getting confused.
 
 ## The five primitives, and who decides
 
@@ -5310,7 +5310,7 @@ What standardizing buys beyond the schema is the part worth designing against. A
 }
 \`\`\`
 
-Read that table down the third column. Exactly one row is invoked by the model, and that is the row an attacker who controls your input can reach. Resources and prompts are chosen by your application and your user, so a sentence buried in a retrieved document cannot cause one to fire. Note what the last two rows no longer say: revision \`2026-07-28\` removed server-initiated requests entirely and replaced them with Multi Round-Trip Requests, where a server that needs sampling or elicitation answers with an \`InputRequiredResult\` rather than a result, and the client re-sends the same call carrying an \`inputResponses\` field, which is a breaking change against every earlier revision. The two rows that turn a call around this way are the ones summaries drop and the ones that surprise people in review: sampling spends your tokens and your model on a third party's request, and elicitation puts a third party's question in front of your user with your product's face on it.
+Read that table down the third column. Exactly one row is invoked by the model, and that is the row an attacker who controls your input can reach. Resources and prompts are chosen by your application and your user, so a sentence buried in a retrieved document cannot cause one to fire. Note what the last two rows no longer say. Those two used to let a server open a request back at the client mid-call; now the server pauses instead, hands back a question, and waits for the client to ask again with the answer attached. Concretely, revision \`2026-07-28\` removed server-initiated requests entirely and replaced them with Multi Round-Trip Requests, where a server that needs sampling or elicitation answers with an \`InputRequiredResult\` rather than a result, and the client re-sends the same call carrying an \`inputResponses\` field, which is a breaking change against every earlier revision. The two rows that turn a call around this way are the ones summaries drop and the ones that surprise people in review: sampling spends your tokens and your model on a third party's request, and elicitation puts a third party's question in front of your user with your product's face on it.
 
 ## Transports: local pipe, remote stream
 
@@ -5364,13 +5364,13 @@ Version negotiation moved out of the initialization handshake and into a per-req
 
 An MCP server that holds anything worth holding is an OAuth 2.1 **resource server**, and nothing else. It does not mint tokens. It validates tokens minted for it.
 
-Three pieces make that work, and all three are the Level 8 "OAuth 2.1 & OpenID Connect" material applied to a new client:
+Three pieces make that work, and all three are the [Level 8 "OAuth 2.1 & OpenID Connect"](/learn/system-design/security-privacy/sd-l8-oauth-oidc) material applied to a new client:
 
 - **Protected resource metadata.** The client that gets a 401 from a server needs to know which authorization server to go to. The server publishes that, so discovery is a fetch rather than a configuration file every client edits by hand.
 - **Resource indicators** (RFC 8707). The client asks for a token *for a named resource*, and the authorization server stamps that audience into the token. A token minted for the invoices server presented to the analytics server is rejected by the analytics server, because the audience does not name it.
 - **Per-request user authorization.** Authenticating the calling client is not the same as authorizing the end user for this record. The server must decide, on every call, whether *this user* may see *this row*.
 
-Skip the second piece and every server you connect to is holding a bearer token that works on every other server you connect to. That is not a hypothetical: it is what a shared, audience-less token means.
+Skip the second piece and every server you connect to is holding a bearer token, a credential whose whole security model is that whoever bears it gets in, that works on every other server you connect to. That is not a hypothetical: it is what a shared, audience-less token means.
 
 \`\`\`cswidget
 {
@@ -5549,7 +5549,7 @@ The result to carry out of this section: an **adaptively selected short list of 
 const agentMemoryTeach = `
 ## Three tiers, and the two people always conflate
 
-The LLM Agents lesson gave memory two sentences: a scratchpad for the current run, a store across runs. That split is right and it is not fine-grained enough to design against, because it hides the tier that actually breaks.
+The [LLM Agents lesson](/learn/system-design/specialized-systems/sd-l11-llm-agents) gave memory two sentences: a scratchpad for the current run, a store across runs. That split is right and it is not fine-grained enough to design against, because it hides the tier that actually breaks.
 
 \`\`\`csdiagram
 {
@@ -5988,7 +5988,7 @@ retry window is off by the tenant's UTC offset. The bug is in NEITHER file.
 It is in a decision the brief never made, that two workers each made once.
 \`\`\`
 
-This is the failure the corpus has never had to handle before. Level 5's "Partial Failure & the Fallacies of Distributed Computing" prepared you for workers that fail: timeouts, retries, compensating actions, a partial result. It did not prepare you for workers that all **succeed** and collectively contradict each other, because that failure has no error, no exception, and no failed worker to retry. Retrying is in fact the worst response, because both workers were right.
+This is the failure the corpus has never had to handle before. [Level 5's "Partial Failure & the Fallacies of Distributed Computing"](/learn/system-design/distributed-core/sd-l5-partial-failure) prepared you for workers that fail: timeouts, retries, compensating actions, a partial result. It did not prepare you for workers that all **succeed** and collectively contradict each other, because that failure has no error, no exception, and no failed worker to retry. Retrying is in fact the worst response, because both workers were right.
 
 ## Four topologies, four bills
 
@@ -6015,7 +6015,7 @@ Fan-out is a scatter-gather, so the hard-won distributed-systems material applie
 
 **Deadlines ladder down.** The caller's deadline bounds the orchestrator's, which bounds each worker's, with room left for the merge. A worker with no deadline of its own is a worker that can hold the whole task open.
 
-**Budgets ladder up.** The LLM Agents lesson's governors (steps, tokens, wall clock, dollars) now exist at two levels: a cap per worker, and a task cap that the sum of the workers must not exceed. Enforce the task cap in the orchestrator, because six workers each individually inside budget can still be six times over the task budget.
+**Budgets ladder up.** The [LLM Agents lesson](/learn/system-design/specialized-systems/sd-l11-llm-agents)'s governors (steps, tokens, wall clock, dollars) now exist at two levels: a cap per worker, and a task cap that the sum of the workers must not exceed. Enforce the task cap in the orchestrator, because six workers each individually inside budget can still be six times over the task budget.
 
 **Consistency is the new one.** For workers that each succeeded, there is nothing to retry and nothing to compensate. The only defenses are upstream: settle the shared decisions before fan-out and put them in every brief, or give workers a shared place to record decisions, or verify the combination rather than the parts. A per-part gate cannot see a combination defect, which is why the integration check belongs before the per-part review rather than after it.
 
@@ -6056,7 +6056,7 @@ Consistency is also measurable, and it is worth naming the shape of the measurem
 const injectionSafeDesignTeach = `
 ## Why there is no parameterized prompt
 
-The LLM Agents lesson said you cannot fully prevent prompt injection and should contain the blast radius instead. This lesson is the architecture that sentence implies.
+The [LLM Agents lesson](/learn/system-design/specialized-systems/sd-l11-llm-agents) said you cannot fully prevent prompt injection and should contain the blast radius instead. This lesson is the architecture that sentence implies.
 
 Start by killing the analogy that sends people down the wrong path. SQL injection looks like the same problem and has a real fix, and the fix works because SQL has **two channels**. The query text goes to the parser, the values go to the driver, and a bound value can never become syntax no matter what characters it contains. Parameterization is not clever escaping. It is a structural separation of instruction from data.
 
@@ -6168,6 +6168,22 @@ They are still not a boundary, and the reason is a distinction that changes how 
   "caption": "The same classifier and the same number mean two different things. The mistake is not overrating classifiers, it is grading one in the safety column and then deploying it in the security column."
 }
 \`\`\`
+
+The second column is worth doing as arithmetic, because that is where "attempts are free" stops being a slogan. If one attempt slips past with probability \`f\`, the fraction the classifier fails to catch, and the attacker makes \`n\` attempts against a detector they can poke at all day, the chance at least one lands is \`1 - (1 - f)^n\`.
+
+\`\`\`
+chance that at least one attempt gets through
+
+catch rate     10 attempts   100 attempts   500 attempts   5,000 attempts
+  95%              40%           99.4%          ~100%          ~100%
+  99%               9.6%         63%             99.3%         ~100%
+  99.9%             1.0%          9.5%           39%            99.3%
+
+expected attempts before the first success
+  95% -> 20          99% -> 100          99.9% -> 1,000
+\`\`\`
+
+Read that table along a row rather than down a column. Every row ends in a near certainty; a ten-times-better classifier only moves where in the row that happens, and at a few cents of tokens per attempt the extra thousand tries is an afternoon. That is the whole content of "defense in depth, and never the boundary". A boundary is something an attacker cannot simply retry against, which is why the answer in this lesson is a missing leg of the trifecta rather than a better filter.
 
 There is a second thing those systems teach, and it transfers well beyond safety. Their cost structure is a **cascade**: a cheap screen runs on 100 percent of traffic, an expensive check runs only on the suspicious tail, and some checks read probes on activations the model already computed, so the marginal cost of the extra look approaches zero. That is the same shape as the retrieval cascade (cheap recall, expensive rerank on a short list) and the candidate-generation cascade in the ML blueprint lesson (cheap filter over millions, expensive ranker over hundreds). When someone tells you a check is too expensive to run everywhere, the answer is usually a cascade rather than a compromise.
 
