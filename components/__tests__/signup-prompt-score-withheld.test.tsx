@@ -156,6 +156,36 @@ describe("SignupPrompt with the score withheld", () => {
     expect(order).toEqual(["attempt", "popup", "profile", "signedIn"])
   })
 
+  it("does NOT abort the cover when the failure came after a successful sign-in", async () => {
+    // The page's onSignedIn sets guestConversion to "failed" and rethrows on
+    // a migrate failure. Calling onAuthAborted here would overwrite "failed"
+    // with "idle" in the same task — un-mounting the modal and stranding the
+    // signed-in convert on the empty feedback shell with no retry surface.
+    // onAuthAborted means "the attempt ended WITHOUT a user"; a migrate
+    // failure after auth is the opposite.
+    signInWithGoogle.mockResolvedValueOnce({ status: "signed-in", user: popupUser })
+    const onAuthAborted = vi.fn()
+    const onSignedIn = vi.fn(async () => {
+      throw new Error("migrate failed")
+    })
+    render(
+      <SignupPrompt
+        sessionId="sess-1"
+        scenarioTitle="Two Sum"
+        onSignedIn={onSignedIn}
+        onAuthAborted={onAuthAborted}
+      />
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: /google/i }))
+
+    await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1))
+    expect(onAuthAborted).not.toHaveBeenCalled()
+    // The /login retry lane survives too: the markers are only cleared once
+    // the whole handoff succeeded.
+    expect(localStorage.getItem("pending_guest_migration")).not.toBeNull()
+  })
+
   it("aborts the cover when the popup attempt fails", async () => {
     const onAuthAttempt = vi.fn()
     const onAuthAborted = vi.fn()

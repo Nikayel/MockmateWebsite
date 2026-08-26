@@ -75,6 +75,12 @@ export function SignupPrompt({
   }
 
   const handleAuth = async (provider: "github" | "google") => {
+    // Distinguishes "the attempt died before a user existed" (popup closed,
+    // auth error) from "auth succeeded but the handoff after it failed"
+    // (migrate error thrown by onSignedIn). Only the former may call
+    // onAuthAborted: the page uses onSignedIn's own failure to enter its
+    // retry state, and an abort here would overwrite it in the same task.
+    let signedIn = false
     try {
       onAuthAttempt?.()
       setIsLoading(true)
@@ -107,6 +113,7 @@ export function SignupPrompt({
       // cold load, where useRedirectSignInReturn consumes the markers set above
       // and runs this same work (profile, analytics, migration).
       if (result.status === "signed-in") {
+        signedIn = true
         const isNewUser = result.user.metadata.creationTime === result.user.metadata.lastSignInTime
         await createOrUpdateProfile(
           result.user.uid,
@@ -116,14 +123,15 @@ export function SignupPrompt({
           isNewUser ? getAttribution() : null
         )
 
-        // This path handles migration in-page (via onSignedIn), so the
-        // redirect-flow markers must not survive: a stale
-        // pending_guest_migration re-runs migration on the next /login visit,
-        // and a stale auth_redirect hijacks that visit's destination.
+        await onSignedIn(result.user)
+
+        // Cleared only after the WHOLE handoff succeeded: if onSignedIn threw
+        // (migration failed), the markers survive so a later /login visit can
+        // retry the migration. Once handled in-page they must not linger — a
+        // stale pending_guest_migration re-runs migration on the next /login
+        // visit, and a stale auth_redirect hijacks that visit's destination.
         localStorage.removeItem("pending_guest_migration")
         localStorage.removeItem("auth_redirect")
-
-        await onSignedIn(result.user)
       } else if (result.status !== "redirecting") {
         // Anything that is neither a sign-in nor a page-unloading redirect
         // ended the attempt without a user.
@@ -133,10 +141,15 @@ export function SignupPrompt({
       }
     } catch (error) {
       console.error("Auth failed:", error)
-      toast.error("Sign up failed", {
+      toast.error(signedIn ? "Connecting your session failed" : "Sign up failed", {
         description: error instanceof Error ? error.message : "Please try again",
       })
-      onAuthAborted?.()
+      if (!signedIn) {
+        // Only a pre-auth failure aborts the cover. After a successful
+        // sign-in, the page's onSignedIn failure path owns the state (it
+        // shows the retry lock), and an abort would overwrite it.
+        onAuthAborted?.()
+      }
       setIsLoading(false)
       setAuthProvider(null)
     }
