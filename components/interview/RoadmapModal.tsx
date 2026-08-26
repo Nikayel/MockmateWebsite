@@ -185,9 +185,26 @@ export function RoadmapModal({
                 const diffColor = difficultyColorClass(scenario.difficulty, "text")
 
                 return (
+                  // The whole row is the control: it highlights on hover and
+                  // carries a Play icon, so users click it (a real guest
+                  // dead-clicked "Two Sum" here). The inner Button remains as
+                  // the visible affordance.
                   <div
                     key={scenario.id}
-                    className={`bg-muted/50 hover:bg-muted group flex items-center justify-between rounded-lg p-2.5 transition-colors ${
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      onClose()
+                      onStartInterview(scenario)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault()
+                        onClose()
+                        onStartInterview(scenario)
+                      }
+                    }}
+                    className={`bg-muted/50 hover:bg-muted group flex cursor-pointer items-center justify-between rounded-lg p-2.5 transition-colors ${
                       isCompleted ? "opacity-60" : ""
                     }`}
                   >
@@ -213,11 +230,16 @@ export function RoadmapModal({
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => {
+                      onClick={(e) => {
+                        // The row handles the same action; without this the
+                        // click bubbles and starts the interview twice.
+                        e.stopPropagation()
                         onClose()
                         onStartInterview(scenario)
                       }}
-                      className="h-7 px-2 text-xs opacity-0 transition-opacity group-hover:opacity-100"
+                      // Visible by default: hover-reveal is a desktop-only
+                      // flourish, and touch devices have no hover at all.
+                      className="h-7 px-2 text-xs opacity-100 transition-opacity focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                     >
                       {isCompleted ? "Redo" : "Start"}
                     </Button>

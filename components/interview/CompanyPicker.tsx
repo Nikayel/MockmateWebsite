@@ -53,6 +53,10 @@ export function CompanyPicker({
 }: CompanyPickerProps) {
   const [selected, setSelected] = useState<InterviewTargetCompany>(lockedCompany ?? null)
   const [realInterviewMode, setRealInterviewMode] = useState(false)
+  // The Start button used to be disabled with pointer-events-none, so a
+  // click with nothing selected vanished into the footer div (observed as
+  // $dead_clicks). It stays clickable and explains itself instead.
+  const [showPickHint, setShowPickHint] = useState(false)
 
   // Sync selected state when lockedCompany changes
   useEffect(() => {
@@ -134,7 +138,7 @@ export function CompanyPicker({
                 <Button
                   variant="default"
                   size="sm"
-                  className="cursor-default gap-2 bg-muted hover:bg-muted"
+                  className="bg-muted hover:bg-muted cursor-default gap-2"
                   disabled
                 >
                   <Sparkles className="h-4 w-4" />
@@ -235,7 +239,16 @@ export function CompanyPicker({
                       Real Interview Mode
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Info className="text-muted-foreground h-3.5 w-3.5" />
+                          <Info
+                            role="img"
+                            aria-label="About Real Interview Mode"
+                            // This trigger lives inside the checkbox label, so
+                            // without preventDefault every tap on the icon
+                            // silently flipped the toggle (a captured
+                            // rageclick) while the hover tooltip never opened.
+                            onClick={(e) => e.preventDefault()}
+                            className="text-muted-foreground h-3.5 w-3.5"
+                          />
                         </TooltipTrigger>
                         <TooltipContent side="top" className="max-w-xs">
                           <p>
@@ -277,14 +290,27 @@ export function CompanyPicker({
             )}
           </div>
 
+          {showPickHint && !selected && (
+            <p className="text-right text-xs text-amber-500">
+              Pick a company or General Practice first.
+            </p>
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>
               {isLocked ? "Skip" : "Cancel"}
             </Button>
             <Button
-              onClick={handleConfirm}
-              disabled={!selected}
-              className="bg-[#c4703f] text-white hover:bg-[#c4703f]/90"
+              onClick={() => {
+                if (!selected) {
+                  setShowPickHint(true)
+                  return
+                }
+                handleConfirm()
+              }}
+              aria-disabled={!selected}
+              className={`bg-[#c4703f] text-white hover:bg-[#c4703f]/90 ${
+                selected ? "" : "opacity-60"
+              }`}
             >
               {isLocked && realInterviewMode ? "Start Real Interview" : "Start Interview"}
             </Button>
