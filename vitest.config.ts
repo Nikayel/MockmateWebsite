@@ -16,6 +16,11 @@ export default defineConfig({
       "extension/**",
       "**/._*",
       "**/*.integration.test.ts",
+      // Other branches' checkouts, mounted as sibling worktrees under .claude/.
+      // The bare patterns above only match at the repo root, so a worktree's
+      // own nested node_modules (e.g. tsconfig-paths' bundled test suite) was
+      // getting collected and run as if it were this branch's source.
+      ".claude/worktrees/**",
     ],
     coverage: {
       provider: "v8",

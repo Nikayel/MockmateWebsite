@@ -52,6 +52,11 @@ const eslintConfig = [
       "**/._*",
       "extension/**",
       "scripts/**",
+      // Other branches' checkouts, mounted as sibling worktrees under .claude/.
+      // Each has its own .next/node_modules; unqualified globs above only match
+      // at the repo root, so a worktree's build output was getting linted as
+      // this branch's source (162k errors from one stale .next chunk dir).
+      ".claude/worktrees/**",
       // Vendored, minified WASM glue (sql.js) — self-hosted for the SQL runner, not our source.
       "public/wasm/**",
     ],
