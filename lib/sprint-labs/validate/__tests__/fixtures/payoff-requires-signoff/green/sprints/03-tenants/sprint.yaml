@@ -1,0 +1,9 @@
+number: 3
+title: "Tenants"
+goal: "Enforce tenant isolation in the database, not in application code."
+standupQuote: "Continental can see Bekins' claims."
+objectives:
+  - tenant-isolation
+filesTouched: []
+newSourceFiles: []
+rewrittenFiles: []

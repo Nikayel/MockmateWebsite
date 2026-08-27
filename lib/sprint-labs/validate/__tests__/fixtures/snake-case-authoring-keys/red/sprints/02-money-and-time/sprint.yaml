@@ -1,0 +1,9 @@
+number: 2
+title: "Money & time"
+goal: "Fix the pagination shim for the v2 API."
+standupQuote: "Reconciliation is out by $412.19 across 40,317 claims this month."
+objectives:
+  - contract-versioning
+filesTouched: []
+newSourceFiles: []
+rewrittenFiles: []
