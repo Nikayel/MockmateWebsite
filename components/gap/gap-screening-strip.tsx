@@ -42,10 +42,7 @@ export function GapScreeningStrip() {
         className="hover:bg-muted flex h-[38px] w-full items-center gap-2.5 px-3.5 text-left transition-colors"
       >
         <Check className="text-neural-strong h-3.5 w-3.5 shrink-0" aria-hidden />
-        <span
-          className="shrink-0 font-mono text-[9.5px] font-bold tracking-[0.13em] uppercase"
-          style={{ color: "var(--faint)" }}
-        >
+        <span className="text-muted-foreground shrink-0 font-mono text-[9.5px] font-bold tracking-[0.13em] uppercase">
           Screening round
         </span>
         <span className="text-muted-foreground truncate font-mono text-[10.5px] font-medium">
@@ -108,7 +105,7 @@ export function GapScreeningStrip() {
                     </span>
                     <span className="text-neural-strong text-[10px] font-semibold">✓ Accepted</span>
                   </div>
-                  <div className="h-[230px] overflow-y-auto">
+                  <div className="h-[230px] overflow-auto">
                     <AnimatePresence mode="wait" initial={false}>
                       <motion.pre
                         key={slideIndex}
