@@ -40,6 +40,7 @@ import {
   layerB,
   layerC,
   renderWorkspaceFiles,
+  stripPerTurnNote,
   type LayerBInput,
 } from "@/lib/sprint-labs/partner/context-layers"
 import { findMatchedConcessionTrigger } from "@/lib/sprint-labs/partner/concession"
@@ -183,7 +184,14 @@ export async function POST(request: NextRequest) {
     // content-compiler task adds one; the seam is already wired end to end.
     const layerAText = layerA(undefined)
 
-    const layerBText = body.layerB ? layerB(body.layerB) : ""
+    // C1 fix (review round 1): Layer B is the src/tests MAP -- exported
+    // symbols, route table, test inventory, diff-stat. A repo-blind tutor
+    // must not receive it regardless of what the client posts, or its
+    // repo-blindness rests on persona prose next to a filesystem-shaped
+    // capability gate -- exactly the anti-pattern AGENT-CONTEXT.md §6
+    // forbids. Gated by the RESOLVED mode (server-derived), not by trusting
+    // the client to withhold `layerB` when it shouldn't send it.
+    const layerBText = mode.kind === "tutor-blind" ? "" : body.layerB ? layerB(body.layerB) : ""
 
     // Layer C: ticket-to-sprint mapping is not tracked anywhere in the
     // compiled registry (documented limitation already on
@@ -278,9 +286,16 @@ export async function POST(request: NextRequest) {
     // exchange: chat-only ships no edit/bash tool, so nothing here is ever
     // an autonomous agent action — "agent" has no v0 producer at all (see
     // lib/sprint-labs/types.ts's doc comment on the Provenance enum).
+    //
+    // M2 fix (review round 1): the live message sent to the model above
+    // keeps the client-appended Layer D note (`body.message`, unstripped) —
+    // but what gets PERSISTED strips it. A stale per-turn note baked
+    // permanently into history is exactly what AGENT-CONTEXT.md §3 warns
+    // against: at turn 30 the agent must reason from turn 30's state, not
+    // turn 1's frozen "3 tests red" snapshot replayed forever after.
     const userTurn: SprintLabTranscriptMessage = {
       role: "user",
-      content: body.message,
+      content: stripPerTurnNote(body.message),
       aiPolicy: ticket.aiPolicy,
       provenance: "human",
       capabilities: capabilityTags,

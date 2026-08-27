@@ -221,6 +221,53 @@ describe("POST /api/sprint-labs/chat", () => {
     expect(call[3]).toBeUndefined() // filesContext arg
   })
 
+  it("C1 (review round 1, Critical): tutor-blind NEVER receives Layer B, even when the client posts one", async () => {
+    // The real layerB/buildPartnerSystemPrompt run in this test (neither is
+    // mocked) -- this is the load-bearing assertion: repo-blindness must be
+    // a capability gate on the SERVER, not a hope that the client withholds
+    // layerB for a repo-blind ticket.
+    mocks.resolvePartnerModeForTicket.mockResolvedValue({ kind: "tutor-blind" })
+    const { POST } = await import("./route")
+    await POST(
+      createRequest({
+        ...VALID_BODY,
+        mode: "tutor",
+        layerB: {
+          sha: "a1b2c3d",
+          generatedAt: "2026-08-27T00:00:00.000Z",
+          files: [{ path: "src/http/claims.ts", exports: ["postClaim", "SECRET_HELPER"] }],
+          routes: ["POST /claims"],
+          migrations: [],
+          tests: ["claims-parser.test.ts"],
+          diffStat: "3 files changed",
+        },
+      })
+    )
+    const [systemPrompt] = mocks.generateAIResponse.mock.calls[0]
+    expect(systemPrompt).not.toContain("generated at a1b2c3d")
+    expect(systemPrompt).not.toContain("SECRET_HELPER")
+    expect(systemPrompt).not.toContain("POST /claims")
+    expect(systemPrompt).not.toContain("claims-parser.test.ts")
+    expect(systemPrompt).not.toContain("EXPORTED SYMBOLS")
+  })
+
+  it("chat and author-agent modes legitimately keep Layer B when the client posts one", async () => {
+    const { POST } = await import("./route")
+    const layerBBody = {
+      sha: "a1b2c3d",
+      generatedAt: "2026-08-27T00:00:00.000Z",
+      files: [{ path: "src/http/claims.ts", exports: ["postClaim"] }],
+      routes: [],
+      migrations: [],
+      tests: [],
+      diffStat: "",
+    }
+    await POST(createRequest({ ...VALID_BODY, layerB: layerBBody }))
+    const [systemPrompt] = mocks.generateAIResponse.mock.calls[0]
+    expect(systemPrompt).toContain("generated at a1b2c3d")
+    expect(systemPrompt).toContain("postClaim")
+  })
+
   it("on success: calls generateAIResponse with service sprint-labs-chat, persists both turns, and returns the reply", async () => {
     const { POST } = await import("./route")
     const response = (await POST(createRequest(VALID_BODY))) as unknown as StubResponse & {
@@ -243,6 +290,19 @@ describe("POST /api/sprint-labs/chat", () => {
       content: "Sable's reply",
       provenance: "human",
     })
+  })
+
+  it("M2 (review round 1): the live model call keeps the client-appended Layer D note, but the stored user turn strips it", async () => {
+    const noted =
+      "why is this failing?\n\n[TURN STATE: turn 4, 2 visible tests red. Failing: a: expected 1 got 2.]"
+    const { POST } = await import("./route")
+    await POST(createRequest({ ...VALID_BODY, message: noted }))
+
+    const [, userMessageSent] = mocks.generateAIResponse.mock.calls[0]
+    expect(userMessageSent).toBe(noted) // live call: unstripped
+
+    const [, , , turns] = mocks.appendPartnerTurns.mock.calls[0]
+    expect(turns[0].content).toBe("why is this failing?") // stored/replayed copy: stripped
   })
 
   it("author-agent mode: a matched concession trigger appends a server-side note to the model call but NOT to the stored user content", async () => {
