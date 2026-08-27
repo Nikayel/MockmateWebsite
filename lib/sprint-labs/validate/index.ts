@@ -15,6 +15,7 @@ import type { ValidationFinding, ValidationRule } from "./types"
 
 import { migrationFilenamesUniqueGapless } from "./rules/migration-filenames-unique-gapless"
 import { filesTouchedExist } from "./rules/files-touched-exist"
+import { sprintHasFilesTouched } from "./rules/sprint-has-files-touched"
 import { newSourceFilesSetDifference } from "./rules/new-source-files-set-difference"
 import { ticketHasObjective } from "./rules/ticket-has-objective"
 import { objectiveTagVocabulary } from "./rules/objective-tag-vocabulary"
@@ -32,6 +33,7 @@ import { snakeCaseAuthoringKeys } from "./rules/snake-case-authoring-keys"
 export const VALIDATION_RULES: ValidationRule[] = [
   migrationFilenamesUniqueGapless,
   filesTouchedExist,
+  sprintHasFilesTouched,
   newSourceFilesSetDifference,
   ticketHasObjective,
   objectiveTagVocabulary,

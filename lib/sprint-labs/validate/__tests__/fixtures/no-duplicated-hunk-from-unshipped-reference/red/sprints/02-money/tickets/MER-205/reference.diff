@@ -1,0 +1,7 @@
+diff --git a/src/delivery/retry.ts b/src/delivery/retry.ts
+--- a/src/delivery/retry.ts
++++ b/src/delivery/retry.ts
+@@ -1,2 +1,5 @@
++export const MAX_RETRY_ATTEMPTS = 5
++export const RETRY_BASE_DELAY_MS = 100
++export const RETRY_JITTER_MS = 50

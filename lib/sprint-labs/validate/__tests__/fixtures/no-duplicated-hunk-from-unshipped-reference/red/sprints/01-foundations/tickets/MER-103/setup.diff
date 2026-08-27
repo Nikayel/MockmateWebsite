@@ -1,0 +1,8 @@
+diff --git a/src/domain/tenant.ts b/src/domain/tenant.ts
+--- a/src/domain/tenant.ts
++++ b/src/domain/tenant.ts
+@@ -1,2 +1,5 @@
++function normalizeTenantId(raw: string) {
+ // unrelated existing line, unchanged
++  return raw.trim().toLowerCase()
++}
