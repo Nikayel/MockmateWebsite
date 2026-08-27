@@ -66,7 +66,7 @@ export function LandingPageTemplate({
               keyword={primaryKeyword}
               className={PRIMARY_CTA_CLASSES}
             >
-              Start practicing free
+              Start free
             </TrackedCtaLink>
             <span className="text-muted-foreground mt-2.5 text-[12px]">
               No credit card required.
@@ -126,7 +126,7 @@ export function LandingPageTemplate({
             keyword={primaryKeyword}
             className={PRIMARY_CTA_CLASSES}
           >
-            Start practicing free
+            Start free
           </TrackedCtaLink>
         </div>
       </section>
