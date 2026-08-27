@@ -14,12 +14,20 @@ export const sealed: SealedTicketContent = {
       humanName: "Escaped: the v1 endpoint stops accepting page and per_page",
       tags: ["contract-versioning"],
       kind: "io-case",
-      input: {
-        path: "/v1/claims?page=2&per_page=25",
-      },
+      input: "v1",
       expected: {
-        status: 200,
-        deprecationHeaderPresent: true,
+        parameters: {
+          page: {
+            status: "deprecated",
+          },
+          per_page: {
+            status: "deprecated",
+          },
+        },
+      },
+      entryPoint: {
+        module: "src/http/compatibility-descriptor.ts",
+        export: "compatibilityDescriptor",
       },
     },
     {
@@ -27,11 +35,13 @@ export const sealed: SealedTicketContent = {
       humanName: "Escaped: the v2 endpoint silently accepts page instead of rejecting it",
       tags: ["contract-versioning"],
       kind: "io-case",
-      input: {
-        path: "/v2/claims?page=2",
-      },
+      input: "v2",
       expected: {
-        status: 400,
+        parameters: {},
+      },
+      entryPoint: {
+        module: "src/http/compatibility-descriptor.ts",
+        export: "compatibilityDescriptor",
       },
     },
   ],
@@ -68,7 +78,7 @@ export const sealed: SealedTicketContent = {
     ],
   },
   referenceDiff:
-    'diff --git a/src/http/compatibility-descriptor.ts b/src/http/compatibility-descriptor.ts\nnew file mode 100644\nindex 0000000..e8b0322\n--- /dev/null\n+++ b/src/http/compatibility-descriptor.ts\n@@ -0,0 +1,23 @@\n+interface ParameterDescriptor {\n+  status: "active" | "deprecated"\n+  sunset?: string\n+}\n+\n+interface CompatibilityDescriptor {\n+  parameters: Record<string, ParameterDescriptor>\n+}\n+\n+const V1: CompatibilityDescriptor = {\n+  parameters: {\n+    page: { status: "deprecated" },\n+    per_page: { status: "deprecated" },\n+  },\n+}\n+\n+const V2: CompatibilityDescriptor = {\n+  parameters: {},\n+}\n+\n+export function compatibilityDescriptor(version: "v1" | "v2"): CompatibilityDescriptor {\n+  return version === "v1" ? V1 : V2\n+}\n',
+    'diff --git a/src/http/compatibility-descriptor.ts b/src/http/compatibility-descriptor.ts\nindex 2f3656a..e8b0322 100644\n--- a/src/http/compatibility-descriptor.ts\n+++ b/src/http/compatibility-descriptor.ts\n@@ -19,5 +19,5 @@ const V2: CompatibilityDescriptor = {\n }\n \n export function compatibilityDescriptor(version: "v1" | "v2"): CompatibilityDescriptor {\n-  return version === "v1" ? V2 : V1\n+  return version === "v1" ? V1 : V2\n }\n',
   rubric: {
     weights: {
       understanding: 0.15,

@@ -1,29 +1,11 @@
 diff --git a/src/http/compatibility-descriptor.ts b/src/http/compatibility-descriptor.ts
-new file mode 100644
-index 0000000..e8b0322
---- /dev/null
+index 2f3656a..e8b0322 100644
+--- a/src/http/compatibility-descriptor.ts
 +++ b/src/http/compatibility-descriptor.ts
-@@ -0,0 +1,23 @@
-+interface ParameterDescriptor {
-+  status: "active" | "deprecated"
-+  sunset?: string
-+}
-+
-+interface CompatibilityDescriptor {
-+  parameters: Record<string, ParameterDescriptor>
-+}
-+
-+const V1: CompatibilityDescriptor = {
-+  parameters: {
-+    page: { status: "deprecated" },
-+    per_page: { status: "deprecated" },
-+  },
-+}
-+
-+const V2: CompatibilityDescriptor = {
-+  parameters: {},
-+}
-+
-+export function compatibilityDescriptor(version: "v1" | "v2"): CompatibilityDescriptor {
+@@ -19,5 +19,5 @@ const V2: CompatibilityDescriptor = {
+ }
+ 
+ export function compatibilityDescriptor(version: "v1" | "v2"): CompatibilityDescriptor {
+-  return version === "v1" ? V2 : V1
 +  return version === "v1" ? V1 : V2
-+}
+ }

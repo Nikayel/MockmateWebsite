@@ -2,8 +2,18 @@ humanName: "Escaped: the v1 endpoint stops accepting page and per_page"
 tags:
   - contract-versioning
 kind: io-case
-input:
-  path: "/v1/claims?page=2&per_page=25"
+# Retargeted at the real callable (PLAN.md Task 7 review round 2): there is no HTTP layer in this
+# fixture to produce a status code or header, so this checks the piece that actually exists and
+# actually drives the ticket's acceptance criteria -- compatibilityDescriptor's own v1 shape, the
+# same thing the ticket's visible test already asserts on. `input` is compatibilityDescriptor's
+# sole argument, not an HTTP request.
+input: "v1"
 expected:
-  status: 200
-  deprecationHeaderPresent: true
+  parameters:
+    page:
+      status: "deprecated"
+    per_page:
+      status: "deprecated"
+entryPoint:
+  module: "src/http/compatibility-descriptor.ts"
+  export: "compatibilityDescriptor"
