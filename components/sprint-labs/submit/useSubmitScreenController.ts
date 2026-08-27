@@ -52,6 +52,9 @@ export interface SubmitScreenState {
   gateResults: GateResult[] | null
   escapedDefects: string[]
   aiPolicy: AiPolicy | null
+  /** The server's own authoritative signal: true on exactly the first completion ever for this
+   *  ticket, false on every later (practice) re-attempt. `null` before any result has landed. */
+  finalized: boolean | null
   submissionsRemaining: number | null
   reviewComments: Array<{ id: string; body: string }> | null
   errorMessage: string | null
@@ -170,6 +173,7 @@ export function useSubmitScreenController({
     gateResults: cached?.outcome.attempt.gateResults ?? null,
     escapedDefects: cached?.outcome.attempt.escapedDefects ?? [],
     aiPolicy: cached?.outcome.attempt.aiPolicy ?? null,
+    finalized: cached?.outcome.attempt.finalized ?? null,
     submissionsRemaining: cached?.outcome.submissionsRemaining ?? null,
     reviewComments: cached?.outcome.reviewComments ?? null,
     errorMessage,

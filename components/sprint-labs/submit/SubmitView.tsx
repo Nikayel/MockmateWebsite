@@ -24,8 +24,8 @@ const PANEL_CLASS =
 
 export function SubmitView({ workbookId, ticketKey, state }: SubmitViewProps) {
   const boardHref = `/sprint-labs/${workbookId}/run/board`
-  const retroHref = `/sprint-labs/${workbookId}/run/ticket/${ticketKey}/retro`
-  const reviewHref = `/sprint-labs/${workbookId}/run/ticket/${ticketKey}/review`
+  const retroHref = `/sprint-labs/${workbookId}/run/retro/${ticketKey}`
+  const reviewHref = `/sprint-labs/${workbookId}/run/review/${ticketKey}`
 
   if (state.phase === "loading") return null
 
@@ -103,8 +103,11 @@ export function SubmitView({ workbookId, ticketKey, state }: SubmitViewProps) {
 
   // "active": queued, revealing, or fully settled — GateSequence owns all three sub-states.
   const settled = state.gateResults !== null
-  const isReattempt =
-    settled && state.submissionsRemaining !== null && state.submissionsRemaining < 4
+  // `finalized` is the server's own authoritative signal (attempts-service.ts: true on exactly the
+  // first completion ever for this ticket) — never re-derive "is this a re-attempt" from
+  // `submissionsRemaining`, which encodes SPRINT_LAB_SUBMISSION_BUDGET as a magic literal that would
+  // silently mislabel every submission the day that budget changes.
+  const isReattempt = settled && state.finalized === false
 
   return (
     <div className="flex flex-col gap-5">

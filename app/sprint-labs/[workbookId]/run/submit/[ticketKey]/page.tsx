@@ -1,12 +1,17 @@
 "use client"
 
 /**
- * Sprint Labs submit/CI — `.../run/ticket/[ticketKey]/submit` (UX-SPEC.md §8, screen 7).
+ * Sprint Labs submit/CI — `.../run/submit/[ticketKey]` (UX-SPEC.md §8, screen 7).
  *
- * Same shape as the ticket screen (`../page.tsx`): one `useActiveSprintLabRun` call backs the whole
- * screen, `run.board[ticketKey]` is the source of truth for whether this ticket exists on this run
- * (there is no ticket-to-sprint field in the compiled registry — same documented gap `../page.tsx`
- * and `board/page.tsx` already carry), and the Pro wall gates the same way, keyed off the run's
+ * A run-LEAF, not nested under `run/ticket/[ticketKey]/` — fix round 1: RULING R25, Task 12's
+ * workspace Submit button (pushes to `/run/submit/${ticketKey}`), and this task's own summary
+ * screen (`run/summary`, no nesting) all use run-leaves, superseding UX-SPEC.md §1.2's original
+ * nested routing table. `run/ticket/[ticketKey]/page.tsx` (screen 5) is unaffected and stays nested.
+ *
+ * Same shape as the ticket screen: one `useActiveSprintLabRun` call backs the whole screen,
+ * `run.board[ticketKey]` is the source of truth for whether this ticket exists on this run (there
+ * is no ticket-to-sprint field in the compiled registry — same documented gap the ticket screen and
+ * `board/page.tsx` already carry), and the Pro wall gates the same way, keyed off the run's
  * `currentSprint`.
  */
 

@@ -34,7 +34,7 @@ const PR_DIFF_NOT_AVAILABLE =
 
 export function ReviewView({ workbookId, ticketKey, state }: ReviewViewProps) {
   const ticketHref = `/sprint-labs/${workbookId}/run/ticket/${ticketKey}`
-  const retroHref = `${ticketHref}/retro`
+  const retroHref = `/sprint-labs/${workbookId}/run/retro/${ticketKey}`
 
   if (state.phase === "loading") {
     return <SparraLoader label="Loading the PR…" />

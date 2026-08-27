@@ -15,6 +15,7 @@ function baseState(overrides: Partial<SubmitScreenState> = {}): SubmitScreenStat
     gateResults: null,
     escapedDefects: [],
     aiPolicy: null,
+    finalized: null,
     submissionsRemaining: null,
     reviewComments: null,
     errorMessage: null,
@@ -98,6 +99,7 @@ describe("SubmitView", () => {
           gateResults: RESULTS,
           escapedDefects: [],
           aiPolicy: "assisted",
+          finalized: true,
           submissionsRemaining: 4,
         })}
       />
@@ -107,7 +109,7 @@ describe("SubmitView", () => {
     })
     expect(screen.getByText(/Assisted attempt\. This result is feedback/)).not.toBeNull()
     const cta = screen.getByRole("link", { name: "See the retro" })
-    expect(cta.getAttribute("href")).toBe("/sprint-labs/meridian/run/ticket/MER-305/retro")
+    expect(cta.getAttribute("href")).toBe("/sprint-labs/meridian/run/retro/MER-305")
     vi.useRealTimers()
   })
 
@@ -121,6 +123,7 @@ describe("SubmitView", () => {
           phase: "active",
           gateResults: RESULTS,
           escapedDefects: [],
+          finalized: true,
           submissionsRemaining: 4,
           reviewComments: [{ id: "c1", body: "text" }],
         })}
@@ -130,7 +133,54 @@ describe("SubmitView", () => {
       vi.advanceTimersByTime(4000)
     })
     const cta = screen.getByRole("link", { name: "See the review" })
-    expect(cta.getAttribute("href")).toBe("/sprint-labs/meridian/run/ticket/MER-305/review")
+    expect(cta.getAttribute("href")).toBe("/sprint-labs/meridian/run/review/MER-305")
+    vi.useRealTimers()
+  })
+
+  it("labels a re-attempt from the server's authoritative finalized flag, never from a submissionsRemaining magic number", () => {
+    vi.useFakeTimers()
+    // submissionsRemaining is deliberately 4 here (what the OLD magic-literal check would have read
+    // as "first attempt") while finalized is false — the practice strip must still show, proving the
+    // label comes from `finalized`, not from re-deriving SPRINT_LAB_SUBMISSION_BUDGET - 1.
+    render(
+      <SubmitView
+        workbookId="meridian"
+        ticketKey="MER-305"
+        state={baseState({
+          phase: "active",
+          gateResults: RESULTS,
+          escapedDefects: [],
+          finalized: false,
+          submissionsRemaining: 4,
+        })}
+      />
+    )
+    act(() => {
+      vi.advanceTimersByTime(4000)
+    })
+    expect(screen.getByText(/Practice run\. Different hidden set\./)).not.toBeNull()
+    vi.useRealTimers()
+  })
+
+  it("never shows the practice strip once the server reports the attempt finalized", () => {
+    vi.useFakeTimers()
+    render(
+      <SubmitView
+        workbookId="meridian"
+        ticketKey="MER-305"
+        state={baseState({
+          phase: "active",
+          gateResults: RESULTS,
+          escapedDefects: [],
+          finalized: true,
+          submissionsRemaining: 0,
+        })}
+      />
+    )
+    act(() => {
+      vi.advanceTimersByTime(4000)
+    })
+    expect(screen.queryByText(/Practice run\. Different hidden set\./)).toBeNull()
     vi.useRealTimers()
   })
 })

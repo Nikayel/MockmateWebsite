@@ -1,9 +1,13 @@
 "use client"
 
 /**
- * Sprint Labs review round — `.../run/ticket/[ticketKey]/review` (UX-SPEC.md §9, screen 8).
+ * Sprint Labs review round — `.../run/review/[ticketKey]` (UX-SPEC.md §9, screen 8).
  *
- * Same shape as the ticket screen (`../page.tsx`): one `useActiveSprintLabRun` call, `run.board[ticketKey]`
+ * A run-LEAF, not nested under `run/ticket/[ticketKey]/` — fix round 1: RULING R25 + Task 12's
+ * workspace + this task's own summary screen all use run-leaves, superseding UX-SPEC.md §1.2's
+ * original nested routing table. `run/ticket/[ticketKey]/page.tsx` (screen 5) is unaffected.
+ *
+ * Same shape as the ticket screen: one `useActiveSprintLabRun` call, `run.board[ticketKey]`
  * is the source of truth for whether this ticket exists on this run, and the Pro wall gates the same way.
  */
 

@@ -41,7 +41,7 @@ const SENIOR_NOTE_NOT_AVAILABLE = "The senior's note for this ticket is not avai
 
 export function RetroView({ workbookId, ticketKey, state }: RetroViewProps) {
   const boardHref = `/sprint-labs/${workbookId}/run/board`
-  const submitHref = `/sprint-labs/${workbookId}/run/ticket/${ticketKey}/submit`
+  const submitHref = `/sprint-labs/${workbookId}/run/submit/${ticketKey}`
 
   if (state.phase === "loading") {
     return <SparraLoader label="Loading the retro…" />

@@ -50,6 +50,7 @@ const mockController = vi.hoisted(() => ({
     gateResults: null,
     escapedDefects: [],
     aiPolicy: null,
+    finalized: null,
     submissionsRemaining: null,
     reviewComments: null,
     errorMessage: null,
