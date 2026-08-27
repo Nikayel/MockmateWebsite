@@ -79,4 +79,46 @@ describe("ObjectiveList", () => {
     )
     expect(fullContainer.querySelector(".flex-wrap")).toBeNull()
   })
+
+  it("fix round 1, M1: defaults the heading to h3, and honors an explicit level", () => {
+    const { unmount } = render(
+      <ObjectiveList heading="By Friday you can" density="full" objectives={OBJECTIVES} />
+    )
+    expect(screen.getByRole("heading", { level: 3, name: "By Friday you can" })).not.toBeNull()
+    unmount()
+
+    render(
+      <ObjectiveList
+        heading="What you'll be able to do"
+        headingLevel="h2"
+        density="full"
+        objectives={OBJECTIVES}
+      />
+    )
+    expect(
+      screen.getByRole("heading", { level: 2, name: "What you'll be able to do" })
+    ).not.toBeNull()
+  })
+
+  it("fix round 1, M1: headingLevel='none' keeps the label's look without adding a heading to the outline", () => {
+    render(
+      <ObjectiveList
+        heading="What you'll learn"
+        headingLevel="none"
+        density="chip"
+        objectives={OBJECTIVES}
+      />
+    )
+    expect(screen.queryByRole("heading")).toBeNull()
+    const label = screen.getByText("What you'll learn")
+    expect(label.tagName).toBe("SPAN")
+  })
+
+  it("fix round 1, M5: the objective group is a real list, labelled by the heading, exposing its count", () => {
+    render(<ObjectiveList heading="By Friday you can" density="full" objectives={OBJECTIVES} />)
+    const list = screen.getByRole("list", { name: "By Friday you can" })
+    const items = screen.getAllByRole("listitem")
+    expect(items).toHaveLength(OBJECTIVES.length)
+    expect(items.every((item) => list.contains(item))).toBe(true)
+  })
 })
