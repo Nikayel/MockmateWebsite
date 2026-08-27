@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest"
-import {
-  canonicalJson,
-  hashCanonical,
-  hashClaim,
-  verifyClaimAuditHash,
-} from "../../src/util/canonical-json"
+import { canonicalJson } from "../../src/util/canonical-json"
+import { hashCanonical } from "../../src/util/canonical-json"
+import { hashClaim } from "../../src/util/canonical-json"
+import { verifyClaimAuditHash } from "../../src/util/canonical-json"
 
 const claimA = {
   id: "clm_1",

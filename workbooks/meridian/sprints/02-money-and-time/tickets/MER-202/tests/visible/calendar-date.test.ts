@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest"
-import {
-  addCalendarDays,
-  calendarDateFromISO,
-  calendarDateInZone,
-  calendarDateToISO,
-  compareCalendarDates,
-} from "../../src/domain/calendar-date"
+import { addCalendarDays } from "../../src/domain/calendar-date"
+import { calendarDateFromISO } from "../../src/domain/calendar-date"
+import { calendarDateInZone } from "../../src/domain/calendar-date"
+import { calendarDateToISO } from "../../src/domain/calendar-date"
+import { compareCalendarDates } from "../../src/domain/calendar-date"
 
 describe("calendarDateFromISO / calendarDateToISO", () => {
   it("round-trips a calendar date through its ISO string", () => {

@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest"
-import {
-  effectiveQueryParameters,
-  findOperationCompatibility,
-} from "../../src/http/compatibility-descriptor"
+import { effectiveQueryParameters } from "../../src/http/compatibility-descriptor"
+import { findOperationCompatibility } from "../../src/http/compatibility-descriptor"
 
 describe("effectiveQueryParameters", () => {
   it("keeps offset in the v1 parameter list", () => {
