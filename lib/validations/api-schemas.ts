@@ -238,7 +238,7 @@ const DSAPatternSchema = z.custom<DSAPattern>((value) => {
   return typeof value === "string" && Object.values(DSA_PATTERNS).includes(value as DSAPattern)
 }, "Invalid DSA pattern")
 
-const CompanyIdSchema = z.custom<CompanyId>((value) => {
+export const CompanyIdSchema = z.custom<CompanyId>((value) => {
   return typeof value === "string" && ALL_COMPANIES.some((company) => company.id === value)
 }, "Invalid company")
 
@@ -356,6 +356,47 @@ export const RAGV2ActionSchema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("health") }),
 ])
+
+// ============================================
+// Roadmap API Schemas
+// ============================================
+
+/**
+ * POST /api/roadmap body. Field-for-field the payload the wizard sends
+ * (app/roadmap/new/page.tsx) plus the resume path's sessionStorage replays.
+ *
+ * Defaults mirror what the route's hand-rolled parsing used to do for absent
+ * fields (experienceLevel "intermediate", problemsSolved 0, hoursPerDay 2,
+ * patternFamiliarity [], mixMode "full", selectedCategories undefined), so
+ * every previously valid wizard payload parses to the same assessment.
+ * `targetCompany` doubles as the catalog-membership guard: CompanyIdSchema
+ * rejects ids outside ALL_COMPANIES with a clear 400.
+ */
+export const CreateRoadmapSchema = z.object({
+  targetCompany: CompanyIdSchema,
+  interviewDate: z
+    .string()
+    .refine((value) => !Number.isNaN(new Date(value).getTime()), "Invalid interview date"),
+  experienceLevel: z
+    .enum(["intern", "beginner", "intermediate", "advanced"])
+    .default("intermediate"),
+  targetTrack: z.enum(["swe", "fdse"]).optional(),
+  problemsSolved: z.number().int().min(0).max(10000).default(0),
+  hoursPerDay: z.number().min(0.25).max(24).default(2),
+  patternFamiliarity: z
+    .array(
+      z.object({
+        pattern: DSAPatternSchema,
+        level: z.enum(["unknown", "seen", "practiced", "confident"]),
+      })
+    )
+    .max(64)
+    .default([]),
+  mixMode: z.enum(["full", "dsa-only", "custom"]).default("full"),
+  selectedCategories: z
+    .array(z.enum(["dsa", "bugfix", "decomposition", "system-design"]))
+    .optional(),
+})
 
 // ============================================
 // Checkout/Payment Schemas

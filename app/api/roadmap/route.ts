@@ -5,13 +5,8 @@ import { requireTierForUser } from "@/lib/quota-enforcement"
 import { generatePersonalizedRoadmap } from "@/lib/roadmap/prioritization-algorithm"
 import { generateRAGEnhancedRoadmap, type RAGEnhancedRoadmap } from "@/lib/rag/roadmap-rag"
 import { scenarios } from "@/lib/scenarios"
-import { getCompanyById } from "@/lib/data/company-questions"
-import {
-  UserRoadmapAssessment,
-  PersonalizedRoadmap,
-  type RoadmapCategory,
-  type RoadmapMixMode,
-} from "@/lib/data/company-questions/types"
+import { UserRoadmapAssessment, PersonalizedRoadmap } from "@/lib/data/company-questions/types"
+import { CreateRoadmapSchema, validationErrorResponse } from "@/lib/validations/api-schemas"
 import { resolveCategoryMix } from "@/lib/roadmap/category-weights"
 import { logger } from "@/lib/logger"
 import {
@@ -32,31 +27,6 @@ const COLLECTION = "user_roadmaps"
 const LEGACY_STATUS_BACKFILL_ENABLED = process.env.ROADMAP_LEGACY_STATUS_BACKFILL !== "false"
 
 type RoadmapStatus = PersonalizedRoadmap["status"]
-
-interface CreateRoadmapRequestBody {
-  targetCompany?: UserRoadmapAssessment["targetCompany"]
-  interviewDate?: string | Date
-  experienceLevel?: UserRoadmapAssessment["experienceLevel"]
-  targetTrack?: UserRoadmapAssessment["targetTrack"]
-  problemsSolved?: number
-  hoursPerDay?: number
-  patternFamiliarity?: UserRoadmapAssessment["patternFamiliarity"]
-  // Category composition choice (full research mix / DSA only / custom subset).
-  mixMode?: RoadmapMixMode
-  selectedCategories?: RoadmapCategory[]
-}
-
-const VALID_MIX_MODES: RoadmapMixMode[] = ["full", "dsa-only", "custom"]
-const VALID_CATEGORIES: RoadmapCategory[] = ["dsa", "bugfix", "decomposition", "system-design"]
-
-function parseMixMode(value: unknown): RoadmapMixMode {
-  return VALID_MIX_MODES.includes(value as RoadmapMixMode) ? (value as RoadmapMixMode) : "full"
-}
-
-function parseSelectedCategories(value: unknown): RoadmapCategory[] | undefined {
-  if (!Array.isArray(value)) return undefined
-  return value.filter((c): c is RoadmapCategory => VALID_CATEGORIES.includes(c as RoadmapCategory))
-}
 
 interface UpdateRoadmapRequestBody {
   roadmapId?: string
@@ -284,9 +254,19 @@ export async function POST(request: NextRequest) {
       return tierCheck.response!
     }
 
-    const body = (await request.json()) as CreateRoadmapRequestBody
-    const { searchParams } = new URL(request.url)
-    const enableRAG = searchParams.get("rag") !== "false" // RAG enabled by default
+    // One schema instead of scattered ifs: CreateRoadmapSchema carries the
+    // membership guard (an id outside the catalog would sail through
+    // resolveCategoryMix and the generator as a silently broken roadmap), the
+    // unparseable-date 400 (a NaN date makes daysRemaining NaN and the generator
+    // divides work across it), and the same absent-field defaults the hand-rolled
+    // parsing applied. The wizard only emits schema-valid payloads, so the 400
+    // only ever rejects stale or hand-built bodies. safeParse directly (not the
+    // validateRequest helper) because the helper's <T> collapses the schema's
+    // input and output types, which discards the .default() narrowing.
+    const validation = CreateRoadmapSchema.safeParse(await request.json())
+    if (!validation.success) {
+      return validationErrorResponse(validation.error)
+    }
 
     const {
       targetCompany,
@@ -296,31 +276,16 @@ export async function POST(request: NextRequest) {
       problemsSolved,
       hoursPerDay,
       patternFamiliarity,
-    } = body
+      mixMode,
+      selectedCategories,
+    } = validation.data
 
-    if (!targetCompany || !interviewDate) {
-      return NextResponse.json(
-        { error: "Target company and interview date are required" },
-        { status: 400 }
-      )
-    }
-
-    // Membership, not just presence: an id outside the catalog would sail through
-    // resolveCategoryMix and the generator and come out as a silently broken roadmap.
-    // The wizard only offers catalog companies, so this rejects stale or hand-built
-    // payloads (the client restores saved walks from sessionStorage) rather than any
-    // path a user can reach normally.
-    if (!getCompanyById(targetCompany)) {
-      return NextResponse.json({ error: "Unknown target company" }, { status: 400 })
-    }
+    const { searchParams } = new URL(request.url)
+    const enableRAG = searchParams.get("rag") !== "false" // RAG enabled by default
 
     // Calculate days remaining
     const now = new Date()
     const interview = new Date(interviewDate)
-    if (Number.isNaN(interview.getTime())) {
-      // Without this, daysRemaining is NaN and the generator divides work across it.
-      return NextResponse.json({ error: "Invalid interview date" }, { status: 400 })
-    }
     const daysRemaining = Math.max(
       1,
       Math.ceil((interview.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
@@ -328,11 +293,10 @@ export async function POST(request: NextRequest) {
 
     // Resolve the category composition the user chose (defaults to the research
     // full mix). Weighted by experience level, target track, and company.
-    const experience = experienceLevel || "intermediate"
     const categoryMix = resolveCategoryMix({
-      mixMode: parseMixMode(body.mixMode),
-      selectedCategories: parseSelectedCategories(body.selectedCategories),
-      experienceLevel: experience,
+      mixMode,
+      selectedCategories,
+      experienceLevel,
       targetTrack,
       companyId: targetCompany,
     })
@@ -342,11 +306,11 @@ export async function POST(request: NextRequest) {
       targetCompany,
       interviewDate: interview,
       daysRemaining,
-      experienceLevel: experience,
+      experienceLevel,
       targetTrack,
-      problemsSolvedEstimate: problemsSolved || 0,
-      patternFamiliarity: patternFamiliarity || [],
-      hoursPerDay: hoursPerDay || 2,
+      problemsSolvedEstimate: problemsSolved,
+      patternFamiliarity,
+      hoursPerDay,
       preferredDifficulty: "mixed",
       targetScore: 80,
       categoryMix,
