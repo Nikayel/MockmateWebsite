@@ -161,19 +161,24 @@ export function cacheCompletedOutcome(
   writeCache(completedKey(runId, ticketKey), cached)
 }
 
-export function getCachedReviewOutcome(
-  runId: string,
-  ticketKey: string
-): ReviewAttemptOutcome | null {
-  return readCache<ReviewAttemptOutcome>(reviewKey(runId, ticketKey))
+/**
+ * `ReviewAttemptOutcome` carries scores and (once finalized) the correctness
+ * per comment id, but never the learner's own decisions back. Re-deriving a
+ * verdict on a later bootstrap (a cache hit from an earlier visit this same
+ * tab) needs both halves, so the cache keeps the decisions that were
+ * actually submitted alongside the server's response.
+ */
+export interface CachedReview {
+  decisions: Array<{ commentId: string; decision: "accept" | "push-back"; reason?: string }>
+  outcome: ReviewAttemptOutcome
 }
 
-export function cacheReviewOutcome(
-  runId: string,
-  ticketKey: string,
-  outcome: ReviewAttemptOutcome
-): void {
-  writeCache(reviewKey(runId, ticketKey), outcome)
+export function getCachedReviewOutcome(runId: string, ticketKey: string): CachedReview | null {
+  return readCache<CachedReview>(reviewKey(runId, ticketKey))
+}
+
+export function cacheReviewOutcome(runId: string, ticketKey: string, cached: CachedReview): void {
+  writeCache(reviewKey(runId, ticketKey), cached)
 }
 
 // ============================================================
