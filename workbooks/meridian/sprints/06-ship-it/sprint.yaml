@@ -1,0 +1,99 @@
+number: 6
+title: "Ship it"
+topic: "Cloud and deployment (AWS)"
+goal: "Get Meridian off long-lived AWS keys and out of the upload path: presigned uploads, a real SQS consumer, two scoped IAM roles, secrets in a rotation-safe provider, and a blue/green release with a rollback you have actually executed, and then read the bill your own week of work generated."
+standupQuote: "Northwind's 41 MB PDF 504s every single time and the api pod OOMKilled twice tonight; also while I was in there, the key that uploads it is a 412-day-old AKIA in the task definition and it can write any bucket in the account."
+archMapDelta:
+  added:
+    - "Presigned S3 upload flow for document intake, off the request path"
+    - "A real SQS consumer driving extraction, with a dead-letter queue"
+    - "Two scoped IAM roles (API, extraction worker) provisioned via Terraform"
+    - "Secrets loaded from a rotation-safe provider instead of the environment"
+    - "A blue/green ECS release with an executed rollback"
+  changed:
+    - "Document upload no longer streams bytes through the API's own request handler"
+  broke:
+    - "AWS spend went from $180/mo to $4,900 in the first nine days of this sprint's work"
+  invariants:
+    - "No long-lived AWS access key exists in any task definition, image, or repository"
+    - "Every IAM policy grants only the actions and resource ARNs its own service actually calls, never a wildcard"
+objectives:
+  - presigned-s3-upload-scoped
+  - least-privilege-iam-secrets-rotation
+  - sqs-consumer-at-least-once-delivery
+  - blue-green-rollback-review
+  - cloud-cost-attribution
+# validate-only fields (lab validate's sprint-file-set rules; the compiler
+# never reads these -- see lib/sprint-labs/validate/rules/files-touched-exist.ts
+# and new-source-files-set-difference.ts).
+#
+# Provenance note (flagged in task-16b-report.md): AUTHORING-RULES.md section
+# 2 states MER-602's future reference.diff deletes infra/task-definition.json
+# and infra/iam-policy.json, which by construction must already exist before
+# this sprint. Their creating sprint is not textually confirmed anywhere in
+# SPRINT-PLAN.md/AUTHORING-RULES.md (unlike infra/deploy.yml, which SPRINT-PLAN's
+# "Fixes to apply" item 5 explicitly assigns to sprint 5) -- so, per this
+# task's instructions, both paths are deliberately left OUT of filesTouched
+# this pass rather than guessed. The two Terraform files below (infra/ecs.tf,
+# infra/iam-api-role.tf) are this sprint's OWN replacements for them; whoever
+# authors sprint 6's full content later must add the two deleted paths to
+# this list once sprint 5's authored newSourceFiles confirm where they came
+# from.
+#
+# The "thirteen Terraform and deploy files" SPRINT-PLAN.md's "Fixes" item 5
+# names for this sprint is a COUNT claim only, not an enumerated list --
+# the 12 infra/ paths below are this task's honest reconstruction from the
+# sprint's own ticket prose (S6 goal: presigned uploads, two IAM roles,
+# secrets, blue/green). One short of thirteen because infra/deploy.yml's
+# blue/green rewrite is deferred to whenever sprint 5 lands (see above);
+# once it does, this sprint's tickets.md/MER-604 will also list
+# infra/deploy.yml under rewrittenFiles, bringing the count to 13.
+filesTouched:
+  - "migrations/0018_documents.sql"
+  - "migrations/0019_outbox_sqs_dedup.sql"
+  - "migrations/0020_documents_drop_legacy_path.sql"
+  - "src/http/routes/uploads.ts"
+  - "src/aws/s3-presign.ts"
+  - "src/aws/secrets.ts"
+  - "src/aws/sqs-consumer.ts"
+  - "src/jobs/extraction-consumer.ts"
+  - "test/infra/iam-policy-simulation.test.ts"
+  - "infra/s3-uploads.tf"
+  - "infra/iam-api-role.tf"
+  - "infra/iam-extraction-role.tf"
+  - "infra/secrets-manager.tf"
+  - "infra/kms.tf"
+  - "infra/sqs.tf"
+  - "infra/ecs-worker.tf"
+  - "infra/ecs.tf"
+  - "infra/alb.tf"
+  - "infra/codedeploy.tf"
+  - "infra/budgets.tf"
+  - "infra/cost-anomaly-alerts.tf"
+  - "src/http/routes/documents.ts"
+  - "src/config.ts"
+newSourceFiles:
+  - "migrations/0018_documents.sql"
+  - "migrations/0019_outbox_sqs_dedup.sql"
+  - "migrations/0020_documents_drop_legacy_path.sql"
+  - "src/http/routes/uploads.ts"
+  - "src/aws/s3-presign.ts"
+  - "src/aws/secrets.ts"
+  - "src/aws/sqs-consumer.ts"
+  - "src/jobs/extraction-consumer.ts"
+  - "test/infra/iam-policy-simulation.test.ts"
+  - "infra/s3-uploads.tf"
+  - "infra/iam-api-role.tf"
+  - "infra/iam-extraction-role.tf"
+  - "infra/secrets-manager.tf"
+  - "infra/kms.tf"
+  - "infra/sqs.tf"
+  - "infra/ecs-worker.tf"
+  - "infra/ecs.tf"
+  - "infra/alb.tf"
+  - "infra/codedeploy.tf"
+  - "infra/budgets.tf"
+  - "infra/cost-anomaly-alerts.tf"
+rewrittenFiles:
+  - "src/http/routes/documents.ts"
+  - "src/config.ts"
