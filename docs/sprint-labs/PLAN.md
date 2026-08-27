@@ -34,9 +34,9 @@ Numbered tasks for the SDD loop. Spec authority: `WORKBOOK-SPEC.md`,
 Owned: `lib/sprint-labs/types.ts`, `lib/sprint-labs/platform-capabilities.ts`,
 `lib/sprint-labs/__tests__/types.test.ts`. Touch-with-care (additive lines
 only): `lib/feature-flags.ts` (add `SPRINT_LABS_ENABLED: false`),
-`lib/usage/services.ts` (append `"sprint-labs-chat"`,
-`"sprint-labs-grading"`, `"sprint-labs-validate"`),
-`docs/FIREBASE_STRUCTURE.md` (new collections section).
+`docs/FIREBASE_STRUCTURE.md` (new collections section). Service ids
+register with their call sites in Tasks 8/9/14, never earlier — the
+services-registry no-dead-entries test enforces this (ruling R9).
 
 Define (Zod schema + inferred type for anything crossing a trust boundary):
 - `WorkbookSummary` (catalog card: id, title, pitch, track, language, level,
@@ -241,8 +241,10 @@ grading.test.ts`, `__tests__/filter-directives.test.ts`. Touch-with-care:
 `lib/types.ts` (add `sprint_score_breakdown` sibling field),
 `lib/types/dsa-patterns.ts` (add `SPRINT_LAB: "sprint-lab"`),
 `lib/sprint-labs/mastery.ts` (recordSprintLabMastery →
-`completeSessionWithMastery`), `firestore.rules` (attempts read-only to
-owner, writes admin-only).
+`completeSessionWithMastery`), `lib/usage/services.ts` (append
+`"sprint-labs-grading"` with its call site, per R9). Verify Task 6's
+firestore.rules attempts block covers this task's needs (R5: Task 6 owns
+all rules; do not edit firestore.rules here).
 
 Scoring per WORKBOOK-SPEC §5: Understanding (files-touched vs reference
 manifest, time-to-first-edit), Problem-Solving (visible+hidden pass rates),
@@ -266,7 +268,8 @@ pastes test run.
 
 Owned: `lib/sprint-labs/validate/contamination.ts`, script flag
 `--contamination` in `scripts/lab-validate.mjs`, tests with a stubbed model
-seam. Touch-with-care: none.
+seam. Touch-with-care: `lib/usage/services.ts` (append
+`"sprint-labs-validate"` with its call site, per R9).
 
 Cold one-shot pinned-model run per ticket: prompt = ticket body + visible
 test sources only; model must output which hidden tests it can guess
@@ -282,11 +285,13 @@ Verification: stub-seam unit tests; one real run deferred to Task 21
 
 ## Task 10: Screens — /labs chooser, catalog, workbook overview
 
-Owned: `app/labs/page.tsx` edits (chooser section), `components/labs/
-SurfaceChooser.tsx` (or per UX-SPEC naming), `app/labs/workbooks/**`
-(catalog + `[workbookId]` overview route pair per Pattern B),
-`components/sprint-labs/catalog/**`. Touch-with-care:
-`components/header.tsx` only if UX-SPEC says so.
+Owned: `app/labs/page.tsx` edits (chooser section per UX-SPEC: anchor
+strip + SprintLabsSection after the Case Labs grid, hero/SEO untouched),
+`app/sprint-labs/**` public half (catalog + `[workbookId]` overview per
+Pattern B — route root per UX-SPEC, NOT nested under `app/labs/[labId]`),
+`components/sprint-labs/catalog/**`, plus the `.workbook-surface` selector
+addition to the four `--wb-*` blocks in `app/globals.css` (zero value
+changes). Touch-with-care: `components/header.tsx` only if UX-SPEC says so.
 
 Build exactly to UX-SPEC sections 1-2: Case Labs content does not regress
 (SEO sections intact); Sprint Labs entries render only when
@@ -300,8 +305,9 @@ typecheck/lint; screenshot or DOM assertions per repo convention.
 
 ## Task 11: Screens — standup, board, ticket
 
-Owned: `app/labs/workbooks/[workbookId]/sprint/[n]/**` (standup, board,
-ticket routes per UX-SPEC), `components/sprint-labs/board/**`,
+Owned: the standup, board, and ticket segments of the auth-gated
+`app/sprint-labs/[workbookId]/run/**` branch (force-dynamic + noindex per
+UX-SPEC routing), `components/sprint-labs/board/**`,
 `components/sprint-labs/ticket/**`.
 
 Standup: goal, inciting quote, arch-map delta, sprint objectives. Board:
@@ -316,8 +322,8 @@ badges; typecheck/lint.
 
 ## Task 12: Screen — workspace
 
-Owned: `app/labs/workbooks/[workbookId]/sprint/[n]/ticket/[key]/workspace/**`
-(force-dynamic, noindex, auth-gated layout per Pattern B),
+Owned: the workspace segment of `app/sprint-labs/[workbookId]/run/**`
+(force-dynamic, noindex, auth-gated layout per UX-SPEC routing),
 `components/sprint-labs/workspace/**`.
 
 BuildStation-derived: file tree + tabs (locked files per role;
@@ -335,7 +341,8 @@ derivation; typecheck/lint.
 
 Owned: `components/sprint-labs/submit/**`, `components/sprint-labs/
 review/**`, `components/sprint-labs/retro/**`, `components/sprint-labs/
-summary/**`, their routes under the sprint segment per UX-SPEC.
+summary/**`, their segments under the `app/sprint-labs/[workbookId]/run/**`
+branch per UX-SPEC.
 
 Submit/CI: staged four-gate reveal (Sparra scoring states, determinate,
 never completes early), hidden failures as humanNames only, escaped-defect
@@ -355,8 +362,9 @@ typecheck/lint.
 Owned: `lib/sprint-labs/partner/**` (context builders A/B/C/D, mode
 resolver, prompt), `app/api/sprint-labs/chat/route.ts`,
 `components/sprint-labs/workspace/PartnerChat.tsx`,
-`lib/sprint-labs/partner/__tests__/**`. Touch-with-care: none (transcript
-shape landed in Task 1/6).
+`lib/sprint-labs/partner/__tests__/**`. Touch-with-care:
+`lib/usage/services.ts` (append `"sprint-labs-chat"` with its call site,
+per R9); otherwise none (transcript shape landed in Task 1/6).
 
 Fork the Case Lab chat trio per INTEGRATION §4. Layers: A = workbook
 invariants (from public bundle, MERIDIAN.md source), B = generated map

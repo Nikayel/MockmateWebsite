@@ -1,0 +1,153 @@
+seedSql: |
+  insert into tenants (id, name, webhook_url, webhook_secret, time_zone, created_at) values
+    ('ten_continental', 'Continental Freight Insurance', null, null, 'America/Chicago', now()),
+    ('ten_bekins', 'Bekins Van Lines', null, null, 'America/Chicago', now());
+
+  insert into claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash, audit_projection_version) values
+    ('clm_continental_1', 'ten_continental', 'CONT-1', 'submitted', 10000, 'USD', 'Alex Chen', '2026-01-01', now(), '', 1),
+    ('clm_continental_2', 'ten_continental', 'CONT-2', 'submitted', 20000, 'USD', 'Priya Shah', '2026-01-02', now(), '', 1),
+    ('clm_bekins_1', 'ten_bekins', 'BEK-1', 'submitted', 30000, 'USD', 'Jordan Rivera', '2026-01-03', now(), '', 1);
+
+  insert into documents (id, claim_id, file_name, content_type, legacy_path, created_at) values
+    ('doc_continental_1', 'clm_continental_1', 'estimate.pdf', 'application/pdf', '/x', now()),
+    ('doc_bekins_1', 'clm_bekins_1', 'notes.pdf', 'application/pdf', '/y', now());
+assertions:
+  - id: claims-select-scoped-to-own-tenant
+    humanName: "Continental's plain SELECT never returns a claim it does not own"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      SELECT id FROM claims WHERE tenant_id <> 'ten_continental';
+    expect: zero-rows
+
+  - id: claims-select-scoped-to-other-tenant
+    humanName: "Bekins' plain SELECT never returns a claim it does not own"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_bekins', true);
+      SELECT id FROM claims WHERE tenant_id <> 'ten_bekins';
+    expect: zero-rows
+
+  - id: claims-visible-count-matches-own-tenant-only
+    humanName: "an unfiltered SELECT * still returns exactly Continental's own two claims, not three"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      SELECT count(*) FROM claims;
+    expect:
+      rows:
+        - [2]
+
+  - id: claims-direct-id-lookup-of-foreign-row-invisible
+    humanName: "looking up Bekins' claim by id while scoped as Continental finds nothing"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      SELECT id FROM claims WHERE id = 'clm_bekins_1';
+    expect: zero-rows
+
+  - id: claims-insert-cross-tenant-rejected
+    humanName: "inserting a claim tagged for another tenant while scoped as Continental is rejected"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      INSERT INTO claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash, audit_projection_version)
+      VALUES ('clm_hack_1', 'ten_bekins', 'HACK-1', 'submitted', 100, 'USD', 'Nobody', '2026-01-05', now(), '', 1);
+    expect:
+      raises: "row-level security"
+
+  - id: claims-insert-own-tenant-succeeds
+    humanName: "inserting a claim tagged for the caller's own tenant still works"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      INSERT INTO claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash, audit_projection_version)
+      VALUES ('clm_new_1', 'ten_continental', 'NEW-1', 'submitted', 500, 'USD', 'New Claimant', '2026-01-06', now(), '', 1)
+      RETURNING tenant_id;
+    expect:
+      rows:
+        - ["ten_continental"]
+
+  - id: claims-update-cannot-retarget-tenant
+    humanName: "updating a row's own tenant_id to move it out of Continental's scope is rejected"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      UPDATE claims SET tenant_id = 'ten_bekins' WHERE id = 'clm_continental_1';
+    expect:
+      raises: "row-level security"
+
+  - id: claims-update-on-foreign-row-matches-nothing
+    humanName: "attempting to update Bekins' claim while scoped as Continental affects zero rows, it is simply not visible"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      UPDATE claims SET status = 'approved' WHERE id = 'clm_bekins_1';
+      SELECT set_config('app.tenant_id', 'ten_bekins', true);
+      SELECT status FROM claims WHERE id = 'clm_bekins_1';
+    expect:
+      rows:
+        - ["submitted"]
+
+  - id: claims-with-no-tenant-context-set-sees-nothing
+    humanName: "a connection that never set app.tenant_id at all sees zero claims, not every claim"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT id FROM claims;
+    expect: zero-rows
+
+  - id: documents-select-of-foreign-claims-document-invisible
+    humanName: "Continental cannot read Bekins' document by id"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      SELECT id FROM documents WHERE id = 'doc_bekins_1';
+    expect: zero-rows
+
+  - id: documents-select-of-own-claims-document-visible
+    humanName: "Continental can still read its own claim's document"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      SELECT file_name FROM documents WHERE id = 'doc_continental_1';
+    expect:
+      rows:
+        - ["estimate.pdf"]
+
+  - id: documents-insert-onto-foreign-claim-rejected
+    humanName: "attaching a new document to Bekins' claim while scoped as Continental is rejected"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      INSERT INTO documents (id, claim_id, file_name, content_type, legacy_path, created_at)
+      VALUES ('doc_hack_1', 'clm_bekins_1', 'hack.pdf', 'application/pdf', '/hack', now());
+    expect:
+      raises: "row-level security"
+
+  - id: documents-insert-onto-own-claim-succeeds
+    humanName: "attaching a new document to Continental's own claim still works"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      INSERT INTO documents (id, claim_id, file_name, content_type, legacy_path, created_at)
+      VALUES ('doc_new_1', 'clm_continental_1', 'photo.jpg', 'image/jpeg', '/new', now())
+      RETURNING file_name;
+    expect:
+      rows:
+        - ["photo.jpg"]
+
+  - id: rls-enabled-and-forced-on-claims
+    humanName: "claims has both ENABLE and FORCE row level security set"
+    sql: |
+      SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname = 'claims';
+    expect:
+      rows:
+        - [true, true]
+
+  - id: rls-enabled-and-forced-on-documents
+    humanName: "documents has both ENABLE and FORCE row level security set"
+    sql: |
+      SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname = 'documents';
+    expect:
+      rows:
+        - [true, true]

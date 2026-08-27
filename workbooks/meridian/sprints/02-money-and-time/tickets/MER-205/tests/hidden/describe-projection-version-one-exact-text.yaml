@@ -1,0 +1,9 @@
+humanName: "Escaped: the projection changelog does not name version 1's exact field set"
+tags:
+  - audit-hash-compatibility-tracing
+kind: io-case
+input: 1
+expected: "MER-203: id, tenantId, externalRef, status, money, claimantName, lossDate, createdAt - the claim's own canonical fields, hashed before any client-facing compatibility shim rewrites anything."
+entryPoint:
+  module: "src/util/canonical-json.ts"
+  export: "describeAuditProjectionVersion"

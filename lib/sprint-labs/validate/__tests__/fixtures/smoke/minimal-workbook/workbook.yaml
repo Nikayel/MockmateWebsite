@@ -1,0 +1,9 @@
+id: fixture
+title: "Fixture Workbook"
+objectives:
+  - id: typed-boundaries
+    label: "Typed boundaries"
+    canDo: "I can replace an any typed parse with a validated type."
+  - id: contract-versioning
+    label: "Contract versioning"
+    canDo: "I can decide when a breaking change needs a new API version."

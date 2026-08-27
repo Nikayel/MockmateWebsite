@@ -1,0 +1,15 @@
+humanName: "Escaped: an amount sent as a single-element array is accepted as a claim amount"
+tags:
+  - typed-boundary-parsing
+kind: io-case
+input:
+  externalRef: "NW-9003"
+  amount: [500]
+  claimantName: "Sam Okafor"
+  lossDate: "2026-01-17"
+expected:
+  ok: false
+  reason: "amount must be a finite number"
+entryPoint:
+  module: "src/http/parsers/claim-input.ts"
+  export: "parseClaimInput"

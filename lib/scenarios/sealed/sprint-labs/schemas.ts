@@ -1,0 +1,166 @@
+/**
+ * Zod schemas for the sealed-content shapes Task 1 doesn't cover (review
+ * comments, author briefs, rubric weights, hidden-test payload halves).
+ * `lib/sprint-labs/types.ts` validates the PUBLIC/metadata side of a
+ * workbook; these validate the SECRET side, which Task 1 deliberately never
+ * types (a hidden test's `expected`/`body` "are never typed here and never
+ * ship client-side" — lib/sprint-labs/types.ts's file header).
+ *
+ * Review-round fix (controller review round 1, finding I-1): before this
+ * file existed, `scripts/compile-workbooks.mjs` read rubric.yaml/
+ * author_brief.yaml/review.yaml with no schema at all, and
+ * `reviewRaw.comments ?? []` turned an authoring mistake (review.yaml
+ * authored as a bare top-level list instead of `{comments: [...]}`) into a
+ * SILENT empty review round — the trap comment just vanished, no error.
+ * `authoredReviewSchema` requires the `{comments: [...]}` wrapper and at
+ * least one comment, so that mistake is now a loud CompileError instead.
+ *
+ * Placed beside lib/scenarios/sealed/sprint-labs/types.ts (co-located,
+ * TS-interfaces + their runtime Zod counterparts) rather than folded into
+ * types.ts itself, so the two files can be skimmed separately: types.ts is
+ * "what does a sealed value look like", this file is "how do we know an
+ * authored one is well-formed".
+ */
+
+import { z } from "zod"
+
+// ============================================================
+// review.yaml — M-3: comments require an author-supplied, stable `id`
+// (a positional `comment-${i}` id breaks the server-release keying a
+// future release endpoint needs: re-ordering comments in review.yaml must
+// not silently change which id a previously-released verdict points at).
+// ============================================================
+
+export const authoredReviewCommentSchema = z.object({
+  id: z.string().min(1, "every review.yaml comment needs its own stable id"),
+  body: z.string().min(1),
+  correct: z.boolean(),
+})
+export type AuthoredReviewComment = z.infer<typeof authoredReviewCommentSchema>
+
+/**
+ * `.strict()` plus `comments` as the ONLY key: a review.yaml authored as a
+ * bare top-level array (no `comments:` wrapper) fails this schema's object
+ * check outright, and `comments: []` fails `.min(1)` — both loud, neither
+ * silent. `.min(1)` also enforces "a review round with a trap in it": at
+ * least one comment must exist for the round to mean anything.
+ */
+export const authoredReviewSchema = z
+  .object({
+    comments: z
+      .array(authoredReviewCommentSchema)
+      .min(1, "review.yaml must author at least one comment"),
+  })
+  .strict()
+export type AuthoredReview = z.infer<typeof authoredReviewSchema>
+
+// ============================================================
+// author_brief.yaml
+// ============================================================
+
+export const sealedAuthorBriefDecisionSchema = z.object({
+  decision: z.string().min(1),
+  justification: z.string().min(1),
+})
+
+export const sealedAuthorBriefSchema = z.object({
+  intent: z.string().min(1),
+  decisions: z
+    .array(sealedAuthorBriefDecisionSchema)
+    .min(1, "author_brief.yaml needs at least one decision"),
+  doNotVolunteer: z.array(z.string()),
+  concessionTriggers: z.array(z.string()),
+})
+export type SealedAuthorBriefParsed = z.infer<typeof sealedAuthorBriefSchema>
+
+// ============================================================
+// rubric.yaml
+// ============================================================
+
+const rubricWeightSchema = z.number().min(0).max(1)
+
+export const sealedRubricSchema = z.object({
+  weights: z.object({
+    understanding: rubricWeightSchema,
+    problemSolving: rubricWeightSchema,
+    codeQuality: rubricWeightSchema,
+    communication: rubricWeightSchema,
+    verification: rubricWeightSchema,
+  }),
+  notes: z.record(z.string(), z.string()),
+})
+export type SealedRubricParsed = z.infer<typeof sealedRubricSchema>
+
+// ============================================================
+// Hidden-test payload halves. Metadata ({id, humanName, tags, kind}) is
+// validated by Task 1's `ticketSecretMetaSchema`; these validate the part
+// that never ships publicly. Split by kind rather than one discriminated
+// union so a caller that already knows `raw.kind` (the compiler does,
+// mid-loop) can pick the right schema directly.
+// ============================================================
+
+const definedValue = z.unknown().refine((v) => v !== undefined, { message: "value is required" })
+
+/**
+ * PLAN.md Task 7 review round 1, Critical 2: names the module + export `lab validate --dynamic`
+ * calls with `input` and compares against `expected`. OPTIONAL -- existing io-case content authored
+ * before this field existed (e.g. `_fixture-workbook`'s DEMO-102) must keep parsing; the dynamic
+ * gate treats an io-case with no `entryPoint` as an unverifiable hidden tier (see
+ * `SealedHiddenCase.entryPoint`'s own doc comment for the WARN/ERROR split).
+ */
+export const sealedEntryPointSchema = z.object({
+  module: z.string().min(1),
+  export: z.string().min(1),
+})
+export type SealedEntryPoint = z.infer<typeof sealedEntryPointSchema>
+
+export const sealedIoCasePayloadSchema = z.object({
+  input: definedValue,
+  expected: definedValue,
+  entryPoint: sealedEntryPointSchema.optional(),
+})
+export type SealedIoCasePayload = z.infer<typeof sealedIoCasePayloadSchema>
+
+export const sealedProbePayloadSchema = z.object({
+  body: z.string().min(1, "a probe's body must be non-empty runnable assertion source"),
+})
+export type SealedProbePayload = z.infer<typeof sealedProbePayloadSchema>
+
+// ============================================================
+// SQL hidden-test payload (the sealed SQL-hidden-test subsystem). Authored
+// under `tests/hidden/*.yaml` with `kind: sql-assertion`, exactly like an
+// io-case/probe hidden test -- but this kind is NOT added to
+// `ticketSecretKindSchema` (lib/sprint-labs/types.ts), because unlike
+// io-case/probe it never joins the public `hiddenTests` metadata array at
+// all: the compiler skips `ticketSecretMetaSchema` entirely for this kind
+// (see compile-workbooks.mjs's tests/hidden loop), so nothing about a SQL
+// hidden assertion -- not its id, humanName, tags, or existence -- reaches
+// the public bundle. This is the fix for the S3 review's Critical finding:
+// SQL tickets previously had NO sealed hidden-test mechanism at all, so a
+// hidden assertion's `sql`/`expect` had to live inside
+// `tests/visible/*.pgsuite.yaml` (a "hidden-" id PREFIX was the only signal,
+// enforced by convention, not by the compiler), which the compiler ships
+// verbatim into the PUBLIC bundle. `tests/hidden/` is the sealed location;
+// this schema is what validates an authored entry there.
+// ============================================================
+
+/**
+ * Mirrors `lib/workspace-execution/pg-sandbox/types.ts`'s `PgSuiteAssertion["expect"]` union
+ * exactly (a bare "zero-rows" sentinel, a positional `{rows}` literal, a bare "raises" sentinel, or
+ * `{raises: <substring>}`) -- redefined here as a runtime Zod validator (that file is types-only, no
+ * runtime schema) rather than imported, since compiling an authored ticket needs to VALIDATE a
+ * value at compile time, not just describe one already trusted.
+ */
+const pgSuiteExpectSchema = z.union([
+  z.literal("zero-rows"),
+  z.object({ rows: z.array(z.array(z.unknown())) }).strict(),
+  z.literal("raises"),
+  z.object({ raises: z.string().min(1) }).strict(),
+])
+
+export const sealedSqlHiddenAssertionSchema = z.object({
+  humanName: z.string().min(1, "a SQL hidden assertion needs a humanName"),
+  sql: z.string().min(1, "a SQL hidden assertion's sql must be non-empty runnable SQL"),
+  expect: pgSuiteExpectSchema,
+})
+export type SealedSqlHiddenAssertionPayload = z.infer<typeof sealedSqlHiddenAssertionSchema>

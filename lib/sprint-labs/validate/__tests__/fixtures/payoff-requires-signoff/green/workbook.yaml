@@ -1,0 +1,6 @@
+id: fixture
+title: "Fixture Workbook"
+objectives:
+  - id: tenant-isolation
+    label: "Tenant isolation"
+    canDo: "I can derive visibility from the database instead of a copied key."

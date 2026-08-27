@@ -1,0 +1,42 @@
+diff --git a/src/http/claims-list.ts b/src/http/claims-list.ts
+new file mode 100644
+index 0000000..1ccd10b
+--- /dev/null
++++ b/src/http/claims-list.ts
+@@ -0,0 +1,7 @@
++import type { FastifyRequest, FastifyReply } from "../types"
++import { parseClaimPayload } from "./claims-parser"
++
++export async function listClaims(request: FastifyRequest, reply: FastifyReply) {
++  const { page, per_page } = request.query as Record<string, string>
++  return { page, per_page }
++}
+diff --git a/src/http/compatibility-descriptor.ts b/src/http/compatibility-descriptor.ts
+new file mode 100644
+index 0000000..2f3656a
+--- /dev/null
++++ b/src/http/compatibility-descriptor.ts
+@@ -0,0 +1,23 @@
++interface ParameterDescriptor {
++  status: "active" | "deprecated"
++  sunset?: string
++}
++
++interface CompatibilityDescriptor {
++  parameters: Record<string, ParameterDescriptor>
++}
++
++const V1: CompatibilityDescriptor = {
++  parameters: {
++    page: { status: "deprecated" },
++    per_page: { status: "deprecated" },
++  },
++}
++
++const V2: CompatibilityDescriptor = {
++  parameters: {},
++}
++
++export function compatibilityDescriptor(version: "v1" | "v2"): CompatibilityDescriptor {
++  return version === "v1" ? V2 : V1
++}

@@ -1,0 +1,16 @@
+humanName: "Escaped: claiming from an empty backlog returns nothing, not an error"
+tags:
+  - transactional-outbox-skip-locked
+kind: probe
+body: |
+  const db = createMemoryDb()
+  return claimOutboxBatch(db, { workerId: "worker-a", leaseDurationMs: 30_000, limit: 10 }).then((batch) => {
+    assert(Array.isArray(batch), "claimOutboxBatch must return an array even when nothing is pending")
+    assert.strictEqual(batch.length, 0)
+    const outbox = createOutbox({ db, workerId: "worker-a" })
+    return outbox.drain(async () => {
+      assert(false, "the handler must never be called when nothing is pending")
+    })
+  }).then((drainedCount) => {
+    assert.strictEqual(drainedCount, 0)
+  })

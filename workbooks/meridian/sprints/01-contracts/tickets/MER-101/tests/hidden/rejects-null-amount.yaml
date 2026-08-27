@@ -1,0 +1,15 @@
+humanName: "Escaped: a null amount is stored instead of being rejected"
+tags:
+  - typed-boundary-parsing
+kind: io-case
+input:
+  externalRef: "NW-9002"
+  amount: null
+  claimantName: "Priya Shah"
+  lossDate: "2026-01-16"
+expected:
+  ok: false
+  reason: "amount must be a finite number"
+entryPoint:
+  module: "src/http/parsers/claim-input.ts"
+  export: "parseClaimInput"

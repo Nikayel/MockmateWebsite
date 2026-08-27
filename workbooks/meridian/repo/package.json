@@ -1,0 +1,21 @@
+{
+  "name": "meridian",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Multi-tenant claims intake API for insurance partners.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,20 @@
+humanName: "A well-formed claim still parses to the exact fields submitted"
+tags:
+  - typed-boundary-parsing
+kind: io-case
+input:
+  externalRef: "NW-9004"
+  amount: 412.19
+  claimantName: "Robin Alvarez"
+  lossDate: "2026-01-18"
+expected:
+  ok: true
+  value:
+    externalRef: "NW-9004"
+    amount: 412.19
+    currency: "USD"
+    claimantName: "Robin Alvarez"
+    lossDate: "2026-01-18"
+entryPoint:
+  module: "src/http/parsers/claim-input.ts"
+  export: "parseClaimInput"

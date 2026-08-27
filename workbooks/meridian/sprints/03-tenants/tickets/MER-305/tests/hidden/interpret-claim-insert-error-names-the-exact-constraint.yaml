@@ -1,0 +1,14 @@
+humanName: "Escaped: a generic database error is treated as the expected duplicate instead of being surfaced as unknown"
+tags:
+  - isolation-level-race-condition
+kind: io-case
+input:
+  code: "23505"
+  constraint: "webhook_deliveries_some_other_constraint"
+  message: "duplicate key value violates unique constraint \"webhook_deliveries_some_other_constraint\""
+expected:
+  outcome: "unknown_error"
+  reason: "duplicate key value violates unique constraint \"webhook_deliveries_some_other_constraint\""
+entryPoint:
+  module: "src/db/repositories/claims.ts"
+  export: "interpretClaimInsertError"

@@ -1,0 +1,10 @@
+weights:
+  understanding: 0.2
+  problemSolving: 0.3
+  codeQuality: 0.15
+  communication: 0
+  verification: 0.35
+notes:
+  understanding: "Keys off whether the cursor carries a real tiebreak (created_at, id) matching a composite index, not a bare timestamp."
+  problemSolving: "Keys off the visible pass rate across dedup, tiebreak, and bounded-limit cases."
+  verification: "Keys off escaped-defect rate on the hidden cases, especially whether a claim inserted mid-page ever reappears on the next page."

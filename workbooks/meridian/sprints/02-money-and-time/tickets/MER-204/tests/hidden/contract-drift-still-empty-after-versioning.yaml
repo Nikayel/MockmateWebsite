@@ -1,0 +1,8 @@
+humanName: "Escaped: versioning the descriptor introduces a route the generated document no longer agrees with"
+tags:
+  - backward-compatible-wire-format
+kind: probe
+body: |
+  const { meridian } = buildTestApp()
+  const drift = findContractDrift(meridian.app)
+  assert(drift.length === 0, `expected no contract drift, got: ${JSON.stringify(drift)}`)

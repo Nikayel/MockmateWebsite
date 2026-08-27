@@ -18,8 +18,19 @@ import {
   executeWorkspaceScenarioSqlClientSide,
   type SqlSingleFileScenario,
 } from "./sql-sandbox"
+import { executeWorkspaceScenarioTsClientSide } from "./ts-workspace"
 import { ORACLE_VISIBLE_PATH } from "@/lib/bugfix/packs/scenario"
 import { isPackScenario, isWorkspaceScenario, type PackScenario } from "./validators"
+
+// NOTE on the Sprint Labs PGlite ("pg-sandbox") suite engine: it is deliberately NOT wired into
+// executeScenarioInBrowser below. Sprint Labs tickets are typed via lib/sprint-labs/types.ts
+// (TicketPublic/SprintLabRun), not the `Scenario`/`WorkspaceScenario` union this file dispatches
+// on, and `WorkspaceScenarioLanguage` (lib/scenarios/types.ts) is a closed `"javascript" |
+// "typescript" | "python" | "sql"` union already fully claimed by the four engines below — "sql"
+// is sql.js/SQLite, a different engine from PGlite/Postgres. `runPgSuite` is reachable from the
+// master barrel (lib/workspace-execution/index.ts), which every other engine is also exported
+// from; it does not need a second, redundant re-export here too. See docs/sprint-labs/PLAN.md
+// Task 5 / task-5-report.md.
 
 type BrowserExecutionResult = DsaExecutionResult | WorkspaceExecutionResult | PackExecutionResult
 
@@ -182,7 +193,9 @@ export async function executeScenarioInBrowser(options: {
         ? await executeWorkspaceScenarioPythonClientSide(scenario, edits)
         : language === "sql"
           ? await executeWorkspaceScenarioSqlClientSide(scenario, edits)
-          : await executeWorkspaceScenarioJsClientSide(scenario, edits)
+          : language === "typescript"
+            ? await executeWorkspaceScenarioTsClientSide(scenario, edits)
+            : await executeWorkspaceScenarioJsClientSide(scenario, edits)
 
     return formatWorkspaceResult(result)
   }

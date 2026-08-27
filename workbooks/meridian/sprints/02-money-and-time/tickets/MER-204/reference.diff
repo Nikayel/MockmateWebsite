@@ -1,0 +1,488 @@
+diff --git a/migrations/0008_subscription_envelope_version.sql b/migrations/0008_subscription_envelope_version.sql
+new file mode 100644
+index 0000000..966e6fd
+--- /dev/null
++++ b/migrations/0008_subscription_envelope_version.sql
+@@ -0,0 +1,15 @@
++-- MER-204: a subscription's pinned wire version. Null until a request explicitly asks for one,
++-- which resolves to v1 by default - see src/http/subscription-version.ts. Every existing
++-- tenant predates this column and is left null on purpose: an existing integration that has
++-- never sent a version keeps getting v1, exactly what it already depended on.
++alter table tenants
++  add column pinned_envelope_version text;
++
++alter table tenants
++  add constraint tenants_pinned_envelope_version_check
++  check (pinned_envelope_version is null or pinned_envelope_version in ('v1', 'v2'));
++
++comment on column tenants.pinned_envelope_version is
++  'The wire version (v1 or v2) this subscription is pinned to, once it has asked for one
++   explicitly. Null means "never asked" - defaults to v1, never to the newest version. See
++   src/http/subscription-version.ts.';
+diff --git a/src/db/memory-db.ts b/src/db/memory-db.ts
+index 56ea14e..e576550 100644
+--- a/src/db/memory-db.ts
++++ b/src/db/memory-db.ts
+@@ -23,6 +23,7 @@ export function createMemoryDb(): DbClient {
+           webhook_url: webhookUrl,
+           webhook_secret: webhookSecret,
+           time_zone: timeZone,
++          pinned_envelope_version: null,
+           created_at: createdAt,
+         }
+         tenants.push(row)
+@@ -35,6 +36,14 @@ export function createMemoryDb(): DbClient {
+         return { rows: row ? [row as T] : [] }
+       }
+ 
++      case queries.UPDATE_TENANT_PINNED_VERSION: {
++        const [id, pinnedEnvelopeVersion] = params
++        const row = tenants.find((tenant) => tenant.id === id)
++        if (!row) return { rows: [] }
++        row.pinned_envelope_version = pinnedEnvelopeVersion
++        return { rows: [row as T] }
++      }
++
+       case queries.INSERT_CLAIM: {
+         const [
+           id,
+diff --git a/src/db/queries.ts b/src/db/queries.ts
+index da8ed52..a9a913a 100644
+--- a/src/db/queries.ts
++++ b/src/db/queries.ts
+@@ -9,6 +9,11 @@ export const INSERT_TENANT =
+ 
+ export const GET_TENANT_BY_ID = "SELECT * FROM tenants WHERE id = $1"
+ 
++/** Pins a subscription's wire version the first time it sends one explicitly - see
++ * src/http/subscription-version.ts and migrations/0008_subscription_envelope_version.sql. */
++export const UPDATE_TENANT_PINNED_VERSION =
++  "UPDATE tenants SET pinned_envelope_version = $2 WHERE id = $1 RETURNING *"
++
+ export const INSERT_CLAIM =
+   "INSERT INTO claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *"
+ 
+diff --git a/src/db/repositories/tenants.ts b/src/db/repositories/tenants.ts
+index 833bb98..5db145a 100644
+--- a/src/db/repositories/tenants.ts
++++ b/src/db/repositories/tenants.ts
+@@ -1,6 +1,7 @@
+ import type { DbClient } from "../client"
+ import type { Tenant } from "../../domain/tenant"
+-import { GET_TENANT_BY_ID, INSERT_TENANT } from "../queries"
++import type { EnvelopeVersion } from "../../http/subscription-version"
++import { GET_TENANT_BY_ID, INSERT_TENANT, UPDATE_TENANT_PINNED_VERSION } from "../queries"
+ 
+ interface TenantRow {
+   id: string
+@@ -8,6 +9,7 @@ interface TenantRow {
+   webhook_url: string | null
+   webhook_secret: string | null
+   time_zone: string
++  pinned_envelope_version: EnvelopeVersion | null
+   created_at: string
+ }
+ 
+@@ -18,6 +20,7 @@ function toTenant(row: TenantRow): Tenant {
+     webhookUrl: row.webhook_url,
+     webhookSecret: row.webhook_secret,
+     timeZone: row.time_zone,
++    pinnedEnvelopeVersion: row.pinned_envelope_version ?? null,
+     createdAt: row.created_at,
+   }
+ }
+@@ -47,3 +50,14 @@ export async function getTenantById(db: DbClient, tenantId: string): Promise<Ten
+   const { rows } = await db.query<TenantRow>(GET_TENANT_BY_ID, [tenantId])
+   return rows[0] ? toTenant(rows[0]) : null
+ }
++
++/** Pins `tenantId`'s subscription to `version` - called the first time a request explicitly
++ * asks for a version different from what is already pinned. A tenant with no row at all (see
++ * src/http/routes/claims.ts's UTC/v1 fallbacks) has nothing to pin and this is a no-op. */
++export async function setTenantPinnedEnvelopeVersion(
++  db: DbClient,
++  tenantId: string,
++  version: EnvelopeVersion
++): Promise<void> {
++  await db.query(UPDATE_TENANT_PINNED_VERSION, [tenantId, version])
++}
+diff --git a/src/domain/tenant.ts b/src/domain/tenant.ts
+index 72e4904..da396b0 100644
+--- a/src/domain/tenant.ts
++++ b/src/domain/tenant.ts
+@@ -1,3 +1,5 @@
++import type { EnvelopeVersion } from "../http/subscription-version"
++
+ export interface Tenant {
+   id: string
+   name: string
+@@ -6,6 +8,9 @@ export interface Tenant {
+   /** An IANA time zone name, e.g. "America/Chicago" - the zone a claim this tenant files is
+    * reported and deadlined in, never the server's own zone. See src/domain/calendar-date.ts. */
+   timeZone: string
++  /** The wire version this subscription is pinned to, once it has sent one explicitly - null
++   * until then, which resolves to v1 by default. See src/http/subscription-version.ts. */
++  pinnedEnvelopeVersion: EnvelopeVersion | null
+   createdAt: string
+ }
+ 
+diff --git a/src/http/compatibility-descriptor.ts b/src/http/compatibility-descriptor.ts
+index b1e2f9f..cec36c8 100644
+--- a/src/http/compatibility-descriptor.ts
++++ b/src/http/compatibility-descriptor.ts
+@@ -4,7 +4,16 @@
+  * headers - see src/http/routes/claims.ts) and the generated OpenAPI document
+  * (src/http/openapi.ts) read from exactly this list. Neither keeps its own copy, so they
+  * cannot say two different things about the same parameter - see MER-104.
++ *
++ * `GET /claims` is the one operation this whole descriptor exists to make possible for MER-204:
++ * a single path plus method has exactly one `parameters` array in OpenAPI 3.1, and v1 keeps
++ * `offset` under the compatibility shim while v2 drops it outright - two true answers for the
++ * same operation. `queryParametersByVersion` is the escape hatch: `queryParameters` stays the
++ * v1 answer, unchanged, and a version present in `queryParametersByVersion` overrides it for
++ * that version alone. Every other operation in this list has never had two versions, so it
++ * never populates the map at all.
+  */
++import type { EnvelopeVersion } from "./subscription-version"
+ 
+ export interface DeprecationInfo {
+   /** Why the parameter is going away, for the generated document's description. */
+@@ -25,14 +34,19 @@ export interface OperationCompatibility {
+   method: string
+   /** An OpenAPI-style path template, matching `App.routes()`'s own shape exactly. */
+   path: string
++  /** The v1 answer - and the only answer, for every operation except `GET /claims`. */
+   queryParameters: QueryParameterDescriptor[]
++  /** Present only where a version's parameter list genuinely differs from `queryParameters`
++   * above. A version absent from this map falls back to `queryParameters`. */
++  queryParametersByVersion?: Partial<Record<EnvelopeVersion, QueryParameterDescriptor[]>>
+ }
+ 
+ /**
+  * `offset` is what the claims list took before MER-103 moved paging to a cursor. It is kept
+- * here, deprecated rather than deleted outright, so a caller still sending it does not break
++ * here, deprecated rather than deleted outright, so a v1 caller still sending it does not break
+  * the moment this ships - see the ticket body for why silence isn't the same as backward
+- * compatibility.
++ * compatibility. v2 has no legacy callers to carry, so it drops `offset` entirely rather than
++ * publish a deprecation for a parameter no v2 integration has ever used.
+  */
+ export const COMPATIBILITY_DESCRIPTOR: OperationCompatibility[] = [
+   {
+@@ -52,7 +66,7 @@ export const COMPATIBILITY_DESCRIPTOR: OperationCompatibility[] = [
+       },
+       {
+         name: "offset",
+-        description: "The zero-based row offset into the tenant's claim list.",
++        description: "The zero-based row offset into the tenant's claim list. v1 only - v2 never had this parameter.",
+         required: false,
+         deprecated: {
+           reason: "Superseded by cursor, which does not shift under concurrent writes.",
+@@ -60,6 +74,20 @@ export const COMPATIBILITY_DESCRIPTOR: OperationCompatibility[] = [
+         },
+       },
+     ],
++    queryParametersByVersion: {
++      v2: [
++        {
++          name: "cursor",
++          description: "An opaque token naming the last claim already seen; omit it for the first page.",
++          required: false,
++        },
++        {
++          name: "limit",
++          description: "How many claims to return, from 1 up to 100.",
++          required: false,
++        },
++      ],
++    },
+   },
+   {
+     operationId: "createClaim",
+@@ -100,3 +128,14 @@ export function findOperationCompatibility(locator: OperationLocator): Operation
+     (operation) => operation.method === locator.method && operation.path === locator.path
+   )
+ }
++
++/** The query parameters `operation` actually accepts for `version` - `queryParametersByVersion`'s
++ * entry for that version if one is authored, else the v1 answer in `queryParameters`. This is
++ * the one function anything version-aware (the runtime, the generated document) should call;
++ * neither should read `queryParameters` directly once a version is in scope. */
++export function effectiveQueryParameters(
++  operation: OperationCompatibility,
++  version: EnvelopeVersion
++): QueryParameterDescriptor[] {
++  return operation.queryParametersByVersion?.[version] ?? operation.queryParameters
++}
+diff --git a/src/http/openapi.ts b/src/http/openapi.ts
+index 25aae5c..3690417 100644
+--- a/src/http/openapi.ts
++++ b/src/http/openapi.ts
+@@ -1,5 +1,6 @@
+-import { COMPATIBILITY_DESCRIPTOR } from "./compatibility-descriptor"
++import { COMPATIBILITY_DESCRIPTOR, effectiveQueryParameters } from "./compatibility-descriptor"
+ import type { OperationCompatibility, QueryParameterDescriptor } from "./compatibility-descriptor"
++import type { EnvelopeVersion } from "./subscription-version"
+ import type { App } from "./types"
+ 
+ export interface OpenApiParameter {
+@@ -40,10 +41,13 @@ function toOpenApiParameter(parameter: QueryParameterDescriptor): OpenApiParamet
+   }
+ }
+ 
+-function toOpenApiOperation(operation: OperationCompatibility): OpenApiOperation {
++function toOpenApiOperation(
++  operation: OperationCompatibility,
++  version: EnvelopeVersion
++): OpenApiOperation {
+   return {
+     operationId: operation.operationId,
+-    parameters: operation.queryParameters.map(toOpenApiParameter),
++    parameters: effectiveQueryParameters(operation, version).map(toOpenApiParameter),
+   }
+ }
+ 
+@@ -56,18 +60,20 @@ function toMethodKey(method: string): OpenApiMethod {
+ }
+ 
+ /**
+- * Builds the OpenAPI document from the exact same compatibility descriptor the runtime reads
+- * to stamp `Deprecation`/`Sunset` headers (src/http/compatibility-descriptor.ts) - there is no
+- * second, hand-maintained copy of which query parameters exist or when they sunset, so the
+- * two cannot drift from each other.
++ * Builds the OpenAPI document for `version` from the exact same compatibility descriptor the
++ * runtime reads to stamp `Deprecation`/`Sunset` headers and resolve query parameters
++ * (src/http/compatibility-descriptor.ts) - there is no second, hand-maintained copy of which
++ * query parameters exist for which version or when they sunset, so the two cannot drift from
++ * each other. Defaults to v1 - the same document this function produced before MER-204 existed,
++ * for every caller that does not know versions exist yet.
+  */
+-export function generateOpenApiDocument(): OpenApiDocument {
++export function generateOpenApiDocument(version: EnvelopeVersion = "v1"): OpenApiDocument {
+   const paths: OpenApiDocument["paths"] = {}
+   for (const operation of COMPATIBILITY_DESCRIPTOR) {
+     const methodKey = toMethodKey(operation.method)
+     paths[operation.path] = {
+       ...paths[operation.path],
+-      [methodKey]: toOpenApiOperation(operation),
++      [methodKey]: toOpenApiOperation(operation, version),
+     }
+   }
+   return {
+@@ -103,8 +109,9 @@ export function findContractDrift(app: App): string[] {
+   return drift
+ }
+ 
+-/** Serves the generated document at `/openapi.json` - the same object `generateOpenApiDocument`
+- * returns, never a second hand-maintained copy on disk. */
++/** Serves the generated v1 document at `/openapi.json` - the same object `generateOpenApiDocument`
++ * returns, never a second hand-maintained copy on disk. Still the default, unversioned contract
++ * URL every existing integration already points at. */
+ export function registerOpenapiRoutes(app: App): void {
+   app.get("/openapi.json", () => ({ statusCode: 200, body: generateOpenApiDocument() }))
+ }
+diff --git a/src/http/routes/claims.ts b/src/http/routes/claims.ts
+index f1b5e2a..8f05c4d 100644
+--- a/src/http/routes/claims.ts
++++ b/src/http/routes/claims.ts
+@@ -2,7 +2,7 @@ import { getDocumentsForClaims } from "../../db/repositories/documents"
+ import type { DbClient } from "../../db/client"
+ import { getClaimById, insertClaim, listClaimsByTenantKeyset } from "../../db/repositories/claims"
+ import type { ClaimsCursor } from "../../db/repositories/claims"
+-import { getTenantById } from "../../db/repositories/tenants"
++import { getTenantById, setTenantPinnedEnvelopeVersion } from "../../db/repositories/tenants"
+ import type { Claim } from "../../domain/claim"
+ import { filedOnDate } from "../../domain/claim"
+ import { parseMoney, toWireAmountV1 } from "../../money/money"
+@@ -12,6 +12,8 @@ import { badRequest, notFound } from "../errors"
+ import { parseClaimInput } from "../parsers/claim-input"
+ import type { ParseClaimInputResult } from "../parsers/claim-input"
+ import { requireTenantId } from "../request-context"
++import { requestedVersion, resolveEnvelopeVersion } from "../subscription-version"
++import type { EnvelopeVersion } from "../subscription-version"
+ import type { App } from "../types"
+ 
+ export interface ClaimRouteDeps {
+@@ -66,11 +68,12 @@ function encodeClaimsCursor(cursor: ClaimsCursor): string {
+   return JSON.stringify(cursor)
+ }
+ 
+-/** A caller still on `offset` gets a `Deprecation`/`Sunset` header stamped from the same
+- * compatibility descriptor the generated OpenAPI document reads - see src/http/openapi.ts.
+- * There is nowhere else in this file that could disagree with the date it publishes. */
+-function deprecationHeaders(usedOffset: boolean): Record<string, string> {
+-  if (!usedOffset) return {}
++/** A v1 caller still on `offset` gets a `Deprecation`/`Sunset` header stamped from the same
++ * compatibility descriptor the generated OpenAPI document reads - see src/http/openapi.ts. v2
++ * never had `offset`, so a v2 request gets no such header no matter what query string it sent;
++ * there is nowhere else in this file that could disagree with the date v1's document publishes. */
++function deprecationHeaders(usedOffset: boolean, version: EnvelopeVersion): Record<string, string> {
++  if (version !== "v1" || !usedOffset) return {}
+   const deprecated = findOperationCompatibility({ method: "GET", path: "/claims" })?.queryParameters.find(
+     (parameter) => parameter.name === "offset"
+   )?.deprecated
+@@ -88,21 +91,41 @@ export function parseCreateClaimBody(body: unknown): ParseClaimInputResult {
+   return parseClaimInput(body)
+ }
+ 
+-/** A tenant that predates this ticket, or was seeded straight through the repository layer
+- * without a zone, is treated as UTC - the same server-time behavior every tenant silently had
+- * before MER-202, so no existing integration's reported dates move underneath it. */
+-async function resolveTenantTimeZone(db: DbClient, tenantId: string): Promise<string> {
++interface TenantRequestContext {
++  timeZone: string
++  envelopeVersion: EnvelopeVersion
++}
++
++/**
++ * Resolves both the zone a claim's dates are reported in and the wire version its response is
++ * shaped as, from one tenant lookup - and pins the tenant's version the first time a request
++ * explicitly asks for one different from what is already pinned, so every later request from
++ * this subscription gets it too, header or no header. A tenant with no row at all (see
++ * MER-202) falls back to UTC and has nothing to pin, so a request that sends no version
++ * information keeps getting exactly the v1 shape it always has - see MER-204's default-to-v1
++ * acceptance criterion.
++ */
++async function resolveTenantRequestContext(
++  db: DbClient,
++  tenantId: string,
++  headers: Record<string, string>
++): Promise<TenantRequestContext> {
+   const tenant = await getTenantById(db, tenantId)
+-  return tenant?.timeZone ?? "UTC"
++  const requested = requestedVersion(headers)
++  const envelopeVersion = resolveEnvelopeVersion(requested, tenant?.pinnedEnvelopeVersion ?? null)
++
++  if (requested !== null && tenant !== null && tenant.pinnedEnvelopeVersion !== requested) {
++    await setTenantPinnedEnvelopeVersion(db, tenantId, requested)
++  }
++
++  return { timeZone: tenant?.timeZone ?? "UTC", envelopeVersion }
+ }
+ 
+ /**
+  * The v1 wire shape for a claim: `amount`/`currency` as flat top-level fields, `amount` a
+  * major-unit float built from the exact `money` value - see src/money/money.ts's
+- * `toWireAmountV1`. `filedOn` is the calendar day this claim counts as filed on, in the owning
+- * tenant's own zone - see src/domain/claim.ts's `filedOnDate`. Every response this file sends
+- * goes through this one function, so there is exactly one place that knows how a claim looks
+- * on the wire today.
++ * `toWireAmountV1`. This is the one v1 serializer, unchanged by MER-204 and every wire-format
++ * change after it - see that ticket for why keeping it exactly as it was matters.
+  */
+ function serializeClaimForV1(claim: Claim, timeZone: string): Record<string, unknown> {
+   const { money, ...rest } = claim
+@@ -114,6 +137,23 @@ function serializeClaimForV1(claim: Claim, timeZone: string): Record<string, unk
+   }
+ }
+ 
++/** The v2 wire shape: `money` travels as the exact `{minorUnits, currency}` value it is
++ * internally, never flattened back into a float. */
++function serializeClaimForV2(claim: Claim, timeZone: string): Record<string, unknown> {
++  return {
++    ...claim,
++    filedOn: filedOnDate({ createdAt: claim.createdAt, timeZone }),
++  }
++}
++
++function serializeClaim(
++  claim: Claim,
++  timeZone: string,
++  version: EnvelopeVersion
++): Record<string, unknown> {
++  return version === "v2" ? serializeClaimForV2(claim, timeZone) : serializeClaimForV1(claim, timeZone)
++}
++
+ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+   app.post("/claims", async (req) => {
+     const tenantId = requireTenantId(req)
+@@ -138,12 +178,16 @@ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+ 
+     deps.outbox.enqueue({ type: "claim.processed", tenantId, claimId: claim.id })
+ 
+-    const timeZone = await resolveTenantTimeZone(deps.db, tenantId)
+-    return { statusCode: 201, body: serializeClaimForV1(claim, timeZone) }
++    const context = await resolveTenantRequestContext(deps.db, tenantId, req.headers)
++    return {
++      statusCode: 201,
++      body: serializeClaim(claim, context.timeZone, context.envelopeVersion),
++    }
+   })
+ 
+   app.get("/claims", async (req) => {
+     const tenantId = requireTenantId(req)
++    const context = await resolveTenantRequestContext(deps.db, tenantId, req.headers)
+ 
+     const limitResult = parseLimit(req.query.limit ?? null)
+     if (!limitResult.ok) {
+@@ -165,7 +209,6 @@ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+       deps.db,
+       claims.map((claim) => claim.id)
+     )
+-    const timeZone = await resolveTenantTimeZone(deps.db, tenantId)
+ 
+     const lastClaim = claims[claims.length - 1]
+     const nextCursor =
+@@ -175,10 +218,10 @@ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+ 
+     return {
+       statusCode: 200,
+-      headers: deprecationHeaders(req.query.offset !== undefined),
++      headers: deprecationHeaders(req.query.offset !== undefined, context.envelopeVersion),
+       body: {
+         claims: claims.map((claim) => ({
+-          ...serializeClaimForV1(claim, timeZone),
++          ...serializeClaim(claim, context.timeZone, context.envelopeVersion),
+           documentCount: documentsByClaimId[claim.id]?.length ?? 0,
+         })),
+         nextCursor,
+@@ -192,7 +235,7 @@ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+     if (!claim) {
+       return notFound({ message: `claim ${req.params.id} not found`, correlationId: req.correlationId })
+     }
+-    const timeZone = await resolveTenantTimeZone(deps.db, tenantId)
+-    return { statusCode: 200, body: serializeClaimForV1(claim, timeZone) }
++    const context = await resolveTenantRequestContext(deps.db, tenantId, req.headers)
++    return { statusCode: 200, body: serializeClaim(claim, context.timeZone, context.envelopeVersion) }
+   })
+ }
+diff --git a/src/http/subscription-version.ts b/src/http/subscription-version.ts
+new file mode 100644
+index 0000000..3eaa9d7
+--- /dev/null
++++ b/src/http/subscription-version.ts
+@@ -0,0 +1,34 @@
++/**
++ * Which wire shape a subscription (tenant) gets on `GET /claims`. The new minor-unit money
++ * format and the old v1 shape both need to keep shipping at once - see MER-204 - so a
++ * subscription's version is read from its own request header, pinned the first time it is
++ * seen, and honored on every request after that even when the header is absent.
++ */
++export type EnvelopeVersion = "v1" | "v2"
++
++const VERSION_HEADER = "x-api-version"
++
++/** Reads the version a request explicitly asked for, from its own header - never a query
++ * parameter, so version negotiation can never collide with an operation's own query
++ * parameters, which is the exact ambiguity this ticket exists to avoid reintroducing. Returns
++ * `null` for a request that did not ask, which is not the same as asking for v1. */
++export function requestedVersion(headers: Record<string, string>): EnvelopeVersion | null {
++  const raw = headers[VERSION_HEADER]
++  if (raw === "2") return "v2"
++  if (raw === "1") return "v1"
++  return null
++}
++
++/**
++ * The version this request actually gets: whatever it explicitly asked for, else the
++ * subscription's own pinned version, else v1. A request that sends no version information at
++ * all, and whose subscription has never pinned one either, gets exactly the response shape
++ * this API served before this ticket - the whole sprint-1 regression column depends on this
++ * defaulting to v1, never to the newest version.
++ */
++export function resolveEnvelopeVersion(
++  requested: EnvelopeVersion | null,
++  pinned: EnvelopeVersion | null
++): EnvelopeVersion {
++  return requested ?? pinned ?? "v1"
++}

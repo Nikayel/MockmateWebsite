@@ -1,0 +1,16 @@
+# NOTE: DEMO-102 is authored as aiPolicy: unassisted; it carries an
+# author_brief.yaml purely so the fixture exercises this artifact kind
+# through the compiler at least once. On real Meridian content,
+# author_brief.yaml is authored only for review-only tickets
+# (AUTHORING-RULES.md §7). Do not copy this pairing as an authoring
+# template.
+intent: "This brief exists to exercise the author_brief.yaml compile path in the fixture workbook. On a real review-only ticket this file carries the agent's stated intent for the diff under review."
+decisions:
+  - decision: "Kept the v1 route handling page and per_page unchanged."
+    justification: "Correct: Northwind's nightly sync still depends on these parameters."
+  - decision: "Did not add a Sunset date alongside the Deprecation header."
+    justification: "Wrong: a deprecation without a stated sunset date is not a real deprecation, it is a suggestion."
+doNotVolunteer:
+  - "Do not mention the missing Sunset date unless asked directly."
+concession_triggers:
+  - "If the learner names the missing Sunset date, concede immediately and agree it should be added."

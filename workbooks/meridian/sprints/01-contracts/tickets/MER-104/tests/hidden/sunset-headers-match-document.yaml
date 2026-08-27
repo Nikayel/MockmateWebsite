@@ -1,0 +1,27 @@
+humanName: "Escaped: the document publishes a sunset date the response headers never promised"
+tags:
+  - openapi-contract-versioning
+kind: probe
+# The `it()` body here runs as a plain, non-async callback, so this returns a promise chain
+# instead of using `await`.
+body: |
+  const { meridian } = buildTestApp()
+  return meridian.app
+    .inject({
+      method: "GET",
+      url: "/claims?offset=0",
+      headers: { "x-tenant-id": "ten_northwind" },
+    })
+    .then((response) => {
+      const doc = generateOpenApiDocument()
+      const documented = doc.paths["/claims"].get.parameters.find(
+        (parameter) => parameter.name === "offset"
+      )
+      assert(documented && documented.deprecated === true, "the document must mark offset as deprecated")
+      const match = documented.description.match(/sunsetting (\S+):/)
+      assert(match, "the document's description must state a sunset date")
+      assert(
+        response.headers.sunset === match[1],
+        "the response Sunset header must match the date the document publishes"
+      )
+    })

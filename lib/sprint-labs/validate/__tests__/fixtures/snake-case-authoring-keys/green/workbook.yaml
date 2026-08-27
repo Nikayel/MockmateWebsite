@@ -1,0 +1,6 @@
+id: fixture
+title: "Fixture Workbook"
+objectives:
+  - id: contract-versioning
+    label: "Contract versioning"
+    canDo: "I can decide when a breaking change needs a new API version."

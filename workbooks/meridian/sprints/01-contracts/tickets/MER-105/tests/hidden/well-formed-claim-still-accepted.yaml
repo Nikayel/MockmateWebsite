@@ -1,0 +1,20 @@
+humanName: "A well-formed claim is still accepted after the review's fix"
+tags:
+  - review-ai-pr-name-defect
+kind: io-case
+input:
+  externalRef: "NW-3"
+  amount: 250
+  claimantName: "Sam Okafor"
+  lossDate: "2026-01-17"
+expected:
+  ok: true
+  value:
+    externalRef: "NW-3"
+    amount: 250
+    currency: "USD"
+    claimantName: "Sam Okafor"
+    lossDate: "2026-01-17"
+entryPoint:
+  module: "src/http/routes/claims.ts"
+  export: "parseCreateClaimBody"

@@ -1,0 +1,447 @@
+diff --git a/migrations/0005_money_minor_units.sql b/migrations/0005_money_minor_units.sql
+new file mode 100644
+index 0000000..28c2c9f
+--- /dev/null
++++ b/migrations/0005_money_minor_units.sql
+@@ -0,0 +1,14 @@
++-- MER-201: claims.amount was a floating-point dollar value - every arithmetic step (tax,
++-- discount, per-line allocation) both rounds it and cannot know it just did, which is why
++-- Finance's reconciliation drifted by a cent or two on a different set of claims every month.
++--
++-- Every claim recorded before this migration is USD (see src/domain/claim.ts's old comment:
++-- "always USD today - nothing enforces that"), so backfilling with a fixed *100 is exact for
++-- every existing row. A currency with a different minor-unit scale arriving after this
++-- migration is converted correctly at the application boundary - see src/money/money.ts's
++-- `parseMoney` - not by this one-time backfill.
++alter table claims
++  alter column amount type bigint using round(amount * 100)::bigint;
++
++comment on column claims.amount is
++  'An exact integer count of the currency''s minor unit (cents for USD), never a floating-point dollar value. See src/money/money.ts.';
+diff --git a/src/db/repositories/claims.ts b/src/db/repositories/claims.ts
+index 0d39840..8635f52 100644
+--- a/src/db/repositories/claims.ts
++++ b/src/db/repositories/claims.ts
+@@ -21,6 +21,8 @@ interface ClaimRow {
+   tenant_id: string
+   external_ref: string
+   status: ClaimStatus
++  /** An exact integer count of the currency's minor unit - see migrations/0005_money_minor_units.sql
++   * and src/money/money.ts. The column is still named "amount"; only its meaning changed. */
+   amount: number
+   currency: string
+   claimant_name: string
+@@ -34,8 +36,7 @@ function toClaim(row: ClaimRow): Claim {
+     tenantId: row.tenant_id,
+     externalRef: row.external_ref,
+     status: row.status,
+-    amount: row.amount,
+-    currency: row.currency,
++    money: { minorUnits: row.amount, currency: row.currency },
+     claimantName: row.claimant_name,
+     lossDate: row.loss_date,
+     createdAt: row.created_at,
+@@ -50,8 +51,8 @@ export async function insertClaim(db: DbClient, input: CreateClaimInput): Promis
+     input.tenantId,
+     input.externalRef,
+     input.status,
+-    input.amount,
+-    input.currency,
++    input.money.minorUnits,
++    input.money.currency,
+     input.claimantName,
+     input.lossDate,
+     createdAt,
+diff --git a/src/delivery/webhook-payload.ts b/src/delivery/webhook-payload.ts
+index d6b509b..b8d02c8 100644
+--- a/src/delivery/webhook-payload.ts
++++ b/src/delivery/webhook-payload.ts
+@@ -1,5 +1,5 @@
+ import type { Claim } from "../domain/claim"
+-import { roundHalfUp } from "../money/round-half-up"
++import { toWireAmountV1 } from "../money/money"
+ 
+ export interface WebhookPayload {
+   claimId: string
+@@ -9,12 +9,15 @@ export interface WebhookPayload {
+   currency: string
+ }
+ 
++/** Webhook subscribers see the same v1 money shape the HTTP API's v1 responses do - a
++ * major-unit float built from the exact stored `money` value. See src/money/money.ts's
++ * `toWireAmountV1` and src/http/routes/claims.ts's `serializeClaimForV1`. */
+ export function buildWebhookPayload(claim: Claim): WebhookPayload {
+   return {
+     claimId: claim.id,
+     externalRef: claim.externalRef,
+     status: claim.status,
+-    amount: roundHalfUp(claim.amount),
+-    currency: claim.currency,
++    amount: toWireAmountV1(claim.money),
++    currency: claim.money.currency,
+   }
+ }
+diff --git a/src/domain/claim.ts b/src/domain/claim.ts
+index 55264cc..a1ddf3a 100644
+--- a/src/domain/claim.ts
++++ b/src/domain/claim.ts
+@@ -1,4 +1,5 @@
+ import type { ClaimStatus } from "./claim-status"
++import type { Money } from "../money/money"
+ 
+ export interface Claim {
+   id: string
+@@ -6,10 +7,9 @@ export interface Claim {
+   /** The reference number the insurer's own system uses - not unique across tenants. */
+   externalRef: string
+   status: ClaimStatus
+-  /** Dollars, floating point - see src/money/round-half-up.ts. */
+-  amount: number
+-  /** An ISO 4217 code. Always "USD" today - nothing enforces that. */
+-  currency: string
++  /** An exact value type - see src/money/money.ts. Never a floating-point dollar amount past
++   * this point in the system. */
++  money: Money
+   claimantName: string
+   /** YYYY-MM-DD, no time zone. */
+   lossDate: string
+@@ -24,8 +24,7 @@ export interface CreateClaimInput {
+   tenantId: string
+   externalRef: string
+   status: ClaimStatus
+-  amount: number
+-  currency: string
++  money: Money
+   claimantName: string
+   lossDate: string
+ }
+diff --git a/src/http/routes/claims.ts b/src/http/routes/claims.ts
+index 1dd4e0e..d085c52 100644
+--- a/src/http/routes/claims.ts
++++ b/src/http/routes/claims.ts
+@@ -2,6 +2,8 @@ import { getDocumentsForClaims } from "../../db/repositories/documents"
+ import type { DbClient } from "../../db/client"
+ import { getClaimById, insertClaim, listClaimsByTenantKeyset } from "../../db/repositories/claims"
+ import type { ClaimsCursor } from "../../db/repositories/claims"
++import type { Claim } from "../../domain/claim"
++import { parseMoney, toWireAmountV1 } from "../../money/money"
+ import type { Outbox } from "../../queue/outbox"
+ import { findOperationCompatibility } from "../compatibility-descriptor"
+ import { badRequest, notFound } from "../errors"
+@@ -84,6 +86,17 @@ export function parseCreateClaimBody(body: unknown): ParseClaimInputResult {
+   return parseClaimInput(body)
+ }
+ 
++/**
++ * The v1 wire shape for a claim: `amount`/`currency` as flat top-level fields, `amount` a
++ * major-unit float built from the exact `money` value - see src/money/money.ts's
++ * `toWireAmountV1`. Every response this file sends goes through this one function, so there is
++ * exactly one place that knows how a claim looks on the wire today.
++ */
++function serializeClaimForV1(claim: Claim): Record<string, unknown> {
++  const { money, ...rest } = claim
++  return { ...rest, amount: toWireAmountV1(money), currency: money.currency }
++}
++
+ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+   app.post("/claims", async (req) => {
+     const tenantId = requireTenantId(req)
+@@ -92,19 +105,23 @@ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+       return badRequest({ message: parsed.reason, correlationId: req.correlationId })
+     }
+ 
++    const moneyResult = parseMoney({ amount: parsed.value.amount, currency: parsed.value.currency })
++    if (!moneyResult.ok) {
++      return badRequest({ message: moneyResult.reason, correlationId: req.correlationId })
++    }
++
+     const claim = await insertClaim(deps.db, {
+       tenantId,
+       externalRef: parsed.value.externalRef,
+       status: "submitted",
+-      amount: parsed.value.amount,
+-      currency: parsed.value.currency,
++      money: moneyResult.value,
+       claimantName: parsed.value.claimantName,
+       lossDate: parsed.value.lossDate,
+     })
+ 
+     deps.outbox.enqueue({ type: "claim.processed", tenantId, claimId: claim.id })
+ 
+-    return { statusCode: 201, body: claim }
++    return { statusCode: 201, body: serializeClaimForV1(claim) }
+   })
+ 
+   app.get("/claims", async (req) => {
+@@ -142,7 +159,7 @@ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+       headers: deprecationHeaders(req.query.offset !== undefined),
+       body: {
+         claims: claims.map((claim) => ({
+-          ...claim,
++          ...serializeClaimForV1(claim),
+           documentCount: documentsByClaimId[claim.id]?.length ?? 0,
+         })),
+         nextCursor,
+@@ -156,6 +173,6 @@ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+     if (!claim) {
+       return notFound({ message: `claim ${req.params.id} not found`, correlationId: req.correlationId })
+     }
+-    return { statusCode: 200, body: claim }
++    return { statusCode: 200, body: serializeClaimForV1(claim) }
+   })
+ }
+diff --git a/src/money/money.ts b/src/money/money.ts
+index f32d569..e44fce8 100644
+--- a/src/money/money.ts
++++ b/src/money/money.ts
+@@ -1,6 +1,109 @@
+-/** Dollars, floating point, everywhere in Meridian today. */
+-export type Money = number
++/**
++ * Money as an exact value type: an integer count of the currency's minor unit (cents for
++ * USD), paired with the currency code. A plain `number` holds that integer, not the literal
++ * `bigint` primitive - `Number.isSafeInteger` covers every realistic claim amount many times
++ * over, and unlike `bigint`, a `number` survives `JSON.stringify` at the HTTP boundary with no
++ * custom (de)serialization. What matters for MER-201 is that the value is an EXACT INTEGER,
++ * never a fractional dollar amount subject to binary floating-point rounding - see
++ * src/money/round-half-up.ts for the one place any rounding happens.
++ */
+ 
+-export function formatMoney(amount: Money, currency: string): string {
+-  return `${currency} ${amount.toFixed(2)}`
++export type CurrencyCode = string
++
++export interface Money {
++  readonly minorUnits: number
++  readonly currency: CurrencyCode
++}
++
++/**
++ * How many minor units make up one major unit, per ISO 4217 - 2 for USD (100 cents to the
++ * dollar), 0 for a currency with no subdivision, 3 for one of the few that has three decimal
++ * places. A currency missing from this table falls back to 2, the overwhelmingly common case,
++ * rather than refusing to parse an amount in a real but unlisted currency.
++ */
++export const MINOR_UNIT_SCALE: Record<string, number> = {
++  USD: 2,
++  EUR: 2,
++  GBP: 2,
++  CAD: 2,
++  AUD: 2,
++  JPY: 0,
++  KRW: 0,
++  BHD: 3,
++  KWD: 3,
++  OMR: 3,
++}
++
++export function minorUnitScale(currency: string): number {
++  return MINOR_UNIT_SCALE[currency] ?? 2
++}
++
++export type ParseMoneyResult = { ok: true; value: Money } | { ok: false; reason: string }
++
++export interface ParseMoneyInput {
++  amount: unknown
++  currency: unknown
++}
++
++/**
++ * Parses a wire-shaped decimal amount (a JSON number expressed in major units - dollars, not
++ * cents) into an exact integer count of minor units. This is the one place a floating-point
++ * amount is allowed to exist in this codebase, and only for as long as it takes to convert it -
++ * every calculation past this function's return statement works in exact minor units.
++ *
++ * Rejects, rather than truncates, an amount that cannot be represented exactly in the target
++ * currency's minor unit - $412.995 has no exact number of cents, and silently dropping the
++ * third decimal digit is exactly the kind of per-request rounding that produced Finance's drift.
++ */
++export function parseMoney(input: ParseMoneyInput): ParseMoneyResult {
++  const { amount, currency } = input
++  if (typeof currency !== "string" || currency.length === 0) {
++    return { ok: false, reason: "currency must be a non-empty string" }
++  }
++  if (typeof amount !== "number" || !Number.isFinite(amount)) {
++    return { ok: false, reason: "amount must be a finite number" }
++  }
++
++  const scale = minorUnitScale(currency)
++  const scaled = amount * 10 ** scale
++  const rounded = Math.round(scaled)
++
++  // `amount * 10 ** scale` is itself floating-point arithmetic, so a value that has an exact
++  // minor-unit representation (412.19 in USD) can still land a hair off the integer (a value
++  // like 41218.999999999996) purely from binary rounding of the multiplication. Comparing
++  // against a tight epsilon - not equality - tells "the true value has more precision than
++  // this currency's minor unit can hold" (412.995 in USD, off by 0.5) apart from "the
++  // multiplication itself introduced noise" (off by a few parts in 10^13).
++  if (Math.abs(scaled - rounded) > 1e-6) {
++    return {
++      ok: false,
++      reason: `amount cannot be represented exactly in ${currency}'s minor unit`,
++    }
++  }
++  if (!Number.isSafeInteger(rounded)) {
++    return { ok: false, reason: "amount is too large to represent exactly" }
++  }
++
++  return { ok: true, value: { minorUnits: rounded, currency } }
++}
++
++/** The exact minor-unit count as a major-unit decimal string, e.g. "412.19" - for display,
++ * never for a further calculation. */
++export function formatMoney(money: Money): string {
++  const scale = minorUnitScale(money.currency)
++  return `${money.currency} ${(money.minorUnits / 10 ** scale).toFixed(scale)}`
++}
++
++/**
++ * The v1 wire representation of an exact `Money` value: a major-unit decimal number, the same
++ * shape this API served before this ticket existed. This is the one v1 money serializer, kept
++ * unchanged by every wire-format change that follows it in this codebase's future. Converting
++ * minor units back to a float is lossless for display (10^-scale of an exact integer is exactly
++ * representable for every scale this table uses), but the result is a float again, which is
++ * exactly why nothing downstream of the HTTP response body may ever read it back in as the
++ * system's source of truth.
++ */
++export function toWireAmountV1(money: Money): number {
++  const scale = minorUnitScale(money.currency)
++  return money.minorUnits / 10 ** scale
+ }
+diff --git a/src/money/round-half-up.ts b/src/money/round-half-up.ts
+index 8683c8c..1894ec8 100644
+--- a/src/money/round-half-up.ts
++++ b/src/money/round-half-up.ts
+@@ -1,21 +1,63 @@
+ /**
+- * Rounds a dollar amount to the nearest cent, ties rounding up. `amount` is a plain JavaScript
+- * number (see src/money/money.ts), so this is floating point arithmetic scaled by 100, not
+- * decimal arithmetic.
++ * The one place any Meridian money calculation rounds a fractional minor-unit amount down to a
++ * whole one. File name is legacy - it shipped as "round half up," which biases every exact
++ * half-cent the same direction and is why Finance's reconciliation drifted by a predictable
++ * amount every month. MER-201 replaces the rounding rule, in this same module, with round-half-
++ * to-even: an exact tie rounds to whichever neighbor is even, so the bias does not accumulate
++ * in one direction over 40,000 claims.
+  */
+-export function roundHalfUp(amount: number): number {
+-  return Math.round(amount * 100) / 100
++import type { Money } from "./money"
++
++/** Round-half-to-even ("banker's rounding") on a fractional minor-unit count. Only ever called
++ * once per calculation - see `allocateRoundedTotal` below for why a second rounding call would
++ * undo the guarantee this function exists to provide. */
++export function roundHalfEven(value: number): number {
++  const floor = Math.floor(value)
++  const diff = value - floor
++  if (diff < 0.5) return floor
++  if (diff > 0.5) return floor + 1
++  return floor % 2 === 0 ? floor : floor + 1
+ }
+ 
+ /**
+- * Rounds a whole payout and spreads it across `count` equal line items so the parts still
+- * sum to the total - the remainder cents land on the first line item.
++ * Splits an exact `total` into `count` line items whose minor units sum back to EXACTLY
++ * `total.minorUnits` - never an approximation, never "off by a cent somewhere." `roundHalfEven`
++ * is called exactly once, to decide each item's base share from `total.minorUnits / count`
++ * (which is almost never a whole number); every minor unit left over after that base share is
++ * placed by exact integer arithmetic, never a second rounding pass. That is the difference
++ * between this function and the old `allocateEvenly` it replaces, which rounded the shared
++ * amount AND rounded the remainder - two rounding points computing over floating-point dollars,
++ * which is exactly how a total stopped summing back to itself.
+  */
+-export function allocateEvenly(total: number, count: number): number[] {
++export interface AllocateRoundedTotalInput {
++  total: Money
++  count: number
++}
++
++export function allocateRoundedTotal(input: AllocateRoundedTotalInput): Money[] {
++  const { total, count } = input
+   if (count <= 0) return []
+-  const share = roundHalfUp(total / count)
+-  const shares = new Array(count).fill(share)
+-  const remainder = roundHalfUp(total - share * count)
+-  shares[0] = roundHalfUp(shares[0] + remainder)
+-  return shares
++
++  const baseShare = roundHalfEven(total.minorUnits / count)
++  const shares = new Array(count).fill(baseShare) as number[]
++
++  // `residual` is always a whole number of minor units, positive when the base share rounded
++  // down (there is leftover to hand out) and negative when it rounded up (one too many minor
++  // units were handed out and some items must give one back). Placing it one minor unit at a
++  // time, front-loaded, keeps every item within one minor unit of every other and the sum
++  // exact by construction - no further rounding decision is ever made.
++  let residual = total.minorUnits - baseShare * count
++  let index = 0
++  while (residual > 0) {
++    shares[index % count] += 1
++    residual -= 1
++    index += 1
++  }
++  while (residual < 0) {
++    shares[index % count] -= 1
++    residual += 1
++    index += 1
++  }
++
++  return shares.map((minorUnits) => ({ minorUnits, currency: total.currency }))
+ }
+diff --git a/test/money/round-half-up.test.ts b/test/money/round-half-up.test.ts
+index 0c5ab46..4092afb 100644
+--- a/test/money/round-half-up.test.ts
++++ b/test/money/round-half-up.test.ts
+@@ -1,16 +1,43 @@
+ import { describe, expect, it } from "vitest"
+-import { roundHalfUp } from "../../src/money/round-half-up"
++import { allocateRoundedTotal, roundHalfEven } from "../../src/money/round-half-up"
+ 
+-describe("roundHalfUp", () => {
+-  it("leaves an amount that is already two decimal places unchanged", () => {
+-    expect(roundHalfUp(20)).toBe(20)
++describe("roundHalfEven", () => {
++  it("leaves a whole minor-unit count unchanged", () => {
++    expect(roundHalfEven(2000)).toBe(2000)
+   })
+ 
+-  it("rounds down when the third decimal is below five", () => {
+-    expect(roundHalfUp(10.123)).toBe(10.12)
++  it("rounds down when the fraction is below a half", () => {
++    expect(roundHalfEven(10.12)).toBe(10)
+   })
+ 
+-  it("rounds up when the third decimal is five or above", () => {
+-    expect(roundHalfUp(10.127)).toBe(10.13)
++  it("rounds up when the fraction is above a half", () => {
++    expect(roundHalfEven(10.87)).toBe(11)
++  })
++
++  it("rounds an exact tie to the even neighbor, not always up", () => {
++    expect(roundHalfEven(2.5)).toBe(2)
++    expect(roundHalfEven(3.5)).toBe(4)
++  })
++})
++
++describe("allocateRoundedTotal", () => {
++  it("splits a total that divides evenly with no remainder to place", () => {
++    const shares = allocateRoundedTotal({ total: { minorUnits: 300, currency: "USD" }, count: 3 })
++    expect(shares).toEqual([
++      { minorUnits: 100, currency: "USD" },
++      { minorUnits: 100, currency: "USD" },
++      { minorUnits: 100, currency: "USD" },
++    ])
++  })
++
++  it("sums back to exactly the original total when the split does not divide evenly", () => {
++    const shares = allocateRoundedTotal({ total: { minorUnits: 100, currency: "USD" }, count: 3 })
++    const sum = shares.reduce((total, share) => total + share.minorUnits, 0)
++    expect(sum).toBe(100)
++    expect(shares.map((share) => share.minorUnits)).toEqual([34, 33, 33])
++  })
++
++  it("returns no shares for a non-positive count", () => {
++    expect(allocateRoundedTotal({ total: { minorUnits: 100, currency: "USD" }, count: 0 })).toEqual([])
+   })
+ })

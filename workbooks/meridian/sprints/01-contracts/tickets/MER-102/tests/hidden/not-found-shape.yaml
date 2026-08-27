@@ -1,0 +1,17 @@
+humanName: "Escaped: a not-found response uses a different envelope than a validation error"
+tags:
+  - error-taxonomy-http-codes
+kind: io-case
+input:
+  message: "claim clm_missing not found"
+  correlationId: "corr_test_2"
+expected:
+  statusCode: 404
+  body:
+    error:
+      code: "NOT_FOUND"
+      message: "claim clm_missing not found"
+      correlationId: "corr_test_2"
+entryPoint:
+  module: "src/http/errors.ts"
+  export: "notFound"

@@ -1,0 +1,17 @@
+intent: "Sign outbound webhooks with HMAC-SHA256 and let receivers reject replays, so partners can finally treat a delivery from Meridian as authenticated."
+decisions:
+  - decision: "Sign only the JSON body, and send the timestamp as a separate, unsigned x-meridian-timestamp header."
+    justification: "Wrong: nothing ties the signature to the timestamp, so a captured request can be replayed indefinitely with the timestamp header rewritten to the current time. A freshness check on the receiving end is checking a value the sender never actually vouched for."
+  - decision: "Compare the recomputed and received signatures with the === operator."
+    justification: "Wrong in principle even though the practical exploitability is debatable - a fixed-length HMAC digest is exactly the shape constant-time comparison exists for, and there is no real cost to using it, so declining to is an unforced error, not a defensible tradeoff."
+  - decision: "Verify against a single configured secret."
+    justification: "Wrong: it works today because the secret has never rotated. The first time it does, every in-flight delivery signed with the outgoing key fails verification with no way to age it out gracefully."
+  - decision: "Add one test asserting a tampered body fails verification, and describe the PR as done."
+    justification: "Correct as far as it goes, and exactly why it is dangerous: it is the one property a naive implementation was always going to get right, so a green suite built only from it certifies nothing about replay, key rotation, or the timestamp binding - the actual asks in the original ticket."
+doNotVolunteer:
+  - "Do not mention that the timestamp-forgery attack works even without ever learning the secret, unless asked directly - let the learner reason out why a valid signature over the wrong timestamp is still accepted."
+  - "Do not mention the specific fix shape (timestamp inside the signed base string) unless the learner has already named that the timestamp needs to be bound to the signature somehow."
+concession_triggers:
+  - "If the learner names that the signature must cover the timestamp (not just the body) so a forged timestamp invalidates it, concede immediately - that is the load-bearing fix."
+  - "If the learner points out that a freshness check and a replay cache are two different protections and the PR only gestures at the first, concede that this is a second, independent gap."
+  - "If the learner pushes back on the string-equality comment by naming that 'unforced error' is the right frame even without a proven practical exploit, concede the point rather than defending the dismissal further."

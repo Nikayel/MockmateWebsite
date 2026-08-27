@@ -1,0 +1,6 @@
+id: fixture
+title: "Fixture Workbook"
+objectives:
+  - id: money
+    label: "Money"
+    canDo: "I can decide a rounding rule with no single correct answer."

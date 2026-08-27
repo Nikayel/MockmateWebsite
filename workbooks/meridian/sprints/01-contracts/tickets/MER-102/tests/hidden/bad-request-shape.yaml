@@ -1,0 +1,17 @@
+humanName: "Escaped: a validation error response does not carry the VALIDATION_ERROR code"
+tags:
+  - error-taxonomy-http-codes
+kind: io-case
+input:
+  message: "externalRef must be a non-empty string"
+  correlationId: "corr_test_1"
+expected:
+  statusCode: 400
+  body:
+    error:
+      code: "VALIDATION_ERROR"
+      message: "externalRef must be a non-empty string"
+      correlationId: "corr_test_1"
+entryPoint:
+  module: "src/http/errors.ts"
+  export: "badRequest"

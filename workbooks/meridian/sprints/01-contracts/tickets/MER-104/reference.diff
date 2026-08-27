@@ -1,0 +1,328 @@
+diff --git a/src/app.ts b/src/app.ts
+index fda6450..7acd005 100644
+--- a/src/app.ts
++++ b/src/app.ts
+@@ -4,6 +4,7 @@ import { createOutboxDeliveryHandler } from "./delivery/webhooks"
+ import type { WebhookHttpClient } from "./delivery/types"
+ import { createApp } from "./http/server"
+ import type { App } from "./http/types"
++import { registerOpenapiRoutes } from "./http/openapi"
+ import { registerClaimRoutes } from "./http/routes/claims"
+ import { registerDocumentRoutes } from "./http/routes/documents"
+ import { registerHealthRoutes } from "./http/routes/health"
+@@ -40,6 +41,7 @@ export function createMeridianApp(deps: MeridianAppDeps): MeridianApp {
+   registerHealthRoutes(app)
+   registerClaimRoutes(app, { db, outbox })
+   registerDocumentRoutes(app, { db })
++  registerOpenapiRoutes(app)
+ 
+   return {
+     app,
+diff --git a/src/http/compatibility-descriptor.ts b/src/http/compatibility-descriptor.ts
+new file mode 100644
+index 0000000..b1e2f9f
+--- /dev/null
++++ b/src/http/compatibility-descriptor.ts
+@@ -0,0 +1,102 @@
++/**
++ * The single source of which query parameters an operation accepts today, which of those are
++ * on a path to sunset, and when. Both the runtime (which stamps `Deprecation`/`Sunset`
++ * headers - see src/http/routes/claims.ts) and the generated OpenAPI document
++ * (src/http/openapi.ts) read from exactly this list. Neither keeps its own copy, so they
++ * cannot say two different things about the same parameter - see MER-104.
++ */
++
++export interface DeprecationInfo {
++  /** Why the parameter is going away, for the generated document's description. */
++  reason: string
++  /** An RFC 3339 date. After this date the parameter may stop being honoured at all. */
++  sunset: string
++}
++
++export interface QueryParameterDescriptor {
++  name: string
++  description: string
++  required: boolean
++  deprecated?: DeprecationInfo
++}
++
++export interface OperationCompatibility {
++  operationId: string
++  method: string
++  /** An OpenAPI-style path template, matching `App.routes()`'s own shape exactly. */
++  path: string
++  queryParameters: QueryParameterDescriptor[]
++}
++
++/**
++ * `offset` is what the claims list took before MER-103 moved paging to a cursor. It is kept
++ * here, deprecated rather than deleted outright, so a caller still sending it does not break
++ * the moment this ships - see the ticket body for why silence isn't the same as backward
++ * compatibility.
++ */
++export const COMPATIBILITY_DESCRIPTOR: OperationCompatibility[] = [
++  {
++    operationId: "listClaims",
++    method: "GET",
++    path: "/claims",
++    queryParameters: [
++      {
++        name: "cursor",
++        description: "An opaque token naming the last claim already seen; omit it for the first page.",
++        required: false,
++      },
++      {
++        name: "limit",
++        description: "How many claims to return, from 1 up to 100.",
++        required: false,
++      },
++      {
++        name: "offset",
++        description: "The zero-based row offset into the tenant's claim list.",
++        required: false,
++        deprecated: {
++          reason: "Superseded by cursor, which does not shift under concurrent writes.",
++          sunset: "2026-11-30",
++        },
++      },
++    ],
++  },
++  {
++    operationId: "createClaim",
++    method: "POST",
++    path: "/claims",
++    queryParameters: [],
++  },
++  {
++    operationId: "getClaim",
++    method: "GET",
++    path: "/claims/{id}",
++    queryParameters: [],
++  },
++  {
++    operationId: "listDocumentsForClaim",
++    method: "GET",
++    path: "/claims/{id}/documents",
++    queryParameters: [],
++  },
++  {
++    operationId: "getHealth",
++    method: "GET",
++    path: "/health",
++    queryParameters: [],
++  },
++]
++
++export interface OperationLocator {
++  method: string
++  path: string
++}
++
++/** Looked up by the exact same `{method, path}` shape `App.routes()` returns, so this can
++ * never quietly disagree with the live route table over whether a path is templated `{id}`
++ * or `:id`. */
++export function findOperationCompatibility(locator: OperationLocator): OperationCompatibility | undefined {
++  return COMPATIBILITY_DESCRIPTOR.find(
++    (operation) => operation.method === locator.method && operation.path === locator.path
++  )
++}
+diff --git a/src/http/openapi.ts b/src/http/openapi.ts
+new file mode 100644
+index 0000000..25aae5c
+--- /dev/null
++++ b/src/http/openapi.ts
+@@ -0,0 +1,110 @@
++import { COMPATIBILITY_DESCRIPTOR } from "./compatibility-descriptor"
++import type { OperationCompatibility, QueryParameterDescriptor } from "./compatibility-descriptor"
++import type { App } from "./types"
++
++export interface OpenApiParameter {
++  name: string
++  in: "query"
++  required: boolean
++  description: string
++  deprecated?: true
++  schema: { type: "string" }
++}
++
++export interface OpenApiOperation {
++  operationId: string
++  parameters: OpenApiParameter[]
++}
++
++type OpenApiMethod = "get" | "post"
++
++export interface OpenApiDocument {
++  openapi: "3.1.0"
++  info: { title: string; version: string }
++  paths: Record<string, Partial<Record<OpenApiMethod, OpenApiOperation>>>
++}
++
++function toOpenApiParameter(parameter: QueryParameterDescriptor): OpenApiParameter {
++  const description =
++    parameter.deprecated === undefined
++      ? parameter.description
++      : `${parameter.description} Deprecated, sunsetting ${parameter.deprecated.sunset}: ${parameter.deprecated.reason}`
++
++  return {
++    name: parameter.name,
++    in: "query",
++    required: parameter.required,
++    description,
++    ...(parameter.deprecated !== undefined ? { deprecated: true as const } : {}),
++    schema: { type: "string" },
++  }
++}
++
++function toOpenApiOperation(operation: OperationCompatibility): OpenApiOperation {
++  return {
++    operationId: operation.operationId,
++    parameters: operation.queryParameters.map(toOpenApiParameter),
++  }
++}
++
++function toMethodKey(method: string): OpenApiMethod {
++  const lower = method.toLowerCase()
++  if (lower !== "get" && lower !== "post") {
++    throw new Error(`compatibility descriptor names an unsupported HTTP method: ${method}`)
++  }
++  return lower
++}
++
++/**
++ * Builds the OpenAPI document from the exact same compatibility descriptor the runtime reads
++ * to stamp `Deprecation`/`Sunset` headers (src/http/compatibility-descriptor.ts) - there is no
++ * second, hand-maintained copy of which query parameters exist or when they sunset, so the
++ * two cannot drift from each other.
++ */
++export function generateOpenApiDocument(): OpenApiDocument {
++  const paths: OpenApiDocument["paths"] = {}
++  for (const operation of COMPATIBILITY_DESCRIPTOR) {
++    const methodKey = toMethodKey(operation.method)
++    paths[operation.path] = {
++      ...paths[operation.path],
++      [methodKey]: toOpenApiOperation(operation),
++    }
++  }
++  return {
++    openapi: "3.1.0",
++    info: { title: "Meridian Claims API", version: "1" },
++    paths,
++  }
++}
++
++/**
++ * Names every place a registered route and the compatibility descriptor disagree - a route
++ * with nothing documented, or a documented operation with no matching registered route.
++ * Never a frozen snapshot equality check: the document is checked for AGREEMENT with the live
++ * route table, so a route added or removed without updating the descriptor fails loudly here
++ * instead of drifting silently.
++ */
++export function findContractDrift(app: App): string[] {
++  const documented = new Set(
++    COMPATIBILITY_DESCRIPTOR.map((operation) => `${operation.method} ${operation.path}`)
++  )
++  // The document does not describe the route that serves the document itself - the same
++  // convention every OpenAPI document in the wild follows.
++  documented.add("GET /openapi.json")
++  const registered = new Set(app.routes().map((route) => `${route.method} ${route.path}`))
++
++  const drift: string[] = []
++  for (const key of registered) {
++    if (!documented.has(key)) drift.push(`registered route "${key}" is not documented`)
++  }
++  for (const key of documented) {
++    if (!registered.has(key)) drift.push(`documented operation "${key}" is not a registered route`)
++  }
++  return drift
++}
++
++/** Serves the generated document at `/openapi.json` - the same object `generateOpenApiDocument`
++ * returns, never a second hand-maintained copy on disk. */
++export function registerOpenapiRoutes(app: App): void {
++  app.get("/openapi.json", () => ({ statusCode: 200, body: generateOpenApiDocument() }))
++}
+diff --git a/src/http/routes/claims.ts b/src/http/routes/claims.ts
+index 623da95..19c13b6 100644
+--- a/src/http/routes/claims.ts
++++ b/src/http/routes/claims.ts
+@@ -3,6 +3,7 @@ import type { DbClient } from "../../db/client"
+ import { getClaimById, insertClaim, listClaimsByTenantKeyset } from "../../db/repositories/claims"
+ import type { ClaimsCursor } from "../../db/repositories/claims"
+ import type { Outbox } from "../../queue/outbox"
++import { findOperationCompatibility } from "../compatibility-descriptor"
+ import { badRequest, notFound } from "../errors"
+ import { parseClaimInput } from "../parsers/claim-input"
+ import { requireTenantId } from "../request-context"
+@@ -60,6 +61,18 @@ function encodeClaimsCursor(cursor: ClaimsCursor): string {
+   return JSON.stringify(cursor)
+ }
+ 
++/** A caller still on `offset` gets a `Deprecation`/`Sunset` header stamped from the same
++ * compatibility descriptor the generated OpenAPI document reads - see src/http/openapi.ts.
++ * There is nowhere else in this file that could disagree with the date it publishes. */
++function deprecationHeaders(usedOffset: boolean): Record<string, string> {
++  if (!usedOffset) return {}
++  const deprecated = findOperationCompatibility({ method: "GET", path: "/claims" })?.queryParameters.find(
++    (parameter) => parameter.name === "offset"
++  )?.deprecated
++  if (!deprecated) return {}
++  return { deprecation: "true", sunset: deprecated.sunset }
++}
++
+ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+   app.post("/claims", async (req) => {
+     const tenantId = requireTenantId(req)
+@@ -115,6 +128,7 @@ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+ 
+     return {
+       statusCode: 200,
++      headers: deprecationHeaders(req.query.offset !== undefined),
+       body: {
+         claims: claims.map((claim) => ({
+           ...claim,
+diff --git a/src/http/server.ts b/src/http/server.ts
+index 6c62752..9e14693 100644
+--- a/src/http/server.ts
++++ b/src/http/server.ts
+@@ -140,10 +140,15 @@ export function createApp(config: MeridianConfig = loadConfig()): App {
+     }
+   }
+ 
++  function toRoutePath(segments: string[]): string {
++    return "/" + segments.map((segment) => (segment.startsWith(":") ? `{${segment.slice(1)}}` : segment)).join("/")
++  }
++
+   return {
+     get: (path, handler) => register("GET", path, handler),
+     post: (path, handler) => register("POST", path, handler),
+     inject,
++    routes: () => routes.map((route) => ({ method: route.method, path: toRoutePath(route.segments) })),
+     config,
+   }
+ }
+diff --git a/src/http/types.ts b/src/http/types.ts
+index f120ac7..97238c0 100644
+--- a/src/http/types.ts
++++ b/src/http/types.ts
+@@ -44,9 +44,20 @@ export interface HandlerResponse {
+ 
+ export type RouteHandler = (req: HandlerRequest) => HandlerResponse | Promise<HandlerResponse>
+ 
++/** One route as it was actually registered - the live route table a generated contract
++ * document can be checked against, instead of a second, hand-maintained list that can drift
++ * from what the server actually serves. */
++export interface RegisteredRouteInfo {
++  method: string
++  /** An OpenAPI-style path template, e.g. "/claims/{id}" - never the internal ":id" form. */
++  path: string
++}
++
+ export interface App {
+   get(path: string, handler: RouteHandler): void
+   post(path: string, handler: RouteHandler): void
+   inject(request: InjectRequest): Promise<InjectResponse>
++  /** Every route registered so far, in registration order. */
++  routes(): RegisteredRouteInfo[]
+   config: MeridianConfig
+ }

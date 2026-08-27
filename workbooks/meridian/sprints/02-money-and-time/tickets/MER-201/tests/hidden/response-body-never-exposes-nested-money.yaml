@@ -1,0 +1,25 @@
+humanName: "Escaped: the response body exposes a nested money object instead of the flat v1 shape"
+tags:
+  - exact-money-representation-rounding
+kind: probe
+# This hidden tier's it() callback runs as a plain, non-async callback, so this returns a
+# promise chain instead of using await.
+body: |
+  const { meridian } = buildTestApp()
+  return meridian.app
+    .inject({
+      method: "POST",
+      url: "/claims",
+      headers: { "x-tenant-id": "ten_northwind" },
+      payload: {
+        externalRef: "NW-9201",
+        amount: 88.5,
+        claimantName: "Test Claimant",
+        lossDate: "2026-01-01",
+      },
+    })
+    .then((response) => {
+      const body = response.json()
+      assert(typeof body.amount === "number", "the v1 response must still carry a flat amount field")
+      assert(body.money === undefined, "the v1 response must not leak the internal nested money value")
+    })

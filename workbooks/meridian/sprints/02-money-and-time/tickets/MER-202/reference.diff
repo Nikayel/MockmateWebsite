@@ -1,0 +1,176 @@
+diff --git a/src/domain/calendar-date.ts b/src/domain/calendar-date.ts
+new file mode 100644
+index 0000000..b45c416
+--- /dev/null
++++ b/src/domain/calendar-date.ts
+@@ -0,0 +1,104 @@
++/**
++ * A civil calendar date - "March 8th, 2026" - with no time of day and no time zone. Distinct
++ * from an instant (an ISO-8601 UTC timestamp like `createdAt`) on purpose: the two are never
++ * silently interchangeable past this module's own functions. MER-202 exists because a moment
++ * in time and a calendar day were being treated as the same thing.
++ */
++export interface CalendarDate {
++  readonly year: number
++  readonly month: number // 1-12
++  readonly day: number // 1-31
++}
++
++/** Parses a "YYYY-MM-DD" string into its three numeric parts. Does not validate that the day
++ * is in range for the month - every caller in this codebase only ever feeds this a string this
++ * module or the database itself produced. */
++export function calendarDateFromISO(iso: string): CalendarDate {
++  const [year, month, day] = iso.split("-").map(Number)
++  return { year, month, day }
++}
++
++export function calendarDateToISO(date: CalendarDate): string {
++  const year = String(date.year).padStart(4, "0")
++  const month = String(date.month).padStart(2, "0")
++  const day = String(date.day).padStart(2, "0")
++  return `${year}-${month}-${day}`
++}
++
++export interface CompareCalendarDatesInput {
++  a: CalendarDate
++  b: CalendarDate
++}
++
++export function compareCalendarDates(input: CompareCalendarDatesInput): number {
++  return calendarDateToISO(input.a).localeCompare(calendarDateToISO(input.b))
++}
++
++export interface AddCalendarDaysInput {
++  date: CalendarDate
++  days: number
++}
++
++/**
++ * Adds `days` calendar days to `date` and returns the resulting calendar date - month and
++ * year rollover, leap years, all handled by delegating to `Date.UTC`'s own day-overflow
++ * arithmetic. This never touches a clock or a time zone, so a daylight-saving transition
++ * anywhere in the window has no way to reach it: adding calendar days to a calendar date is
++ * arithmetic on a calendar, not on time.
++ */
++export function addCalendarDays(input: AddCalendarDaysInput): CalendarDate {
++  const { date, days } = input
++  const utcMidnight = new Date(Date.UTC(date.year, date.month - 1, date.day))
++  utcMidnight.setUTCDate(utcMidnight.getUTCDate() + days)
++  return {
++    year: utcMidnight.getUTCFullYear(),
++    month: utcMidnight.getUTCMonth() + 1,
++    day: utcMidnight.getUTCDate(),
++  }
++}
++
++/**
++ * The real UTC offset, in minutes, a given IANA time zone was actually observing at
++ * `instantMs` - read out of the JS engine's own tz database via `Intl`, so a date inside a
++ * daylight-saving transition gets the offset that transition actually put in effect, never a
++ * fixed year-round number. This is the one place this module reads real-world zone rules.
++ */
++function utcOffsetMinutesAt(instantMs: number, timeZone: string): number {
++  const parts = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "shortOffset" }).formatToParts(
++    new Date(instantMs)
++  )
++  const offsetText = parts.find((part) => part.type === "timeZoneName")?.value ?? "GMT+0"
++  const match = offsetText.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/)
++  if (!match) return 0
++  const sign = match[1] === "-" ? -1 : 1
++  const hours = Number(match[2])
++  const minutes = match[3] ? Number(match[3]) : 0
++  return sign * (hours * 60 + minutes)
++}
++
++/**
++ * The calendar date `instantIso` falls on when read in `timeZone` - not the server's zone, not
++ * UTC. Uses `Intl.DateTimeFormat` against the real tz database, so a half-hour offset and a
++ * daylight-saving transition are both handled by the same code path that handles every other
++ * zone, rather than a special case.
++ */
++export function calendarDateInZone(instantIso: string, timeZone: string): CalendarDate {
++  const formatter = new Intl.DateTimeFormat("en-CA", {
++    timeZone,
++    year: "numeric",
++    month: "2-digit",
++    day: "2-digit",
++  })
++  return calendarDateFromISO(formatter.format(new Date(instantIso)))
++}
++
++/** The first instant (as epoch milliseconds) of `date`'s calendar day in `timeZone` - midnight
++ * local time, converted to UTC using the offset actually in effect at that moment. Exported for
++ * a deadline that needs to become a real instant later (a scheduler, an alert) rather than stay
++ * a calendar date forever - not currently called inside this ticket's own HTTP surface, whose
++ * deadlines are reported as calendar dates. */
++export function startOfCalendarDayInZone(date: CalendarDate, timeZone: string): number {
++  const naiveUtcMs = Date.UTC(date.year, date.month - 1, date.day)
++  const offsetMinutes = utcOffsetMinutesAt(naiveUtcMs, timeZone)
++  return naiveUtcMs - offsetMinutes * 60_000
++}
+diff --git a/src/domain/claim.ts b/src/domain/claim.ts
+index 16071c2..ed1b316 100644
+--- a/src/domain/claim.ts
++++ b/src/domain/claim.ts
+@@ -1,3 +1,4 @@
++import { addCalendarDays, calendarDateInZone, calendarDateToISO } from "./calendar-date"
+ import type { ClaimStatus } from "./claim-status"
+ import type { Money } from "../money/money"
+ 
+@@ -29,35 +30,16 @@ export interface CreateClaimInput {
+   lossDate: string
+ }
+ 
+-/**
+- * How many minutes each zone sits from UTC - a single number per zone, the same one all
+- * year round. This is what "the day it was filed" was computed with before MER-202: correct
+- * for whichever season the number was chosen in, and wrong by exactly the daylight-saving
+- * delta for the rest of the year. Real zones do not have one offset; they have a history of
+- * them. See src/domain/calendar-date.ts for the fix.
+- */
+-const FIXED_ZONE_OFFSET_MINUTES: Record<string, number> = {
+-  "America/Chicago": -360,
+-  "America/New_York": -300,
+-  "America/Los_Angeles": -480,
+-  "America/St_Johns": -210,
+-  UTC: 0,
+-}
+-
+-function fixedOffsetMinutesFor(timeZone: string): number {
+-  return FIXED_ZONE_OFFSET_MINUTES[timeZone] ?? 0
+-}
+-
+ export interface FiledOnDateInput {
+   createdAt: string
+   timeZone: string
+ }
+ 
+-/** The calendar day (YYYY-MM-DD) a claim counts as filed on, in the owning tenant's own zone. */
++/** The calendar day (YYYY-MM-DD) a claim counts as filed on, in the owning tenant's own zone -
++ * see src/domain/calendar-date.ts's `calendarDateInZone`, which reads the zone's real,
++ * daylight-saving-aware offset rather than a single fixed number. */
+ export function filedOnDate(input: FiledOnDateInput): string {
+-  const offsetMs = fixedOffsetMinutesFor(input.timeZone) * 60_000
+-  const localMs = new Date(input.createdAt).getTime() + offsetMs
+-  return new Date(localMs).toISOString().slice(0, 10)
++  return calendarDateToISO(calendarDateInZone(input.createdAt, input.timeZone))
+ }
+ 
+ export interface ClaimDeadlineInput {
+@@ -66,8 +48,13 @@ export interface ClaimDeadlineInput {
+   days: number
+ }
+ 
+-/** A calendar-day deadline, `days` days after the claim's filed-on date. */
++/**
++ * A calendar-day deadline, `days` days after the claim's filed-on date. Built entirely from
++ * `filedOnDate` plus pure calendar arithmetic (`addCalendarDays`) - never from adding
++ * milliseconds to the original instant, which is exactly the computation a daylight-saving
++ * transition inside the window quietly shifts by an hour.
++ */
+ export function computeClaimDeadline(input: ClaimDeadlineInput): string {
+-  const deadlineMs = new Date(input.createdAt).getTime() + input.days * 24 * 60 * 60 * 1000
+-  return new Date(deadlineMs).toISOString().slice(0, 10)
++  const filedOn = calendarDateInZone(input.createdAt, input.timeZone)
++  return calendarDateToISO(addCalendarDays({ date: filedOn, days: input.days }))
+ }

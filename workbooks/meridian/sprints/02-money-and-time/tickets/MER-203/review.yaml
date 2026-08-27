@@ -1,0 +1,10 @@
+comments:
+  - id: "json-stringify-key-order"
+    body: "JSON.stringify walks an object's own keys in insertion order, not a canonical order. Two calls to toClaim() in this same file always build the object the same way, so this passes today - but the moment this hash gets recomputed from a row that came back through a jsonb column, or from a claim object some other code path assembled with the fields in a different order, JSON.stringify(claim) can produce different bytes for the identical logical claim. That's a false positive on every tamper check compliance runs against it."
+    correct: true
+  - id: "no-cross-process-test"
+    body: "There's no test anywhere in this PR that builds the same claim twice with different key orders and compares the hashes. 'Tests pass locally' only proves this one process's JSON.stringify is internally consistent with itself, which was never in question."
+    correct: true
+  - id: "same-file-same-order-is-safe"
+    body: "Every claim in this codebase is built by the same toClaim() function, so the key order really is always identical in practice - the object literal's fields are written in the same order every time it runs. This is a real fix for the reported symptom and safe to merge; a canonical encoder can be a fast-follow if it ever actually causes a problem."
+    correct: false

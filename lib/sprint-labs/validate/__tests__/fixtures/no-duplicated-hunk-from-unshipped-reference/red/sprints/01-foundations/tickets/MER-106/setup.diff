@@ -1,0 +1,7 @@
+diff --git a/src/http/routes/webhooks.ts b/src/http/routes/webhooks.ts
+--- a/src/http/routes/webhooks.ts
++++ b/src/http/routes/webhooks.ts
+@@ -1,2 +1,5 @@
++import { z } from "zod"
++import { NextRequest, NextResponse } from "next/server"
++import { verifyAuth } from "@/lib/auth"

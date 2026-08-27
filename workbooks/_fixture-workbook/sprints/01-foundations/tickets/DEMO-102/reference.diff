@@ -1,0 +1,11 @@
+diff --git a/src/http/compatibility-descriptor.ts b/src/http/compatibility-descriptor.ts
+index 2f3656a..e8b0322 100644
+--- a/src/http/compatibility-descriptor.ts
++++ b/src/http/compatibility-descriptor.ts
+@@ -19,5 +19,5 @@ const V2: CompatibilityDescriptor = {
+ }
+ 
+ export function compatibilityDescriptor(version: "v1" | "v2"): CompatibilityDescriptor {
+-  return version === "v1" ? V2 : V1
++  return version === "v1" ? V1 : V2
+ }

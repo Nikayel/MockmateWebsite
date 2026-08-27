@@ -1,0 +1,264 @@
+diff --git a/migrations/0006_claim_dates_and_tenant_zone.sql b/migrations/0006_claim_dates_and_tenant_zone.sql
+new file mode 100644
+index 0000000..cafe9fb
+--- /dev/null
++++ b/migrations/0006_claim_dates_and_tenant_zone.sql
+@@ -0,0 +1,12 @@
++-- MER-202: a claim's filed-on date and any deadline computed from it need the owning
++-- tenant's own time zone, not the server's - see src/domain/calendar-date.ts.
++--
++-- Every existing tenant predates this column, so it is backfilled to UTC rather than left
++-- null: UTC is not any real tenant's true zone, but it is the same server-time behavior every
++-- tenant silently had before this ticket, so no existing tenant's reported dates move.
++alter table tenants
++  add column time_zone text not null default 'UTC';
++
++comment on column tenants.time_zone is
++  'An IANA time zone name (e.g. America/Chicago) - never a fixed UTC-offset number, which goes
++   wrong the moment the zone observes daylight saving. See src/domain/calendar-date.ts.';
+diff --git a/src/db/memory-db.ts b/src/db/memory-db.ts
+index ef06624..5bcae23 100644
+--- a/src/db/memory-db.ts
++++ b/src/db/memory-db.ts
+@@ -16,12 +16,13 @@ export function createMemoryDb(): DbClient {
+   async function query<T>(sql: string, params: unknown[] = []): Promise<QueryResult<T>> {
+     switch (sql) {
+       case queries.INSERT_TENANT: {
+-        const [id, name, webhookUrl, webhookSecret, createdAt] = params
++        const [id, name, webhookUrl, webhookSecret, timeZone, createdAt] = params
+         const row = {
+           id,
+           name,
+           webhook_url: webhookUrl,
+           webhook_secret: webhookSecret,
++          time_zone: timeZone,
+           created_at: createdAt,
+         }
+         tenants.push(row)
+diff --git a/src/db/queries.ts b/src/db/queries.ts
+index 0b75cf8..10878b9 100644
+--- a/src/db/queries.ts
++++ b/src/db/queries.ts
+@@ -5,7 +5,7 @@
+  */
+ 
+ export const INSERT_TENANT =
+-  "INSERT INTO tenants (id, name, webhook_url, webhook_secret, created_at) VALUES ($1, $2, $3, $4, $5) RETURNING *"
++  "INSERT INTO tenants (id, name, webhook_url, webhook_secret, time_zone, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *"
+ 
+ export const GET_TENANT_BY_ID = "SELECT * FROM tenants WHERE id = $1"
+ 
+diff --git a/src/db/repositories/tenants.ts b/src/db/repositories/tenants.ts
+index c717921..833bb98 100644
+--- a/src/db/repositories/tenants.ts
++++ b/src/db/repositories/tenants.ts
+@@ -7,6 +7,7 @@ interface TenantRow {
+   name: string
+   webhook_url: string | null
+   webhook_secret: string | null
++  time_zone: string
+   created_at: string
+ }
+ 
+@@ -16,6 +17,7 @@ function toTenant(row: TenantRow): Tenant {
+     name: row.name,
+     webhookUrl: row.webhook_url,
+     webhookSecret: row.webhook_secret,
++    timeZone: row.time_zone,
+     createdAt: row.created_at,
+   }
+ }
+@@ -25,6 +27,7 @@ export interface InsertTenantParams {
+   name: string
+   webhookUrl: string | null
+   webhookSecret: string | null
++  timeZone: string
+   createdAt: string
+ }
+ 
+@@ -34,6 +37,7 @@ export async function insertTenant(db: DbClient, params: InsertTenantParams): Pr
+     params.name,
+     params.webhookUrl,
+     params.webhookSecret,
++    params.timeZone,
+     params.createdAt,
+   ])
+   return toTenant(rows[0])
+diff --git a/src/domain/claim.ts b/src/domain/claim.ts
+index a1ddf3a..16071c2 100644
+--- a/src/domain/claim.ts
++++ b/src/domain/claim.ts
+@@ -28,3 +28,46 @@ export interface CreateClaimInput {
+   claimantName: string
+   lossDate: string
+ }
++
++/**
++ * How many minutes each zone sits from UTC - a single number per zone, the same one all
++ * year round. This is what "the day it was filed" was computed with before MER-202: correct
++ * for whichever season the number was chosen in, and wrong by exactly the daylight-saving
++ * delta for the rest of the year. Real zones do not have one offset; they have a history of
++ * them. See src/domain/calendar-date.ts for the fix.
++ */
++const FIXED_ZONE_OFFSET_MINUTES: Record<string, number> = {
++  "America/Chicago": -360,
++  "America/New_York": -300,
++  "America/Los_Angeles": -480,
++  "America/St_Johns": -210,
++  UTC: 0,
++}
++
++function fixedOffsetMinutesFor(timeZone: string): number {
++  return FIXED_ZONE_OFFSET_MINUTES[timeZone] ?? 0
++}
++
++export interface FiledOnDateInput {
++  createdAt: string
++  timeZone: string
++}
++
++/** The calendar day (YYYY-MM-DD) a claim counts as filed on, in the owning tenant's own zone. */
++export function filedOnDate(input: FiledOnDateInput): string {
++  const offsetMs = fixedOffsetMinutesFor(input.timeZone) * 60_000
++  const localMs = new Date(input.createdAt).getTime() + offsetMs
++  return new Date(localMs).toISOString().slice(0, 10)
++}
++
++export interface ClaimDeadlineInput {
++  createdAt: string
++  timeZone: string
++  days: number
++}
++
++/** A calendar-day deadline, `days` days after the claim's filed-on date. */
++export function computeClaimDeadline(input: ClaimDeadlineInput): string {
++  const deadlineMs = new Date(input.createdAt).getTime() + input.days * 24 * 60 * 60 * 1000
++  return new Date(deadlineMs).toISOString().slice(0, 10)
++}
+diff --git a/src/domain/tenant.ts b/src/domain/tenant.ts
+index bd889be..72e4904 100644
+--- a/src/domain/tenant.ts
++++ b/src/domain/tenant.ts
+@@ -3,6 +3,9 @@ export interface Tenant {
+   name: string
+   webhookUrl: string | null
+   webhookSecret: string | null
++  /** An IANA time zone name, e.g. "America/Chicago" - the zone a claim this tenant files is
++   * reported and deadlined in, never the server's own zone. See src/domain/calendar-date.ts. */
++  timeZone: string
+   createdAt: string
+ }
+ 
+@@ -10,4 +13,5 @@ export interface CreateTenantInput {
+   name: string
+   webhookUrl?: string | null
+   webhookSecret?: string | null
++  timeZone: string
+ }
+diff --git a/src/http/routes/claims.ts b/src/http/routes/claims.ts
+index d085c52..f1b5e2a 100644
+--- a/src/http/routes/claims.ts
++++ b/src/http/routes/claims.ts
+@@ -2,7 +2,9 @@ import { getDocumentsForClaims } from "../../db/repositories/documents"
+ import type { DbClient } from "../../db/client"
+ import { getClaimById, insertClaim, listClaimsByTenantKeyset } from "../../db/repositories/claims"
+ import type { ClaimsCursor } from "../../db/repositories/claims"
++import { getTenantById } from "../../db/repositories/tenants"
+ import type { Claim } from "../../domain/claim"
++import { filedOnDate } from "../../domain/claim"
+ import { parseMoney, toWireAmountV1 } from "../../money/money"
+ import type { Outbox } from "../../queue/outbox"
+ import { findOperationCompatibility } from "../compatibility-descriptor"
+@@ -86,15 +88,30 @@ export function parseCreateClaimBody(body: unknown): ParseClaimInputResult {
+   return parseClaimInput(body)
+ }
+ 
++/** A tenant that predates this ticket, or was seeded straight through the repository layer
++ * without a zone, is treated as UTC - the same server-time behavior every tenant silently had
++ * before MER-202, so no existing integration's reported dates move underneath it. */
++async function resolveTenantTimeZone(db: DbClient, tenantId: string): Promise<string> {
++  const tenant = await getTenantById(db, tenantId)
++  return tenant?.timeZone ?? "UTC"
++}
++
+ /**
+  * The v1 wire shape for a claim: `amount`/`currency` as flat top-level fields, `amount` a
+  * major-unit float built from the exact `money` value - see src/money/money.ts's
+- * `toWireAmountV1`. Every response this file sends goes through this one function, so there is
+- * exactly one place that knows how a claim looks on the wire today.
++ * `toWireAmountV1`. `filedOn` is the calendar day this claim counts as filed on, in the owning
++ * tenant's own zone - see src/domain/claim.ts's `filedOnDate`. Every response this file sends
++ * goes through this one function, so there is exactly one place that knows how a claim looks
++ * on the wire today.
+  */
+-function serializeClaimForV1(claim: Claim): Record<string, unknown> {
++function serializeClaimForV1(claim: Claim, timeZone: string): Record<string, unknown> {
+   const { money, ...rest } = claim
+-  return { ...rest, amount: toWireAmountV1(money), currency: money.currency }
++  return {
++    ...rest,
++    amount: toWireAmountV1(money),
++    currency: money.currency,
++    filedOn: filedOnDate({ createdAt: claim.createdAt, timeZone }),
++  }
+ }
+ 
+ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+@@ -121,7 +138,8 @@ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+ 
+     deps.outbox.enqueue({ type: "claim.processed", tenantId, claimId: claim.id })
+ 
+-    return { statusCode: 201, body: serializeClaimForV1(claim) }
++    const timeZone = await resolveTenantTimeZone(deps.db, tenantId)
++    return { statusCode: 201, body: serializeClaimForV1(claim, timeZone) }
+   })
+ 
+   app.get("/claims", async (req) => {
+@@ -147,6 +165,7 @@ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+       deps.db,
+       claims.map((claim) => claim.id)
+     )
++    const timeZone = await resolveTenantTimeZone(deps.db, tenantId)
+ 
+     const lastClaim = claims[claims.length - 1]
+     const nextCursor =
+@@ -159,7 +178,7 @@ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+       headers: deprecationHeaders(req.query.offset !== undefined),
+       body: {
+         claims: claims.map((claim) => ({
+-          ...serializeClaimForV1(claim),
++          ...serializeClaimForV1(claim, timeZone),
+           documentCount: documentsByClaimId[claim.id]?.length ?? 0,
+         })),
+         nextCursor,
+@@ -173,6 +192,7 @@ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+     if (!claim) {
+       return notFound({ message: `claim ${req.params.id} not found`, correlationId: req.correlationId })
+     }
+-    return { statusCode: 200, body: serializeClaimForV1(claim) }
++    const timeZone = await resolveTenantTimeZone(deps.db, tenantId)
++    return { statusCode: 200, body: serializeClaimForV1(claim, timeZone) }
+   })
+ }
+diff --git a/test/support/fixtures.ts b/test/support/fixtures.ts
+index fc8d687..0d73f96 100644
+--- a/test/support/fixtures.ts
++++ b/test/support/fixtures.ts
+@@ -7,6 +7,9 @@ export interface SeedTenantOptions {
+   name?: string
+   webhookUrl?: string | null
+   webhookSecret?: string | null
++  /** An IANA time zone name. Defaults to a whole-hour-offset zone so a test that does not
++   * care about time zones does not have to think about one. */
++  timeZone?: string
+ }
+ 
+ /** Inserts a tenant directly through the repository layer, the way a fixture load would,
+@@ -17,6 +20,7 @@ export async function seedTenant(db: DbClient, options: SeedTenantOptions): Prom
+     name: options.name ?? "Northwind Mutual",
+     webhookUrl: options.webhookUrl ?? null,
+     webhookSecret: options.webhookSecret ?? null,
++    timeZone: options.timeZone ?? "America/Chicago",
+     createdAt: new Date().toISOString(),
+   })
+ }

@@ -1,0 +1,15 @@
+humanName: "Escaped: the v2 endpoint silently accepts page instead of rejecting it"
+tags:
+  - contract-versioning
+kind: io-case
+# Retargeted at the real callable (PLAN.md Task 7 review round 2): no HTTP layer exists to reject
+# a request, so this checks the structural fact a full implementation would reject ON -- v2's
+# descriptor lists no page/per_page parameter at all, exactly acceptance criterion 3 and exactly
+# what the ticket's visible test already checks the same way. `input` is
+# compatibilityDescriptor's sole argument, not an HTTP request.
+input: "v2"
+expected:
+  parameters: {}
+entryPoint:
+  module: "src/http/compatibility-descriptor.ts"
+  export: "compatibilityDescriptor"

@@ -1,0 +1,36 @@
+humanName: "Escaped: a replayed response carries the original authorizedAt, not a freshly computed one"
+tags:
+  - idempotent-post-with-replay
+kind: probe
+body: |
+  const { meridian } = buildTestApp()
+  return meridian.app
+    .inject({
+      method: "POST",
+      url: "/claims",
+      headers: { "x-tenant-id": "ten_northwind" },
+      payload: { externalRef: "NW-8848", amount: 100, claimantName: "Test Claimant", lossDate: "2026-01-15" },
+    })
+    .then((created) => {
+      const claimId = created.json().id
+      const request = {
+        method: "POST",
+        url: `/claims/${claimId}/payment-authorizations`,
+        headers: { "x-tenant-id": "ten_northwind", "idempotency-key": "hidden-key-timestamp" },
+        payload: { approvedBy: "adjuster_griffin" },
+      }
+      return meridian.app.inject(request).then((first) =>
+        new Promise((resolve) => setTimeout(resolve, 5)).then(() =>
+          meridian.app.inject(request).then((retry) => {
+            const firstBody = first.json()
+            const retryBody = retry.json()
+            assert(typeof firstBody.authorizedAt === "string" && firstBody.authorizedAt.length > 0)
+            assert.strictEqual(
+              retryBody.authorizedAt,
+              firstBody.authorizedAt,
+              "a replay must carry the exact original authorizedAt, not a value recomputed at replay time"
+            )
+          })
+        )
+      )
+    })

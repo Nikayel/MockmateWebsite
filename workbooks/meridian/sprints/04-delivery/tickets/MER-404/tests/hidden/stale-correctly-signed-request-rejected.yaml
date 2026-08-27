@@ -1,0 +1,16 @@
+humanName: "Escaped: a correctly-signed but stale delivery outside the freshness window still verifies"
+tags:
+  - webhook-hmac-verification-review
+kind: io-case
+input:
+  body: "{\"claimId\":\"clm_8842\",\"status\":\"paid\",\"amount\":412.19,\"currency\":\"USD\"}"
+  timestamp: "1770000000"
+  signature: "804bd96626b2eaad356c5c97247e5b903214b9aafc2726452fcc14049696da27"
+  secrets:
+    - "shh-secret"
+  nowMs: 1770000400000
+  windowSeconds: 300
+expected: false
+entryPoint:
+  module: "src/delivery/signature.ts"
+  export: "verifyWebhookSignature"

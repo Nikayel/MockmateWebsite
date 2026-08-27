@@ -1,0 +1,338 @@
+diff --git a/migrations/0004_claims_created_at_id_idx.sql b/migrations/0004_claims_created_at_id_idx.sql
+new file mode 100644
+index 0000000..6f8e4a6
+--- /dev/null
++++ b/migrations/0004_claims_created_at_id_idx.sql
+@@ -0,0 +1,4 @@
++-- Composite index matching the claims-list keyset cursor's ORDER BY exactly - MER-103. Without
++-- column order matching (tenant_id, created_at, id), the keyset predicate falls back to a scan
++-- of every row for the tenant instead of a seek to the cursor's position.
++create index claims_tenant_created_at_id_idx on claims(tenant_id, created_at, id);
+diff --git a/src/db/memory-db.ts b/src/db/memory-db.ts
+index 1c7b86b..ef06624 100644
+--- a/src/db/memory-db.ts
++++ b/src/db/memory-db.ts
+@@ -67,12 +67,27 @@ export function createMemoryDb(): DbClient {
+         return { rows: row ? [row as T] : [] }
+       }
+ 
+-      case queries.LIST_CLAIMS_BY_TENANT: {
+-        const [tenantId, limit, offset] = params as [string, number, number]
+-        const matching = claims
++      case queries.LIST_CLAIMS_KEYSET: {
++        const [tenantId, cursorCreatedAt, cursorId, limit] = params as [
++          string,
++          string | null,
++          string | null,
++          number,
++        ]
++        const sorted = claims
+           .filter((claim) => claim.tenant_id === tenantId)
+-          .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+-        return { rows: matching.slice(offset, offset + limit) as T[] }
++          .sort((a, b) => {
++            const byCreatedAt = String(a.created_at).localeCompare(String(b.created_at))
++            return byCreatedAt !== 0 ? byCreatedAt : String(a.id).localeCompare(String(b.id))
++          })
++        const afterCursor =
++          cursorCreatedAt === null
++            ? sorted
++            : sorted.filter((claim) => {
++                const byCreatedAt = String(claim.created_at).localeCompare(cursorCreatedAt)
++                return byCreatedAt !== 0 ? byCreatedAt > 0 : String(claim.id).localeCompare(cursorId ?? "") > 0
++              })
++        return { rows: afterCursor.slice(0, limit) as T[] }
+       }
+ 
+       case queries.FIND_CLAIM_BY_EXTERNAL_REF: {
+diff --git a/src/db/queries.ts b/src/db/queries.ts
+index 33b6c62..0b75cf8 100644
+--- a/src/db/queries.ts
++++ b/src/db/queries.ts
+@@ -14,8 +14,15 @@ export const INSERT_CLAIM =
+ 
+ export const GET_CLAIM_BY_ID = "SELECT * FROM claims WHERE tenant_id = $1 AND id = $2"
+ 
+-export const LIST_CLAIMS_BY_TENANT =
+-  "SELECT * FROM claims WHERE tenant_id = $1 ORDER BY created_at LIMIT $2 OFFSET $3"
++/** Keyset pagination over `(created_at, id)` - the same pair the composite index in
++ * `migrations/0004_claims_created_at_id_idx.sql` covers, in the same order. `$2`/`$3` are the
++ * cursor's half of the tiebreak and may be null for the first page; when they are not null,
++ * only rows strictly after that position are returned, so a row already handed to a caller
++ * can never be handed to them again no matter what gets inserted in the meantime. */
++export const LIST_CLAIMS_KEYSET =
++  "SELECT * FROM claims WHERE tenant_id = $1" +
++  " AND ($2::timestamptz IS NULL OR (created_at, id) > ($2, $3))" +
++  " ORDER BY created_at, id LIMIT $4"
+ 
+ /** Used by the reconciliation job, which only ever has the insurer's own reference number
+  * to go on. */
+diff --git a/src/db/repositories/claims.ts b/src/db/repositories/claims.ts
+index 892e77c..0d39840 100644
+--- a/src/db/repositories/claims.ts
++++ b/src/db/repositories/claims.ts
+@@ -6,9 +6,16 @@ import {
+   FIND_CLAIM_BY_EXTERNAL_REF,
+   GET_CLAIM_BY_ID,
+   INSERT_CLAIM,
+-  LIST_CLAIMS_BY_TENANT,
++  LIST_CLAIMS_KEYSET,
+ } from "../queries"
+ 
++/** The tiebreak half of the claims-list cursor: the position of the last claim a caller has
++ * already seen. `(createdAt, id)` together are always unique, so this is the whole cursor. */
++export interface ClaimsCursor {
++  createdAt: string
++  id: string
++}
++
+ interface ClaimRow {
+   id: string
+   tenant_id: string
+@@ -61,13 +68,24 @@ export async function getClaimById(
+   return rows[0] ? toClaim(rows[0]) : null
+ }
+ 
+-export async function listClaimsByTenant(
++/**
++ * Pages a tenant's claims by keyset, never by offset: `cursor` names the last claim the
++ * caller already saw, and only claims strictly after it come back, so a claim already handed
++ * out can never be handed out again no matter what gets inserted while someone is still
++ * paging - see migrations/0004_claims_created_at_id_idx.sql for the index this relies on.
++ */
++export async function listClaimsByTenantKeyset(
+   db: DbClient,
+   tenantId: string,
+-  limit: number,
+-  offset: number
++  cursor: ClaimsCursor | null,
++  limit: number
+ ): Promise<Claim[]> {
+-  const { rows } = await db.query<ClaimRow>(LIST_CLAIMS_BY_TENANT, [tenantId, limit, offset])
++  const { rows } = await db.query<ClaimRow>(LIST_CLAIMS_KEYSET, [
++    tenantId,
++    cursor?.createdAt ?? null,
++    cursor?.id ?? null,
++    limit,
++  ])
+   return rows.map(toClaim)
+ }
+ 
+diff --git a/src/http/routes/claims.ts b/src/http/routes/claims.ts
+index 0aa3d26..623da95 100644
+--- a/src/http/routes/claims.ts
++++ b/src/http/routes/claims.ts
+@@ -1,6 +1,7 @@
+ import { getDocumentsForClaims } from "../../db/repositories/documents"
+ import type { DbClient } from "../../db/client"
+-import { getClaimById, insertClaim, listClaimsByTenant } from "../../db/repositories/claims"
++import { getClaimById, insertClaim, listClaimsByTenantKeyset } from "../../db/repositories/claims"
++import type { ClaimsCursor } from "../../db/repositories/claims"
+ import type { Outbox } from "../../queue/outbox"
+ import { badRequest, notFound } from "../errors"
+ import { parseClaimInput } from "../parsers/claim-input"
+@@ -12,6 +13,53 @@ export interface ClaimRouteDeps {
+   outbox: Outbox
+ }
+ 
++const DEFAULT_LIMIT = 20
++const MAX_LIMIT = 100
++
++export type ParseLimitResult = { ok: true; limit: number } | { ok: false }
++
++/** The page size is bounded: an absurd or unbounded value is rejected outright, never
++ * silently clamped down to something the caller did not ask for. */
++export function parseLimit(raw: string | null): ParseLimitResult {
++  if (raw === null) return { ok: true, limit: DEFAULT_LIMIT }
++  const limit = Number(raw)
++  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
++    return { ok: false }
++  }
++  return { ok: true, limit }
++}
++
++export type DecodedCursor =
++  | { kind: "none" }
++  | { kind: "valid"; cursor: ClaimsCursor }
++  | { kind: "invalid" }
++
++/** A cursor names the exact `(createdAt, id)` tiebreak position the caller last saw. It is
++ * never parsed as a bare timestamp - a cursor with only half the tiebreak is treated as
++ * invalid, not silently accepted with the missing half defaulted to something. */
++export function decodeClaimsCursor(raw: string | null): DecodedCursor {
++  if (raw === null) return { kind: "none" }
++  try {
++    const parsed: unknown = JSON.parse(raw)
++    if (
++      typeof parsed === "object" &&
++      parsed !== null &&
++      typeof (parsed as Record<string, unknown>).createdAt === "string" &&
++      typeof (parsed as Record<string, unknown>).id === "string"
++    ) {
++      const { createdAt, id } = parsed as Record<string, unknown>
++      return { kind: "valid", cursor: { createdAt: createdAt as string, id: id as string } }
++    }
++    return { kind: "invalid" }
++  } catch {
++    return { kind: "invalid" }
++  }
++}
++
++function encodeClaimsCursor(cursor: ClaimsCursor): string {
++  return JSON.stringify(cursor)
++}
++
+ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+   app.post("/claims", async (req) => {
+     const tenantId = requireTenantId(req)
+@@ -37,15 +85,34 @@ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+ 
+   app.get("/claims", async (req) => {
+     const tenantId = requireTenantId(req)
+-    const limit = Number(req.query.limit ?? "20")
+-    const offset = Number(req.query.offset ?? "0")
+-    const claims = await listClaimsByTenant(deps.db, tenantId, limit, offset)
++
++    const limitResult = parseLimit(req.query.limit ?? null)
++    if (!limitResult.ok) {
++      return badRequest({
++        message: `limit must be a whole number from 1 to ${MAX_LIMIT}`,
++        correlationId: req.correlationId,
++      })
++    }
++
++    const decodedCursor = decodeClaimsCursor(req.query.cursor ?? null)
++    if (decodedCursor.kind === "invalid") {
++      return badRequest({ message: "cursor is not valid", correlationId: req.correlationId })
++    }
++    const cursor = decodedCursor.kind === "valid" ? decodedCursor.cursor : null
++
++    const claims = await listClaimsByTenantKeyset(deps.db, tenantId, cursor, limitResult.limit)
+ 
+     const documentsByClaimId = await getDocumentsForClaims(
+       deps.db,
+       claims.map((claim) => claim.id)
+     )
+ 
++    const lastClaim = claims[claims.length - 1]
++    const nextCursor =
++      claims.length === limitResult.limit && lastClaim
++        ? encodeClaimsCursor({ createdAt: lastClaim.createdAt, id: lastClaim.id })
++        : null
++
+     return {
+       statusCode: 200,
+       body: {
+@@ -53,6 +120,7 @@ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+           ...claim,
+           documentCount: documentsByClaimId[claim.id]?.length ?? 0,
+         })),
++        nextCursor,
+       },
+     }
+   })
+diff --git a/test/claims/list-claims.test.ts b/test/claims/list-claims.test.ts
+index 7c0c7b5..c90cb3b 100644
+--- a/test/claims/list-claims.test.ts
++++ b/test/claims/list-claims.test.ts
+@@ -1,26 +1,12 @@
+ import { describe, expect, it } from "vitest"
+ import { buildTestApp } from "../support/build-app"
+-import type { MeridianApp } from "../../src/app"
+-
+-function createClaim(meridian: MeridianApp, tenantId: string, externalRef: string) {
+-  return meridian.app.inject({
+-    method: "POST",
+-    url: "/claims",
+-    headers: { "x-tenant-id": tenantId },
+-    payload: {
+-      externalRef,
+-      amount: 100,
+-      claimantName: "Test Claimant",
+-      lossDate: "2026-01-01",
+-    },
+-  })
+-}
++import { seedClaim } from "../fixtures/claims"
+ 
+ describe("GET /claims", () => {
+   it("lists claims scoped to the requesting tenant", async () => {
+     const { meridian } = buildTestApp()
+-    await createClaim(meridian, "ten_a", "A-1")
+-    await createClaim(meridian, "ten_b", "B-1")
++    await seedClaim(meridian.db, { id: "clm_a1", tenantId: "ten_a", createdAt: "2026-01-04T09:12:00.000Z" })
++    await seedClaim(meridian.db, { id: "clm_b1", tenantId: "ten_b", createdAt: "2026-01-04T09:12:00.000Z" })
+ 
+     const response = await meridian.app.inject({
+       method: "GET",
+@@ -28,25 +14,60 @@ describe("GET /claims", () => {
+       headers: { "x-tenant-id": "ten_a" },
+     })
+ 
+-    const body = response.json<{ claims: Array<{ externalRef: string }> }>()
++    const body = response.json<{ claims: Array<{ id: string }> }>()
+     expect(body.claims).toHaveLength(1)
+-    expect(body.claims[0].externalRef).toBe("A-1")
++    expect(body.claims[0].id).toBe("clm_a1")
++  })
++
++  it("pages forward with a cursor instead of an offset", async () => {
++    const { meridian } = buildTestApp()
++    await seedClaim(meridian.db, { id: "clm_1", tenantId: "ten_a", createdAt: "2026-01-04T09:12:00.000Z" })
++    await seedClaim(meridian.db, { id: "clm_2", tenantId: "ten_a", createdAt: "2026-01-04T09:12:01.000Z" })
++    await seedClaim(meridian.db, { id: "clm_3", tenantId: "ten_a", createdAt: "2026-01-04T09:12:02.000Z" })
++
++    const page1 = await meridian.app.inject({
++      method: "GET",
++      url: "/claims?limit=2",
++      headers: { "x-tenant-id": "ten_a" },
++    })
++    const body1 = page1.json<{ claims: Array<{ id: string }>; nextCursor: string | null }>()
++    expect(body1.claims.map((claim) => claim.id)).toEqual(["clm_1", "clm_2"])
++    expect(body1.nextCursor).not.toBeNull()
++
++    const page2 = await meridian.app.inject({
++      method: "GET",
++      url: `/claims?limit=2&cursor=${encodeURIComponent(body1.nextCursor as string)}`,
++      headers: { "x-tenant-id": "ten_a" },
++    })
++    const body2 = page2.json<{ claims: Array<{ id: string }>; nextCursor: string | null }>()
++    expect(body2.claims.map((claim) => claim.id)).toEqual(["clm_3"])
++    expect(body2.nextCursor).toBeNull()
+   })
+ 
+-  it("applies limit and offset", async () => {
++  it("sorts two claims sharing the same timestamp deterministically by id", async () => {
+     const { meridian } = buildTestApp()
+-    await createClaim(meridian, "ten_a", "A-1")
+-    await createClaim(meridian, "ten_a", "A-2")
+-    await createClaim(meridian, "ten_a", "A-3")
++    await seedClaim(meridian.db, { id: "clm_b", tenantId: "ten_a", createdAt: "2026-01-04T09:12:00.000Z" })
++    await seedClaim(meridian.db, { id: "clm_a", tenantId: "ten_a", createdAt: "2026-01-04T09:12:00.000Z" })
+ 
+     const response = await meridian.app.inject({
+       method: "GET",
+-      url: "/claims?limit=1&offset=1",
++      url: "/claims",
+       headers: { "x-tenant-id": "ten_a" },
+     })
+ 
+-    const body = response.json<{ claims: Array<{ externalRef: string }> }>()
+-    expect(body.claims).toHaveLength(1)
+-    expect(body.claims[0].externalRef).toBe("A-2")
++    const body = response.json<{ claims: Array<{ id: string }> }>()
++    expect(body.claims.map((claim) => claim.id)).toEqual(["clm_a", "clm_b"])
++  })
++
++  it("rejects an absurd limit instead of silently truncating it", async () => {
++    const { meridian } = buildTestApp()
++
++    const response = await meridian.app.inject({
++      method: "GET",
++      url: "/claims?limit=100000",
++      headers: { "x-tenant-id": "ten_a" },
++    })
++
++    expect(response.statusCode).toBe(400)
+   })
+ })

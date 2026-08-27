@@ -1,0 +1,7 @@
+diff --git a/db/migrations/0004_claims_created_at_id_idx.sql b/db/migrations/0004_claims_created_at_id_idx.sql
+new file mode 100644
+--- /dev/null
++++ b/db/migrations/0004_claims_created_at_id_idx.sql
+@@ -0,0 +1,3 @@
++CREATE INDEX claims_created_at_id_idx
++  ON claims (created_at, id);

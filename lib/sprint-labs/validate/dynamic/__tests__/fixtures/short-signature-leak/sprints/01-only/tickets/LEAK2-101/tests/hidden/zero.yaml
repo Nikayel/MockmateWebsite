@@ -1,0 +1,6 @@
+humanName: "zero"
+tags:
+  - arithmetic
+kind: probe
+body: |
+  assert(true, "placeholder -- this fixture ticket is not run through the red/green gate")

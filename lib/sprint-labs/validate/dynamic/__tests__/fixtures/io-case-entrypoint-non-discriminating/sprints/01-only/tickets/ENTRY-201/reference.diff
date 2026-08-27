@@ -1,0 +1,9 @@
+diff --git a/src/classify.ts b/src/classify.ts
+index 4383d3f..597c572 100644
+--- a/src/classify.ts
++++ b/src/classify.ts
+@@ -1,3 +1,3 @@
+ export function classify(input: { n: number }): { label: string } {
+-  return { label: "positive" }
++  return { label: input.n > 0 ? "positive" : "negative" }
+ }

@@ -1,0 +1,44 @@
+number: 9
+title: "Trust it"
+topic: "Verifying AI: evals & injection defence"
+goal: "Make every claim that 'the extractor got better' falsifiable, and make a document that tells the model what to do unable to reach another tenant's data."
+standupQuote: "We shipped the new extraction prompt on Tuesday. Northwind's ops lead says deductibles are wrong more often now. Our dashboard says 99.2%. Which one is lying?"
+archMapDelta:
+  added:
+    - "A human-labelled golden eval set with per-field and per-slice scoring, pinned to a dataset revision"
+    - "Prompt-injection defenses that fence untrusted document text as data, with a named per-request delimiter"
+    - "Rejected extraction as a first-class, tenant-scoped, non-retryable outcome"
+  changed:
+    - "A prompt or model change must clear a per-slice gate on the pinned golden set before it ships"
+  broke:
+    - "Northwind received a claimant name that belonged to a different tenant's claim"
+  invariants:
+    - "The model's output can choose arguments to a tool call, never the tool's scope"
+    - "A prompt-cache prefix change can never leak one tenant's cached context into another tenant's request"
+objectives:
+  - golden-eval-set-per-slice-scoring
+  - block-regressing-model-change-review
+  - prompt-injection-defense-tool-scoping
+  - prompt-cache-prefix-cost-regression
+  - rejected-extraction-first-class-outcome
+# validate-only fields (lab validate's sprint-file-set rules; the compiler
+# never reads these). src/extract/cache.ts is created by this sprint's own
+# predecessor within this task's range (sprint 8, MER-804) and rewritten
+# here by MER-904 -- a self-contained chain, no dependency on sprints 1-5.
+filesTouched:
+  - "migrations/0025_extraction_quarantine.sql"
+  - "src/eval/golden-eval.ts"
+  - "src/eval/scoring.ts"
+  - "test/fixtures/golden-eval-set.json"
+  - "src/security/prompt-fencing.ts"
+  - "src/extract/rejected-outcome.ts"
+  - "src/extract/cache.ts"
+newSourceFiles:
+  - "migrations/0025_extraction_quarantine.sql"
+  - "src/eval/golden-eval.ts"
+  - "src/eval/scoring.ts"
+  - "test/fixtures/golden-eval-set.json"
+  - "src/security/prompt-fencing.ts"
+  - "src/extract/rejected-outcome.ts"
+rewrittenFiles:
+  - "src/extract/cache.ts"

@@ -1,0 +1,823 @@
+diff --git a/migrations/0015_dead_letters.sql b/migrations/0015_dead_letters.sql
+new file mode 100644
+index 0000000..b5438f1
+--- /dev/null
++++ b/migrations/0015_dead_letters.sql
+@@ -0,0 +1,30 @@
++-- MER-403: persisted retry state on outbox_entries, and a dead_letters table for entries that
++-- exhaust their retry budget. See src/delivery/retry.ts and src/db/repositories/outbox.ts.
++alter table outbox_entries
++  add column attempt_count integer not null default 0,
++  add column next_attempt_at timestamptz,
++  add column last_error text;
++
++comment on column outbox_entries.attempt_count is
++  'How many delivery attempts this entry has had. Persisted so a process restart does not reset
++   or lose the retry schedule.';
++comment on column outbox_entries.next_attempt_at is
++  'Set after a failed attempt: this entry is not claimable again until now() reaches this value,
++   independent of leased_until. Null means claimable as soon as it is pending (a fresh entry) or
++   its lease expired (MER-402 crash recovery) - the retry schedule imposes no extra wait.';
++
++create table dead_letters (
++  id text primary key,
++  tenant_id text not null,
++  claim_id text not null,
++  event_type text not null,
++  payload text not null,
++  attempt_count integer not null,
++  last_error text not null,
++  created_at timestamptz not null default now()
++);
++
++comment on table dead_letters is
++  'An outbox entry that exhausted its retry budget, or failed with a non-retryable error. The
++   original payload is kept intact - never dropped - so it can be inspected or manually replayed.
++   See src/delivery/retry.ts.';
+diff --git a/src/db/memory-db.ts b/src/db/memory-db.ts
+index 3a96b5c..c65d54e 100644
+--- a/src/db/memory-db.ts
++++ b/src/db/memory-db.ts
+@@ -14,6 +14,7 @@ export function createMemoryDb(): DbClient {
+   const webhookDeliveries: Record<string, unknown>[] = []
+   const idempotencyKeys: Record<string, unknown>[] = []
+   const outboxEntries: Record<string, unknown>[] = []
++  const deadLetters: Record<string, unknown>[] = []
+ 
+   async function query<T>(sql: string, params: unknown[] = []): Promise<QueryResult<T>> {
+     switch (sql) {
+@@ -181,6 +182,9 @@ export function createMemoryDb(): DbClient {
+           leased_until: null,
+           created_at: createdAt,
+           delivered_at: null,
++          attempt_count: 0,
++          next_attempt_at: null,
++          last_error: null,
+         }
+         outboxEntries.push(row)
+         return { rows: [row as T] }
+@@ -195,11 +199,12 @@ export function createMemoryDb(): DbClient {
+         const [workerId, leasedUntil, limit] = params as [string, string, number]
+         const now = new Date().toISOString()
+         const eligible = outboxEntries
+-          .filter(
+-            (entry) =>
+-              entry.status === "pending" ||
+-              (entry.status === "leased" && typeof entry.leased_until === "string" && entry.leased_until < now)
+-          )
++          .filter((entry) => {
++            if (entry.status === "pending") {
++              return entry.next_attempt_at === null || (entry.next_attempt_at as string) <= now
++            }
++            return entry.status === "leased" && typeof entry.leased_until === "string" && entry.leased_until < now
++          })
+           .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+           .slice(0, limit)
+         for (const entry of eligible) {
+@@ -219,6 +224,50 @@ export function createMemoryDb(): DbClient {
+         return { rows: [row as T] }
+       }
+ 
++      case queries.RESCHEDULE_OUTBOX_ENTRY: {
++        const [id, attemptCount, nextAttemptAt, lastError] = params
++        const row = outboxEntries.find((entry) => entry.id === id)
++        if (!row) return { rows: [] }
++        row.status = "pending"
++        row.attempt_count = attemptCount
++        row.next_attempt_at = nextAttemptAt
++        row.last_error = lastError
++        row.leased_by = null
++        row.leased_until = null
++        return { rows: [row as T] }
++      }
++
++      case queries.DELETE_OUTBOX_ENTRY: {
++        const [id] = params
++        const index = outboxEntries.findIndex((entry) => entry.id === id)
++        if (index !== -1) outboxEntries.splice(index, 1)
++        return { rows: [] }
++      }
++
++      case queries.INSERT_DEAD_LETTER: {
++        const [id, tenantId, claimId, eventType, payload, attemptCount, lastError, createdAt] = params
++        const row = {
++          id,
++          tenant_id: tenantId,
++          claim_id: claimId,
++          event_type: eventType,
++          payload,
++          attempt_count: attemptCount,
++          last_error: lastError,
++          created_at: createdAt,
++        }
++        deadLetters.push(row)
++        return { rows: [row as T] }
++      }
++
++      case queries.LIST_DEAD_LETTERS_FOR_TENANT: {
++        const [tenantId] = params
++        const matching = deadLetters
++          .filter((row) => row.tenant_id === tenantId)
++          .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
++        return { rows: matching as T[] }
++      }
++
+       case queries.INSERT_WEBHOOK_DELIVERY: {
+         const [id, tenantId, claimId, status, payload, createdAt] = params
+         const row = {
+@@ -262,6 +311,7 @@ export function createMemoryDb(): DbClient {
+       webhookDeliveries: webhookDeliveries.map((row) => ({ ...row })),
+       idempotencyKeys: idempotencyKeys.map((row) => ({ ...row })),
+       outboxEntries: outboxEntries.map((row) => ({ ...row })),
++      deadLetters: deadLetters.map((row) => ({ ...row })),
+     }
+     try {
+       return await fn({ query, transaction })
+@@ -278,6 +328,8 @@ export function createMemoryDb(): DbClient {
+       idempotencyKeys.push(...snapshot.idempotencyKeys)
+       outboxEntries.length = 0
+       outboxEntries.push(...snapshot.outboxEntries)
++      deadLetters.length = 0
++      deadLetters.push(...snapshot.deadLetters)
+       throw error
+     }
+   }
+diff --git a/src/db/queries.ts b/src/db/queries.ts
+index 08ee5aa..11ddd61 100644
+--- a/src/db/queries.ts
++++ b/src/db/queries.ts
+@@ -67,20 +67,38 @@ export const INSERT_OUTBOX_ENTRY =
+ /**
+  * The real shape a Postgres-backed drain would run: `FOR UPDATE SKIP LOCKED` so two workers
+  * racing this same statement never both lock the same rows, `leased_until < now()` so a lease
+- * left by a crashed worker is exactly as claimable as a row that was never leased at all, and
+- * `LIMIT $3` so one drain never claims the entire backlog. See src/db/repositories/outbox.ts.
++ * left by a crashed worker is exactly as claimable as a row that was never leased at all,
++ * `next_attempt_at` gates a `pending` row that just failed and is on a MER-403 backoff schedule
++ * (a crash-recovered `leased` row is exempt from that gate - a worker that never got to report
++ * failure never set one), and `LIMIT $3` so one drain never claims the entire backlog. See
++ * src/db/repositories/outbox.ts.
+  */
+ export const CLAIM_OUTBOX_BATCH =
+   "UPDATE outbox_entries SET status = 'leased', leased_by = $1, leased_until = $2" +
+   " WHERE id IN (" +
+   "SELECT id FROM outbox_entries" +
+-  " WHERE status = 'pending' OR (status = 'leased' AND leased_until < now())" +
++  " WHERE (status = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= now()))" +
++  " OR (status = 'leased' AND leased_until < now())" +
+   " ORDER BY created_at LIMIT $3 FOR UPDATE SKIP LOCKED" +
+   ") RETURNING *"
+ 
+ export const MARK_OUTBOX_ENTRY_DELIVERED =
+   "UPDATE outbox_entries SET status = 'delivered', delivered_at = $2 WHERE id = $1 RETURNING *"
+ 
++/** MER-403: a failed attempt that is worth retrying - increments attempt_count, records why it
++ * failed, clears the lease, and sets next_attempt_at so it is not claimable again until the
++ * computed backoff (or Retry-After, or the daily cooldown) has actually elapsed. */
++export const RESCHEDULE_OUTBOX_ENTRY =
++  "UPDATE outbox_entries SET status = 'pending', attempt_count = $2, next_attempt_at = $3," +
++  " last_error = $4, leased_by = null, leased_until = null WHERE id = $1 RETURNING *"
++
++export const DELETE_OUTBOX_ENTRY = "DELETE FROM outbox_entries WHERE id = $1"
++
++export const INSERT_DEAD_LETTER =
++  "INSERT INTO dead_letters (id, tenant_id, claim_id, event_type, payload, attempt_count, last_error, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *"
++
++export const LIST_DEAD_LETTERS_FOR_TENANT = "SELECT * FROM dead_letters WHERE tenant_id = $1 ORDER BY created_at"
++
+ export const INSERT_WEBHOOK_DELIVERY =
+   "INSERT INTO webhook_deliveries (id, tenant_id, claim_id, status, payload, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *"
+ 
+diff --git a/src/db/repositories/outbox.ts b/src/db/repositories/outbox.ts
+index 35c7658..43b2b15 100644
+--- a/src/db/repositories/outbox.ts
++++ b/src/db/repositories/outbox.ts
+@@ -1,12 +1,21 @@
+ import type { DbClient } from "../client"
+ import type { DomainEvent } from "../../queue/events"
++import { DeliveryFailureError } from "../../delivery/retry"
+ import { generateId } from "../../util/ids"
+-import { CLAIM_OUTBOX_BATCH, INSERT_OUTBOX_ENTRY, MARK_OUTBOX_ENTRY_DELIVERED } from "../queries"
++import {
++  CLAIM_OUTBOX_BATCH,
++  DELETE_OUTBOX_ENTRY,
++  INSERT_DEAD_LETTER,
++  INSERT_OUTBOX_ENTRY,
++  LIST_DEAD_LETTERS_FOR_TENANT,
++  MARK_OUTBOX_ENTRY_DELIVERED,
++  RESCHEDULE_OUTBOX_ENTRY,
++} from "../queries"
+ 
+ export type OutboxEntryStatus = "pending" | "leased" | "delivered"
+ 
+-/** A durable outbox row (migrations/0014_outbox.sql) - MER-402's replacement for the in-process
+- * array src/queue/outbox.ts used to stand in for one. */
++/** A durable outbox row (migrations/0014_outbox.sql, migrations/0015_dead_letters.sql) -
++ * MER-402's replacement for the in-process array src/queue/outbox.ts used to stand in for one. */
+ export interface OutboxEntryRecord {
+   id: string
+   tenantId: string
+@@ -17,6 +26,11 @@ export interface OutboxEntryRecord {
+   leasedUntil: string | null
+   createdAt: string
+   deliveredAt: string | null
++  /** MER-403: how many delivery attempts this entry has had. */
++  attemptCount: number
++  /** MER-403: not claimable again until now() reaches this value, independent of leasedUntil. */
++  nextAttemptAt: string | null
++  lastError: string | null
+ }
+ 
+ interface OutboxEntryRow {
+@@ -29,6 +43,9 @@ interface OutboxEntryRow {
+   leased_until: string | null
+   created_at: string
+   delivered_at: string | null
++  attempt_count: number
++  next_attempt_at: string | null
++  last_error: string | null
+ }
+ 
+ function toOutboxEntryRecord(row: OutboxEntryRow): OutboxEntryRecord {
+@@ -42,6 +59,9 @@ function toOutboxEntryRecord(row: OutboxEntryRow): OutboxEntryRecord {
+     leasedUntil: row.leased_until,
+     createdAt: row.created_at,
+     deliveredAt: row.delivered_at,
++    attemptCount: row.attempt_count,
++    nextAttemptAt: row.next_attempt_at,
++    lastError: row.last_error,
+   }
+ }
+ 
+@@ -75,13 +95,14 @@ export interface ClaimOutboxBatchInput {
+ }
+ 
+ /**
+- * Claims up to `limit` rows that are either pending or whose previous lease has expired,
+- * marking them leased to `workerId` until now + `leaseDurationMs` - see CLAIM_OUTBOX_BATCH in
+- * src/db/queries.ts for the `FOR UPDATE SKIP LOCKED` statement this models. Two workers calling
+- * this against the same backlog never both receive the same row: a real Postgres `SKIP LOCKED`
+- * guarantees it across processes, and src/db/memory-db.ts's handler guarantees the equivalent
+- * for this in-memory stand-in by reading and marking eligible rows in one synchronous stretch
+- * with no `await` in between the two calls this codebase's tests make to prove it.
++ * Claims up to `limit` rows that are due - pending with no `next_attempt_at` gate still in the
++ * future, or leased past a now-expired lease - marking them leased to `workerId` until now +
++ * `leaseDurationMs`. See CLAIM_OUTBOX_BATCH in src/db/queries.ts for the `FOR UPDATE SKIP LOCKED`
++ * statement this models. Two workers calling this against the same backlog never both receive
++ * the same row: a real Postgres `SKIP LOCKED` guarantees it across processes, and
++ * src/db/memory-db.ts's handler guarantees the equivalent for this in-memory stand-in by reading
++ * and marking eligible rows in one synchronous stretch with no `await` in between the two calls
++ * this codebase's tests make to prove it.
+  */
+ export async function claimOutboxBatch(
+   db: DbClient,
+@@ -96,11 +117,122 @@ export async function claimOutboxBatch(
+   return rows.map(toOutboxEntryRecord)
+ }
+ 
+-/** Marks one claimed entry delivered. Never called for an entry whose handler threw - an entry
+- * that fails delivery stays leased until its lease naturally expires, so a different worker (or
+- * the same one, later) picks it back up exactly as if it had never been claimed, rather than
+- * this codebase inventing a separate "release early" path a crashed worker could never reach
+- * anyway. */
++/** Marks one claimed entry delivered. Never called for an entry whose handler threw - a failed
++ * entry goes through `recordDeliveryFailure` instead. */
+ export async function markOutboxEntryDelivered(db: DbClient, id: string): Promise<void> {
+   await db.query(MARK_OUTBOX_ENTRY_DELIVERED, [id, new Date().toISOString()])
+ }
++
++export type DeliveryFailureOutcome = "rescheduled" | "dead-lettered"
++
++export interface RecordDeliveryFailureOptions {
++  /** Once attemptCount (after this failure) reaches this many, the entry is dead-lettered
++   * regardless of classification - MER-403's retry budget. */
++  maxAttempts: number
++}
++
++/**
++ * Records one failed delivery attempt for `entry` and decides what happens next: a classified,
++ * still-retryable failure under the attempt budget is rescheduled (attempt_count incremented,
++ * next_attempt_at set, lease cleared); a terminal failure, or one that has now exhausted its
++ * budget, is dead-lettered instead - the original payload preserved intact in `dead_letters`, the
++ * outbox row removed since dead_letters is now its durable record. `error` is typed as `unknown`
++ * because it is whatever the caller's own delivery handler threw - a `DeliveryFailureError`
++ * (src/delivery/retry.ts) carries everything needed to decide precisely; anything else is
++ * treated as an unclassified, retryable failure with a short fixed delay, never silently
++ * swallowed and never immediately dead-lettered for a bug this module cannot itself diagnose.
++ */
++export async function recordDeliveryFailure(
++  db: DbClient,
++  entry: OutboxEntryRecord,
++  error: unknown,
++  options: RecordDeliveryFailureOptions
++): Promise<DeliveryFailureOutcome> {
++  const isTyped = error instanceof DeliveryFailureError
++  const classification = isTyped ? error.classification : "retryable"
++  const payload = isTyped ? error.payload : JSON.stringify({ tenantId: entry.tenantId, claimId: entry.claimId, eventType: entry.eventType })
++  const nextAttemptAt = isTyped ? error.nextAttemptAt : new Date(Date.now() + 60_000).toISOString()
++  const message = error instanceof Error ? error.message : String(error)
++  const attemptCount = entry.attemptCount + 1
++
++  if (classification === "terminal" || attemptCount >= options.maxAttempts) {
++    await insertDeadLetter(db, {
++      tenantId: entry.tenantId,
++      claimId: entry.claimId,
++      eventType: entry.eventType,
++      payload,
++      attemptCount,
++      lastError: message,
++    })
++    await db.query(DELETE_OUTBOX_ENTRY, [entry.id])
++    return "dead-lettered"
++  }
++
++  await db.query(RESCHEDULE_OUTBOX_ENTRY, [entry.id, attemptCount, nextAttemptAt, message])
++  return "rescheduled"
++}
++
++export interface DeadLetterRecord {
++  id: string
++  tenantId: string
++  claimId: string
++  eventType: string
++  payload: string
++  attemptCount: number
++  lastError: string
++  createdAt: string
++}
++
++interface DeadLetterRow {
++  id: string
++  tenant_id: string
++  claim_id: string
++  event_type: string
++  payload: string
++  attempt_count: number
++  last_error: string
++  created_at: string
++}
++
++function toDeadLetterRecord(row: DeadLetterRow): DeadLetterRecord {
++  return {
++    id: row.id,
++    tenantId: row.tenant_id,
++    claimId: row.claim_id,
++    eventType: row.event_type,
++    payload: row.payload,
++    attemptCount: row.attempt_count,
++    lastError: row.last_error,
++    createdAt: row.created_at,
++  }
++}
++
++export interface InsertDeadLetterInput {
++  tenantId: string
++  claimId: string
++  eventType: string
++  payload: string
++  attemptCount: number
++  lastError: string
++}
++
++export async function insertDeadLetter(db: DbClient, input: InsertDeadLetterInput): Promise<DeadLetterRecord> {
++  const id = generateId("dlq")
++  const createdAt = new Date().toISOString()
++  const { rows } = await db.query<DeadLetterRow>(INSERT_DEAD_LETTER, [
++    id,
++    input.tenantId,
++    input.claimId,
++    input.eventType,
++    input.payload,
++    input.attemptCount,
++    input.lastError,
++    createdAt,
++  ])
++  return toDeadLetterRecord(rows[0])
++}
++
++export async function listDeadLettersForTenant(db: DbClient, tenantId: string): Promise<DeadLetterRecord[]> {
++  const { rows } = await db.query<DeadLetterRow>(LIST_DEAD_LETTERS_FOR_TENANT, [tenantId])
++  return rows.map(toDeadLetterRecord)
++}
+diff --git a/src/delivery/retry.ts b/src/delivery/retry.ts
+index c8e09b6..d853327 100644
+--- a/src/delivery/retry.ts
++++ b/src/delivery/retry.ts
+@@ -1,14 +1,162 @@
+ /**
+- * Retries `fn` up to `attempts` times. Every attempt goes out immediately after the last one.
++ * MER-403: classifying a delivery failure, and computing when to try again. Replaces the old
++ * `withRetry` - three immediate in-process attempts with nothing spacing them out, which is
++ * exactly why every retry Northwind ever saw landed a fixed interval after the last one: the
++ * real schedule now lives in the persisted `attempt_count`/`next_attempt_at` on each outbox
++ * entry (migrations/0015_dead_letters.sql), advanced by one real attempt per drain cycle, never
++ * by a tight loop inside a single call.
+  */
+-export async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+-  let lastError: unknown
+-  for (let attempt = 1; attempt <= attempts; attempt++) {
+-    try {
+-      return await fn()
+-    } catch (error) {
+-      lastError = error
+-    }
+-  }
+-  throw lastError
++import { addCalendarDays, calendarDateInZone, startOfCalendarDayInZone } from "../domain/calendar-date"
++
++export type FailureClassification = "retryable" | "terminal"
++
++/** Status codes worth trying again: rate-limited, momentarily unavailable, or a transient
++ * gateway/timeout condition. Everything else - a 4xx that isn't 408/429 in particular - means
++ * retrying the exact same request will never succeed. */
++const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504])
++
++export interface ClassifyDeliveryFailureInput {
++  /** Null when the request never got a response at all (a network error, a timeout) - worth
++   * retrying, since the endpoint might simply be reachable again next time. */
++  statusCode: number | null
++}
++
++export function classifyDeliveryFailure(input: ClassifyDeliveryFailureInput): FailureClassification {
++  if (input.statusCode === null) return "retryable"
++  return RETRYABLE_STATUS_CODES.has(input.statusCode) ? "retryable" : "terminal"
++}
++
++export interface BackoffScheduleOptions {
++  baseDelayMs: number
++  maxDelayMs: number
++  jitterMs: number
++}
++
++export const DEFAULT_BACKOFF_SCHEDULE: BackoffScheduleOptions = {
++  baseDelayMs: 1_000,
++  maxDelayMs: 5 * 60_000,
++  jitterMs: 2_000,
++}
++
++/** The raw exponential term for `attemptCount` prior failed attempts (0 = computing the delay
++ * before the first retry), with no cap applied - used only to detect whether the schedule has
++ * already reached its ceiling; see `cappedBackoffDelayMs` for the value anything else should
++ * use. */
++function rawExponentialDelayMs(attemptCount: number, options: BackoffScheduleOptions): number {
++  return options.baseDelayMs * 2 ** attemptCount
++}
++
++/** Whether `attemptCount` more failures have already pushed the exponential term to (or past)
++ * `maxDelayMs` on its own - the point past which this schedule stops growing and settles into
++ * MER-403's once-a-day cooldown instead of an ever-tighter loop. */
++export function hasReachedBackoffCap(
++  attemptCount: number,
++  options: BackoffScheduleOptions = DEFAULT_BACKOFF_SCHEDULE
++): boolean {
++  return rawExponentialDelayMs(attemptCount, options) >= options.maxDelayMs
++}
++
++/** The exponential-with-cap delay in milliseconds, BEFORE jitter - doubles per prior attempt,
++ * never past `maxDelayMs`. Jitter (see `jitteredBackoffDelayMs`) is always added on top of this
++ * value, never used in place of the cap: a schedule deep enough to have reached the cap still
++ * has this function return exactly `maxDelayMs`, so jitter never re-opens room the cap closed. */
++export function cappedBackoffDelayMs(
++  attemptCount: number,
++  options: BackoffScheduleOptions = DEFAULT_BACKOFF_SCHEDULE
++): number {
++  return Math.min(rawExponentialDelayMs(attemptCount, options), options.maxDelayMs)
++}
++
++/** `cappedBackoffDelayMs` plus a bounded random addition - always at least the capped value,
++ * never below it, and never more than `jitterMs` above it. */
++export function jitteredBackoffDelayMs(
++  attemptCount: number,
++  options: BackoffScheduleOptions = DEFAULT_BACKOFF_SCHEDULE,
++  random: () => number = Math.random
++): number {
++  return cappedBackoffDelayMs(attemptCount, options) + Math.floor(random() * options.jitterMs)
++}
++
++export interface ComputeNextAttemptAtInput {
++  /** How many attempts have already failed. */
++  attemptCount: number
++  /** Straight from a 429/503's `Retry-After` header, in seconds, when the endpoint sent one -
++   * honored ahead of the default schedule entirely, whatever `attemptCount` says. */
++  retryAfterSeconds: number | null
++  /** The instant this attempt just failed, as an ISO string. */
++  now: string
++  /** The owning tenant's IANA zone - only reached once the schedule has settled into the daily
++   * cooldown tier; see MER-202's src/domain/calendar-date.ts. */
++  timeZone: string
++  options?: BackoffScheduleOptions
++  random?: () => number
++}
++
++/**
++ * The instant an entry becomes claimable again after a failed attempt.
++ *
++ * `Retry-After` wins outright when present. Otherwise: capped exponential backoff plus jitter -
++ * UNLESS the schedule has already reached its cap with no `Retry-After` to go on, in which case
++ * this settles into a once-a-day cooldown, retrying at the START OF THE TENANT'S NEXT CALENDAR
++ * DAY rather than every few minutes forever. That boundary is computed with MER-202's
++ * `calendarDateInZone`/`addCalendarDays`/`startOfCalendarDayInZone` - genuine calendar
++ * arithmetic, resolved back to a real instant using the zone's offset actually in effect on the
++ * target day - never as `now + 24h` of milliseconds. Adding a fixed 24 hours is exactly the
++ * computation a daylight-saving transition between now and then quietly shifts by an hour,
++ * holding the next attempt back an hour past when the tenant's next day has actually started.
++ */
++export function computeNextAttemptAt(input: ComputeNextAttemptAtInput): string {
++  if (input.retryAfterSeconds !== null) {
++    return new Date(new Date(input.now).getTime() + input.retryAfterSeconds * 1000).toISOString()
++  }
++
++  const options = input.options ?? DEFAULT_BACKOFF_SCHEDULE
++  if (hasReachedBackoffCap(input.attemptCount, options)) {
++    const today = calendarDateInZone(input.now, input.timeZone)
++    const tomorrow = addCalendarDays({ date: today, days: 1 })
++    return new Date(startOfCalendarDayInZone(tomorrow, input.timeZone)).toISOString()
++  }
++
++  const random = input.random ?? Math.random
++  const delayMs = jitteredBackoffDelayMs(input.attemptCount, options, random)
++  return new Date(new Date(input.now).getTime() + delayMs).toISOString()
++}
++
++/**
++ * Thrown by src/delivery/webhooks.ts when a delivery attempt fails - carries everything the
++ * outbox drain loop needs to decide what happens next: whether trying again could ever help
++ * (`classification`), when to try again if so (`retryAfterSeconds`, folded into `nextAttemptAt`
++ * by the thrower, which already has the tenant's zone in scope), and the exact payload that was
++ * being sent (`payload`), so a dead-lettered entry keeps it intact rather than losing it.
++ */
++export class DeliveryFailureError extends Error {
++  readonly classification: FailureClassification
++  readonly nextAttemptAt: string
++  readonly payload: string
++
++  constructor(input: { message: string; classification: FailureClassification; nextAttemptAt: string; payload: string }) {
++    super(input.message)
++    this.name = "DeliveryFailureError"
++    this.classification = input.classification
++    this.nextAttemptAt = input.nextAttemptAt
++    this.payload = input.payload
++  }
++}
++
++/** Reads `Retry-After` as either a delta-seconds integer (the common case) or an HTTP-date,
++ * per RFC 7231 - either way returned as a non-negative integer number of seconds from `now`, or
++ * `null` when the header is absent or unparseable. */
++export function parseRetryAfterSeconds(headers: Record<string, string> | undefined, now: string): number | null {
++  const raw = headers?.["retry-after"]
++  if (!raw) return null
++
++  const seconds = Number(raw)
++  if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds)
++
++  const asDate = Date.parse(raw)
++  if (!Number.isNaN(asDate)) {
++    return Math.max(0, Math.round((asDate - new Date(now).getTime()) / 1000))
++  }
++
++  return null
+ }
+diff --git a/src/delivery/types.ts b/src/delivery/types.ts
+index da281a5..af5cde7 100644
+--- a/src/delivery/types.ts
++++ b/src/delivery/types.ts
+@@ -1,5 +1,9 @@
+ export interface WebhookHttpResponse {
+   status: number
++  /** Lower-cased header names, matching how this codebase already reads every other header
++   * (src/http/request-context.ts's `x-tenant-id`/`x-correlation-id`) - `retry-after` in
++   * particular, read by src/delivery/retry.ts. */
++  headers?: Record<string, string>
+ }
+ 
+ /**
+diff --git a/src/delivery/webhooks.ts b/src/delivery/webhooks.ts
+index 7f772b9..03f6ec3 100644
+--- a/src/delivery/webhooks.ts
++++ b/src/delivery/webhooks.ts
+@@ -6,7 +6,7 @@ import type { Claim } from "../domain/claim"
+ import type { DrainHandler } from "../queue/outbox"
+ import { generateId } from "../util/ids"
+ import { log } from "../util/logger"
+-import { withRetry } from "./retry"
++import { classifyDeliveryFailure, computeNextAttemptAt, DeliveryFailureError, parseRetryAfterSeconds } from "./retry"
+ import { signPayload } from "./signature"
+ import type { WebhookHttpClient } from "./types"
+ import { buildWebhookPayload } from "./webhook-payload"
+@@ -17,10 +17,16 @@ export interface DeliverWebhookDeps {
+ }
+ 
+ /**
+- * Sends a claim's current status to its tenant's webhook URL, and records that we did.
+- * Tenants with no webhook configured are skipped.
++ * Sends a claim's current status to its tenant's webhook URL. Tenants with no webhook configured
++ * are skipped - treated as delivered, since there is nothing to retry. A delivery ROW is only
++ * ever written once the send actually succeeds (a 2xx response) - MER-403: the old code wrote
++ * "delivered" before making the call at all, which cannot be reconciled with retrying a failure
++ * that never happened. Anything else - a non-2xx response, or the request never completing at
++ * all - throws a `DeliveryFailureError` carrying the classification, the next attempt time
++ * (computed from `attemptCount` and the tenant's own zone), and the exact payload that was being
++ * sent, for the outbox drain loop to act on.
+  */
+-export async function deliverWebhook(deps: DeliverWebhookDeps, claim: Claim): Promise<void> {
++export async function deliverWebhook(deps: DeliverWebhookDeps, claim: Claim, attemptCount: number): Promise<void> {
+   const tenant = await getTenantById(deps.db, claim.tenantId)
+   if (!tenant || !tenant.webhookUrl || !tenant.webhookSecret) {
+     log("no webhook configured for tenant", { tenantId: claim.tenantId })
+@@ -28,27 +34,56 @@ export async function deliverWebhook(deps: DeliverWebhookDeps, claim: Claim): Pr
+   }
+ 
+   const payload = JSON.stringify(buildWebhookPayload(claim))
++  const signature = signPayload(payload, tenant.webhookSecret)
++  const now = new Date().toISOString()
+ 
+-  await insertWebhookDelivery(deps.db, {
+-    id: generateId("whd"),
+-    tenantId: claim.tenantId,
+-    claimId: claim.id,
+-    status: "delivered",
+-    payload,
+-  })
++  const fail = (statusCode: number | null, message: string, retryAfterSeconds: number | null) => {
++    return new DeliveryFailureError({
++      message,
++      classification: classifyDeliveryFailure({ statusCode }),
++      nextAttemptAt: computeNextAttemptAt({
++        attemptCount,
++        retryAfterSeconds,
++        now,
++        timeZone: tenant.timeZone,
++      }),
++      payload,
++    })
++  }
+ 
+-  const signature = signPayload(payload, tenant.webhookSecret)
+-  await withRetry(() =>
+-    deps.httpClient.post(tenant.webhookUrl as string, payload, {
++  let response
++  try {
++    response = await deps.httpClient.post(tenant.webhookUrl, payload, {
+       "content-type": "application/json",
+       "x-meridian-signature": signature,
+     })
++  } catch (error) {
++    throw fail(null, error instanceof Error ? error.message : "network error calling webhook endpoint", null)
++  }
++
++  if (response.status >= 200 && response.status < 300) {
++    await insertWebhookDelivery(deps.db, {
++      id: generateId("whd"),
++      tenantId: claim.tenantId,
++      claimId: claim.id,
++      status: "delivered",
++      payload,
++    })
++    return
++  }
++
++  throw fail(
++    response.status,
++    `webhook endpoint responded ${response.status}`,
++    parseRetryAfterSeconds(response.headers, now)
+   )
+ }
+ 
+ /**
+  * Turns an outbox entry back into a claim and delivers its webhook. This is what the outbox
+  * scheduler drains against in production, and what tests call `outbox.drain()` with directly.
++ * A claim that no longer exists is treated as nothing left to deliver - not an error, and not
++ * retried.
+  */
+ export function createOutboxDeliveryHandler(deps: DeliverWebhookDeps): DrainHandler {
+   return async (entry) => {
+@@ -57,6 +92,6 @@ export function createOutboxDeliveryHandler(deps: DeliverWebhookDeps): DrainHand
+       log("outbox entry references a claim that no longer exists", { claimId: entry.claimId })
+       return
+     }
+-    await deliverWebhook(deps, claim)
++    await deliverWebhook(deps, claim, entry.attemptCount)
+   }
+ }
+diff --git a/src/queue/outbox.ts b/src/queue/outbox.ts
+index b3d2bc6..209281b 100644
+--- a/src/queue/outbox.ts
++++ b/src/queue/outbox.ts
+@@ -3,6 +3,7 @@ import {
+   claimOutboxBatch,
+   insertOutboxEntry,
+   markOutboxEntryDelivered,
++  recordDeliveryFailure,
+   type OutboxEntryRecord,
+ } from "../db/repositories/outbox"
+ import { generateId } from "../util/ids"
+@@ -40,6 +41,9 @@ export interface CreateOutboxOptions {
+   leaseDurationMs?: number
+   /** The most one `drain()` call ever claims at once. Defaults to 50. */
+   batchSize?: number
++  /** MER-403: once an entry's attempt_count reaches this many, it is dead-lettered regardless of
++   * classification - the retry budget. Defaults to 8. */
++  maxAttempts?: number
+ }
+ 
+ /**
+@@ -55,6 +59,7 @@ export function createOutbox(options: CreateOutboxOptions): Outbox {
+   const workerId = options.workerId ?? generateId("worker")
+   const leaseDurationMs = options.leaseDurationMs ?? 30_000
+   const batchSize = options.batchSize ?? 50
++  const maxAttempts = options.maxAttempts ?? 8
+   let pending = 0
+ 
+   return {
+@@ -67,9 +72,18 @@ export function createOutbox(options: CreateOutboxOptions): Outbox {
+     async drain(handler) {
+       const batch = await claimOutboxBatch(db, { workerId, leaseDurationMs, limit: batchSize })
+       for (const entry of batch) {
+-        await handler(entry)
+-        await markOutboxEntryDelivered(db, entry.id)
+-        pending = Math.max(0, pending - 1)
++        try {
++          await handler(entry)
++          await markOutboxEntryDelivered(db, entry.id)
++          pending = Math.max(0, pending - 1)
++        } catch (error) {
++          // MER-403: one entry failing must never abort the batch - every remaining entry still
++          // gets its own attempt this drain cycle. A "rescheduled" entry stays counted as
++          // pending (it is not delivered yet, just waiting its turn); a "dead-lettered" one has
++          // left the backlog for good.
++          const outcome = await recordDeliveryFailure(db, entry, error, { maxAttempts })
++          if (outcome === "dead-lettered") pending = Math.max(0, pending - 1)
++        }
+       }
+       return batch.length
+     },
+diff --git a/test/support/build-app.ts b/test/support/build-app.ts
+index 41aa5c5..2939bd3 100644
+--- a/test/support/build-app.ts
++++ b/test/support/build-app.ts
+@@ -3,6 +3,7 @@ import { createMeridianApp } from "../../src/app"
+ import type { MeridianApp } from "../../src/app"
+ import { createFakeHttpClient } from "./fake-http-client"
+ import type { FakeHttpClient } from "./fake-http-client"
++import type { WebhookHttpResponse } from "../../src/delivery/types"
+ 
+ export interface TestApp {
+   meridian: MeridianApp
+@@ -15,14 +16,23 @@ export interface BuildTestAppOptions {
+   db?: DbClient
+   /** A canned response the fake http client should return for every call. */
+   webhookResponseStatus?: number
++  /** A canned response, or an ordered sequence of them, the fake http client should return -
++   * takes precedence over `webhookResponseStatus` when both are given. Use this when a test
++   * needs headers (e.g. `retry-after`) or a sequence ("fails twice, then succeeds"). */
++  webhookResponses?: WebhookHttpResponse | WebhookHttpResponse[]
++  /** A fully custom http client, bypassing both options above entirely. */
++  httpClient?: FakeHttpClient
+ }
+ 
+ /** A fresh app, a fresh in-memory database (unless one is given), and a fresh fake http
+  * client - nothing carries over between tests by default. */
+ export function buildTestApp(options: BuildTestAppOptions = {}): TestApp {
+-  const httpClient = createFakeHttpClient(
+-    options.webhookResponseStatus ? { status: options.webhookResponseStatus } : undefined
+-  )
++  const httpClient =
++    options.httpClient ??
++    createFakeHttpClient(
++      options.webhookResponses ??
++        (options.webhookResponseStatus ? { status: options.webhookResponseStatus } : undefined)
++    )
+   const meridian = createMeridianApp({ db: options.db, httpClient })
+   return { meridian, httpClient }
+ }
+diff --git a/test/support/fake-http-client.ts b/test/support/fake-http-client.ts
+index 3cbc7d1..a6c48f4 100644
+--- a/test/support/fake-http-client.ts
++++ b/test/support/fake-http-client.ts
+@@ -10,16 +10,23 @@ export interface FakeHttpClient extends WebhookHttpClient {
+   calls: FakeHttpCall[]
+ }
+ 
+-/** Records every call instead of reaching a real socket - there is no real network available
+- * to this test suite anyway. */
++/**
++ * Records every call instead of reaching a real socket - there is no real network available to
++ * this test suite anyway. `responses` is either one canned response every call gets, or an
++ * ordered sequence - the Nth call gets `responses[n]`, and every call past the end of the array
++ * repeats the last one (so a test can say "the first two calls fail, then it succeeds" without
++ * having to know exactly how many calls will happen).
++ */
+ export function createFakeHttpClient(
+-  response: WebhookHttpResponse = { status: 200 }
++  responses: WebhookHttpResponse | WebhookHttpResponse[] = { status: 200 }
+ ): FakeHttpClient {
++  const sequence = Array.isArray(responses) ? responses : [responses]
+   const calls: FakeHttpCall[] = []
+   return {
+     calls,
+     async post(url, body, headers) {
+       calls.push({ url, body, headers })
++      const response = sequence[Math.min(calls.length - 1, sequence.length - 1)]
+       return response
+     },
+   }

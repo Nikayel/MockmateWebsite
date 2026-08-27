@@ -1,0 +1,9 @@
+diff --git a/src/math.ts b/src/math.ts
+index 011527d..a39d4ef 100644
+--- a/src/math.ts
++++ b/src/math.ts
+@@ -1,3 +1,3 @@
+ export function add(a: number, b: number): number {
+-  return Math.abs(a) + Math.abs(b)
++  return a + b
+ }

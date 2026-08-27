@@ -1,0 +1,40 @@
+humanName: "Escaped: two claims filed with the same dollar amount store different minor-unit values"
+tags:
+  - exact-money-representation-rounding
+kind: probe
+body: |
+  const { meridian } = buildTestApp()
+  return meridian.app
+    .inject({
+      method: "POST",
+      url: "/claims",
+      headers: { "x-tenant-id": "ten_northwind" },
+      payload: {
+        externalRef: "NW-9202",
+        amount: 91.7,
+        claimantName: "First Claimant",
+        lossDate: "2026-01-01",
+      },
+    })
+    .then((first) =>
+      meridian.app
+        .inject({
+          method: "POST",
+          url: "/claims",
+          headers: { "x-tenant-id": "ten_northwind" },
+          payload: {
+            externalRef: "NW-9203",
+            amount: 91.7,
+            claimantName: "Second Claimant",
+            lossDate: "2026-01-01",
+          },
+        })
+        .then((second) => {
+          const firstBody = first.json()
+          const secondBody = second.json()
+          assert(
+            firstBody.amount === secondBody.amount,
+            "the same dollar amount submitted twice must be stored and returned identically both times"
+          )
+        })
+    )

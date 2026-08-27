@@ -1,0 +1,15 @@
+# Three deliberate mistakes for the red case:
+# 1. newSourceFiles wrongly lists claims.ts (it's already in the seed).
+# 2. queue/outbox.ts is touched and genuinely new but missing from newSourceFiles.
+# 3. rewrittenFiles claims queue/outbox.ts was "substantially replaced", but it
+#    doesn't exist in the seed or any earlier sprint (there is no earlier sprint).
+number: 1
+title: "Foundations"
+filesTouched:
+  - "src/db/repositories/claims.ts"
+  - "src/queue/outbox.ts"
+newSourceFiles:
+  - "src/db/repositories/claims.ts"
+  - "src/never/touched.ts"
+rewrittenFiles:
+  - "src/queue/outbox.ts"

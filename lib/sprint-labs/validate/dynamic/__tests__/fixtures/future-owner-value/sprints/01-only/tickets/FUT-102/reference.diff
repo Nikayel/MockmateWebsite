@@ -1,0 +1,9 @@
+diff --git a/src/late.ts b/src/late.ts
+index 9999999..aaaaaaa 100644
+--- a/src/late.ts
++++ b/src/late.ts
+@@ -1,3 +1,3 @@
+ export function late(): string {
+-  return "unknown"
++  return "FUTURE-VALUE: quartz, ruby, sapphire - shipped in a later ticket"
+ }

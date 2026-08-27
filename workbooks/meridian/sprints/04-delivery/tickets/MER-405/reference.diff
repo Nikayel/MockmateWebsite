@@ -1,0 +1,155 @@
+diff --git a/migrations/0016_outbox_ordering.sql b/migrations/0016_outbox_ordering.sql
+new file mode 100644
+index 0000000..5e25a59
+--- /dev/null
++++ b/migrations/0016_outbox_ordering.sql
+@@ -0,0 +1,12 @@
++-- MER-405: a claim's own outbox entries must always be delivered in the order they were
++-- produced, even across a retry - so claiming only ever takes the EARLIEST undelivered entry
++-- per claim_id (the head of that claim's own lane), never a later one jumping ahead of a sibling
++-- still waiting on its own backoff. This index matches that per-claim ordering scan exactly, the
++-- same way migrations/0004_claims_created_at_id_idx.sql matches the claims list's own cursor
++-- order. See src/db/repositories/outbox.ts and src/db/queries.ts's CLAIM_OUTBOX_BATCH.
++create index outbox_entries_claim_lane_idx on outbox_entries (claim_id, created_at)
++  where status in ('pending', 'leased');
++
++comment on index outbox_entries_claim_lane_idx is
++  'Supports scanning each claim''s own undelivered entries in production order to find its head
++   of line - see MER-405.';
+diff --git a/src/db/memory-db.ts b/src/db/memory-db.ts
+index c65d54e..481778e 100644
+--- a/src/db/memory-db.ts
++++ b/src/db/memory-db.ts
+@@ -195,16 +195,40 @@ export function createMemoryDb(): DbClient {
+       // between, so two calls issued back to back (e.g. `Promise.all([...])`) can never both
+       // select the same row, the same way a real SKIP LOCKED statement never hands the same
+       // locked row to two concurrent callers.
++      //
++      // MER-405: mirrors `DISTINCT ON (claim_id)` - grouped by claim_id, only the EARLIEST
++      // undelivered entry per claim is ever a candidate. A claim whose head-of-line entry is not
++      // yet eligible (still on backoff) contributes NOTHING this round, even if that same claim
++      // has a later entry that individually looks eligible - a later entry can never jump ahead
++      // of an earlier, still-outstanding sibling. This also means the result can never contain
++      // two rows for the same claim_id.
+       case queries.CLAIM_OUTBOX_BATCH: {
+         const [workerId, leasedUntil, limit] = params as [string, string, number]
+         const now = new Date().toISOString()
+-        const eligible = outboxEntries
+-          .filter((entry) => {
+-            if (entry.status === "pending") {
+-              return entry.next_attempt_at === null || (entry.next_attempt_at as string) <= now
+-            }
+-            return entry.status === "leased" && typeof entry.leased_until === "string" && entry.leased_until < now
+-          })
++
++        const isEligible = (entry: Record<string, unknown>): boolean => {
++          if (entry.status === "pending") {
++            return entry.next_attempt_at === null || (entry.next_attempt_at as string) <= now
++          }
++          return entry.status === "leased" && typeof entry.leased_until === "string" && entry.leased_until < now
++        }
++
++        const undeliveredByClaimId = new Map<string, Record<string, unknown>[]>()
++        for (const entry of outboxEntries) {
++          if (entry.status === "delivered") continue
++          const claimId = entry.claim_id as string
++          const group = undeliveredByClaimId.get(claimId) ?? []
++          group.push(entry)
++          undeliveredByClaimId.set(claimId, group)
++        }
++
++        const headsOfLine: Record<string, unknown>[] = []
++        for (const group of undeliveredByClaimId.values()) {
++          const headOfLine = group.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))[0]
++          if (isEligible(headOfLine)) headsOfLine.push(headOfLine)
++        }
++
++        const eligible = headsOfLine
+           .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+           .slice(0, limit)
+         for (const entry of eligible) {
+diff --git a/src/db/queries.ts b/src/db/queries.ts
+index 11ddd61..bcd876a 100644
+--- a/src/db/queries.ts
++++ b/src/db/queries.ts
+@@ -70,16 +70,26 @@ export const INSERT_OUTBOX_ENTRY =
+  * left by a crashed worker is exactly as claimable as a row that was never leased at all,
+  * `next_attempt_at` gates a `pending` row that just failed and is on a MER-403 backoff schedule
+  * (a crash-recovered `leased` row is exempt from that gate - a worker that never got to report
+- * failure never set one), and `LIMIT $3` so one drain never claims the entire backlog. See
+- * src/db/repositories/outbox.ts.
++ * failure never set one), and `LIMIT $3` so one drain never claims the entire backlog.
++ *
++ * MER-405: `DISTINCT ON (claim_id)` takes only the EARLIEST eligible row per claim - a claim's
++ * own later entry can never be claimed while an earlier, still-outstanding sibling is waiting on
++ * its own backoff, which is the whole per-claim ordering guarantee. One consequence worth
++ * stating: this can never return more than one row per claim_id, so every entry a single drain
++ * claims belongs to a DIFFERENT claim - see src/queue/outbox.ts, which is what makes it safe to
++ * hand the whole claimed batch to concurrent delivery instead of one sequential loop. See
++ * src/db/repositories/outbox.ts and migrations/0016_outbox_ordering.sql for the index this scan
++ * matches.
+  */
+ export const CLAIM_OUTBOX_BATCH =
+   "UPDATE outbox_entries SET status = 'leased', leased_by = $1, leased_until = $2" +
+   " WHERE id IN (" +
+-  "SELECT id FROM outbox_entries" +
++  "SELECT id FROM (" +
++  "SELECT DISTINCT ON (claim_id) id, created_at FROM outbox_entries" +
+   " WHERE (status = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= now()))" +
+   " OR (status = 'leased' AND leased_until < now())" +
+-  " ORDER BY created_at LIMIT $3 FOR UPDATE SKIP LOCKED" +
++  " ORDER BY claim_id, created_at" +
++  ") head_of_line ORDER BY created_at LIMIT $3 FOR UPDATE SKIP LOCKED" +
+   ") RETURNING *"
+ 
+ export const MARK_OUTBOX_ENTRY_DELIVERED =
+diff --git a/src/queue/outbox.ts b/src/queue/outbox.ts
+index 209281b..78d29cc 100644
+--- a/src/queue/outbox.ts
++++ b/src/queue/outbox.ts
+@@ -71,20 +71,31 @@ export function createOutbox(options: CreateOutboxOptions): Outbox {
+ 
+     async drain(handler) {
+       const batch = await claimOutboxBatch(db, { workerId, leaseDurationMs, limit: batchSize })
+-      for (const entry of batch) {
+-        try {
+-          await handler(entry)
+-          await markOutboxEntryDelivered(db, entry.id)
+-          pending = Math.max(0, pending - 1)
+-        } catch (error) {
+-          // MER-403: one entry failing must never abort the batch - every remaining entry still
+-          // gets its own attempt this drain cycle. A "rescheduled" entry stays counted as
+-          // pending (it is not delivered yet, just waiting its turn); a "dead-lettered" one has
+-          // left the backlog for good.
+-          const outcome = await recordDeliveryFailure(db, entry, error, { maxAttempts })
+-          if (outcome === "dead-lettered") pending = Math.max(0, pending - 1)
+-        }
+-      }
++
++      // MER-405: CLAIM_OUTBOX_BATCH never returns more than one entry per claim_id (the head of
++      // that claim's own lane) - so every entry in `batch` belongs to a DIFFERENT claim, and
++      // delivering them concurrently rather than one at a time in sequence cannot reorder
++      // anything within a claim. It is exactly what stops one slow or unreachable destination
++      // from holding up delivery for every other claim sharing this drain cycle: a sequential
++      // `for` loop would make every entry queued behind a hung call wait for it; this lets the
++      // other lanes finish independently while that one is still in flight.
++      await Promise.all(
++        batch.map(async (entry) => {
++          try {
++            await handler(entry)
++            await markOutboxEntryDelivered(db, entry.id)
++            pending = Math.max(0, pending - 1)
++          } catch (error) {
++            // MER-403: one entry failing must never abort the batch - every remaining entry
++            // still gets its own attempt this drain cycle. A "rescheduled" entry stays counted
++            // as pending (it is not delivered yet, just waiting its turn); a "dead-lettered" one
++            // has left the backlog for good.
++            const outcome = await recordDeliveryFailure(db, entry, error, { maxAttempts })
++            if (outcome === "dead-lettered") pending = Math.max(0, pending - 1)
++          }
++        })
++      )
++
+       return batch.length
+     },
+ 

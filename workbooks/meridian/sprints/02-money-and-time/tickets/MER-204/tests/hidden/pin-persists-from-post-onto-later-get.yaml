@@ -1,0 +1,33 @@
+humanName: "Escaped: a version pinned on a POST is not honored by a later GET from the same subscription"
+tags:
+  - backward-compatible-wire-format
+kind: probe
+body: |
+  const { meridian } = buildTestApp()
+  return seedTenant(meridian.db, { id: "ten_northwind" })
+    .then(() =>
+      meridian.app.inject({
+        method: "POST",
+        url: "/claims",
+        headers: { "x-tenant-id": "ten_northwind", "x-api-version": "2" },
+        payload: {
+          externalRef: "NW-9601",
+          amount: 100,
+          claimantName: "Test Claimant",
+          lossDate: "2026-01-01",
+        },
+      })
+    )
+    .then(() =>
+      meridian.app.inject({
+        method: "GET",
+        url: "/claims",
+        headers: { "x-tenant-id": "ten_northwind" },
+      })
+    )
+    .then((response) => {
+      const body = response.json()
+      assert(body.claims.length > 0, "expected at least one claim back")
+      assert(body.claims[0].money !== undefined, "a GET with no header must still honor the pin a POST set")
+      assert(body.claims[0].amount === undefined, "the pinned v2 shape must not also carry the v1 flat amount")
+    })

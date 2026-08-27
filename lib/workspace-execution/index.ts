@@ -42,6 +42,20 @@ export type {
   SqlIntrospectResult,
   SqlWorkspacePreviewResult,
 } from "./sql-sandbox"
+export {
+  runPgSuite,
+  runPgInWorker,
+  isPgRuntimeWarm,
+  markPgRuntimeWarm,
+  prewarmPgRuntime,
+} from "./pg-sandbox"
+export type {
+  PgSuite,
+  PgSuiteAssertion,
+  PgSuiteOptions,
+  PgWorkerRequest,
+  PgWorkerRunResult,
+} from "./pg-sandbox"
 export { executeScenarioInBrowser } from "./browser-execution"
 export { overlayWorkspaceFiles, getVisibleWorkspaceFiles, getWorkspacePrimaryCode } from "./files"
 export { buildPistonWorkspaceFiles } from "./piston-builder"

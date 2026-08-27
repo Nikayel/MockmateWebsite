@@ -102,7 +102,11 @@ export function CaseLabGallery({ labs }: { labs: CaseLab[] }) {
   const showCompanyFilter = companies.length > 1
 
   return (
-    <section aria-labelledby="pick-a-case-lab" className="flex flex-col gap-5">
+    // `id="case-labs"` is always present, flag or no flag: it is the /labs jump strip's scroll
+    // target (Sprint Labs Task 10), added directly rather than behind a prop so this component
+    // never needs to know Sprint Labs exists. An unused anchor id changes nothing rendered or
+    // announced when the jump strip itself is flag-gated off.
+    <section id="case-labs" aria-labelledby="pick-a-case-lab" className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="pick-a-case-lab" className="text-lg font-semibold text-[var(--wb-text)] sm:text-xl">
           Pick a case lab

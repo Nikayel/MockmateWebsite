@@ -1,0 +1,16 @@
+humanName: "Escaped: a single-secret design has no rotation overlap, so a retired key is not even attempted"
+tags:
+  - webhook-hmac-verification-review
+kind: io-case
+input:
+  body: "{\"claimId\":\"clm_8842\",\"status\":\"paid\",\"amount\":412.19,\"currency\":\"USD\"}"
+  timestamp: "1770000000"
+  signature: "2dc0434e28d74734a2055f8397960cb4ad5e6d8f4aa11855afaa7da29fa22a70"
+  secrets:
+    - "shh-secret"
+  nowMs: 1770000000000
+  windowSeconds: 300
+expected: false
+entryPoint:
+  module: "src/delivery/signature.ts"
+  export: "verifyWebhookSignature"

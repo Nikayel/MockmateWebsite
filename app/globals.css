@@ -352,7 +352,8 @@
    no longer overrides the app's semantic tokens — those now come from the
    unified global palette (`:root` / `.dark`), so the labs surface and the rest
    of the app stay in lockstep. */
-.case-lab-workbook {
+.case-lab-workbook,
+.workbook-surface {
   /* Surfaces */
   --wb-page: #f9f8f5;
   --wb-topbar: #fdfcf9;
@@ -406,7 +407,8 @@
 
 /* Dark workbook surface — follows the global `.dark` class so /labs tracks the
    platform theme. A warm, low-glare dark that keeps the clay accent. */
-.dark .case-lab-workbook {
+.dark .case-lab-workbook,
+.dark .workbook-surface {
   /* Surfaces */
   --wb-page: #1a1917;
   --wb-topbar: #1f1e1b;
@@ -459,16 +461,19 @@
 
 /* Scope the spec's form-control look to the workbook so the shared ui/textarea
    and ui/input primitives stay untouched everywhere else in the app. */
-.case-lab-workbook :is(textarea, input):not([type="checkbox"]):not([type="radio"]) {
+.case-lab-workbook :is(textarea, input):not([type="checkbox"]):not([type="radio"]),
+.workbook-surface :is(textarea, input):not([type="checkbox"]):not([type="radio"]) {
   background-color: var(--wb-field-bg);
   border-color: var(--wb-input-border);
   color: var(--wb-field-text);
 }
-.case-lab-workbook :is(textarea, input):not([type="checkbox"]):not([type="radio"]):focus-visible {
+.case-lab-workbook :is(textarea, input):not([type="checkbox"]):not([type="radio"]):focus-visible,
+.workbook-surface :is(textarea, input):not([type="checkbox"]):not([type="radio"]):focus-visible {
   border-color: var(--wb-accent);
   box-shadow: 0 0 0 3px var(--wb-focus-ring);
 }
-.case-lab-workbook ::placeholder {
+.case-lab-workbook ::placeholder,
+.workbook-surface ::placeholder {
   color: var(--wb-placeholder);
 }
 

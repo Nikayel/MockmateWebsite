@@ -1,0 +1,25 @@
+humanName: "Escaped: a pool of size one still leaks a stale tenant id across a third caller, not just a second"
+tags:
+  - transaction-scoped-tenant-context
+kind: probe
+body: |
+  const pool = createConnectionPool(createMemoryDb(), 1)
+  const seen = []
+  return withTenant(pool, "ten_continental", (connection) => {
+    seen.push(connection.tenantId)
+    return Promise.resolve()
+  })
+    .then(() => withTenant(pool, "ten_bekins", (connection) => {
+      seen.push(connection.tenantId)
+      return Promise.resolve()
+    }))
+    .then(() => withTenant(pool, "ten_northwind", (connection) => {
+      seen.push(connection.tenantId)
+      return Promise.resolve()
+    }))
+    .then(() => {
+      assert(
+        JSON.stringify(seen) === JSON.stringify(["ten_continental", "ten_bekins", "ten_northwind"]),
+        "each of three sequential tenants through a pool of one must see only its own tenant id, in order"
+      )
+    })

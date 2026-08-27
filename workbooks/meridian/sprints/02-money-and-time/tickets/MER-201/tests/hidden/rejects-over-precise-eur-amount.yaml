@@ -1,0 +1,13 @@
+humanName: "Escaped: a three-decimal EUR amount is silently truncated to two decimal places"
+tags:
+  - exact-money-representation-rounding
+kind: io-case
+input:
+  amount: 19.999
+  currency: "EUR"
+expected:
+  ok: false
+  reason: "amount cannot be represented exactly in EUR's minor unit"
+entryPoint:
+  module: "src/money/money.ts"
+  export: "parseMoney"

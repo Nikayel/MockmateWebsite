@@ -1,0 +1,15 @@
+diff --git a/src/multiply.ts b/src/multiply.ts
+index d6e2059..25aaba8 100644
+--- a/src/multiply.ts
++++ b/src/multiply.ts
+@@ -1,5 +1,9 @@
+ import { add } from "./math"
+ 
+ export function multiply(a: number, count: number): number {
+-  return add(a, count)
++  let total = 0
++  for (let i = 0; i < count; i++) {
++    total = add(total, a)
++  }
++  return total
+ }

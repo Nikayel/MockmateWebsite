@@ -1,0 +1,132 @@
+diff --git a/src/http/parsers/claim-input.ts b/src/http/parsers/claim-input.ts
+new file mode 100644
+index 0000000..ba2faf6
+--- /dev/null
++++ b/src/http/parsers/claim-input.ts
+@@ -0,0 +1,67 @@
++/**
++ * The one place an untrusted claim payload gets narrowed into something the rest of the
++ * system can trust. `parseClaimInput` takes `unknown` - never `any` - and returns a
++ * discriminated union: an invalid claim cannot be represented past this function's return
++ * statement, because there is no shape a caller can hold that claims to be a valid claim
++ * without actually being one.
++ */
++
++/** What a caller must give us to open a claim, once it has been checked field by field. */
++export interface ParsedClaimInput {
++  externalRef: string
++  amount: number
++  currency: string
++  claimantName: string
++  lossDate: string
++}
++
++export type ParseClaimInputResult =
++  | { ok: true; value: ParsedClaimInput }
++  | { ok: false; reason: string }
++
++function isNonEmptyString(value: unknown): value is string {
++  return typeof value === "string" && value.length > 0
++}
++
++/**
++ * Parses an unknown HTTP request body into a `ParsedClaimInput`, or a typed rejection reason.
++ * Never throws - a payload this function cannot make sense of comes back as `{ ok: false }`,
++ * not an exception, so a caller can always turn it into a 400 with a field-level reason
++ * instead of a 500.
++ */
++export function parseClaimInput(body: unknown): ParseClaimInputResult {
++  if (typeof body !== "object" || body === null || Array.isArray(body)) {
++    return { ok: false, reason: "request body must be a JSON object" }
++  }
++
++  const record = body as Record<string, unknown>
++
++  if (!isNonEmptyString(record.externalRef)) {
++    return { ok: false, reason: "externalRef must be a non-empty string" }
++  }
++  if (!isNonEmptyString(record.claimantName)) {
++    return { ok: false, reason: "claimantName must be a non-empty string" }
++  }
++  if (!isNonEmptyString(record.lossDate)) {
++    return { ok: false, reason: "lossDate must be a non-empty string" }
++  }
++  if (typeof record.amount !== "number" || !Number.isFinite(record.amount)) {
++    return { ok: false, reason: "amount must be a finite number" }
++  }
++
++  const currency = record.currency === undefined ? "USD" : record.currency
++  if (!isNonEmptyString(currency)) {
++    return { ok: false, reason: "currency must be a non-empty string" }
++  }
++
++  return {
++    ok: true,
++    value: {
++      externalRef: record.externalRef,
++      amount: record.amount,
++      currency,
++      claimantName: record.claimantName,
++      lossDate: record.lossDate,
++    },
++  }
++}
+diff --git a/src/http/routes/claims.ts b/src/http/routes/claims.ts
+index 22ed22d..4e3722e 100644
+--- a/src/http/routes/claims.ts
++++ b/src/http/routes/claims.ts
+@@ -3,44 +3,31 @@ import type { DbClient } from "../../db/client"
+ import { getClaimById, insertClaim, listClaimsByTenant } from "../../db/repositories/claims"
+ import type { Outbox } from "../../queue/outbox"
+ import { badRequest, notFound } from "../errors"
++import { parseClaimInput } from "../parsers/claim-input"
+ import { requireTenantId } from "../request-context"
+-import type { App, HandlerRequest } from "../types"
++import type { App } from "../types"
+ 
+ export interface ClaimRouteDeps {
+   db: DbClient
+   outbox: Outbox
+ }
+ 
+-/** `req.body` is `any` (see src/http/types.ts) - none of these fields are checked before we
+- * hand them to the repository layer. Finance asked for amounts to always carry two decimal
+- * places on the wire, so this rounds before the claim is stored. */
+-function parseCreateClaimBody(req: HandlerRequest) {
+-  const body = req.body
+-  return {
+-    externalRef: body?.externalRef,
+-    amount: Number(body?.amount.toFixed(2)),
+-    currency: body?.currency ?? "USD",
+-    claimantName: body?.claimantName,
+-    lossDate: body?.lossDate,
+-  }
+-}
+-
+ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+   app.post("/claims", async (req) => {
+     const tenantId = requireTenantId(req)
+-    const input = parseCreateClaimBody(req)
+-    if (!input.externalRef || !input.claimantName) {
+-      return badRequest("externalRef and claimantName are required")
++    const parsed = parseClaimInput(req.body)
++    if (!parsed.ok) {
++      return badRequest(parsed.reason)
+     }
+ 
+     const claim = await insertClaim(deps.db, {
+       tenantId,
+-      externalRef: input.externalRef,
++      externalRef: parsed.value.externalRef,
+       status: "submitted",
+-      amount: input.amount,
+-      currency: input.currency,
+-      claimantName: input.claimantName,
+-      lossDate: input.lossDate,
++      amount: parsed.value.amount,
++      currency: parsed.value.currency,
++      claimantName: parsed.value.claimantName,
++      lossDate: parsed.value.lossDate,
+     })
+ 
+     deps.outbox.enqueue({ type: "claim.processed", tenantId, claimId: claim.id })

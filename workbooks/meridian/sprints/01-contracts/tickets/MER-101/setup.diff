@@ -1,0 +1,20 @@
+diff --git a/src/http/routes/claims.ts b/src/http/routes/claims.ts
+index 410c576..22ed22d 100644
+--- a/src/http/routes/claims.ts
++++ b/src/http/routes/claims.ts
+@@ -12,12 +12,13 @@ export interface ClaimRouteDeps {
+ }
+ 
+ /** `req.body` is `any` (see src/http/types.ts) - none of these fields are checked before we
+- * hand them to the repository layer. */
++ * hand them to the repository layer. Finance asked for amounts to always carry two decimal
++ * places on the wire, so this rounds before the claim is stored. */
+ function parseCreateClaimBody(req: HandlerRequest) {
+   const body = req.body
+   return {
+     externalRef: body?.externalRef,
+-    amount: body?.amount,
++    amount: Number(body?.amount.toFixed(2)),
+     currency: body?.currency ?? "USD",
+     claimantName: body?.claimantName,
+     lossDate: body?.lossDate,

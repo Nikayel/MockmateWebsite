@@ -42,6 +42,11 @@ export interface WorkspaceExecutionResult {
     effectiveTotal: number
   }
   error: string | null
+  /** Per-file TS transpile time in ms, keyed by path. Only ever populated by the TS workspace
+   *  path (ts-workspace/types.ts's TsWorkspaceRunResult makes it required); optional here so the
+   *  other three workspace runners (JS/Python/SQL, which never transpile) are not forced to fake
+   *  it, while still giving the field a typed consumer path on the shared result shape. */
+  transpileTimingsMs?: Record<string, number>
 }
 
 export type WorkspaceScenario = Scenario & {

@@ -1,0 +1,6 @@
+diff --git a/archive/migrations/0002_claims.sql b/archive/migrations/0002_claims.sql
+new file mode 100644
+--- /dev/null
++++ b/archive/migrations/0002_claims.sql
+@@ -0,0 +1,1 @@
++ALTER TABLE claims ADD COLUMN legacy_amount integer;

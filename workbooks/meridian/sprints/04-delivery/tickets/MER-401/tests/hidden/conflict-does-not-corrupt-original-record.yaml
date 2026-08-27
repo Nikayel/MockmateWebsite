@@ -1,0 +1,39 @@
+humanName: "Escaped: a rejected conflicting retry does not corrupt the original record"
+tags:
+  - idempotent-post-with-replay
+kind: probe
+body: |
+  const { meridian } = buildTestApp()
+  return meridian.app
+    .inject({
+      method: "POST",
+      url: "/claims",
+      headers: { "x-tenant-id": "ten_northwind" },
+      payload: { externalRef: "NW-8849", amount: 100, claimantName: "Test Claimant", lossDate: "2026-01-15" },
+    })
+    .then((created) => {
+      const claimId = created.json().id
+      const original = {
+        method: "POST",
+        url: `/claims/${claimId}/payment-authorizations`,
+        headers: { "x-tenant-id": "ten_northwind", "idempotency-key": "hidden-key-conflict" },
+        payload: { approvedBy: "adjuster_griffin" },
+      }
+      return meridian.drainOutbox().then(() =>
+        meridian.app.inject(original).then((first) =>
+          meridian.app
+            .inject({ ...original, payload: { approvedBy: "someone_else" } })
+            .then((conflict) => {
+              assert.strictEqual(conflict.statusCode, 409)
+              return meridian.app.inject(original).then((replay) => {
+                assert.strictEqual(replay.statusCode, 201)
+                assert.deepStrictEqual(replay.json(), first.json())
+                assert(
+                  meridian.outbox.pendingCount() === 1,
+                  "the conflicting attempt must never have enqueued a delivery of its own"
+                )
+              })
+            })
+        )
+      )
+    })

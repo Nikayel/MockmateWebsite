@@ -1,0 +1,10 @@
+weights:
+  understanding: 0.15
+  problemSolving: 0.15
+  codeQuality: 0.1
+  communication: 0.3
+  verification: 0.3
+notes:
+  understanding: "Keys off naming that the timestamp is not part of the signed material, not just 'there could be a replay somehow'."
+  communication: "Keys off whether the learner pushed back on the string-equality dismissal with the actual reasoning (constant-time is free and categorical, not a probabilistic tradeoff), not just disagreement."
+  verification: "Keys off whether the learner's own regression test forges a timestamp on a captured signature rather than only testing a tampered body, since the PR's own test already covers the tampered-body case."

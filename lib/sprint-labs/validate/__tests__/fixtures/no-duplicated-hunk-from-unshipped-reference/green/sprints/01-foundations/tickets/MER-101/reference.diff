@@ -1,0 +1,10 @@
+diff --git a/src/queue/outbox.ts b/src/queue/outbox.ts
+--- a/src/queue/outbox.ts
++++ b/src/queue/outbox.ts
+@@ -1,4 +1,4 @@
+-function legacyOutboxLoop() {
+-  return null
+-}
++function outboxLoop() {
++  return drainOutbox()
++}

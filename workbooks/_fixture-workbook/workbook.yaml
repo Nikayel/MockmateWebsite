@@ -1,0 +1,27 @@
+# Fixture workbook for lib/sprint-labs/__tests__/compiler.test.ts and
+# sealing.test.ts. Not real learner content: it exists only to exercise
+# every artifact kind the compiler must handle (workbook, sprint, both
+# ai_policy tiers, io-case AND probe hidden tests, adversary, review.yaml
+# with a trap, author_brief.yaml, reference.diff, rubric.yaml) in the
+# smallest possible tree. See docs/sprint-labs/WORKBOOK-SPEC.md §6 for the
+# authored tree shape this follows.
+id: fixture-demo
+title: "Fixture Demo: Contracts Sprint"
+pitch: "A tiny two-ticket workbook that exists to exercise the Sprint Labs content compiler end to end."
+track: "Systems / Backend"
+language: typescript
+level: "Junior / Mid"
+topics:
+  - typescript
+  - api-contracts
+sprintCount: 1
+ticketCount: 2
+estimatedHours: 2
+requiresServerExecution: false
+objectives:
+  - id: typed-boundaries
+    label: "Typed boundaries"
+    canDo: "I can replace an any-typed parse of external input with a validated, narrowed type at a system boundary."
+  - id: contract-versioning
+    label: "Contract versioning"
+    canDo: "I can decide when a breaking API change needs a new version instead of a silent behavior change."

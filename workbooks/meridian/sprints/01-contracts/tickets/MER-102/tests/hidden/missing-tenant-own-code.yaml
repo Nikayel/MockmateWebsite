@@ -1,0 +1,17 @@
+humanName: "Escaped: a missing tenant header is reported under the generic validation code instead of its own"
+tags:
+  - error-taxonomy-http-codes
+kind: io-case
+input:
+  message: "Missing x-tenant-id header"
+  correlationId: "corr_test_4"
+expected:
+  statusCode: 400
+  body:
+    error:
+      code: "MISSING_TENANT"
+      message: "Missing x-tenant-id header"
+      correlationId: "corr_test_4"
+entryPoint:
+  module: "src/http/errors.ts"
+  export: "missingTenant"

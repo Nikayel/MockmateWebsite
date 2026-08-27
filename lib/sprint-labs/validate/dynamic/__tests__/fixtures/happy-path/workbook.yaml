@@ -1,0 +1,19 @@
+# Fixture for lib/sprint-labs/validate/dynamic's own test suite. Not real
+# learner content -- exercises red/green + regression replay end to end
+# under full test-author control (see task-7-report.md).
+id: dynamic-happy-path
+title: "Dynamic gate happy path fixture"
+pitch: "Exercises lab validate --dynamic's red/green + regression replay end to end."
+track: "Test fixture"
+language: typescript
+level: "n/a"
+topics:
+  - arithmetic
+sprintCount: 1
+ticketCount: 2
+estimatedHours: 0
+requiresServerExecution: false
+objectives:
+  - id: arithmetic
+    label: "Arithmetic"
+    canDo: "n/a"

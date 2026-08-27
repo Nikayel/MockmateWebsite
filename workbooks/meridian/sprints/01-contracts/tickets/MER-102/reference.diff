@@ -1,0 +1,219 @@
+diff --git a/src/http/error-codes.ts b/src/http/error-codes.ts
+new file mode 100644
+index 0000000..5527f79
+--- /dev/null
++++ b/src/http/error-codes.ts
+@@ -0,0 +1,13 @@
++/**
++ * Stable, machine-readable error codes a partner's retry logic can branch on. A code never
++ * changes once shipped, even if the human-readable message next to it gets reworded - add a
++ * new one here before using it anywhere else, this is the one place they are all named.
++ */
++export const ERROR_CODES = {
++  VALIDATION_ERROR: "VALIDATION_ERROR",
++  MISSING_TENANT: "MISSING_TENANT",
++  NOT_FOUND: "NOT_FOUND",
++  INTERNAL_ERROR: "INTERNAL_ERROR",
++} as const
++
++export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES]
+diff --git a/src/http/errors.ts b/src/http/errors.ts
+index 1ae8ad9..c815571 100644
+--- a/src/http/errors.ts
++++ b/src/http/errors.ts
+@@ -1,10 +1,54 @@
++import type { ErrorCode } from "./error-codes"
++import { ERROR_CODES } from "./error-codes"
+ import type { HandlerResponse } from "./types"
+ 
+-// Each helper returns its own response shape.
+-export function notFound(message: string): HandlerResponse {
+-  return { statusCode: 404, body: { message } }
++/** The one shape every error response takes, on every path - including the ones the
++ * framework generates itself (an unmatched route, an uncaught exception). A partner can
++ * always read `error.code`, never has to guess whether this particular failure looks
++ * different from the last one. */
++export interface ErrorResponseBody {
++  error: {
++    code: ErrorCode
++    message: string
++    correlationId: string
++  }
+ }
+ 
+-export function badRequest(message: string): HandlerResponse {
+-  return { statusCode: 400, body: { message } }
++interface ErrorOptions {
++  message: string
++  correlationId: string
++}
++
++function errorEnvelope(statusCode: number, code: ErrorCode, options: ErrorOptions): HandlerResponse {
++  return {
++    statusCode,
++    body: { error: { code, message: options.message, correlationId: options.correlationId } },
++  }
++}
++
++export function badRequest(options: ErrorOptions): HandlerResponse {
++  return errorEnvelope(400, ERROR_CODES.VALIDATION_ERROR, options)
++}
++
++/** A distinct code from `VALIDATION_ERROR` on purpose - a partner whose integration forgot
++ * the tenant header entirely is a different failure than one whose claim payload is wrong,
++ * and their retry logic should be able to tell the two apart. */
++export function missingTenant(options: ErrorOptions): HandlerResponse {
++  return errorEnvelope(400, ERROR_CODES.MISSING_TENANT, options)
++}
++
++export function notFound(options: ErrorOptions): HandlerResponse {
++  return errorEnvelope(404, ERROR_CODES.NOT_FOUND, options)
++}
++
++/**
++ * Takes no error detail as an argument, on purpose - there is structurally nothing here for
++ * a stack trace or a database error string to ride along on. The correlation id is what lets
++ * support find the real detail in the server's own log line instead.
++ */
++export function internalError(options: { correlationId: string }): HandlerResponse {
++  return errorEnvelope(500, ERROR_CODES.INTERNAL_ERROR, {
++    message: "Something went wrong on our end. Contact support with this correlation id.",
++    correlationId: options.correlationId,
++  })
+ }
+diff --git a/src/http/request-context.ts b/src/http/request-context.ts
+index b234965..42a26f0 100644
+--- a/src/http/request-context.ts
++++ b/src/http/request-context.ts
+@@ -1,5 +1,16 @@
++import { generateId } from "../util/ids"
+ import type { HandlerRequest } from "./types"
+ 
++/** Thrown by `requireTenantId` - a distinct type so `src/http/server.ts` can tell "the caller
++ * forgot the tenant header" apart from every other exception a handler might raise, and
++ * answer with a 400 in its own error code instead of a generic 500. */
++export class MissingTenantError extends Error {
++  constructor() {
++    super("Missing x-tenant-id header")
++    this.name = "MissingTenantError"
++  }
++}
++
+ /**
+  * There is no auth system in front of this API yet - every request carries its tenant in a
+  * header, and we trust whoever is calling us to set it correctly.
+@@ -7,7 +18,14 @@ import type { HandlerRequest } from "./types"
+ export function requireTenantId(req: HandlerRequest): string {
+   const tenantId = req.headers["x-tenant-id"]
+   if (!tenantId) {
+-    throw new Error("Missing x-tenant-id header")
++    throw new MissingTenantError()
+   }
+   return tenantId
+ }
++
++/** A caller-supplied `x-correlation-id` is echoed back verbatim, so a partner who already
++ * tags their own requests can trace one through our logs by an id they chose themselves.
++ * Otherwise one is generated, so every request still gets exactly one. */
++export function getCorrelationId(headers: Record<string, string>): string {
++  return headers["x-correlation-id"] || generateId("req")
++}
+diff --git a/src/http/routes/claims.ts b/src/http/routes/claims.ts
+index 4e3722e..0aa3d26 100644
+--- a/src/http/routes/claims.ts
++++ b/src/http/routes/claims.ts
+@@ -17,7 +17,7 @@ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+     const tenantId = requireTenantId(req)
+     const parsed = parseClaimInput(req.body)
+     if (!parsed.ok) {
+-      return badRequest(parsed.reason)
++      return badRequest({ message: parsed.reason, correlationId: req.correlationId })
+     }
+ 
+     const claim = await insertClaim(deps.db, {
+@@ -60,7 +60,9 @@ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+   app.get("/claims/:id", async (req) => {
+     const tenantId = requireTenantId(req)
+     const claim = await getClaimById(deps.db, tenantId, req.params.id)
+-    if (!claim) return notFound(`claim ${req.params.id} not found`)
++    if (!claim) {
++      return notFound({ message: `claim ${req.params.id} not found`, correlationId: req.correlationId })
++    }
+     return { statusCode: 200, body: claim }
+   })
+ }
+diff --git a/src/http/server.ts b/src/http/server.ts
+index ec5f5cb..6c62752 100644
+--- a/src/http/server.ts
++++ b/src/http/server.ts
+@@ -1,5 +1,8 @@
+ import { loadConfig } from "../config"
+ import type { MeridianConfig } from "../config"
++import { log } from "../util/logger"
++import { internalError, missingTenant, notFound } from "./errors"
++import { getCorrelationId, MissingTenantError } from "./request-context"
+ import type {
+   App,
+   HandlerRequest,
+@@ -92,6 +95,7 @@ export function createApp(config: MeridianConfig = loadConfig()): App {
+     const [pathname, search = ""] = request.url.split("?")
+     const segments = splitPath(pathname)
+     const headers = request.headers ?? {}
++    const correlationId = getCorrelationId(headers)
+ 
+     let matched: { route: RegisteredRoute; params: Record<string, string> } | undefined
+     for (const route of routes) {
+@@ -103,7 +107,10 @@ export function createApp(config: MeridianConfig = loadConfig()): App {
+     }
+ 
+     if (!matched) {
+-      return toInjectResponse({ statusCode: 404, body: { message: "Not Found" } })
++      log("route not found", { method: request.method, url: request.url, correlationId })
++      return toInjectResponse(
++        notFound({ message: `${request.method} ${pathname} not found`, correlationId })
++      )
+     }
+ 
+     const handlerRequest: HandlerRequest = {
+@@ -113,14 +120,23 @@ export function createApp(config: MeridianConfig = loadConfig()): App {
+       query: parseQuery(search),
+       headers,
+       body: parseBody(request.payload),
++      correlationId,
+     }
+ 
+     try {
+       const response = await matched.route.handler(handlerRequest)
+       return toInjectResponse(response)
+     } catch (error) {
+-      const message = error instanceof Error ? error.message : "Internal Server Error"
+-      return toInjectResponse({ statusCode: 500, body: { message } })
++      if (error instanceof MissingTenantError) {
++        log("request rejected", { correlationId, code: "MISSING_TENANT" })
++        return toInjectResponse(missingTenant({ message: error.message, correlationId }))
++      }
++      log("request failed", {
++        correlationId,
++        code: "INTERNAL_ERROR",
++        error: error instanceof Error ? error.message : String(error),
++      })
++      return toInjectResponse(internalError({ correlationId }))
+     }
+   }
+ 
+diff --git a/src/http/types.ts b/src/http/types.ts
+index 776deb8..f120ac7 100644
+--- a/src/http/types.ts
++++ b/src/http/types.ts
+@@ -29,6 +29,11 @@ export interface HandlerRequest {
+   query: Record<string, string>
+   headers: Record<string, string>
+   body: any
++  /** Assigned once per request, from the caller's own `x-correlation-id` header if it sent
++   * one, or generated otherwise - see src/http/request-context.ts. Every error response
++   * carries this same value, so support can join a response back to the server's log line
++   * for the request that produced it. */
++  correlationId: string
+ }
+ 
+ export interface HandlerResponse {

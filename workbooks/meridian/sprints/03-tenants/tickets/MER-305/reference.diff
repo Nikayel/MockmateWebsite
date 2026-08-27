@@ -1,0 +1,71 @@
+diff --git a/migrations/0012_claims_external_ref_unique.sql b/migrations/0012_claims_external_ref_unique.sql
+new file mode 100644
+index 0000000..fd430af
+--- /dev/null
++++ b/migrations/0012_claims_external_ref_unique.sql
+@@ -0,0 +1,14 @@
++-- MER-305: CX-88431 was extracted by two worker runs seconds apart, and both proceeded to bill
++-- it, because each one checked whether a claim with that external reference already existed
++-- before inserting its own - an ordinary check-then-insert, and READ COMMITTED (Postgres's
++-- default, and this database's) does not stop two transactions from both passing that check
++-- before either one commits its insert. A bigger lock or a longer transaction narrows the
++-- window; it does not close it. A constraint the database itself enforces does, regardless of
++-- how the two inserts happen to interleave.
++--
++-- Scoped to (tenant_id, external_ref), not external_ref alone: external_ref is the insurer's
++-- own reference number, only meaningful within the tenant that sent it (see
++-- src/db/queries.ts's FIND_CLAIM_BY_EXTERNAL_REF) - two different tenants are allowed to reuse
++-- the exact same reference number for two entirely unrelated claims.
++alter table claims
++  add constraint claims_tenant_external_ref_unique unique (tenant_id, external_ref);
+diff --git a/src/db/repositories/claims.ts b/src/db/repositories/claims.ts
+index b646559..a30d0e9 100644
+--- a/src/db/repositories/claims.ts
++++ b/src/db/repositories/claims.ts
+@@ -157,3 +157,46 @@ export async function findClaimByExternalRef(
+   ])
+   return rows[0] ? toClaim(rows[0]) : null
+ }
++
++/** The Postgres SQLSTATE for a unique-violation - a real, stable code, not specific to any one
++ * constraint. See migrations/0012_claims_external_ref_unique.sql for the constraint this module
++ * cares about specifically. */
++const UNIQUE_VIOLATION_SQLSTATE = "23505"
++
++/** Shape of what a Postgres-driver error carries for a constraint violation - `code` is the
++ * SQLSTATE, `constraint` is the violated constraint's own name. Both are real fields a `pg`
++ * driver error object exposes; this repository does not depend on the driver package itself,
++ * only on this narrow shape of what it throws. */
++export interface DriverErrorLike {
++  code?: string
++  constraint?: string
++  message?: string
++}
++
++export type ClaimInsertOutcome =
++  | { outcome: "created" }
++  | { outcome: "duplicate"; reason: string }
++  | { outcome: "unknown_error"; reason: string }
++
++/**
++ * CX-88431: two worker runs both checked whether a claim with this external reference already
++ * existed, both saw nothing, both inserted - an ordinary check-then-insert race READ COMMITTED
++ * does not prevent. migrations/0012_claims_external_ref_unique.sql closes the race itself; this
++ * function is what the write path needs regardless - a duplicate is now an EXPECTED outcome of
++ * a normal insert, not a database error indistinguishable from a real one, and it must be named
++ * as such rather than surfacing as an unhandled 500. Recognizes exactly the one constraint this
++ * ticket added, by name, from whatever a Postgres-shaped driver throws - a foreign key
++ * violation, a not-null violation, or a unique violation on some other constraint entirely, all
++ * still count as `unknown_error` and must not be silently swallowed as if they were the
++ * expected conflict.
++ */
++export function interpretClaimInsertError(error: DriverErrorLike | null): ClaimInsertOutcome {
++  if (!error) return { outcome: "created" }
++  if (error.code === UNIQUE_VIOLATION_SQLSTATE && error.constraint === "claims_tenant_external_ref_unique") {
++    return {
++      outcome: "duplicate",
++      reason: "a claim with this external reference already exists for this tenant",
++    }
++  }
++  return { outcome: "unknown_error", reason: error.message ?? "unknown database error" }
++}

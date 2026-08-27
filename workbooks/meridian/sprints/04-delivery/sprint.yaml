@@ -1,0 +1,75 @@
+number: 4
+title: "Delivery: Pay It Once"
+goal: "Meridian paid a claim twice last Thursday: by the end of this sprint intake is idempotent, every outbound webhook goes through a transactional outbox with a retry policy you could defend in an incident review, and the ordering guarantee we actually offer is written down and enforced."
+standupQuote: "Northwind Mutual, 08:41: You sent us two payment authorizations for CLM-8842, 412ms apart, identical amounts. Finance has already cut both cheques. Who do I talk to?"
+topic: "Concurrency & distributed correctness"
+archMapDelta:
+  added:
+    - "Idempotency-key storage for claim intake"
+    - "A database-backed transactional outbox drained with expiring SKIP LOCKED leases"
+    - "HMAC signing and replay protection on outbound webhooks"
+  changed:
+    - "Webhook retries follow a capped, jittered backoff with a dead letter queue instead of a fixed retry interval"
+  invariants:
+    - "A business row and its outbound event are committed together, in the same transaction."
+    - "The same idempotency key arriving with a different body is rejected with a 409, never silently reprocessed."
+objectives:
+  - idempotent-post-with-replay
+  - transactional-outbox-skip-locked
+  - defensible-retry-policy-backoff-jitter
+  - webhook-hmac-verification-review
+  - per-claim-ordering-guarantee
+filesTouched:
+  # MER-401
+  - "migrations/0013_idempotency_keys.sql"
+  - "src/db/repositories/idempotency-keys.ts"
+  - "src/http/idempotency.ts"
+  - "src/http/routes/payment-authorizations.ts"
+  - "src/http/error-codes.ts"
+  - "src/http/errors.ts"
+  - "src/db/queries.ts"
+  - "src/db/memory-db.ts"
+  - "src/app.ts"
+  - "src/http/compatibility-descriptor.ts"
+  # MER-402
+  - "migrations/0014_outbox.sql"
+  - "src/db/client.ts"
+  - "src/db/repositories/outbox.ts"
+  - "src/domain/outbox-entry.ts"
+  - "src/queue/outbox.ts"
+  - "src/http/routes/claims.ts"
+  - "test/support/failing-query-db.ts"
+  # MER-403
+  - "migrations/0015_dead_letters.sql"
+  - "src/delivery/types.ts"
+  - "src/delivery/retry.ts"
+  - "src/delivery/webhooks.ts"
+  - "test/support/fake-http-client.ts"
+  - "test/support/build-app.ts"
+  # MER-404
+  - "src/delivery/signature.ts"
+  # MER-405
+  - "migrations/0016_outbox_ordering.sql"
+newSourceFiles:
+  # MER-401
+  - "migrations/0013_idempotency_keys.sql"
+  - "src/db/repositories/idempotency-keys.ts"
+  - "src/http/idempotency.ts"
+  - "src/http/routes/payment-authorizations.ts"
+  # MER-402
+  - "migrations/0014_outbox.sql"
+  - "src/db/repositories/outbox.ts"
+  - "test/support/failing-query-db.ts"
+  # MER-403
+  - "migrations/0015_dead_letters.sql"
+  # MER-405
+  - "migrations/0016_outbox_ordering.sql"
+rewrittenFiles:
+  # MER-402: the in-process array is fully replaced by the durable outbox_entries table.
+  - "src/queue/outbox.ts"
+  # MER-403: withRetry's immediate in-process loop is replaced by classification + persisted
+  # backoff state; delivery no longer records a row before the send has actually succeeded.
+  - "src/delivery/retry.ts"
+  - "src/delivery/webhooks.ts"
+  # MER-404: PR #447's body-only HMAC and === comparison are replaced end to end.
+  - "src/delivery/signature.ts"

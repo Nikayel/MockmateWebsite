@@ -1,0 +1,22 @@
+# Fixture for lib/sprint-labs/validate/dynamic's provisioning scan temporal-precision test.
+# EARN-101 ships a distinctive io-case expected value into src/order.ts via its reference.diff, and
+# that same value is its hidden test's expected. A strictly-later ticket (EARN-102) legitimately
+# carries it as earned, shipped source -- the provisioning scan must NOT flag that. EARN-103 proves
+# real leaks still fire: its own answer embedded in its own setup, and an earlier ticket's
+# NON-shipped humanName in its bundle. Not real learner content.
+id: dynamic-earned-shipped-value
+title: "Provisioning scan earned-shipped-value fixture"
+pitch: "An earlier ticket's shipped io-case value carried into a later bundle is not a leak."
+track: "Test fixture"
+language: typescript
+level: "n/a"
+topics:
+  - provisioning
+sprintCount: 1
+ticketCount: 3
+estimatedHours: 0
+requiresServerExecution: false
+objectives:
+  - id: provisioning
+    label: "Provisioning"
+    canDo: "n/a"

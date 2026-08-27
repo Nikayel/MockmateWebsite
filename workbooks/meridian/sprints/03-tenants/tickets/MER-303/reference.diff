@@ -1,0 +1,31 @@
+diff --git a/src/db/tenant-context.ts b/src/db/tenant-context.ts
+index 60d40b7..00733cf 100644
+--- a/src/db/tenant-context.ts
++++ b/src/db/tenant-context.ts
+@@ -44,15 +44,19 @@ export function createConnectionPool(db: DbClient, size: number): ConnectionPool
+     },
+ 
+     /**
+-     * PR #431: resets the connection's tenant tag on a listener registered at release time,
+-     * so the reset runs "on release" without blocking whatever called release(). The
+-     * connection is handed back to the pool immediately - acquire() can reuse it before this
+-     * listener has actually run.
++     * PR #431 proposed resetting the connection's tenant tag on a listener registered at
++     * release time, reasoning that a connection reused before that listener ran would be a
++     * pool-implementation bug. Rejected in review: this pool IS the implementation, and
++     * "acquire" is what actually needs to be safe, not "whatever release scheduled." Clears
++     * the tag synchronously, inline, before release() returns - never scheduled onto a
++     * listener, an event emitter, or a later tick. That is the entire fix: nothing runs
++     * between "released" and "cleared" for a later callback to race against, so the very next
++     * acquire() (which stamps its own tenant id immediately, synchronously, in the same call)
++     * can never observe - or be clobbered by - a reset left pending from the connection's
++     * previous tenant.
+      */
+     release(connection) {
+-      queueMicrotask(() => {
+-        connection.tenantId = null
+-      })
++      connection.tenantId = null
+     },
+   }
+ }

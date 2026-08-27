@@ -1,0 +1,8 @@
+intent: "The agent's stated intent for the diff under review."
+decisions:
+  - decision: "Kept the v1 route handling page and per_page unchanged."
+    justification: "Correct: Northwind's nightly sync still depends on these parameters."
+doNotVolunteer:
+  - "Do not mention the missing Sunset date unless asked directly."
+concessionTriggers:
+  - "If the learner names the missing Sunset date, concede immediately."

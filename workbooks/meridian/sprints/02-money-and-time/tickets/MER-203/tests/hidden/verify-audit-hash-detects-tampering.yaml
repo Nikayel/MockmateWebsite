@@ -1,0 +1,21 @@
+humanName: "Escaped: a claim whose amount changed after write time still verifies as untampered"
+tags:
+  - canonical-encoding-audit-hash
+kind: io-case
+input:
+  claim:
+    id: "clm_hidden1"
+    tenantId: "ten_cascade"
+    externalRef: "CAS-1"
+    status: "submitted"
+    money:
+      minorUnits: 999999
+      currency: "USD"
+    claimantName: "Jordan Rivera"
+    lossDate: "2026-02-01"
+    createdAt: "2026-02-02T08:00:00.000Z"
+  storedHash: "46457919"
+expected: false
+entryPoint:
+  module: "src/util/canonical-json.ts"
+  export: "verifyClaimAuditHash"

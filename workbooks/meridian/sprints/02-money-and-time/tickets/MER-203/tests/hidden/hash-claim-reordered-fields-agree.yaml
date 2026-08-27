@@ -1,0 +1,19 @@
+humanName: "Escaped: the exact same claim reconstructed with its fields in a different order hashes differently"
+tags:
+  - canonical-encoding-audit-hash
+kind: io-case
+input:
+  createdAt: "2026-02-02T08:00:00.000Z"
+  lossDate: "2026-02-01"
+  claimantName: "Jordan Rivera"
+  money:
+    currency: "USD"
+    minorUnits: 250000
+  status: "submitted"
+  externalRef: "CAS-1"
+  tenantId: "ten_cascade"
+  id: "clm_hidden1"
+expected: "46457919"
+entryPoint:
+  module: "src/util/canonical-json.ts"
+  export: "hashClaim"

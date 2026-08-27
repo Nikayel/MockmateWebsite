@@ -1,0 +1,14 @@
+intent: "Stop Northwind's claim intake from returning 500 by catching whatever the amount normalization throws on and falling back to the original payload, since the ticket only asked to unblock their integration overnight."
+decisions:
+  - decision: "Wrapped the amount normalization in a try/catch inside a new parseCreateClaimBody function, instead of changing parseClaimInput itself."
+    justification: "Correct as a boundary: parseClaimInput is untouched, so every other caller of it keeps its existing guarantees. The risk is contained to this one new function."
+  - decision: "On catch, returned { ok: true, value: body } instead of rejecting with a 400."
+    justification: "Wrong: this is exactly the validation gap MER-101 exists to close. It ships an unvalidated amount straight through to the repository, so a non-numeric amount is silently accepted again, just without a 500 this time."
+  - decision: "Added one test for the literal CLM-77102 payload from the ticket, not a wider sweep of malformed shapes."
+    justification: "Wrong: it proves the crash is gone for this one payload, not that the endpoint still rejects a boolean, null, or missing amount, so a green CI run here understates what has actually been checked."
+doNotVolunteer:
+  - "Do not mention that the catch block silently accepts non-numeric amounts unless asked directly."
+  - "Do not mention the thin test coverage unless asked directly."
+concession_triggers:
+  - "If the learner names that the catch block returns ok: true with an unvalidated amount, concede immediately and agree that is the real remaining defect."
+  - "If the learner asks why there is no test for a non-numeric, boolean, or null amount, concede that coverage is thin and agree it should be added before merging."

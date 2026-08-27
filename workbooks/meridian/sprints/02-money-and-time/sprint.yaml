@@ -1,0 +1,55 @@
+number: 2
+title: "Money & Time"
+goal: "Give every amount and every date in Meridian exactly one meaning: an exact decimal with a currency, a civil date with a zone, and one canonical hash over both, without breaking the two insurers still on v1."
+standupQuote: "#finance-ops, 08:41: Reconciliation is out by $412.19 across 40,317 claims this month, and it's a different set of claims every time we re-run the export."
+topic: "Serialization & data contracts"
+archMapDelta:
+  added:
+    - "A canonical JSON encoder and an audit hash over every claim"
+  changed:
+    - "Claim amounts stored and served as exact minor-unit integers instead of floating point"
+    - "Claim dates modeled as a civil date plus the owning tenant's time zone instead of a single instant"
+    - "The claims list response is versioned per subscription instead of one shared shape"
+  invariants:
+    - "An amount is never represented as a floating-point number anywhere past the request parser."
+    - "A subscription that sends no version header keeps receiving the v1 shape it already depends on."
+sizingNotes: "Originally scoped at 127 visible and 32 hidden test cases, which inverts the point of this sprint: the whole lesson is that the obvious float fix is wrong, so the hidden tier should carry more of that weight. As authored: 113 visible / 45 hidden across the five tickets (MER-201 36v/12h, MER-202 25v/11h, MER-203 13v/7h, MER-204 26v/9h, MER-205 13v/6h) - the hidden share is far larger relative to sprint 1's own ratio than the original 127/32 draft, and every hidden tier leans on io-case or probe cases that discriminate the setup state from the reference, not restatements of the visible tier."
+objectives:
+  - exact-money-representation-rounding
+  - date-time-zone-modeling
+  - canonical-encoding-audit-hash
+  - backward-compatible-wire-format
+  - audit-hash-compatibility-tracing
+filesTouched:
+  - "src/money/money.ts"
+  - "src/money/round-half-up.ts"
+  - "migrations/0005_money_minor_units.sql"
+  - "src/db/repositories/claims.ts"
+  - "src/domain/claim.ts"
+  - "src/delivery/webhook-payload.ts"
+  - "test/money/round-half-up.test.ts"
+  - "src/domain/calendar-date.ts"
+  - "migrations/0006_claim_dates_and_tenant_zone.sql"
+  - "src/domain/tenant.ts"
+  - "src/db/repositories/tenants.ts"
+  - "src/db/queries.ts"
+  - "src/db/memory-db.ts"
+  - "test/support/fixtures.ts"
+  - "src/util/canonical-json.ts"
+  - "migrations/0007_claim_audit_hash.sql"
+  - "src/http/routes/claims.ts"
+  - "src/http/compatibility-descriptor.ts"
+  - "src/http/openapi.ts"
+  - "src/http/subscription-version.ts"
+  - "migrations/0008_subscription_envelope_version.sql"
+  - "migrations/0009_audit_hash_projection_version.sql"
+newSourceFiles:
+  - "migrations/0005_money_minor_units.sql"
+  - "src/domain/calendar-date.ts"
+  - "migrations/0006_claim_dates_and_tenant_zone.sql"
+  - "src/util/canonical-json.ts"
+  - "migrations/0007_claim_audit_hash.sql"
+  - "src/http/subscription-version.ts"
+  - "migrations/0008_subscription_envelope_version.sql"
+  - "migrations/0009_audit_hash_projection_version.sql"
+rewrittenFiles: []

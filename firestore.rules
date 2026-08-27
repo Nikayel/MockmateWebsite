@@ -435,6 +435,67 @@ service cloud.firestore {
                     && resource.data.userId == request.auth.uid;
     }
 
+    // ============================================================================
+    // SPRINT LAB RUNS (workbook practice surface)
+    // ============================================================================
+
+    // RULING R12 (2026-08-26 review): the caseLabRuns copy-verbatim pattern is
+    // wrong for THIS collection. caseLabRuns' client-writable create/update is
+    // safe because milestoneStatus/answers are formative, not entitlement-
+    // bearing. sprintLabRuns.currentSprint gates a Pro paywall and board is a
+    // graded state machine, so a signed-in client CREATE/UPDATE here would let
+    // a learner forge currentSprint past the paywall or rewrite board around
+    // every transition rule in lib/sprint-labs/runs.ts (which only runs
+    // server-side, in app/api/sprint-labs/*, and never sees a direct client
+    // write). R5's purpose was defense-in-depth; on an entitlement-bearing
+    // collection that means DENY, not "copy the pattern verbatim." Every
+    // legitimate write goes through the Admin SDK from app/api/sprint-labs/*
+    // (which bypasses these rules and already verifies token + ownership), so
+    // read stays owner-scoped but create/update/delete are server-only.
+    match /sprintLabRuns/{runId} {
+      allow read: if isAuthenticated()
+                  && documentExists()
+                  && resource.data.userId == request.auth.uid;
+
+      allow create, update, delete: if false;
+
+      // Shared by the three subcollections below: none of their docs carry a
+      // `userId` field of their own (Task 1's frozen shapes in
+      // lib/sprint-labs/types.ts), so ownership is resolved via the parent run
+      // doc instead. Scoped to this match block, so it is visible to the
+      // nested `files` / `attempts` / `transcripts` matches but nowhere else.
+      function isRunOwner() {
+        return isAuthenticated()
+          && get(/databases/$(database)/documents/sprintLabRuns/$(runId)).data.userId == request.auth.uid;
+      }
+
+      // Per-file workspace store. Owner-readable so a future direct-client read
+      // is not blocked outright, but every write is server-stamped (revision,
+      // updatedAt, the 100,000-char cap) in
+      // app/api/sprint-labs/runs/files/route.ts, so client writes are denied
+      // rather than re-deriving that validation in rules.
+      match /files/{fileId} {
+        allow read: if isRunOwner();
+        allow write: if false;
+      }
+
+      // Graded ticket submissions. Written only by the Admin SDK from the
+      // Task 8 attempts routes; a client write here would let a learner forge
+      // their own score or escaped-defect list.
+      match /attempts/{attemptId} {
+        allow read: if isRunOwner();
+        allow write: if false;
+      }
+
+      // Sable partner transcripts (Task 14). Server-owned, same posture as
+      // lib/feedback/transcript-storage.ts's existing bounded subcollection;
+      // never client-written.
+      match /transcripts/{transcriptId} {
+        allow read: if isRunOwner();
+        allow write: if false;
+      }
+    }
+
     // Owner-only access for interactive Python tutorial progress. Authoritative
     // writes go through the Firebase Admin SDK in app/api/tutorials/progress (which
     // verifies the token + ownership and bypasses these rules), so this block is

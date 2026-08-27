@@ -1,0 +1,27 @@
+humanName: "Escaped: a freshly written claim's stored audit info is missing its projection version"
+tags:
+  - audit-hash-compatibility-tracing
+kind: probe
+body: |
+  const { meridian } = buildTestApp()
+  return meridian.app
+    .inject({
+      method: "POST",
+      url: "/claims",
+      headers: { "x-tenant-id": "ten_northwind" },
+      payload: {
+        externalRef: "NW-9701",
+        amount: 75,
+        claimantName: "Test Claimant",
+        lossDate: "2026-01-01",
+      },
+    })
+    .then((created) => {
+      const { id } = created.json()
+      return getStoredClaimAuditInfo(meridian.db, "ten_northwind", id)
+    })
+    .then((stored) => {
+      assert(stored !== null, "expected the freshly written claim to have stored audit info")
+      assert(typeof stored.storedHash === "string" && stored.storedHash.length > 0, "expected a non-empty stored hash")
+      assert(stored.projectionVersion === AUDIT_PROJECTION_VERSION, "expected the current projection version to be stamped")
+    })

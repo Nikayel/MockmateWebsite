@@ -1,0 +1,13 @@
+number: 1
+title: "Only sprint"
+goal: "n/a"
+standupQuote: "n/a"
+objectives:
+  - provisioning
+filesTouched:
+  - "src/early.ts"
+  - "src/late.ts"
+newSourceFiles:
+  - "src/early.ts"
+  - "src/late.ts"
+rewrittenFiles: []

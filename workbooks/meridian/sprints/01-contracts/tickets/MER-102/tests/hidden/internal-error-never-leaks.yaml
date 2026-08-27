@@ -1,0 +1,16 @@
+humanName: "Escaped: the internal error response leaks something other than the fixed message and the correlation id"
+tags:
+  - error-taxonomy-http-codes
+kind: io-case
+input:
+  correlationId: "corr_test_3"
+expected:
+  statusCode: 500
+  body:
+    error:
+      code: "INTERNAL_ERROR"
+      message: "Something went wrong on our end. Contact support with this correlation id."
+      correlationId: "corr_test_3"
+entryPoint:
+  module: "src/http/errors.ts"
+  export: "internalError"

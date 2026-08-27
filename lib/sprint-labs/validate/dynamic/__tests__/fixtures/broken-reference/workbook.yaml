@@ -1,0 +1,20 @@
+# Fixture for lib/sprint-labs/validate/dynamic's own test suite. Deliberately
+# BROKEN: BROK-101's reference.diff fixes the visible-test case but not the
+# hidden-probe case, proving the gate fails loudly and names which tier
+# didn't flip. Not real learner content.
+id: dynamic-broken-reference
+title: "Dynamic gate broken-reference fixture"
+pitch: "A reference.diff that fixes visible but not hidden -- proves the gate fails loudly."
+track: "Test fixture"
+language: typescript
+level: "n/a"
+topics:
+  - arithmetic
+sprintCount: 1
+ticketCount: 1
+estimatedHours: 0
+requiresServerExecution: false
+objectives:
+  - id: arithmetic
+    label: "Arithmetic"
+    canDo: "n/a"

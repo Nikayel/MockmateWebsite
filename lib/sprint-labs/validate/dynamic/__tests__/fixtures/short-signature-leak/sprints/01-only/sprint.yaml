@@ -1,0 +1,13 @@
+number: 1
+title: "Only sprint"
+goal: "n/a"
+standupQuote: "n/a"
+objectives:
+  - arithmetic
+filesTouched:
+  - "src/util.ts"
+  - "src/zero.ts"
+newSourceFiles:
+  - "src/util.ts"
+  - "src/zero.ts"
+rewrittenFiles: []

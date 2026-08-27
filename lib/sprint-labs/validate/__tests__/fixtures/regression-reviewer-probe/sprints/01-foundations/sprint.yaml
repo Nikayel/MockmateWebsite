@@ -1,0 +1,10 @@
+# Review round 1, C-1c: the reviewer's probe. `files_touched` (wrong case
+# per ruling R17 -- the authored key is `filesTouched`) names a path that
+# does not exist anywhere in the seed. Before the C-1 fix, the loader read
+# `raw.filesTouched` (undefined, since the authored key is snake_case),
+# producing an empty set with nothing to check -- files-touched-exist
+# vacuously passed. This fixture must now fail.
+number: 1
+title: "Foundations"
+files_touched:
+  - "src/does/not/exist.ts"

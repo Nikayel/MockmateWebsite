@@ -1,0 +1,10 @@
+humanName: "Escaped: a cursor missing its id half of the tiebreak is treated as valid"
+tags:
+  - keyset-pagination
+kind: io-case
+input: "{\"createdAt\":\"2026-01-04T09:12:00.000Z\"}"
+expected:
+  kind: "invalid"
+entryPoint:
+  module: "src/http/routes/claims.ts"
+  export: "decodeClaimsCursor"

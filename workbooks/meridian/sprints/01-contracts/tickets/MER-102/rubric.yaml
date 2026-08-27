@@ -1,0 +1,10 @@
+weights:
+  understanding: 0.15
+  problemSolving: 0.3
+  codeQuality: 0.2
+  communication: 0.1
+  verification: 0.25
+notes:
+  understanding: "Keys off whether one envelope shape and one code list covers every failure path, including the framework's own unmatched-route and uncaught-exception cases."
+  problemSolving: "Keys off the visible and hidden pass rate across the four failure kinds - validation, missing tenant, not found, internal."
+  verification: "Keys off whether the internal-error path can be shown to leak nothing beyond the fixed message and the correlation id."

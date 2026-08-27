@@ -1,0 +1,21 @@
+# Fixture for lib/sprint-labs/validate/dynamic's own test suite (PLAN.md Task 7
+# review round 1, Critical 2). ENTRY-101's io-case hidden test authors an
+# entryPoint and genuinely discriminates (fails against the buggy setup,
+# passes against the fixed reference) -- proves the entryPoint mechanism
+# itself works end to end. Not real learner content.
+id: dynamic-io-case-entrypoint-green
+title: "Dynamic gate io-case entryPoint (discriminating) fixture"
+pitch: "An io-case with entryPoint that goes red->green -- proves the entryPoint execution mechanism."
+track: "Test fixture"
+language: typescript
+level: "n/a"
+topics:
+  - arithmetic
+sprintCount: 1
+ticketCount: 1
+estimatedHours: 0
+requiresServerExecution: false
+objectives:
+  - id: arithmetic
+    label: "Arithmetic"
+    canDo: "n/a"

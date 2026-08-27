@@ -1,0 +1,182 @@
+diff --git a/migrations/0011_claims_tenant_indexes.sql b/migrations/0011_claims_tenant_indexes.sql
+new file mode 100644
+index 0000000..4e4c038
+--- /dev/null
++++ b/migrations/0011_claims_tenant_indexes.sql
+@@ -0,0 +1,8 @@
++-- MER-304: the claims list endpoint's own query and its composite index
++-- (migrations/0004_claims_created_at_id_idx.sql) are untouched by this ticket - the regression
++-- is in what that endpoint does next, fetching every returned claim's documents. That fetch is
++-- now one statement for the whole page instead of one per claim (see
++-- src/db/repositories/documents.ts's `getDocumentsForClaims`), and this index is what that one
++-- statement needs: column order matches its own ORDER BY exactly, so rows for the same claim
++-- come back together and in a stable order without a separate sort step.
++create index documents_claim_id_created_at_idx on documents(claim_id, created_at);
+diff --git a/src/db/memory-db.ts b/src/db/memory-db.ts
+index 292ed73..03536f2 100644
+--- a/src/db/memory-db.ts
++++ b/src/db/memory-db.ts
+@@ -132,6 +132,18 @@ export function createMemoryDb(): DbClient {
+         return { rows: matching as T[] }
+       }
+ 
++      case queries.GET_DOCUMENTS_FOR_CLAIMS: {
++        const [claimIds] = params as [string[]]
++        const idSet = new Set(claimIds)
++        const matching = documents
++          .filter((document) => idSet.has(document.claim_id as string))
++          .sort((a, b) => {
++            const byClaimId = String(a.claim_id).localeCompare(String(b.claim_id))
++            return byClaimId !== 0 ? byClaimId : String(a.created_at).localeCompare(String(b.created_at))
++          })
++        return { rows: matching as T[] }
++      }
++
+       case queries.INSERT_WEBHOOK_DELIVERY: {
+         const [id, tenantId, claimId, status, payload, createdAt] = params
+         const row = {
+diff --git a/src/db/queries.ts b/src/db/queries.ts
+index 943e6f7..6b49ec2 100644
+--- a/src/db/queries.ts
++++ b/src/db/queries.ts
+@@ -41,6 +41,14 @@ export const INSERT_DOCUMENT =
+ 
+ export const GET_DOCUMENTS_FOR_CLAIM = "SELECT * FROM documents WHERE claim_id = $1"
+ 
++/** One statement for a whole page of claim ids, not one statement per claim - see
++ * migrations/0011_claims_tenant_indexes.sql for the index this relies on, and
++ * src/db/repositories/documents.ts's `getDocumentsForClaims` for the caller. Ordered by
++ * `(claim_id, created_at)` so rows for the same claim arrive together and in a stable order,
++ * matching the index exactly. */
++export const GET_DOCUMENTS_FOR_CLAIMS =
++  "SELECT * FROM documents WHERE claim_id = ANY($1) ORDER BY claim_id, created_at"
++
+ export const INSERT_WEBHOOK_DELIVERY =
+   "INSERT INTO webhook_deliveries (id, tenant_id, claim_id, status, payload, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *"
+ 
+diff --git a/src/db/repositories/documents.ts b/src/db/repositories/documents.ts
+index 818cddb..e0b899c 100644
+--- a/src/db/repositories/documents.ts
++++ b/src/db/repositories/documents.ts
+@@ -1,7 +1,7 @@
+ import type { DbClient } from "../client"
+ import type { ClaimDocument, CreateDocumentInput } from "../../domain/document"
+ import { generateId } from "../../util/ids"
+-import { GET_DOCUMENTS_FOR_CLAIM, INSERT_DOCUMENT } from "../queries"
++import { GET_DOCUMENTS_FOR_CLAIM, GET_DOCUMENTS_FOR_CLAIMS, INSERT_DOCUMENT } from "../queries"
+ 
+ interface DocumentRow {
+   id: string
+@@ -51,14 +51,28 @@ export async function getDocumentsForClaim(
+   return rows.map(toDocument)
+ }
+ 
+-/** One query per claim, reusing `getDocumentsForClaim`. */
++/**
++ * One statement for the whole page of claim ids, not one per claim - MER-304: this used to
++ * call `getDocumentsForClaim` in a loop, which stayed fast right up until MER-302's row-level
++ * security policy made every one of those per-claim statements measurably more expensive on a
++ * realistic-sized documents table. Fixing the query pattern here is what actually closes that,
++ * not any change to the policy itself.
++ */
+ export async function getDocumentsForClaims(
+   db: DbClient,
+   claimIds: string[]
+ ): Promise<Record<string, ClaimDocument[]>> {
+   const result: Record<string, ClaimDocument[]> = {}
+   for (const claimId of claimIds) {
+-    result[claimId] = await getDocumentsForClaim(db, claimId)
++    result[claimId] = []
++  }
++  if (claimIds.length === 0) return result
++
++  const { rows } = await db.query<DocumentRow>(GET_DOCUMENTS_FOR_CLAIMS, [claimIds])
++  for (const row of rows) {
++    const document = toDocument(row)
++    result[document.claimId] = result[document.claimId] ?? []
++    result[document.claimId].push(document)
+   }
+   return result
+ }
+diff --git a/test/tenants/documents-batch-fetch.test.ts b/test/tenants/documents-batch-fetch.test.ts
+new file mode 100644
+index 0000000..7714b9f
+--- /dev/null
++++ b/test/tenants/documents-batch-fetch.test.ts
+@@ -0,0 +1,76 @@
++import { describe, expect, it } from "vitest"
++import type { DbClient } from "../../src/db/client"
++import { createMemoryDb } from "../../src/db/memory-db"
++import { insertDocument } from "../../src/db/repositories/documents"
++import { getDocumentsForClaims } from "../../src/db/repositories/documents"
++
++function spyOnQueries(db: DbClient): { db: DbClient; count: () => number } {
++  let calls = 0
++  return {
++    db: {
++      query: (sql, params) => {
++        calls += 1
++        return db.query(sql, params)
++      },
++    },
++    count: () => calls,
++  }
++}
++
++describe("getDocumentsForClaims issues a bounded number of queries", () => {
++  it("fetches documents for five claims in exactly one query, not five", async () => {
++    const db = createMemoryDb()
++    const claimIds = ["clm_1", "clm_2", "clm_3", "clm_4", "clm_5"]
++    for (const claimId of claimIds) {
++      await insertDocument(db, {
++        claimId,
++        fileName: `${claimId}.pdf`,
++        contentType: "application/pdf",
++        legacyPath: `/x/${claimId}`,
++      })
++    }
++
++    const spy = spyOnQueries(db)
++    const result = await getDocumentsForClaims(spy.db, claimIds)
++
++    expect(spy.count()).toBe(1)
++    for (const claimId of claimIds) {
++      expect(result[claimId]).toHaveLength(1)
++      expect(result[claimId][0].fileName).toBe(`${claimId}.pdf`)
++    }
++  })
++
++  it("still issues exactly one query for fifty claims", async () => {
++    const db = createMemoryDb()
++    const claimIds = Array.from({ length: 50 }, (_, i) => `clm_${i}`)
++
++    const spy = spyOnQueries(db)
++    await getDocumentsForClaims(spy.db, claimIds)
++
++    expect(spy.count()).toBe(1)
++  })
++
++  it("issues zero queries for an empty page", async () => {
++    const db = createMemoryDb()
++    const spy = spyOnQueries(db)
++
++    await getDocumentsForClaims(spy.db, [])
++
++    expect(spy.count()).toBe(0)
++  })
++
++  it("every claim id on the page gets an entry, even ones with no documents at all", async () => {
++    const db = createMemoryDb()
++    await insertDocument(db, {
++      claimId: "clm_has_docs",
++      fileName: "estimate.pdf",
++      contentType: "application/pdf",
++      legacyPath: "/x",
++    })
++
++    const result = await getDocumentsForClaims(db, ["clm_has_docs", "clm_no_docs"])
++
++    expect(result.clm_has_docs).toHaveLength(1)
++    expect(result.clm_no_docs).toEqual([])
++  })
++})

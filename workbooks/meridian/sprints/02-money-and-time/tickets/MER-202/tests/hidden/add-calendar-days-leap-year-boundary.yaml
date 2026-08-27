@@ -1,0 +1,17 @@
+humanName: "Escaped: adding one day to February 28th in a leap year skips straight to March 1st"
+tags:
+  - date-time-zone-modeling
+kind: io-case
+input:
+  date:
+    year: 2028
+    month: 2
+    day: 28
+  days: 1
+expected:
+  year: 2028
+  month: 2
+  day: 29
+entryPoint:
+  module: "src/domain/calendar-date.ts"
+  export: "addCalendarDays"

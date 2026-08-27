@@ -1,0 +1,35 @@
+humanName: "Escaped: the default (no-version) response is missing a field sprint-1 callers already depend on"
+tags:
+  - backward-compatible-wire-format
+kind: probe
+body: |
+  const { meridian } = buildTestApp()
+  return meridian.app
+    .inject({
+      method: "POST",
+      url: "/claims",
+      headers: { "x-tenant-id": "ten_northwind" },
+      payload: {
+        externalRef: "NW-9801",
+        amount: 250,
+        claimantName: "Jordan Rivera",
+        lossDate: "2026-01-16",
+      },
+    })
+    .then((response) => {
+      const body = response.json()
+      for (const field of [
+        "id",
+        "tenantId",
+        "externalRef",
+        "status",
+        "amount",
+        "currency",
+        "claimantName",
+        "lossDate",
+        "createdAt",
+      ]) {
+        assert(body[field] !== undefined, `default response is missing "${field}", which sprint 1 already depends on`)
+      }
+      assert(body.money === undefined, "default response must not also leak the internal nested money value")
+    })

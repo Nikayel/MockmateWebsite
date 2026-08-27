@@ -1,0 +1,23 @@
+# Fixture for lib/sprint-labs/validate/dynamic's own test suite (PLAN.md Task 7
+# review round 1, Critical 2's negative proof). ENTRY-201's io-case authors an
+# entryPoint whose output MATCHES `expected` even against the buggy setup
+# state (a non-discriminating check: the buggy code ignores its input and
+# always returns the "positive" label, which happens to be correct for this
+# particular io-case's input too) -- the gate must reject this the same way
+# it rejects a non-discriminating probe. Not real learner content.
+id: dynamic-io-case-entrypoint-non-discriminating
+title: "Dynamic gate io-case entryPoint (non-discriminating) fixture"
+pitch: "An io-case with entryPoint whose output matches in red too -- proves the gate catches it."
+track: "Test fixture"
+language: typescript
+level: "n/a"
+topics:
+  - arithmetic
+sprintCount: 1
+ticketCount: 1
+estimatedHours: 0
+requiresServerExecution: false
+objectives:
+  - id: arithmetic
+    label: "Arithmetic"
+    canDo: "n/a"

@@ -1,0 +1,49 @@
+number: 1
+title: "Contracts"
+goal: "By Friday an invalid claim cannot get past the first line of a handler, every failure carries a code and a status support can quote to a partner, the list endpoint returns each claim exactly once while people are writing to it, and /openapi.json is generated from the same schema objects the server validates with."
+standupQuote: "#support-escalations, 08:41: Northwind got a 500 posting a claim their engineer swears is valid, and while I was checking I found 1,900 rows in claims with a null amount that nobody ever rejected."
+topic: "TypeScript as a type system · API design & contracts"
+sizingNotes: "For MER-204's author: the seed's list endpoint has never had page/per_page - the deprecated v1 parameter this sprint's compatibility descriptor collides on is offset (paired with limit, which stays). SPRINT-PLAN.md §9.4's own text names page/per_page, but that pair is phantom for this workbook; MER-104's descriptor correctly uses offset and MER-204 should collide on that, not on parameters the seed never had. Separately: this sprint ships without adversary/ runners on any of its 5 tickets (SPRINT-PLAN.md's own sizing table counts 2 for sprint 1). Deferred on purpose, not an oversight - adversary is optional per WORKBOOK-SPEC.md §4 and the four-gate flow already reports an absent adversary honestly (could not run / not counted) rather than silently. Tracked for a later content-enhancement pass, not blocking this sprint."
+archMapDelta:
+  added:
+    - "A generated /openapi.json contract endpoint"
+    - "A stable, machine-readable error-code taxonomy on every failure response"
+  changed:
+    - "POST /claims parses the request body into a validated domain type before any handler code sees it"
+    - "GET /claims pagination moved from limit and offset to a keyset cursor"
+  invariants:
+    - "Every external payload is parsed through a validator before any handler code touches its fields."
+    - "/openapi.json is generated from the same schema objects the server validates with."
+objectives:
+  - typed-boundary-parsing
+  - error-taxonomy-http-codes
+  - keyset-pagination
+  - openapi-contract-versioning
+  - review-ai-pr-name-defect
+filesTouched:
+  - "src/http/routes/claims.ts"
+  - "src/domain/claim.ts"
+  - "src/http/parsers/claim-input.ts"
+  - "src/http/errors.ts"
+  - "src/http/error-codes.ts"
+  - "src/http/server.ts"
+  - "src/http/request-context.ts"
+  - "src/http/types.ts"
+  - "src/app.ts"
+  - "src/db/repositories/claims.ts"
+  - "src/db/queries.ts"
+  - "src/db/memory-db.ts"
+  - "migrations/0004_claims_created_at_id_idx.sql"
+  - "test/fixtures/claims.json"
+  - "test/fixtures/claims.ts"
+  - "test/claims/list-claims.test.ts"
+  - "src/http/openapi.ts"
+  - "src/http/compatibility-descriptor.ts"
+newSourceFiles:
+  - "src/http/parsers/claim-input.ts"
+  - "src/http/error-codes.ts"
+  - "migrations/0004_claims_created_at_id_idx.sql"
+  - "test/fixtures/claims.ts"
+  - "src/http/openapi.ts"
+  - "src/http/compatibility-descriptor.ts"
+rewrittenFiles: []

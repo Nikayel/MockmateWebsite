@@ -1,0 +1,10 @@
+humanName: "Escaped: an empty version header value resolves to a real version instead of none"
+tags:
+  - backward-compatible-wire-format
+kind: io-case
+input:
+  x-api-version: ""
+expected: null
+entryPoint:
+  module: "src/http/subscription-version.ts"
+  export: "requestedVersion"

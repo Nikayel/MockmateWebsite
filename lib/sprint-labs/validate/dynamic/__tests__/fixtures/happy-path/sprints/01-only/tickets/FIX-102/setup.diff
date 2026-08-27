@@ -1,0 +1,11 @@
+diff --git a/src/multiply.ts b/src/multiply.ts
+new file mode 100644
+index 0000000..d6e2059
+--- /dev/null
++++ b/src/multiply.ts
+@@ -0,0 +1,5 @@
++import { add } from "./math"
++
++export function multiply(a: number, count: number): number {
++  return add(a, count)
++}

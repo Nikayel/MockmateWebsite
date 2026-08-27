@@ -1,0 +1,12 @@
+# Review round 1, I-2: S3 touches a file S1 (two sprints back, with S2 in
+# between) already created, and WRONGLY re-lists it in newSourceFiles as if
+# it were new. A cumulative-set implementation that only looks at the
+# immediately-prior sprint (rather than the full seed + all prior sprints)
+# would miss this and vacuously pass.
+number: 3
+title: "Tenants"
+filesTouched:
+  - "src/queue/outbox.ts"
+newSourceFiles:
+  - "src/queue/outbox.ts"
+rewrittenFiles: []

@@ -59,6 +59,9 @@ const eslintConfig = [
       ".claude/worktrees/**",
       // Vendored, minified WASM glue (sql.js) — self-hosted for the SQL runner, not our source.
       "public/wasm/**",
+      // Vendored TypeScript compiler build, copied from node_modules by scripts/copy-ts-vendor.mjs
+      // (gitignored, regenerated on every install) — not our source, and far too large to lint.
+      "public/vendor/**",
     ],
   },
 ];

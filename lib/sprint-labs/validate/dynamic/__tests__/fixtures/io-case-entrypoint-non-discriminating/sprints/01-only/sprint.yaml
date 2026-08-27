@@ -1,0 +1,11 @@
+number: 1
+title: "Only sprint"
+goal: "n/a"
+standupQuote: "n/a"
+objectives:
+  - arithmetic
+filesTouched:
+  - "src/classify.ts"
+newSourceFiles:
+  - "src/classify.ts"
+rewrittenFiles: []

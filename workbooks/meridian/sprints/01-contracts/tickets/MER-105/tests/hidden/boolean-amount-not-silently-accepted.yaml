@@ -1,0 +1,15 @@
+humanName: "Escaped: a boolean amount is silently accepted after the catch swallows the normalization error"
+tags:
+  - review-ai-pr-name-defect
+kind: io-case
+input:
+  externalRef: "NW-2"
+  amount: true
+  claimantName: "Priya Shah"
+  lossDate: "2026-01-16"
+expected:
+  ok: false
+  reason: "amount must be a finite number"
+entryPoint:
+  module: "src/http/routes/claims.ts"
+  export: "parseCreateClaimBody"

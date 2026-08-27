@@ -1,0 +1,27 @@
+diff --git a/src/http/claims-parser.ts b/src/http/claims-parser.ts
+index a227e5e..e953d1d 100644
+--- a/src/http/claims-parser.ts
++++ b/src/http/claims-parser.ts
+@@ -1,3 +1,20 @@
+-export function parseClaimPayload(body: any) {
+-  return { ok: true, value: body }
++interface ParsedClaim {
++  tenantId: string
++  amount: number
++}
++
++export function parseClaimPayload(
++  body: unknown
++): { ok: true; value: ParsedClaim } | { ok: false; reason: string } {
++  if (typeof body !== "object" || body === null) {
++    return { ok: false, reason: "payload must be an object" }
++  }
++  const { tenantId, amount } = body as Record<string, unknown>
++  if (typeof tenantId !== "string" || tenantId.length === 0) {
++    return { ok: false, reason: "tenantId must be a non-empty string" }
++  }
++  if (typeof amount !== "number" || !Number.isFinite(amount)) {
++    return { ok: false, reason: "amount must be a finite number" }
++  }
++  return { ok: true, value: { tenantId, amount } }
+ }

@@ -1,0 +1,24 @@
+humanName: "Escaped: a single batch contains two entries for the same claim"
+tags:
+  - per-claim-ordering-guarantee
+kind: probe
+body: |
+  const db = createMemoryDb()
+  return Promise.all(
+    [0, 1, 2].flatMap((claimIdx) =>
+      [0, 1, 2, 3].map(() =>
+        insertOutboxEntry(db, { type: "claim.processed", tenantId: "ten_a", claimId: `clm_${claimIdx}` })
+      )
+    )
+  )
+    .then(() => claimOutboxBatch(db, { workerId: "w1", leaseDurationMs: 30000, limit: 100 }))
+    .then((batch) => {
+      const claimIds = batch.map((entry) => entry.claimId)
+      const uniqueClaimIds = new Set(claimIds)
+      assert.strictEqual(batch.length, 3, "one claimable head-of-line entry per claim, 3 claims")
+      assert.strictEqual(
+        uniqueClaimIds.size,
+        claimIds.length,
+        "no claim may appear twice in the same claimed batch"
+      )
+    })

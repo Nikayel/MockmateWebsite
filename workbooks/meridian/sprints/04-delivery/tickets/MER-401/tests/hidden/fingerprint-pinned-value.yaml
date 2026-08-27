@@ -1,0 +1,13 @@
+humanName: "Escaped: the request fingerprint algorithm drifted from its pinned shape"
+tags:
+  - idempotent-post-with-replay
+kind: io-case
+input:
+  method: "POST"
+  path: "/claims/clm_8842/payment-authorizations"
+  body:
+    approvedBy: "adjuster_griffin"
+expected: "c846d763"
+entryPoint:
+  module: "src/http/idempotency.ts"
+  export: "fingerprintIdempotentRequest"

@@ -1,0 +1,41 @@
+humanName: "Escaped: reconciling a batch with a mix of refs still returns another tenant's claim for the ones it does not own"
+tags:
+  - transaction-scoped-tenant-context
+kind: probe
+body: |
+  const { meridian } = buildTestApp()
+  return seedContinentalAndBekins(meridian.db)
+    .then(() =>
+      Promise.all([
+        meridian.app.inject({
+          method: "POST",
+          url: "/claims",
+          headers: { "x-tenant-id": "ten_continental" },
+          payload: {
+            externalRef: "BATCH-A",
+            amount: 100,
+            claimantName: "Continental Claimant",
+            lossDate: "2026-01-13",
+          },
+        }),
+        meridian.app.inject({
+          method: "POST",
+          url: "/claims",
+          headers: { "x-tenant-id": "ten_bekins" },
+          payload: {
+            externalRef: "BATCH-B",
+            amount: 200,
+            claimantName: "Bekins Claimant",
+            lossDate: "2026-01-13",
+          },
+        }),
+      ])
+    )
+    .then(() => {
+      const pool = createConnectionPool(meridian.db, 4)
+      return runReconciliation(pool, "ten_continental", ["BATCH-A", "BATCH-B"])
+    })
+    .then((results) => {
+      assert(results["BATCH-A"] !== null, "Continental's own claim must still be found")
+      assert(results["BATCH-B"] === null, "Bekins' claim must never come back under Continental's reconciliation run")
+    })

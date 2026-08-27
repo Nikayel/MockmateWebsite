@@ -1,0 +1,12 @@
+humanName: "Escaped: a 30-day deadline crossing the fall daylight-saving transition lands a day late"
+tags:
+  - date-time-zone-modeling
+kind: io-case
+input:
+  createdAt: "2026-10-03T04:50:00.000Z"
+  timeZone: "America/Chicago"
+  days: 30
+expected: "2026-11-01"
+entryPoint:
+  module: "src/domain/claim.ts"
+  export: "computeClaimDeadline"

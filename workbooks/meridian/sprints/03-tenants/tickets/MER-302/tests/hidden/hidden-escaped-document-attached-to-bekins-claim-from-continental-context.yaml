@@ -1,0 +1,11 @@
+humanName: "Escaped: a document can be attached to another tenant's claim"
+tags:
+  - row-level-security-policy
+kind: sql-assertion
+sql: |
+  SET ROLE sprintlab_app;
+  SELECT set_config('app.tenant_id', 'ten_bekins', true);
+  INSERT INTO documents (id, claim_id, file_name, content_type, legacy_path, created_at)
+  VALUES ('doc_hack_2', 'clm_continental_1', 'hack2.pdf', 'application/pdf', '/hack2', now());
+expect:
+  raises: "row-level security"

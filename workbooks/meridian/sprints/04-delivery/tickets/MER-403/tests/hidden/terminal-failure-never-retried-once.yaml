@@ -1,0 +1,31 @@
+humanName: "Escaped: a terminal failure is retried once before being dead-lettered, instead of never"
+tags:
+  - defensible-retry-policy-backoff-jitter
+kind: probe
+body: |
+  const db = createMemoryDb()
+  const outbox = createOutbox({ db, workerId: "worker-a", maxAttempts: 8 })
+  return outbox
+    .enqueue({ type: "claim.processed", tenantId: "ten_northwind", claimId: "clm_terminal" })
+    .then(() =>
+      outbox.drain(async () => {
+        throw new DeliveryFailureError({
+          message: "404 from Northwind - claim rejected",
+          classification: "terminal",
+          nextAttemptAt: new Date(Date.now() + 5).toISOString(),
+          payload: "{}",
+        })
+      })
+    )
+    .then(() => new Promise((resolve) => setTimeout(resolve, 20)))
+    .then(() => outbox.drain(async () => {
+      assert(false, "a terminal failure must never be attempted again - it should already be dead-lettered")
+    }))
+    .then((drainedCount) => {
+      assert.strictEqual(drainedCount, 0, "nothing should be claimable - the terminal entry left the backlog on its first failure")
+      return listDeadLettersForTenant(db, "ten_northwind")
+    })
+    .then((deadLetters) => {
+      assert.strictEqual(deadLetters.length, 1)
+      assert.strictEqual(deadLetters[0].attemptCount, 1)
+    })

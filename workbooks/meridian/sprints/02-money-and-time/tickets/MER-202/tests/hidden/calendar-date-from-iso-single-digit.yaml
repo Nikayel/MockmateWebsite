@@ -1,0 +1,12 @@
+humanName: "Escaped: parsing a calendar date drops a leading zero and shifts the wrong field"
+tags:
+  - date-time-zone-modeling
+kind: io-case
+input: "2026-03-08"
+expected:
+  year: 2026
+  month: 3
+  day: 8
+entryPoint:
+  module: "src/domain/calendar-date.ts"
+  export: "calendarDateFromISO"

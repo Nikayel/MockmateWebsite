@@ -77,6 +77,22 @@ docs/._*
 # Future Sprints
 /future-sprints/
 
+# Vendored TypeScript compiler build for the Sprint Labs worker
+# (public/vendor/typescript/typescript.js). Regenerated from node_modules/typescript by
+# scripts/copy-ts-vendor.mjs on every `pnpm install` (postinstall); never commit it, or it will
+# drift from the pinned devDependency version instead of tracking it. Scoped to this one
+# subdirectory, not all of public/vendor/, so a future hand-committed vendor asset elsewhere under
+# public/vendor/ is not silently swallowed by this rule.
+/public/vendor/typescript/
+
+# Vendored PGlite (Postgres-in-WASM) browser build for the Sprint Labs pg-sandbox worker (every
+# top-level .js/.wasm/.data file under @electric-sql/pglite's dist/, glob-copied by
+# scripts/copy-pglite-vendor.mjs -- see that script's header for why a glob, not a fixed list).
+# Regenerated on every `pnpm install` (postinstall); never commit it, for the same drift reason as
+# the TypeScript vendor copy above. Scoped to this one subdirectory, not all of public/wasm/, so the
+# existing committed public/wasm/sql-wasm.{js,wasm} (sql.js, a different engine) is untouched.
+/public/wasm/pglite/
+
 # Firebase emulator artifacts (pnpm test:integration)
 firestore-debug.log
 firebase-debug.log

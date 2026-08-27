@@ -117,6 +117,100 @@ contract defined by `CaseLabRun` in `lib/labs/types.ts` — keep them in sync.
 
 ---
 
+### `sprintLabRuns` - Sprint Lab Runs (resumable)
+
+Sprint Labs is the third practice surface beside Case Labs and Mock Rounds: a
+learner joins one persistent codebase (a "workbook") and ships tickets across
+ten sprints. Types: `lib/sprint-labs/types.ts` (`docs/sprint-labs/PLAN.md`
+Task 1). Read/write service, client hook, and the `firestore.rules` blocks:
+`lib/sprint-labs/runs.ts` / `components/sprint-labs/useSprintLabRunSync.ts`
+(Task 6). The `attempts` subcollection's write path (grading) lands with
+Task 8 and is read-only here until then.
+
+Unlike `caseLabRuns`, `board` is never a client-controlled whole-object
+overwrite: `lib/sprint-labs/runs.ts` only changes it through two
+server-validated actions — `moveSprintLabTicket` (legal transitions only:
+`todo`→`doing`→`review`→`done`, `review`→`doing`; at most one ticket `doing`
+at a time) and `advanceSprintLabRun` (sequential sprint advance, merging new
+ticket keys onto the board as `todo`). A client can create-or-resume a run
+and request those two moves; it can never PUT an arbitrary board.
+
+```typescript
+// sprintLabRuns/{runId}
+{
+  userId: string,                // Firebase Auth UID
+  workbookId: string,             // WorkbookSummary.id, e.g. "meridian"
+  contentVersion: string,         // compiled content version this run started against
+  currentSprint: number,          // 1-10
+  currentTicketKey?: string,      // e.g. "MER-401"
+  board: {                        // Record<ticketKey, status>
+    [ticketKey: string]: "todo" | "doing" | "review" | "done",
+  },
+  status: "in_progress" | "completed" | "abandoned",
+
+  startedAt: string,              // ISO timestamp, server-owned
+  updatedAt: string,              // ISO timestamp, server-owned
+  completedAt?: string,           // ISO timestamp, server-owned
+}
+
+// sprintLabRuns/{runId}/files/{fileDocId} — one doc per workspace file path
+{
+  path: string,                   // e.g. "src/http/server.ts"
+  content: string,                // <= 100,000 chars (MAX_WORKSPACE_FILE_CONTENT_CHARS)
+  updatedAt: string,               // ISO timestamp, server-stamped
+  revision: number,
+}
+
+// sprintLabRuns/{runId}/attempts/{attemptDocId} — one doc per ticket submission
+{
+  ticketKey: string,
+  aiPolicy: "assisted" | "unassisted" | "review-only",
+  variantId: string,               // hidden-suite variant; rotates on re-attempt
+  finalized: boolean,               // score/escapedDefects release only once true
+  gateResults: {
+    gate: "visible" | "hidden" | "regression" | "adversary",
+    cases: { testId: string, humanName: string, passed: boolean }[],
+  }[],
+  escapedDefects: string[],        // curated humanNames, released only once finalized
+  scores: {
+    understanding: number,          // 0-100
+    problemSolving: number,         // 0-100
+    codeQuality: number,            // 0-100
+    communication: number | null,   // 0-100, or null when the ticket collects no prose
+    verification: number,           // 0-100
+    overall: number,                // 0-100
+  },
+  modelId?: string,                 // dates the score to a model/version
+  submittedAt: string,              // ISO timestamp
+}
+
+// sprintLabRuns/{runId}/transcripts/{transcriptDocId} — Sable partner chat (Task 14)
+// Additive onto lib/feedback/transcript-storage.ts's bounded StoredTranscript shape.
+{
+  messages: {
+    role: string,
+    content: string,
+    aiPolicy?: "assisted" | "unassisted" | "review-only",
+    provenance?: "human" | "agent",
+    capabilities?: string[],        // e.g. ["chat"] in v0
+  }[],
+  truncated: boolean,
+  originalCount: number,
+}
+```
+
+**Firestore rules** (`firestore.rules`, `sprintLabRuns` block, right after
+`caseLabRuns`): the run doc copies the `caseLabRuns` owner-CRUD
+defense-in-depth pattern verbatim. Its three subcollections carry no `userId`
+field of their own, so ownership is resolved via a `get()` back to the parent
+run doc (an `isRunOwner()` helper scoped to the `sprintLabRuns/{runId}` match
+block): `files` is owner-read, writes denied (server-stamped in
+`app/api/sprint-labs/runs/files/route.ts`); `attempts` is owner-read, writes
+denied (the Admin SDK writes them from Task 8's grading routes); `transcripts`
+is owner-read, writes denied (server-owned, Task 14).
+
+---
+
 ### `analytics_events` - Custom Events
 
 ```typescript

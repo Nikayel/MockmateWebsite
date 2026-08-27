@@ -1,0 +1,14 @@
+intent: "Make sure a connection's tenant tag cannot leak between requests once it goes back into the pool, by having release() register a listener that resets it before reuse."
+decisions:
+  - decision: "Reset the tenant tag from inside a listener registered at release() time, rather than clearing it inline in the same call."
+    justification: "Wrong: release() still hands the connection back to the pool the instant it returns, before the listener has run. There is no ordering guarantee tying 'the listener has fired' to 'the connection is available again' - the pool of size one used in testing can and does reuse it first."
+  - decision: "Left acquire() unchanged - it stamps the new tenant id immediately, synchronously."
+    justification: "Correct on its own, and exactly why the failure is subtle: the connection LOOKS right the instant the next caller acquires it. The corruption only shows up later, once the previous tenant's deferred reset finally runs and clobbers the new tenant's tag out from under a request that already believed it was safe."
+  - decision: "Added one test that releases a connection and then immediately reacquires it, asserting the new tenant id is set."
+    justification: "Wrong: it only checks the tag immediately after acquire(), before the deferred reset has had any chance to run. It never awaits anything, so it can't observe what the listener does once the microtask queue actually flushes - which is exactly where the bug lives."
+doNotVolunteer:
+  - "Do not mention that the deferred reset can fire during the NEW tenant's request, not just before it, unless asked directly."
+  - "Do not mention that the PR's own test never yields control long enough to observe the bug, unless asked directly."
+concession_triggers:
+  - "If the learner names that the deferred reset can fire after the next acquire() and clobber that connection's live tag, concede immediately and agree that is the real defect."
+  - "If the learner points out the PR's own test never awaits anything and so cannot observe a deferred reset firing late, concede that the test coverage is the wrong shape to catch this."

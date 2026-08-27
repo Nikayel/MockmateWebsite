@@ -1,0 +1,8 @@
+humanName: "Escaped: rounding drifts across 40,317 sequential reconciliations"
+tags:
+  - money
+kind: io-case
+input:
+  claimAmountsCents: [101, 205, 99]
+expected:
+  totalCents: 405

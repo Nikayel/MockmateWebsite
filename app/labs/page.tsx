@@ -53,6 +53,9 @@ import { CaseLabGallery } from "@/components/labs/CaseLabGallery"
 import { BreadcrumbJsonLd, CourseListJsonLd } from "@/components/seo/JsonLd"
 import { getStarterCaseLab, listCaseLabs } from "@/lib/labs/case-labs"
 import { canonicalPageMetadata } from "@/lib/seo/page-metadata"
+import { getFlagAsync } from "@/lib/feature-flags"
+import { listWorkbookSummaries } from "@/lib/sprint-labs/content/registry"
+import { SprintLabsSection } from "@/components/sprint-labs/catalog/SprintLabsSection"
 import { HowACaseLabWorks } from "./_components/HowACaseLabWorks"
 import { CaseLabsExplainer } from "./_components/CaseLabsExplainer"
 import { CaseLabsFaq } from "./_components/CaseLabsFaq"
@@ -66,9 +69,21 @@ export const metadata = canonicalPageMetadata({
     "Practice the decomposition interview on a real multi-file codebase. Scope an underspecified problem, commit to a design, then build until the tests pass, in labs modeled on Palantir FDSE and Stripe engineering rounds.",
 })
 
-export default function CaseLabsGalleryPage() {
+// UX-SPEC.md §1.2/§15.5: the Sprint Labs flag's authoritative layer is Firestore, and this page must
+// stay static and indexable, so ISR at 300s is the compromise that lands the owner's flip within
+// five minutes without a redeploy.
+export const revalidate = 300
+
+export default async function CaseLabsGalleryPage() {
   const labs = listCaseLabs()
   const starter = getStarterCaseLab()
+  // UX-SPEC.md §1.2/§2 "flag off": the Sprint Labs section, the jump strip and the workbook
+  // CourseListJsonLd entries all render only when the flag is on. `CaseLabGallery` always carries
+  // its `id="case-labs"` scroll target regardless of flag state (a harmless, unused attribute when
+  // the jump strip that targets it isn't rendered), so it is the one deliberate exception to
+  // "byte-identical when off" and not a regression.
+  const sprintLabsEnabled = await getFlagAsync("SPRINT_LABS_ENABLED")
+  const workbookSummaries = sprintLabsEnabled ? listWorkbookSummaries() : []
 
   // The global nav stays outside the workbook scope so it keeps the app's dark chrome; everything
   // below it is the light-by-default workbook surface the labs themselves use.
@@ -87,13 +102,25 @@ export default function CaseLabsGalleryPage() {
           `isAccessibleForFree` claim inside the schema is true of what is indexed here: the brief,
           the five milestones and the Build workspace all open without an account. */}
       <CourseListJsonLd
-        courses={labs.map((lab) => ({
-          name: lab.title,
-          description: lab.hook,
-          url: `/labs/${lab.id}`,
-          workloadMinutes: lab.estimatedMinutes,
-          teaches: lab.skills,
-        }))}
+        courses={[
+          ...labs.map((lab) => ({
+            name: lab.title,
+            description: lab.hook,
+            url: `/labs/${lab.id}`,
+            workloadMinutes: lab.estimatedMinutes,
+            teaches: lab.skills,
+          })),
+          // UX-SPEC.md §1.2(c): omitted entirely when the flag is off, alongside the sitemap (whose
+          // own workbook entries are a separate, not-yet-wired change outside this task's owned
+          // paths — see task-10-report.md).
+          ...workbookSummaries.map((workbook) => ({
+            name: workbook.title,
+            description: workbook.pitch,
+            url: `/sprint-labs/${workbook.id}`,
+            workloadMinutes: workbook.estimatedHours * 60,
+            teaches: workbook.topics,
+          })),
+        ]}
       />
       <main className="case-lab-workbook min-h-screen bg-[var(--wb-page)] text-[var(--wb-text)]">
         <div className="container mx-auto flex max-w-[1120px] flex-col gap-10 px-4 pt-20 pb-16 sm:pt-24">
@@ -151,7 +178,37 @@ export default function CaseLabsGalleryPage() {
             )}
           </header>
 
+          {sprintLabsEnabled && (
+            // 44px jump strip (UX-SPEC.md §2): plain anchors, not the round-group `FilterChip`
+            // (that component lives inside the client-only `CaseLabGallery` and has an
+            // active/pressed affordance neither of these needs). `aria-current` is deliberately
+            // absent from both, per spec: they are links, not tabs.
+            <nav aria-label="Jump to a catalog" className="flex flex-wrap gap-2">
+              <a
+                href="#case-labs"
+                className="inline-flex min-h-[44px] items-center rounded-full border border-[var(--wb-border)] px-4 text-xs font-medium text-[var(--wb-text-secondary)] transition-colors hover:bg-black/[0.03] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wb-accent)] dark:hover:bg-white/[0.04]"
+              >
+                Case labs
+              </a>
+              <a
+                href="#sprint-labs"
+                className="inline-flex min-h-[44px] items-center rounded-full border border-[var(--wb-border)] px-4 text-xs font-medium text-[var(--wb-text-secondary)] transition-colors hover:bg-black/[0.03] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wb-accent)] dark:hover:bg-white/[0.04]"
+              >
+                Sprint labs
+              </a>
+            </nav>
+          )}
+
+          {/* Fix round 1, C1: a bordered "Case labs" wrapper used to sit here, double-boxing and
+              double-headlining the gallery (its own "Pick a case lab" h2 was already the section
+              header) and pushing the first card down by the exact amount this page was rebuilt to
+              claw back. `CaseLabGallery` carries its own `id="case-labs"` now (the jump strip's
+              scroll target), so no wrapper is needed at any flag state. Outline is h1 -> h2 "Pick a
+              case lab" -> h3 round groups -> h2 "Sprint labs", with `SprintLabsSection` standing as
+              the one symmetric round-group-style box. */}
           <CaseLabGallery labs={labs} />
+
+          {sprintLabsEnabled && <SprintLabsSection workbooks={workbookSummaries} />}
 
           {/* Everything below is explanation and ranking surface. It is deliberately after the
               catalog: a visitor who already knows what a case lab is never scrolls past it again. */}

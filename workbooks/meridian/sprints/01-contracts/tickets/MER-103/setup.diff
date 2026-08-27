@@ -1,0 +1,104 @@
+diff --git a/test/fixtures/claims.json b/test/fixtures/claims.json
+deleted file mode 100644
+index 2ed6b61..0000000
+--- a/test/fixtures/claims.json
++++ /dev/null
+@@ -1,35 +0,0 @@
+-[
+-  {
+-    "id": "clm_seed001",
+-    "tenantId": "ten_northwind",
+-    "externalRef": "NW-4001",
+-    "status": "submitted",
+-    "amount": 1204.5,
+-    "currency": "USD",
+-    "claimantName": "Alex Chen",
+-    "lossDate": "2026-01-03",
+-    "createdAt": "2026-01-04T09:12:00.000Z"
+-  },
+-  {
+-    "id": "clm_seed002",
+-    "tenantId": "ten_northwind",
+-    "externalRef": "NW-4002",
+-    "status": "submitted",
+-    "amount": 89.99,
+-    "currency": "USD",
+-    "claimantName": "Morgan Blake",
+-    "lossDate": "2026-01-03",
+-    "createdAt": "2026-01-04T09:12:00.000Z"
+-  },
+-  {
+-    "id": "clm_seed003",
+-    "tenantId": "ten_northwind",
+-    "externalRef": "NW-4003",
+-    "status": "under_review",
+-    "amount": 5600.0,
+-    "currency": "USD",
+-    "claimantName": "Sam Okafor",
+-    "lossDate": "2026-01-05",
+-    "createdAt": "2026-01-06T14:47:31.000Z"
+-  }
+-]
+diff --git a/test/fixtures/claims.ts b/test/fixtures/claims.ts
+new file mode 100644
+index 0000000..af4f861
+--- /dev/null
++++ b/test/fixtures/claims.ts
+@@ -0,0 +1,57 @@
++import type { DbClient } from "../../src/db/client"
++import type { Claim } from "../../src/domain/claim"
++import type { ClaimStatus } from "../../src/domain/claim-status"
++import { INSERT_CLAIM } from "../../src/db/queries"
++
++export interface BuildClaimOptions {
++  id: string
++  tenantId?: string
++  externalRef?: string
++  status?: ClaimStatus
++  amount?: number
++  currency?: string
++  claimantName?: string
++  lossDate?: string
++  createdAt?: string
++}
++
++function buildClaim(options: BuildClaimOptions): Claim {
++  return {
++    id: options.id,
++    tenantId: options.tenantId ?? "ten_northwind",
++    externalRef: options.externalRef ?? `EXT-${options.id}`,
++    status: options.status ?? "submitted",
++    amount: options.amount ?? 100,
++    currency: options.currency ?? "USD",
++    claimantName: options.claimantName ?? "Test Claimant",
++    lossDate: options.lossDate ?? "2026-01-01",
++    createdAt: options.createdAt ?? "2026-01-04T09:12:00.000Z",
++  }
++}
++
++/**
++ * Inserts a claim fixture directly through the same INSERT statement the repository layer
++ * uses, with a caller-controlled `createdAt` - `insertClaim` always stamps `new Date()`
++ * itself, which cannot put two claims on the same millisecond on demand the way a
++ * pagination-tiebreak test needs. Replaces the old `test/fixtures/claims.json`, which nothing
++ * ever read.
++ *
++ * Present from the start of this ticket (not something you write yourself): it is test
++ * scaffolding, not the fix. `src/db/repositories/claims.ts`'s keyset query is the part with
++ * no implementation yet.
++ */
++export async function seedClaim(db: DbClient, options: BuildClaimOptions): Promise<Claim> {
++  const claim = buildClaim(options)
++  await db.query(INSERT_CLAIM, [
++    claim.id,
++    claim.tenantId,
++    claim.externalRef,
++    claim.status,
++    claim.amount,
++    claim.currency,
++    claim.claimantName,
++    claim.lossDate,
++    claim.createdAt,
++  ])
++  return claim
++}

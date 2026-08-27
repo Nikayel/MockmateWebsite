@@ -1,0 +1,11 @@
+humanName: "Escaped: a southern-hemisphere tenant in its own daylight-saving season is misdated"
+tags:
+  - date-time-zone-modeling
+kind: io-case
+input:
+  createdAt: "2026-12-20T13:20:00.000Z"
+  timeZone: "Australia/Sydney"
+expected: "2026-12-21"
+entryPoint:
+  module: "src/domain/claim.ts"
+  export: "filedOnDate"

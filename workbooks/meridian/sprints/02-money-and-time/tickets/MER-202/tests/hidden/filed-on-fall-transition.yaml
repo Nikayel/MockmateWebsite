@@ -1,0 +1,11 @@
+humanName: "Escaped: a claim filed near midnight after the fall daylight-saving transition lands on the wrong day"
+tags:
+  - date-time-zone-modeling
+kind: io-case
+input:
+  createdAt: "2026-10-15T05:15:00.000Z"
+  timeZone: "America/Chicago"
+expected: "2026-10-15"
+entryPoint:
+  module: "src/domain/claim.ts"
+  export: "filedOnDate"

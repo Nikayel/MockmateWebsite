@@ -1,0 +1,23 @@
+humanName: "Escaped: claiming fewer than the whole backlog leaves the remainder genuinely pending, not silently leased"
+tags:
+  - transactional-outbox-skip-locked
+kind: probe
+body: |
+  const db = createMemoryDb()
+  return Promise.all(
+    Array.from({ length: 5 }, (_, i) =>
+      insertOutboxEntry(db, { type: "claim.processed", tenantId: "ten_northwind", claimId: `clm_${i}` })
+    )
+  )
+    .then(() => claimOutboxBatch(db, { workerId: "worker-a", leaseDurationMs: 30_000, limit: 2 }))
+    .then((firstBatch) => {
+      assert.strictEqual(firstBatch.length, 2, "a limit of 2 must claim exactly 2")
+      return claimOutboxBatch(db, { workerId: "worker-b", leaseDurationMs: 30_000, limit: 10 })
+    })
+    .then((secondBatch) => {
+      assert.strictEqual(
+        secondBatch.length,
+        3,
+        "the 3 entries the first claim did not take must still be claimable by a second caller"
+      )
+    })

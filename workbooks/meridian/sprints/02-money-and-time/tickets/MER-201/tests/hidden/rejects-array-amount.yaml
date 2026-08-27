@@ -1,0 +1,13 @@
+humanName: "Escaped: a single-element array amount is accepted as a claim amount"
+tags:
+  - exact-money-representation-rounding
+kind: io-case
+input:
+  amount: [500]
+  currency: "USD"
+expected:
+  ok: false
+  reason: "amount must be a finite number"
+entryPoint:
+  module: "src/money/money.ts"
+  export: "parseMoney"

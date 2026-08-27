@@ -1,0 +1,25 @@
+humanName: "Escaped: adding filedOn silently changes the unrelated lossDate field"
+tags:
+  - date-time-zone-modeling
+kind: probe
+body: |
+  const { meridian } = buildTestApp()
+  return seedTenant(meridian.db, { id: "ten_northwind", timeZone: "America/Chicago" })
+    .then(() =>
+      meridian.app.inject({
+        method: "POST",
+        url: "/claims",
+        headers: { "x-tenant-id": "ten_northwind" },
+        payload: {
+          externalRef: "NW-9403",
+          amount: 100,
+          claimantName: "Test Claimant",
+          lossDate: "2025-12-25",
+        },
+      })
+    )
+    .then((response) => {
+      const body = response.json()
+      assert(body.lossDate === "2025-12-25", "lossDate must remain exactly what the caller sent")
+      assert(body.lossDate !== body.filedOn, "lossDate and filedOn are different concepts and must not collapse into one value")
+    })

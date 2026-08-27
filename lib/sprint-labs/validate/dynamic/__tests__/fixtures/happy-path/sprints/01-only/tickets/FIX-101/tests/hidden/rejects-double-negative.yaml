@@ -1,0 +1,7 @@
+humanName: "Escaped: adding two negative numbers gives the wrong sign"
+tags:
+  - arithmetic
+kind: probe
+body: |
+  const result = add(-5, -3)
+  assert(result === -8, "adding two negatives should sum correctly, got " + result)

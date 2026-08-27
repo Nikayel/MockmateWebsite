@@ -1,0 +1,41 @@
+humanName: "Escaped: a naive now-plus-24h cooldown holds a delivery back an extra hour across the spring-forward transition"
+tags:
+  - defensible-retry-policy-backoff-jitter
+kind: probe
+body: |
+  // Midnight, March 8 2026, in America/Chicago - the start of the spring-forward transition day
+  // (a 23-real-hour day: clocks jump from 2am to 3am). Anchoring `now` at a calendar-day
+  // boundary makes "now + 24h of milliseconds" and "start of the next calendar day" the same
+  // comparison a naive implementation would actually make.
+  const now = "2026-03-08T06:00:00.000Z"
+  const correct = computeNextAttemptAt({ attemptCount: 20, retryAfterSeconds: null, now, timeZone: "America/Chicago" })
+  const naiveTwentyFourHoursLater = new Date(new Date(now).getTime() + 24 * 60 * 60 * 1000).toISOString()
+
+  assert.notStrictEqual(
+    correct,
+    naiveTwentyFourHoursLater,
+    "genuine calendar arithmetic must disagree with a naive +24h-of-milliseconds computation across this transition"
+  )
+
+  const deltaMinutes = (new Date(naiveTwentyFourHoursLater).getTime() - new Date(correct).getTime()) / 60_000
+  assert(
+    deltaMinutes >= 55 && deltaMinutes <= 65,
+    `expected the naive computation to hold the delivery back by about an hour, got a ${deltaMinutes} minute difference`
+  )
+
+  // On an ordinary day with no transition in the window, the same comparison (also anchored at
+  // that day's own midnight) should show NO drift at all - proving the naive computation's bug
+  // is specifically the DST crossing, not a general disagreement between the two approaches.
+  const ordinaryNow = "2026-06-15T05:00:00.000Z"
+  const ordinaryCorrect = computeNextAttemptAt({
+    attemptCount: 20,
+    retryAfterSeconds: null,
+    now: ordinaryNow,
+    timeZone: "America/Chicago",
+  })
+  const ordinaryNaive = new Date(new Date(ordinaryNow).getTime() + 24 * 60 * 60 * 1000).toISOString()
+  assert.strictEqual(
+    ordinaryCorrect,
+    ordinaryNaive,
+    "on an ordinary day with no transition, calendar arithmetic and +24h must agree exactly"
+  )

@@ -1,0 +1,22 @@
+diff --git a/src/http/claims-parser.ts b/src/http/claims-parser.ts
+new file mode 100644
+index 0000000..a227e5e
+--- /dev/null
++++ b/src/http/claims-parser.ts
+@@ -0,0 +1,3 @@
++export function parseClaimPayload(body: any) {
++  return { ok: true, value: body }
++}
+diff --git a/src/http/claims.ts b/src/http/claims.ts
+new file mode 100644
+index 0000000..660eafd
+--- /dev/null
++++ b/src/http/claims.ts
+@@ -0,0 +1,7 @@
++import type { FastifyRequest, FastifyReply } from "../types"
++import { insertClaim } from "../db/repositories/claims"
++
++export async function postClaim(request: FastifyRequest, reply: FastifyReply) {
++  const body = request.body as any
++  return insertClaim(body)
++}

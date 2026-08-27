@@ -1,0 +1,9 @@
+weights:
+  understanding: 0.15
+  problemSolving: 0.3
+  codeQuality: 0.15
+  communication: 0.15
+  verification: 0.25
+notes:
+  understanding: "Keys off whether one compatibility descriptor, not a second source of truth, drives both routes."
+  verification: "Keys off escaped-defect rate on the two io-cases and whether the learner pushed back on the wrong review comment."

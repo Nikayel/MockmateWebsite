@@ -1,0 +1,47 @@
+{
+  "family": "meridian-api",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::482913005577:role/meridian-api-execution-role",
+  "taskRoleArn": "arn:aws:iam::482913005577:role/meridian-api-task-role",
+  "containerDefinitions": [
+    {
+      "name": "meridian-api",
+      "image": "482913005577.dkr.ecr.us-east-1.amazonaws.com/meridian-api:1.42.0",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "NODE_ENV", "value": "production" },
+        { "name": "PORT", "value": "3000" },
+        { "name": "LOG_LEVEL", "value": "info" },
+        { "name": "AWS_REGION", "value": "us-east-1" },
+        { "name": "AWS_ACCESS_KEY_ID", "value": "AKIAIOSFODNN7EXAMPLE" },
+        { "name": "AWS_SECRET_ACCESS_KEY", "value": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" },
+        { "name": "S3_DOCUMENTS_BUCKET", "value": "meridian-prod-claim-documents" },
+        {
+          "name": "DB_HOST",
+          "value": "meridian-prod.cluster-c9abcd1efghi.us-east-1.rds.amazonaws.com"
+        },
+        { "name": "DB_PORT", "value": "5432" },
+        { "name": "DB_NAME", "value": "meridian" },
+        { "name": "DB_USER", "value": "meridian_app" },
+        { "name": "DB_PASSWORD", "value": "R7kv$Qn2pLxT9wZa" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/meridian-api",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "meridian-api"
+        }
+      }
+    }
+  ]
+}

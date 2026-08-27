@@ -1,0 +1,11 @@
+weights:
+  understanding: 0.2
+  problemSolving: 0.3
+  codeQuality: 0.15
+  communication: 0.1
+  verification: 0.25
+notes:
+  understanding: "Keys off recognizing that a fixed-interval reclaim (the ambiguous ask: 'can we just retry less often?') is a rate change, not a classification, and does not address terminal failures looping forever."
+  problemSolving: "Keys off the visible pass rate across Retry-After honouring, capped-plus-jitter backoff, persisted attempt_count, and dead-lettering."
+  codeQuality: "Keys off computing the once-the-cap-is-reached cooldown boundary with the same calendar-arithmetic primitives MER-202 shipped, rather than a fixed 24-hour-in-milliseconds addition."
+  verification: "Keys off whether the learner's own test pins the exact DST-transition boundary rather than only asserting 'roughly a day later'."

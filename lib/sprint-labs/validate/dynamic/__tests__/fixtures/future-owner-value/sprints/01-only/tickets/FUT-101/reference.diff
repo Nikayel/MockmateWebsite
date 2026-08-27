@@ -1,0 +1,9 @@
+diff --git a/src/early.ts b/src/early.ts
+index 7777777..8888888 100644
+--- a/src/early.ts
++++ b/src/early.ts
+@@ -1,3 +1,3 @@
+ export function early(): string {
+-  return "FUTURE-VALUE: quartz, ruby, sapphire - shipped in a later ticket"
++  return "placeholder value that is not the future answer"
+ }

@@ -1,0 +1,30 @@
+number: 1
+title: "Foundations"
+goal: "Replace the loose, any-typed edges of the claims intake endpoint with validated, narrow types, and decide how the API signals a breaking change."
+standupQuote: "Northwind's engineer swears the payload is valid, and the parser just shrugged and returned any."
+archMapDelta:
+  added:
+    - "POST /v2/claims (versioned alongside v1)"
+  invariants:
+    - "Every external payload is parsed through a validator before any handler code touches its fields."
+objectives:
+  - typed-boundaries
+  - contract-versioning
+sizingNotes: "Two tickets only. This workbook exists to exercise the compiler, not to teach a full sprint."
+# validate-only fields (lab validate's sprint-file-set rules; the compiler
+# never reads these -- see lib/sprint-labs/validate/rules/files-touched-exist.ts
+# and new-source-files-set-difference.ts). This fixture workbook has no
+# repo/ seed, so every path either ticket's setup.diff/reference.diff
+# touches is, by construction, new to the workbook -- filesTouched and
+# newSourceFiles are identical for that reason, not by coincidence.
+filesTouched:
+  - "src/http/claims.ts"
+  - "src/http/claims-parser.ts"
+  - "src/http/claims-list.ts"
+  - "src/http/compatibility-descriptor.ts"
+newSourceFiles:
+  - "src/http/claims.ts"
+  - "src/http/claims-parser.ts"
+  - "src/http/claims-list.ts"
+  - "src/http/compatibility-descriptor.ts"
+rewrittenFiles: []

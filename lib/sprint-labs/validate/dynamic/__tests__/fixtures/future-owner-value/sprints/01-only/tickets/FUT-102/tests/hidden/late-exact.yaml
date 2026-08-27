@@ -1,0 +1,10 @@
+humanName: "Escaped: late omits the future value"
+tags:
+  - provisioning
+kind: io-case
+input:
+  version: 1
+expected: "FUTURE-VALUE: quartz, ruby, sapphire - shipped in a later ticket"
+entryPoint:
+  module: "src/late.ts"
+  export: "late"

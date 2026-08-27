@@ -1,0 +1,22 @@
+# Fixture for lib/sprint-labs/validate/dynamic's own test suite (PLAN.md Task 7
+# review round 1, Important 2). LEAK2-101's setup.diff embeds its own hidden
+# test's SHORT humanName ("zero", 4 chars) once in a source COMMENT and once
+# as a literal file PATH -- proves neither the length gate (2a) nor the
+# content-only scan (2b) leaves a hole for a short/filename-shaped leak.
+# Not real learner content.
+id: dynamic-short-signature-leak
+title: "Dynamic gate short-signature and path leak fixture"
+pitch: "A short hidden-test humanName leaked via content AND via a file path -- proves both scans catch it."
+track: "Test fixture"
+language: typescript
+level: "n/a"
+topics:
+  - arithmetic
+sprintCount: 1
+ticketCount: 1
+estimatedHours: 0
+requiresServerExecution: false
+objectives:
+  - id: arithmetic
+    label: "Arithmetic"
+    canDo: "n/a"

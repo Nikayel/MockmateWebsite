@@ -1,0 +1,10 @@
+humanName: "Escaped: an absurd page size is silently truncated instead of rejected"
+tags:
+  - keyset-pagination
+kind: io-case
+input: "100000"
+expected:
+  ok: false
+entryPoint:
+  module: "src/http/routes/claims.ts"
+  export: "parseLimit"

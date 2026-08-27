@@ -1,0 +1,470 @@
+diff --git a/migrations/0013_idempotency_keys.sql b/migrations/0013_idempotency_keys.sql
+new file mode 100644
+index 0000000..383b4c5
+--- /dev/null
++++ b/migrations/0013_idempotency_keys.sql
+@@ -0,0 +1,18 @@
++-- MER-401: one row per (tenant, Idempotency-Key) pair actually executed, so a retried POST can
++-- replay its original response instead of running the handler again. See src/http/idempotency.ts.
++create table idempotency_keys (
++  tenant_id text not null,
++  idempotency_key text not null,
++  request_fingerprint text not null,
++  response_status integer not null,
++  response_body text not null,
++  created_at timestamptz not null default now(),
++  primary key (tenant_id, idempotency_key)
++);
++
++comment on table idempotency_keys is
++  'One row per (tenant, Idempotency-Key) pair. request_fingerprint is a canonical hash over
++   method + path + body (src/util/canonical-json.ts), so a retry with the same key and the same
++   logical body - regardless of key order in the JSON the client sent - replays
++   response_status/response_body verbatim. A retry with the same key and a different fingerprint
++   is a 409, never silently reprocessed and never silently accepted as the original.';
+diff --git a/src/app.ts b/src/app.ts
+index 7acd005..ef80c35 100644
+--- a/src/app.ts
++++ b/src/app.ts
+@@ -8,6 +8,7 @@ import { registerOpenapiRoutes } from "./http/openapi"
+ import { registerClaimRoutes } from "./http/routes/claims"
+ import { registerDocumentRoutes } from "./http/routes/documents"
+ import { registerHealthRoutes } from "./http/routes/health"
++import { registerPaymentAuthorizationRoutes } from "./http/routes/payment-authorizations"
+ import type { Outbox } from "./queue/outbox"
+ import { createOutbox } from "./queue/outbox"
+ 
+@@ -40,6 +41,7 @@ export function createMeridianApp(deps: MeridianAppDeps): MeridianApp {
+ 
+   registerHealthRoutes(app)
+   registerClaimRoutes(app, { db, outbox })
++  registerPaymentAuthorizationRoutes(app, { db, outbox })
+   registerDocumentRoutes(app, { db })
+   registerOpenapiRoutes(app)
+ 
+diff --git a/src/db/memory-db.ts b/src/db/memory-db.ts
+index 03536f2..629a8ae 100644
+--- a/src/db/memory-db.ts
++++ b/src/db/memory-db.ts
+@@ -12,6 +12,7 @@ export function createMemoryDb(): DbClient {
+   const claims: Record<string, unknown>[] = []
+   const documents: Record<string, unknown>[] = []
+   const webhookDeliveries: Record<string, unknown>[] = []
++  const idempotencyKeys: Record<string, unknown>[] = []
+ 
+   async function query<T>(sql: string, params: unknown[] = []): Promise<QueryResult<T>> {
+     switch (sql) {
+@@ -144,6 +145,29 @@ export function createMemoryDb(): DbClient {
+         return { rows: matching as T[] }
+       }
+ 
++      case queries.INSERT_IDEMPOTENCY_KEY: {
++        const [tenantId, idempotencyKey, requestFingerprint, responseStatus, responseBody, createdAt] =
++          params
++        const row = {
++          tenant_id: tenantId,
++          idempotency_key: idempotencyKey,
++          request_fingerprint: requestFingerprint,
++          response_status: responseStatus,
++          response_body: responseBody,
++          created_at: createdAt,
++        }
++        idempotencyKeys.push(row)
++        return { rows: [row as T] }
++      }
++
++      case queries.FIND_IDEMPOTENCY_KEY: {
++        const [tenantId, idempotencyKey] = params
++        const row = idempotencyKeys.find(
++          (entry) => entry.tenant_id === tenantId && entry.idempotency_key === idempotencyKey
++        )
++        return { rows: row ? [row as T] : [] }
++      }
++
+       case queries.INSERT_WEBHOOK_DELIVERY: {
+         const [id, tenantId, claimId, status, payload, createdAt] = params
+         const row = {
+diff --git a/src/db/queries.ts b/src/db/queries.ts
+index 6b49ec2..6c9d1f9 100644
+--- a/src/db/queries.ts
++++ b/src/db/queries.ts
+@@ -49,6 +49,15 @@ export const GET_DOCUMENTS_FOR_CLAIM = "SELECT * FROM documents WHERE claim_id =
+ export const GET_DOCUMENTS_FOR_CLAIMS =
+   "SELECT * FROM documents WHERE claim_id = ANY($1) ORDER BY claim_id, created_at"
+ 
++/** MER-401: scoped by tenant_id in the WHERE clause and in the table's own primary key
++ * (migrations/0013_idempotency_keys.sql) - one tenant's Idempotency-Key can never collide with
++ * or replay another tenant's. */
++export const INSERT_IDEMPOTENCY_KEY =
++  "INSERT INTO idempotency_keys (tenant_id, idempotency_key, request_fingerprint, response_status, response_body, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *"
++
++export const FIND_IDEMPOTENCY_KEY =
++  "SELECT * FROM idempotency_keys WHERE tenant_id = $1 AND idempotency_key = $2"
++
+ export const INSERT_WEBHOOK_DELIVERY =
+   "INSERT INTO webhook_deliveries (id, tenant_id, claim_id, status, payload, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *"
+ 
+diff --git a/src/db/repositories/idempotency-keys.ts b/src/db/repositories/idempotency-keys.ts
+new file mode 100644
+index 0000000..f281be2
+--- /dev/null
++++ b/src/db/repositories/idempotency-keys.ts
+@@ -0,0 +1,71 @@
++import type { DbClient } from "../client"
++import { FIND_IDEMPOTENCY_KEY, INSERT_IDEMPOTENCY_KEY } from "../queries"
++
++export interface IdempotencyKeyRecord {
++  tenantId: string
++  idempotencyKey: string
++  requestFingerprint: string
++  responseStatus: number
++  responseBody: string
++  createdAt: string
++}
++
++interface IdempotencyKeyRow {
++  tenant_id: string
++  idempotency_key: string
++  request_fingerprint: string
++  response_status: number
++  response_body: string
++  created_at: string
++}
++
++function toIdempotencyKeyRecord(row: IdempotencyKeyRow): IdempotencyKeyRecord {
++  return {
++    tenantId: row.tenant_id,
++    idempotencyKey: row.idempotency_key,
++    requestFingerprint: row.request_fingerprint,
++    responseStatus: row.response_status,
++    responseBody: row.response_body,
++    createdAt: row.created_at,
++  }
++}
++
++export interface InsertIdempotencyKeyInput {
++  tenantId: string
++  idempotencyKey: string
++  requestFingerprint: string
++  responseStatus: number
++  responseBody: string
++}
++
++/** Persists the one response a (tenant, key) pair produced. Scoped to the tenant in the
++ * primary key itself (migrations/0013_idempotency_keys.sql) - one tenant's key can never
++ * collide with or replay another tenant's, because there is no row a cross-tenant lookup could
++ * even find. */
++export async function insertIdempotencyKey(
++  db: DbClient,
++  input: InsertIdempotencyKeyInput
++): Promise<IdempotencyKeyRecord> {
++  const createdAt = new Date().toISOString()
++  const { rows } = await db.query<IdempotencyKeyRow>(INSERT_IDEMPOTENCY_KEY, [
++    input.tenantId,
++    input.idempotencyKey,
++    input.requestFingerprint,
++    input.responseStatus,
++    input.responseBody,
++    createdAt,
++  ])
++  return toIdempotencyKeyRecord(rows[0])
++}
++
++export async function findIdempotencyKey(
++  db: DbClient,
++  tenantId: string,
++  idempotencyKey: string
++): Promise<IdempotencyKeyRecord | null> {
++  const { rows } = await db.query<IdempotencyKeyRow>(FIND_IDEMPOTENCY_KEY, [
++    tenantId,
++    idempotencyKey,
++  ])
++  return rows[0] ? toIdempotencyKeyRecord(rows[0]) : null
++}
+diff --git a/src/http/compatibility-descriptor.ts b/src/http/compatibility-descriptor.ts
+index cec36c8..370c7d0 100644
+--- a/src/http/compatibility-descriptor.ts
++++ b/src/http/compatibility-descriptor.ts
+@@ -101,6 +101,12 @@ export const COMPATIBILITY_DESCRIPTOR: OperationCompatibility[] = [
+     path: "/claims/{id}",
+     queryParameters: [],
+   },
++  {
++    operationId: "authorizeClaimPayment",
++    method: "POST",
++    path: "/claims/{id}/payment-authorizations",
++    queryParameters: [],
++  },
+   {
+     operationId: "listDocumentsForClaim",
+     method: "GET",
+diff --git a/src/http/error-codes.ts b/src/http/error-codes.ts
+index 5527f79..4fa7e39 100644
+--- a/src/http/error-codes.ts
++++ b/src/http/error-codes.ts
+@@ -8,6 +8,12 @@ export const ERROR_CODES = {
+   MISSING_TENANT: "MISSING_TENANT",
+   NOT_FOUND: "NOT_FOUND",
+   INTERNAL_ERROR: "INTERNAL_ERROR",
++  /** MER-401: the caller retried a mutating request with no Idempotency-Key header at all. */
++  IDEMPOTENCY_KEY_REQUIRED: "IDEMPOTENCY_KEY_REQUIRED",
++  /** MER-401: the same Idempotency-Key arrived twice with two different request bodies - there
++   * is no single "original response" that is correct for both, so this can never be resolved
++   * by replaying. */
++  IDEMPOTENCY_KEY_CONFLICT: "IDEMPOTENCY_KEY_CONFLICT",
+ } as const
+ 
+ export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES]
+diff --git a/src/http/errors.ts b/src/http/errors.ts
+index c815571..7112060 100644
+--- a/src/http/errors.ts
++++ b/src/http/errors.ts
+@@ -41,6 +41,18 @@ export function notFound(options: ErrorOptions): HandlerResponse {
+   return errorEnvelope(404, ERROR_CODES.NOT_FOUND, options)
+ }
+ 
++/** MER-401: distinct from `badRequest` - the body itself may be perfectly well-formed, the
++ * request is just missing the header that makes a retry safe to tell apart from a new one. */
++export function idempotencyKeyRequired(options: ErrorOptions): HandlerResponse {
++  return errorEnvelope(400, ERROR_CODES.IDEMPOTENCY_KEY_REQUIRED, options)
++}
++
++/** MER-401: the one case an idempotency key can never resolve by replaying - two different
++ * bodies both claiming the same key. */
++export function idempotencyKeyConflict(options: ErrorOptions): HandlerResponse {
++  return errorEnvelope(409, ERROR_CODES.IDEMPOTENCY_KEY_CONFLICT, options)
++}
++
+ /**
+  * Takes no error detail as an argument, on purpose - there is structurally nothing here for
+  * a stack trace or a database error string to ride along on. The correlation id is what lets
+diff --git a/src/http/idempotency.ts b/src/http/idempotency.ts
+new file mode 100644
+index 0000000..e343e6c
+--- /dev/null
++++ b/src/http/idempotency.ts
+@@ -0,0 +1,84 @@
++import type { DbClient } from "../db/client"
++import { findIdempotencyKey, insertIdempotencyKey } from "../db/repositories/idempotency-keys"
++import type { JsonValue } from "../util/canonical-json"
++import { hashCanonical } from "../util/canonical-json"
++
++export interface IdempotentRequestIdentity {
++  tenantId: string
++  idempotencyKey: string
++  method: string
++  path: string
++  body: unknown
++}
++
++/**
++ * The fingerprint an idempotency key is checked against: method, path and body together,
++ * canonically encoded - see MER-203's src/util/canonical-json.ts. Reuses that encoder rather
++ * than hashing whatever `JSON.stringify` happens to produce, so a retried request whose client
++ * serialized the exact same logical body with its keys in a different order still fingerprints
++ * identically, instead of reading as a materially different request. Path is part of the
++ * fingerprint, not just the body, so the same key replayed against a different claim's
++ * endpoint is never mistaken for a replay of this one.
++ */
++export function fingerprintIdempotentRequest(
++  identity: Pick<IdempotentRequestIdentity, "method" | "path" | "body">
++): string {
++  return hashCanonical({
++    method: identity.method,
++    path: identity.path,
++    body: (identity.body ?? null) as JsonValue,
++  })
++}
++
++export type IdempotencyCheckResult =
++  | { kind: "fresh" }
++  | { kind: "replay"; statusCode: number; body: unknown }
++  | { kind: "conflict" }
++
++/**
++ * Looks up whatever this (tenant, key) pair already recorded, if anything. `fresh` means the
++ * caller should actually do the work; `replay` means hand back exactly what was recorded last
++ * time, verbatim, with no side effect re-run; `conflict` means the same key arrived with a
++ * fingerprint that does not match what was recorded, and must be rejected rather than silently
++ * reprocessed or silently accepted as the original.
++ */
++export async function checkIdempotency(
++  db: DbClient,
++  identity: IdempotentRequestIdentity
++): Promise<IdempotencyCheckResult> {
++  const existing = await findIdempotencyKey(db, identity.tenantId, identity.idempotencyKey)
++  if (!existing) return { kind: "fresh" }
++
++  const fingerprint = fingerprintIdempotentRequest(identity)
++  if (existing.requestFingerprint !== fingerprint) return { kind: "conflict" }
++
++  return {
++    kind: "replay",
++    statusCode: existing.responseStatus,
++    body: JSON.parse(existing.responseBody) as unknown,
++  }
++}
++
++export interface RecordIdempotentResponseInput extends IdempotentRequestIdentity {
++  statusCode: number
++  responseBody: unknown
++}
++
++/**
++ * Persists the one response this (tenant, key) pair produced, so a later request carrying the
++ * same key replays it instead of running the handler again. Call once, after the real work has
++ * actually succeeded - never speculatively beforehand, and never for a request with no
++ * idempotency key at all.
++ */
++export async function recordIdempotentResponse(
++  db: DbClient,
++  input: RecordIdempotentResponseInput
++): Promise<void> {
++  await insertIdempotencyKey(db, {
++    tenantId: input.tenantId,
++    idempotencyKey: input.idempotencyKey,
++    requestFingerprint: fingerprintIdempotentRequest(input),
++    responseStatus: input.statusCode,
++    responseBody: JSON.stringify(input.responseBody),
++  })
++}
+diff --git a/src/http/routes/payment-authorizations.ts b/src/http/routes/payment-authorizations.ts
+new file mode 100644
+index 0000000..ea462d0
+--- /dev/null
++++ b/src/http/routes/payment-authorizations.ts
+@@ -0,0 +1,134 @@
++import type { DbClient } from "../../db/client"
++import { getClaimById } from "../../db/repositories/claims"
++import type { Claim } from "../../domain/claim"
++import { toWireAmountV1 } from "../../money/money"
++import type { Outbox } from "../../queue/outbox"
++import { badRequest, idempotencyKeyConflict, idempotencyKeyRequired, notFound } from "../errors"
++import { checkIdempotency, recordIdempotentResponse } from "../idempotency"
++import { requireTenantId } from "../request-context"
++import type { App } from "../types"
++
++export interface PaymentAuthorizationRouteDeps {
++  db: DbClient
++  outbox: Outbox
++}
++
++export interface AuthorizePaymentInput {
++  approvedBy: string
++  memo: string | null
++}
++
++export type ParseAuthorizePaymentInputResult =
++  | { ok: true; value: AuthorizePaymentInput }
++  | { ok: false; reason: string }
++
++/** What an ops tool has to send to authorize a claim's payment, checked field by field before
++ * anything downstream trusts it - the same discipline src/http/parsers/claim-input.ts uses for
++ * claim intake. */
++export function parseAuthorizePaymentInput(body: unknown): ParseAuthorizePaymentInputResult {
++  if (typeof body !== "object" || body === null || Array.isArray(body)) {
++    return { ok: false, reason: "request body must be a JSON object" }
++  }
++  const record = body as Record<string, unknown>
++  if (typeof record.approvedBy !== "string" || record.approvedBy.length === 0) {
++    return { ok: false, reason: "approvedBy must be a non-empty string" }
++  }
++  if (record.memo !== undefined && typeof record.memo !== "string") {
++    return { ok: false, reason: "memo must be a string when present" }
++  }
++  return { ok: true, value: { approvedBy: record.approvedBy, memo: record.memo ?? null } }
++}
++
++/** The exact path this endpoint is served at, for a given claim - also the path half of the
++ * idempotency fingerprint (src/http/idempotency.ts), so the same Idempotency-Key reused against
++ * a different claim can never be mistaken for a replay of this one. */
++export function paymentAuthorizationPath(claimId: string): string {
++  return `/claims/${claimId}/payment-authorizations`
++}
++
++export interface PaymentAuthorizationResponseBody {
++  claimId: string
++  externalRef: string
++  amount: number
++  currency: string
++  approvedBy: string
++  authorizedAt: string
++}
++
++function buildResponseBody(
++  claim: Claim,
++  approvedBy: string,
++  authorizedAt: string
++): PaymentAuthorizationResponseBody {
++  return {
++    claimId: claim.id,
++    externalRef: claim.externalRef,
++    amount: toWireAmountV1(claim.money),
++    currency: claim.money.currency,
++    approvedBy,
++    authorizedAt,
++  }
++}
++
++/**
++ * Authorizes a claim's payment and enqueues the webhook that tells its tenant so. Idempotent
++ * under a client retry (MER-401): the same Idempotency-Key with the same body gets back the
++ * exact response the first attempt produced, with no second webhook enqueued; the same key with
++ * a materially different body is rejected outright rather than silently reprocessed or silently
++ * accepted as the original. See src/http/idempotency.ts for the fingerprint and replay
++ * mechanics this handler is built on.
++ */
++export function registerPaymentAuthorizationRoutes(
++  app: App,
++  deps: PaymentAuthorizationRouteDeps
++): void {
++  app.post("/claims/:id/payment-authorizations", async (req) => {
++    const tenantId = requireTenantId(req)
++    const claim = await getClaimById(deps.db, tenantId, req.params.id)
++    if (!claim) {
++      return notFound({
++        message: `claim ${req.params.id} not found`,
++        correlationId: req.correlationId,
++      })
++    }
++
++    const idempotencyKey = req.headers["idempotency-key"]
++    if (!idempotencyKey) {
++      return idempotencyKeyRequired({
++        message: "Idempotency-Key header is required to authorize a payment",
++        correlationId: req.correlationId,
++      })
++    }
++
++    const parsed = parseAuthorizePaymentInput(req.body)
++    if (!parsed.ok) {
++      return badRequest({ message: parsed.reason, correlationId: req.correlationId })
++    }
++
++    const identity = {
++      tenantId,
++      idempotencyKey,
++      method: "POST",
++      path: paymentAuthorizationPath(claim.id),
++      body: req.body,
++    }
++
++    const check = await checkIdempotency(deps.db, identity)
++    if (check.kind === "conflict") {
++      return idempotencyKeyConflict({
++        message: "This idempotency key was already used with a different request body",
++        correlationId: req.correlationId,
++      })
++    }
++    if (check.kind === "replay") {
++      return { statusCode: check.statusCode, body: check.body }
++    }
++
++    deps.outbox.enqueue({ type: "claim.processed", tenantId, claimId: claim.id })
++
++    const responseBody = buildResponseBody(claim, parsed.value.approvedBy, new Date().toISOString())
++    await recordIdempotentResponse(deps.db, { ...identity, statusCode: 201, responseBody })
++
++    return { statusCode: 201, body: responseBody }
++  })
++}

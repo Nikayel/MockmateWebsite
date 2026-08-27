@@ -1,0 +1,13 @@
+humanName: "Escaped: a negative line-item count throws instead of returning no shares"
+tags:
+  - exact-money-representation-rounding
+kind: io-case
+input:
+  total:
+    minorUnits: 100
+    currency: "USD"
+  count: -3
+expected: []
+entryPoint:
+  module: "src/money/round-half-up.ts"
+  export: "allocateRoundedTotal"

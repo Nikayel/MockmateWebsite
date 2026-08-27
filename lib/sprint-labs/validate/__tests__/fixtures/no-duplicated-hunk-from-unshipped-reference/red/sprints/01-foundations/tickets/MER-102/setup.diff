@@ -1,0 +1,7 @@
+diff --git a/src/delivery/retry.ts b/src/delivery/retry.ts
+--- a/src/delivery/retry.ts
++++ b/src/delivery/retry.ts
+@@ -1,2 +1,5 @@
++  const base = 100
++  const jitter = Math.random() * 50
++  return base * attempt + jitter
