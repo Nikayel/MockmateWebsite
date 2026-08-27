@@ -80,11 +80,15 @@ self.onmessage = async function (event) {
       return
     }
 
-    // Boot is (about to be) done; tell the runner to start its (short) execution timeout.
-    self.postMessage({ type: "exec-start", timestamp: Date.now() })
-
     if (mode === "suite") {
       const pg = await PGlite.create()
+      // Boot (module load + THIS instance's own construction — the genuinely expensive step,
+      // easily the majority of total wall-clock on a cold run) is done now; only now does the
+      // tight execution timeout start (see worker-runner.ts's two-phase timeout). Posting this
+      // BEFORE `PGlite.create()` resolved let a slow boot alone burn the whole exec budget and get
+      // misreported as "the suite itself is stuck", instead of correctly being covered by the much
+      // more generous boot budget.
+      self.postMessage({ type: "exec-start", timestamp: Date.now() })
       try {
         const results = await runPgSuiteCore(pg, suite)
         self.postMessage({ type: "result", success: true, logs: [resultsAsMarkerLog(results)] })
