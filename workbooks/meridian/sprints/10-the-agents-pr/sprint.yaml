@@ -1,0 +1,57 @@
+number: 10
+title: "The Agent's PR"
+topic: "Verifying AI: reviewing the agent's PR"
+goal: "Three agent-authored PRs are green and waiting on you: merge the one that is right, prove the two that are not, build the CI gates that would have turned them red, and then take the 2am page whose root cause is the retry policy you wrote in sprint 4."
+standupQuote: "the agent burned the whole backlog down overnight: 3 PRs, CI green on all three, I'd like them in before standup. can you rubber-stamp? 🙏"
+archMapDelta:
+  added:
+    - "A migration-safety CI gate enforcing expand/backfill/contract"
+    - "A queue drain-conformance harness running under multiple concurrent workers"
+    - "An absolute retry deadline measured from first attempt, replacing attempt-count-based bounding"
+  changed:
+    - "An agent-authored PR requires a repro test that fails on the branch and passes on main before merge"
+  broke:
+    - "Deliveries to Northwind stopped at 02:14 because the lease-reclaim path kept resetting the persisted attempt count"
+  invariants:
+    - "A destructive schema change always ships as expand, then backfill, then contract"
+    - "Retry attempts are bounded by an absolute deadline, never by attempt count alone"
+objectives:
+  - review-agent-pr-defensible-verdict
+  - multi-process-concurrency-bug-repro
+  - expand-backfill-contract-migration
+  - ci-gates-migration-safety-queue-conformance
+  - incident-response-absolute-retry-deadline
+# validate-only fields (lab validate's sprint-file-set rules; the compiler
+# never reads these). src/queue/outbox.ts, src/queue/scheduler.ts, and
+# src/delivery/retry.ts are seed files (confirmed against
+# `ls workbooks/meridian/repo`), rewritten again this sprint -- rewriting a
+# seed file across more than one sprint is allowed (sprint 7 already
+# rewrote src/queue/outbox.ts for trace context; this sprint rewrites it
+# again for the lease/concurrency fix). Nothing here depends on sprints 1-5.
+filesTouched:
+  - "migrations/0026_outbox_lease.sql"
+  - "migrations/0027_payout_expand.sql"
+  - "migrations/0028_payout_backfill.sql"
+  - "migrations/0029_payout_contract.sql"
+  - "src/queue/outbox-lease.ts"
+  - "test/queue/multi-worker-drain.test.ts"
+  - "src/money/payout.ts"
+  - "scripts/check-migration-safety.mjs"
+  - "scripts/check-queue-drain-conformance.mjs"
+  - "src/queue/outbox.ts"
+  - "src/queue/scheduler.ts"
+  - "src/delivery/retry.ts"
+newSourceFiles:
+  - "migrations/0026_outbox_lease.sql"
+  - "migrations/0027_payout_expand.sql"
+  - "migrations/0028_payout_backfill.sql"
+  - "migrations/0029_payout_contract.sql"
+  - "src/queue/outbox-lease.ts"
+  - "test/queue/multi-worker-drain.test.ts"
+  - "src/money/payout.ts"
+  - "scripts/check-migration-safety.mjs"
+  - "scripts/check-queue-drain-conformance.mjs"
+rewrittenFiles:
+  - "src/queue/outbox.ts"
+  - "src/queue/scheduler.ts"
+  - "src/delivery/retry.ts"
