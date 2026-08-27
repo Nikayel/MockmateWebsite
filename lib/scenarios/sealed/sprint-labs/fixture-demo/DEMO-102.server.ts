@@ -38,12 +38,12 @@ export const sealed: SealedTicketContent = {
   adversaryFiles: [],
   review: [
     {
-      id: "comment-0",
+      id: "missing-sunset-date",
       body: "This adds a Deprecation header but no Sunset date. Might want both.",
       correct: true,
     },
     {
-      id: "comment-1",
+      id: "just-remove-page-param",
       body: "Since v1 is deprecated, we should just remove the page parameter now to keep the code simple.",
       correct: false,
     },
