@@ -135,7 +135,15 @@ export function readEntryPoint(hidden: AuthoredHiddenTest): EntryPointRef | null
 /** Every synthesized hidden test file lives at `tests/hidden/<name>.test.ts` (2 segments deep,
  *  matching `tests/visible/`'s own depth -- see the file header's note on why probe imports reuse
  *  that depth verbatim). Computes the relative specifier from there to an entryPoint's `module`
- *  path (extension stripped, since the require-graph re-keys every `.ts`/`.tsx` file to `.js`). */
+ *  path (extension stripped, since the require-graph re-keys every `.ts`/`.tsx` file to `.js`),
+ *  using real `path.posix.relative` math -- the mathematically minimal count of `../` segments
+ *  (2, for a 2-segment-deep synthesized file), NOT necessarily the count an authored visible test
+ *  elsewhere in the same ticket happens to use. `require-graph.ts`'s `resolveTsModulePath` builds
+ *  a path stack and treats a `".."` on an already-empty stack as a silent no-op (confirmed by
+ *  tracing its `for (const part of parts)` loop by hand), so an authored import with ONE MORE
+ *  `../` than strictly necessary (e.g. DEMO-101's/DEMO-102's own `tests/visible/*.test.ts`, which
+ *  use 3 rather than the minimal 2) still resolves correctly -- that leniency is real and worth
+ *  knowing about, but this function does not rely on it: it always emits the exact count. */
 function computeRelativeImportPath(modulePath: string): string {
   const withoutExt = modulePath.replace(/\.tsx?$/, "")
   const rel = posix.relative("tests/hidden", withoutExt)

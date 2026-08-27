@@ -16,18 +16,20 @@
  *  2. DEMO-101's `reference.diff` hunk header undercounted both its old-side and new-side line
  *     totals (`@@ -1,10 +1,19 @@` where the actual counts are 3 and 20) -- a second, independent
  *     hand-authoring mistake caught by the same regeneration.
- * The workbook was recompiled (`pnpm workbooks:compile workbooks/_fixture-workbook`) after the
- * fix so the generated public/sealed bundles stay byte-consistent with the corrected diffs;
- * `compiler.test.ts`/`sealing.test.ts` both still pass unchanged.
  *
- * Review round 1 update: DEMO-102 is `ai_policy: unassisted` (a score-feeding policy, per
- * WORKBOOK-SPEC.md §5 -- corrects this file's own earlier "review-only" mischaracterization). Its
- * two io-case hidden tests author no `entryPoint`, so under Critical 2's new severity split they
- * are now `dynamic-hidden-test-not-executable` ERRORs, not WARNs: an unverifiable hidden tier on a
- * score-feeding ticket is a real content gap, correctly surfaced rather than silently passed. This
- * is a genuinely correct, intended behavior change from before this review round, not a
- * regression -- content authoring (Task 2/15, or a follow-up) needs to either author an
- * `entryPoint` matching a real callable, or convert these to `probe`-kind hidden tests.
+ * Review round 2 update: DEMO-102's two io-case hidden tests now carry a real `entryPoint`
+ * (`compatibilityDescriptor`, the same function the ticket's own visible test already exercises)
+ * with `input`/`expected` retargeted to match it -- there is no HTTP layer anywhere in this
+ * fixture to produce a status code or header, so the original `{path, status, ...}` shape (Task
+ * 2's illustrative authoring, never actually run before this task existed) could never have been
+ * executed by ANY mechanism. `compatibilityDescriptor`'s v1/v2 branches were also DELIBERATELY
+ * swapped in `setup.diff` (previously the file did not exist at all until `reference.diff`,
+ * which made the hidden tier fail via "module not found" rather than via a genuine wrong-answer
+ * check) -- both io-cases now discriminate on their own terms: traced by hand and confirmed by
+ * the tests below that the buggy (swapped) branch returns the WRONG shape for both v1 and v2
+ * inputs, and the reference (un-swapped) branch returns the right one for both. The workbook was
+ * recompiled after every content change so the generated public/sealed bundles stay
+ * byte-consistent; `compiler.test.ts`/`sealing.test.ts` both still pass unchanged.
  */
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
@@ -49,29 +51,20 @@ describe("workbooks/_fixture-workbook (real content, not a synthetic fixture)", 
     expect(findings).toEqual([])
   }, 20_000)
 
-  it("DEMO-102 (unassisted, io-case hidden tests with no entryPoint authored, depends on DEMO-101 same-sprint): visible tier still goes red->green, but the unverifiable hidden tier is correctly an ERROR on a score-feeding ticket", async () => {
+  it("DEMO-102 (unassisted, two io-cases with a real entryPoint, depends on DEMO-101 same-sprint): both visible AND hidden tiers genuinely go red->green, zero findings", async () => {
     const workbook = loadWorkbookTree(FIXTURE_WORKBOOK)
     const { ticket } = findTicketLocation(workbook, "DEMO-102")
 
     const findings = await runDynamicGateForTicket(workbook, ticket)
 
-    // No red/green or regression ERROR from the VISIBLE tier itself -- that half still holds.
-    expect(findings.some((f) => f.ruleId === "dynamic-red-green")).toBe(false)
-    expect(findings.some((f) => f.ruleId === "dynamic-regression")).toBe(false)
-    // Exactly the two io-case gaps, named, ERROR (unassisted is score-feeding).
-    const ioCaseGaps = findings.filter((f) => f.ruleId === "dynamic-hidden-test-not-executable")
-    expect(ioCaseGaps).toHaveLength(2)
-    expect(ioCaseGaps.every((f) => f.ticketKey === "DEMO-102" && f.severity === "error")).toBe(true)
-    expect(findings).toHaveLength(2)
+    expect(findings).toEqual([])
   }, 20_000)
 
-  it("validateWorkbookDynamic runs the whole fixture workbook end to end and reports only the two known (now ERROR) io-case gaps", async () => {
+  it("validateWorkbookDynamic runs the whole fixture workbook end to end with zero findings -- fully green, the exemplar this task's own verification bar requires", async () => {
     const workbook = loadWorkbookTree(FIXTURE_WORKBOOK)
 
     const findings = await validateWorkbookDynamic(workbook)
 
-    expect(findings.every((f) => f.ruleId === "dynamic-hidden-test-not-executable")).toBe(true)
-    expect(findings.every((f) => f.severity === "error")).toBe(true)
-    expect(findings).toHaveLength(2)
+    expect(findings).toEqual([])
   }, 30_000)
 })

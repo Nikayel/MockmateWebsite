@@ -70,7 +70,7 @@ describe("bridgeHiddenTests", () => {
     expect(greenHidden).toMatchObject({ passed: true, suite: "hidden" })
   })
 
-  it("reports an io-case hidden test with no entryPoint as a named, non-crashing gap -- ERROR, since DEMO-102 is ai_policy: unassisted (score-feeding)", async () => {
+  it("bridges an io-case WITH a real entryPoint into a runnable file, zero gaps (real content: DEMO-102, review round 2)", async () => {
     const FIXTURE_WORKBOOK = join(__dirname, "../../../../../workbooks/_fixture-workbook")
     const workbook = loadWorkbookTree(FIXTURE_WORKBOOK)
     const { ticket } = findTicketLocation(workbook, "DEMO-102")
@@ -78,16 +78,69 @@ describe("bridgeHiddenTests", () => {
 
     const bridged = bridgeHiddenTests(ticket, visibleFiles)
 
-    expect(bridged.files).toEqual([])
-    expect(bridged.paths).toEqual([])
-    expect(bridged.findings).toHaveLength(2)
-    for (const finding of bridged.findings) {
-      expect(finding).toMatchObject({
-        ruleId: "dynamic-hidden-test-not-executable",
-        severity: "error",
-        ticketKey: "DEMO-102",
-      })
-      expect(finding.message).toContain("io-case")
+    expect(bridged.findings).toEqual([])
+    expect(bridged.paths.sort()).toEqual([
+      "tests/hidden/v1-still-accepts-page.test.ts",
+      "tests/hidden/v2-rejects-page.test.ts",
+    ])
+    const v1File = bridged.files.find(
+      (f) => f.path === "tests/hidden/v1-still-accepts-page.test.ts"
+    )
+    // Two levels up (tests/hidden -> tests -> root), the mathematically minimal relative path --
+    // NOT the three-up convention DEMO-101's/DEMO-102's own hand-authored visible tests happen to
+    // use, which only resolves because the require-graph tolerates excess ".." as a no-op past an
+    // empty stack (see computeRelativeImportPath's own doc comment in hidden-tests.ts).
+    expect(v1File?.content).toContain(
+      'import { compatibilityDescriptor } from "../../src/http/compatibility-descriptor"'
+    )
+    expect(v1File?.content).toContain('const assert = require("assert")')
+    expect(v1File?.content).toContain('const input = "v1"')
+    expect(v1File?.content).toContain("await compatibilityDescriptor(input)")
+  })
+
+  it("reports an io-case hidden test with NO entryPoint as a named, non-crashing gap -- WARN for assisted, ERROR for a score-feeding policy", () => {
+    const ioCaseHidden = {
+      fileName: "no-entry-point",
+      path: "/dev/null",
+      raw: {
+        humanName: "Escaped: no entry point authored",
+        kind: "io-case",
+        input: 1,
+        expected: 2,
+      },
+      humanName: "Escaped: no entry point authored",
+      kind: "io-case",
+      tags: [],
     }
+    const baseTicket = {
+      key: "T-1",
+      dirPath: join(FIXTURES, "happy-path/sprints/01-only/tickets/FIX-101"),
+      sprintNumber: 1,
+      frontmatterRaw: {},
+      bodyMd: "",
+      labels: [],
+      objectives: [],
+      acceptanceCriteria: [],
+      setupDiff: null,
+      referenceDiff: null,
+      authorBriefRaw: null,
+      hiddenTests: [ioCaseHidden],
+    }
+
+    const assistedBridged = bridgeHiddenTests({ ...baseTicket, aiPolicy: "assisted" }, [])
+    expect(assistedBridged.files).toEqual([])
+    expect(assistedBridged.findings).toEqual([
+      expect.objectContaining({ ruleId: "dynamic-hidden-test-not-executable", severity: "warn" }),
+    ])
+
+    const unassistedBridged = bridgeHiddenTests({ ...baseTicket, aiPolicy: "unassisted" }, [])
+    expect(unassistedBridged.findings).toEqual([
+      expect.objectContaining({ ruleId: "dynamic-hidden-test-not-executable", severity: "error" }),
+    ])
+
+    const reviewOnlyBridged = bridgeHiddenTests({ ...baseTicket, aiPolicy: "review-only" }, [])
+    expect(reviewOnlyBridged.findings).toEqual([
+      expect.objectContaining({ ruleId: "dynamic-hidden-test-not-executable", severity: "error" }),
+    ])
   })
 })
