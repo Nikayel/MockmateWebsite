@@ -1,10 +1,12 @@
 /**
  * WORKBOOK-SPEC.md §4 / AUTHORING-RULES.md §6: "The files to touch are
  * never listed — in body, criteria, or hints." Heuristic per PLAN.md Task
- * 3: 3+ `src/` path mentions in a ticket's body+criteria fails, unless the
- * ticket carries `pathEnumerationSignoff: true` (an escape hatch this task
- * introduces — see tree.ts's field doc — for the rare ticket a reviewer has
- * decided is legitimately a mechanical, not locate-the-bug, exercise).
+ * 3: 3+ DISTINCT `src/` paths in a ticket's body+criteria fails (review
+ * round 1, I-3: counting raw mentions let three repeats of the same path
+ * trip the rule, which isn't "enumerating files to touch" at all), unless
+ * the ticket carries `pathEnumerationSignoff: true` (an escape hatch this
+ * task introduces — see tree.ts's field doc — for the rare ticket a
+ * reviewer has confirmed the enumeration is pedagogically necessary).
  */
 
 import type { AuthoredWorkbook } from "../tree"
@@ -24,13 +26,14 @@ export function noFilePathEnumeration(workbook: AuthoredWorkbook): ValidationFin
 
       const haystack = [ticket.bodyMd, ...ticket.acceptanceCriteria].join("\n")
       const matches = haystack.match(SRC_PATH_RE) ?? []
+      const distinctPaths = new Set(matches)
 
-      if (matches.length >= MIN_MATCHES_TO_FAIL) {
+      if (distinctPaths.size >= MIN_MATCHES_TO_FAIL) {
         findings.push({
           ruleId: RULE_ID,
           severity: "error",
           ticketKey: ticket.key,
-          message: `ticket ${ticket.key}'s body/criteria name ${matches.length} src/ paths (${[...new Set(matches)].join(", ")}); locating the change is part of the exercise -- add pathEnumerationSignoff: true (with reviewer signoff) if this is intentional`,
+          message: `ticket ${ticket.key}'s body/criteria name ${distinctPaths.size} distinct src/ paths (${[...distinctPaths].join(", ")}); locating the change is part of the exercise -- add pathEnumerationSignoff: true (with reviewer signoff) if this is intentional`,
         })
       }
     }

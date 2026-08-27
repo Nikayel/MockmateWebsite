@@ -14,7 +14,7 @@ describe(RULE_ID, () => {
     expect(findings[0]).toMatchObject({ severity: "error", ticketKey: "DEMO-1" })
   })
 
-  it("passes under the 3-path threshold, and passes at/above it with pathEnumerationSignoff: true", () => {
+  it("passes under the 3-DISTINCT-path threshold, at/above it with pathEnumerationSignoff: true, and when the same path repeats 3+ times (review round 1, I-3)", () => {
     const workbook = loadWorkbookTree(join(FIXTURES, "green"))
     const findings = noFilePathEnumeration(workbook).filter((f) => f.ruleId === RULE_ID)
     expect(findings).toHaveLength(0)
