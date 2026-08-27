@@ -1,0 +1,21 @@
+humanName: "Escaped: the audit hash is computed over something other than the claim's own canonical fields"
+tags:
+  - audit-hash-compatibility-tracing
+kind: io-case
+input:
+  claim:
+    id: "clm_205a"
+    tenantId: "ten_northwind"
+    externalRef: "NW-205"
+    status: "submitted"
+    money:
+      minorUnits: 61402
+      currency: "USD"
+    claimantName: "Test Claimant"
+    lossDate: "2026-03-01"
+    createdAt: "2026-03-02T10:00:00.000Z"
+  projectionVersion: 1
+expected: "15c03cfa"
+entryPoint:
+  module: "src/util/canonical-json.ts"
+  export: "computeClaimAuditHash"

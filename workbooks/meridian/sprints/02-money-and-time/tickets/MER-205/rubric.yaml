@@ -1,0 +1,11 @@
+weights:
+  understanding: 0.2
+  problemSolving: 0.2
+  codeQuality: 0.15
+  communication: 0.1
+  verification: 0.35
+notes:
+  understanding: "Keys off tracing the mismatch to the v1 compatibility shim specifically, not a vague 'the hash logic has a bug.'"
+  problemSolving: "Keys off the visible pass rate across computing, verifying, and describing a pinned projection version."
+  codeQuality: "Keys off whether the fix pins a projection version rather than special-casing 'old claims' by date or id."
+  verification: "Keys off escaped-defect rate on the hidden cases - especially whether a claim's stored audit info still verifies regardless of which wire version later serves it."

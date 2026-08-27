@@ -1,0 +1,37 @@
+humanName: "Escaped: the audit hash for a claim disagrees depending on which wire version served it"
+tags:
+  - audit-hash-compatibility-tracing
+kind: probe
+body: |
+  const { meridian } = buildTestApp()
+  return meridian.app
+    .inject({
+      method: "POST",
+      url: "/claims",
+      headers: { "x-tenant-id": "ten_northwind" },
+      payload: {
+        externalRef: "NW-9703",
+        amount: 634.02,
+        claimantName: "Test Claimant",
+        lossDate: "2026-01-01",
+      },
+    })
+    .then((created) => {
+      const createdBody = created.json()
+      return getStoredClaimAuditInfo(meridian.db, "ten_northwind", createdBody.id).then((stored) => {
+        assert(stored !== null, "expected stored audit info")
+        assert(
+          verifyClaimAuditHash({
+            claim: stored.claim,
+            storedHash: stored.storedHash,
+            projectionVersion: stored.projectionVersion,
+          }),
+          "the claim must verify from its own stored fields"
+        )
+        // The v1 shim's response shape (a flat float amount, no money object) is a completely
+        // different-looking payload - it must have no bearing on whether the STORED claim
+        // still verifies.
+        assert(typeof createdBody.amount === "number", "sanity: the v1 response is still the flat shape")
+        assert(createdBody.money === undefined, "sanity: the v1 response never carries the nested money value")
+      })
+    })

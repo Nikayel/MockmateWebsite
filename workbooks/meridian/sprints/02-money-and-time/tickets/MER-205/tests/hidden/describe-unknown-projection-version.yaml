@@ -1,0 +1,9 @@
+humanName: "Escaped: an unrecognized projection version is described as if it were a known one"
+tags:
+  - audit-hash-compatibility-tracing
+kind: io-case
+input: 7
+expected: "unknown audit projection version: 7"
+entryPoint:
+  module: "src/util/canonical-json.ts"
+  export: "describeAuditProjectionVersion"

@@ -1,0 +1,218 @@
+diff --git a/migrations/0009_audit_hash_projection_version.sql b/migrations/0009_audit_hash_projection_version.sql
+new file mode 100644
+index 0000000..bac60cf
+--- /dev/null
++++ b/migrations/0009_audit_hash_projection_version.sql
+@@ -0,0 +1,13 @@
++-- MER-205: pins each claim's stored audit hash to the exact projection version it was
++-- computed under, so a later projection change can never make an old, correctly written hash
++-- look tampered - see src/util/canonical-json.ts's AUDIT_PROJECTION_VERSION.
++--
++-- Every claim written before this migration was hashed under projection version 1 (the only
++-- version this codebase has ever had - see MER-203), so backfilling every existing row to 1 is
++-- exact, not a guess.
++alter table claims
++  add column audit_projection_version integer not null default 1;
++
++comment on column claims.audit_projection_version is
++  'Which exact set of fields claims.audit_hash was computed over - see
++   src/util/canonical-json.ts''s AUDIT_PROJECTION_CHANGELOG for what each version number means.';
+diff --git a/src/db/memory-db.ts b/src/db/memory-db.ts
+index e576550..55e9dc8 100644
+--- a/src/db/memory-db.ts
++++ b/src/db/memory-db.ts
+@@ -56,6 +56,7 @@ export function createMemoryDb(): DbClient {
+           lossDate,
+           createdAt,
+           auditHash,
++          auditProjectionVersion,
+         ] = params
+         const row = {
+           id,
+@@ -65,6 +66,7 @@ export function createMemoryDb(): DbClient {
+           amount,
+           currency,
+           audit_hash: auditHash,
++          audit_projection_version: auditProjectionVersion,
+           claimant_name: claimantName,
+           loss_date: lossDate,
+           created_at: createdAt,
+diff --git a/src/db/queries.ts b/src/db/queries.ts
+index a9a913a..ba9f750 100644
+--- a/src/db/queries.ts
++++ b/src/db/queries.ts
+@@ -15,7 +15,7 @@ export const UPDATE_TENANT_PINNED_VERSION =
+   "UPDATE tenants SET pinned_envelope_version = $2 WHERE id = $1 RETURNING *"
+ 
+ export const INSERT_CLAIM =
+-  "INSERT INTO claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *"
++  "INSERT INTO claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash, audit_projection_version) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *"
+ 
+ export const GET_CLAIM_BY_ID = "SELECT * FROM claims WHERE tenant_id = $1 AND id = $2"
+ 
+diff --git a/src/db/repositories/claims.ts b/src/db/repositories/claims.ts
+index 395ef9e..dc43bf6 100644
+--- a/src/db/repositories/claims.ts
++++ b/src/db/repositories/claims.ts
+@@ -1,7 +1,7 @@
+ import type { DbClient } from "../client"
+ import type { Claim, CreateClaimInput } from "../../domain/claim"
+ import type { ClaimStatus } from "../../domain/claim-status"
+-import { hashClaim } from "../../util/canonical-json"
++import { AUDIT_PROJECTION_VERSION, computeClaimAuditHash } from "../../util/canonical-json"
+ import { generateId } from "../../util/ids"
+ import {
+   FIND_CLAIM_BY_EXTERNAL_REF,
+@@ -32,6 +32,9 @@ interface ClaimRow {
+   /** A hash over this row's canonical fields at write time - see src/util/canonical-json.ts
+    * and migrations/0007_claim_audit_hash.sql. */
+   audit_hash: string
++  /** Which projection version `audit_hash` was computed under - see
++   * migrations/0009_audit_hash_projection_version.sql. */
++  audit_projection_version: number
+ }
+ 
+ function toClaim(row: ClaimRow): Claim {
+@@ -60,7 +63,7 @@ export async function insertClaim(db: DbClient, input: CreateClaimInput): Promis
+     lossDate: input.lossDate,
+     createdAt,
+   }
+-  const auditHash = hashClaim(claim)
++  const auditHash = computeClaimAuditHash({ claim, projectionVersion: AUDIT_PROJECTION_VERSION })
+   const { rows } = await db.query<ClaimRow>(INSERT_CLAIM, [
+     id,
+     input.tenantId,
+@@ -72,6 +75,7 @@ export async function insertClaim(db: DbClient, input: CreateClaimInput): Promis
+     input.lossDate,
+     createdAt,
+     auditHash,
++    AUDIT_PROJECTION_VERSION,
+   ])
+   return toClaim(rows[0])
+ }
+@@ -85,6 +89,33 @@ export async function getClaimById(
+   return rows[0] ? toClaim(rows[0]) : null
+ }
+ 
++export interface StoredClaimAuditInfo {
++  claim: Claim
++  storedHash: string
++  projectionVersion: number
++}
++
++/**
++ * Fetches a claim together with the exact hash and projection version it was stored under -
++ * never bundled onto `Claim` itself, since hashing a claim that carries its own stored hash
++ * would be hashing the hash. This is what compliance's tamper check reads to verify a claim -
++ * see src/util/canonical-json.ts's `verifyClaimAuditHash`.
++ */
++export async function getStoredClaimAuditInfo(
++  db: DbClient,
++  tenantId: string,
++  claimId: string
++): Promise<StoredClaimAuditInfo | null> {
++  const { rows } = await db.query<ClaimRow>(GET_CLAIM_BY_ID, [tenantId, claimId])
++  const row = rows[0]
++  if (!row) return null
++  return {
++    claim: toClaim(row),
++    storedHash: row.audit_hash,
++    projectionVersion: row.audit_projection_version,
++  }
++}
++
+ /**
+  * Pages a tenant's claims by keyset, never by offset: `cursor` names the last claim the
+  * caller already saw, and only claims strictly after it come back, so a claim already handed
+diff --git a/src/util/canonical-json.ts b/src/util/canonical-json.ts
+index 9ccb102..280a547 100644
+--- a/src/util/canonical-json.ts
++++ b/src/util/canonical-json.ts
+@@ -9,7 +9,6 @@
+  * never extends past the process that made it.
+  */
+ import type { Claim } from "../domain/claim"
+-import { toWireAmountV1 } from "../money/money"
+ 
+ export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
+ 
+@@ -62,27 +61,66 @@ export function hashClaim(claim: Claim): string {
+ export interface VerifyClaimAuditHashInput {
+   claim: Claim
+   storedHash: string
++  /** Defaults to the one projection version this codebase has ever written - see
++   * `AUDIT_PROJECTION_VERSION` below. Existing callers that never pass this keep getting
++   * exactly what they always did. */
++  projectionVersion?: number
+ }
+ 
+-/** Compliance's tamper check: recompute the hash the same way it was written, and compare. */
++/** Compliance's tamper check: recompute the hash the same way it was written, and compare -
++ * always over the claim's own canonical fields, never the wire-shaped view any client-facing
++ * shim produces. See MER-205: this is the function compliance's real tamper-check tool now
++ * calls, replacing the wire-shaped `verifyStoredAuditHash` it used to carry its own copy of. */
+ export function verifyClaimAuditHash(input: VerifyClaimAuditHashInput): boolean {
+-  return hashClaim(input.claim) === input.storedHash
++  const projectionVersion = input.projectionVersion ?? AUDIT_PROJECTION_VERSION
++  return computeClaimAuditHash({ claim: input.claim, projectionVersion }) === input.storedHash
+ }
+ 
+-export interface VerifyStoredAuditHashInput {
++/**
++ * The current audit projection version: which exact set of a claim's fields this codebase
++ * hashes today. Every claim written from here on is stamped with this version alongside its
++ * hash - see migrations/0009_audit_hash_projection_version.sql - so a later projection change
++ * never has to guess which shape an old, correctly-written hash was computed over.
++ */
++export const AUDIT_PROJECTION_VERSION = 1
++
++export interface AuditProjectionChangelogEntry {
++  version: number
++  description: string
++}
++
++/** Traces a stored `audit_projection_version` back to exactly what it means, from the stored
++ * number alone - see MER-205's traceability criterion. Append a new entry here, never edit an
++ * existing one: an old claim's stored version must always resolve to what its hash actually
++ * covered at the time it was written. */
++export const AUDIT_PROJECTION_CHANGELOG: AuditProjectionChangelogEntry[] = [
++  {
++    version: 1,
++    description:
++      "MER-203: id, tenantId, externalRef, status, money, claimantName, lossDate, createdAt - the claim's own canonical fields, hashed before any client-facing compatibility shim rewrites anything.",
++  },
++]
++
++export function describeAuditProjectionVersion(version: number): string {
++  const entry = AUDIT_PROJECTION_CHANGELOG.find((candidate) => candidate.version === version)
++  return entry ? entry.description : `unknown audit projection version: ${version}`
++}
++
++export interface ComputeClaimAuditHashInput {
+   claim: Claim
+-  storedHash: string
++  projectionVersion: number
+ }
+ 
+ /**
+- * Compliance's own tamper-check tool - built independently of `verifyClaimAuditHash` above,
+- * against the v1 API response shape compliance actually has access to, since engineering's
+- * internal helper is not something their tooling calls. Rebuilds the wire-shaped view the v1
+- * compatibility shim produces (money as a float `amount`, not the exact stored value) before
+- * hashing it - the same rewrite a legacy caller's response goes through. See MER-205.
++ * Computes the audit hash for `claim` under a specific, named projection version - never
++ * "whatever fields the claim happens to have today." Version 1 is the only projection this
++ * codebase has ever shipped; a future version that hashes a different field set gets its own
++ * branch here, so recomputing an OLD claim's hash always uses the SAME shape it was originally
++ * written under, and a field added under a later version can never make it look tampered.
+  */
+-export function verifyStoredAuditHash(input: VerifyStoredAuditHashInput): boolean {
+-  const { money, ...rest } = input.claim
+-  const wireShaped = { ...rest, amount: toWireAmountV1(money), currency: money.currency }
+-  return hashClaim(wireShaped as unknown as Claim) === input.storedHash
++export function computeClaimAuditHash(input: ComputeClaimAuditHashInput): string {
++  if (input.projectionVersion === AUDIT_PROJECTION_VERSION) {
++    return hashClaim(input.claim)
++  }
++  throw new Error(`unknown audit projection version: ${input.projectionVersion}`)
+ }

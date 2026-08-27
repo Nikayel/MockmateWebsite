@@ -1,0 +1,34 @@
+diff --git a/src/util/canonical-json.ts b/src/util/canonical-json.ts
+index ec02c24..9ccb102 100644
+--- a/src/util/canonical-json.ts
++++ b/src/util/canonical-json.ts
+@@ -9,6 +9,7 @@
+  * never extends past the process that made it.
+  */
+ import type { Claim } from "../domain/claim"
++import { toWireAmountV1 } from "../money/money"
+ 
+ export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
+ 
+@@ -67,3 +68,21 @@ export interface VerifyClaimAuditHashInput {
+ export function verifyClaimAuditHash(input: VerifyClaimAuditHashInput): boolean {
+   return hashClaim(input.claim) === input.storedHash
+ }
++
++export interface VerifyStoredAuditHashInput {
++  claim: Claim
++  storedHash: string
++}
++
++/**
++ * Compliance's own tamper-check tool - built independently of `verifyClaimAuditHash` above,
++ * against the v1 API response shape compliance actually has access to, since engineering's
++ * internal helper is not something their tooling calls. Rebuilds the wire-shaped view the v1
++ * compatibility shim produces (money as a float `amount`, not the exact stored value) before
++ * hashing it - the same rewrite a legacy caller's response goes through. See MER-205.
++ */
++export function verifyStoredAuditHash(input: VerifyStoredAuditHashInput): boolean {
++  const { money, ...rest } = input.claim
++  const wireShaped = { ...rest, amount: toWireAmountV1(money), currency: money.currency }
++  return hashClaim(wireShaped as unknown as Claim) === input.storedHash
++}

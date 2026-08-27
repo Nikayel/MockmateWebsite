@@ -1,0 +1,31 @@
+humanName: "Escaped: a claim actually altered after being written no longer fails the tamper check"
+tags:
+  - audit-hash-compatibility-tracing
+kind: probe
+body: |
+  const { meridian } = buildTestApp()
+  return meridian.app
+    .inject({
+      method: "POST",
+      url: "/claims",
+      headers: { "x-tenant-id": "ten_northwind" },
+      payload: {
+        externalRef: "NW-9702",
+        amount: 200,
+        claimantName: "Test Claimant",
+        lossDate: "2026-01-01",
+      },
+    })
+    .then((created) => {
+      const { id } = created.json()
+      return getStoredClaimAuditInfo(meridian.db, "ten_northwind", id).then((stored) => {
+        assert(stored !== null, "expected stored audit info")
+        const tampered = { ...stored.claim, money: { minorUnits: 999999, currency: "USD" } }
+        const stillVerifies = verifyClaimAuditHash({
+          claim: tampered,
+          storedHash: stored.storedHash,
+          projectionVersion: stored.projectionVersion,
+        })
+        assert(stillVerifies === false, "a claim whose amount actually changed must fail the tamper check")
+      })
+    })
