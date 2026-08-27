@@ -1,0 +1,31 @@
+humanName: "Escaped: a claim inserted after the first page is fetched still shows up again on the next page"
+tags:
+  - keyset-pagination
+kind: probe
+# This hidden tier's `it()` body runs as a plain, non-async callback (see
+# lib/sprint-labs/validate/dynamic/hidden-tests.ts's probe template), so this returns a promise
+# chain instead of using `await` - `await` inside a non-async callback is not valid here.
+body: |
+  const { meridian } = buildTestApp()
+  return seedClaim(meridian.db, { id: "clm_a", createdAt: "2026-01-04T09:12:00.000Z" })
+    .then(() => seedClaim(meridian.db, { id: "clm_b", createdAt: "2026-01-04T09:12:01.000Z" }))
+    .then(() => seedClaim(meridian.db, { id: "clm_c", createdAt: "2026-01-04T09:12:02.000Z" }))
+    .then(() => listClaimsByTenantKeyset(meridian.db, "ten_northwind", null, 2))
+    .then((page1) => {
+      assert(
+        page1.map((claim) => claim.id).join(",") === "clm_a,clm_b",
+        "page one must be [clm_a, clm_b]"
+      )
+      const cursor = { createdAt: page1[1].createdAt, id: page1[1].id }
+      // A claim lands with an earlier timestamp after page one was already fetched - the same
+      // shape of write that shifts every row under offset pagination.
+      return seedClaim(meridian.db, { id: "clm_z", createdAt: "2026-01-04T09:11:00.000Z" }).then(
+        () => listClaimsByTenantKeyset(meridian.db, "ten_northwind", cursor, 2)
+      )
+    })
+    .then((page2) => {
+      const page2Ids = page2.map((claim) => claim.id)
+      assert(!page2Ids.includes("clm_a"), "page two must not repeat clm_a from page one")
+      assert(!page2Ids.includes("clm_b"), "page two must not repeat clm_b from page one")
+      assert(page2Ids.includes("clm_c"), "page two must still include clm_c")
+    })
