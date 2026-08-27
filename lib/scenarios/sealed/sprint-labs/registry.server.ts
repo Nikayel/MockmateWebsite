@@ -14,6 +14,11 @@ if (typeof window !== "undefined") {
 const SEALED_TICKET_LOADERS: Record<string, () => Promise<{ sealed: SealedTicketContent }>> = {
   "fixture-demo:DEMO-101": () => import("./fixture-demo/DEMO-101.server"),
   "fixture-demo:DEMO-102": () => import("./fixture-demo/DEMO-102.server"),
+  "meridian:MER-101": () => import("./meridian/MER-101.server"),
+  "meridian:MER-102": () => import("./meridian/MER-102.server"),
+  "meridian:MER-103": () => import("./meridian/MER-103.server"),
+  "meridian:MER-104": () => import("./meridian/MER-104.server"),
+  "meridian:MER-105": () => import("./meridian/MER-105.server"),
 }
 
 function loaderKey(workbookId: string, ticketKey: string): string {
