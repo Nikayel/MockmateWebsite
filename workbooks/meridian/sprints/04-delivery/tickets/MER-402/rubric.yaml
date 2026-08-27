@@ -1,0 +1,11 @@
+weights:
+  understanding: 0.2
+  problemSolving: 0.3
+  codeQuality: 0.15
+  communication: 0.1
+  verification: 0.25
+notes:
+  understanding: "Keys off recognizing the in-process array itself as the defect (not adding a retry loop around the send call, which the ambiguous on-call question invites), and replacing it with a durable table."
+  problemSolving: "Keys off the visible pass rate across the transactional-rollback, restart-durability, concurrent-claim and lease-expiry cases."
+  codeQuality: "Keys off the business row and its outbox event committing on the same transaction-scoped client, not two independent writes with a gap between them."
+  verification: "Keys off whether the learner's own test proves two concurrent claims never overlap, using a genuinely deterministic interleaving rather than a real-clock race that could pass by luck."

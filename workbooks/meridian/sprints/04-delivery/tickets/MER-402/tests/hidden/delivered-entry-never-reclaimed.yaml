@@ -1,0 +1,22 @@
+humanName: "Escaped: a delivered entry is never reclaimed, even after what would have been its lease window"
+tags:
+  - transactional-outbox-skip-locked
+kind: probe
+body: |
+  const db = createMemoryDb()
+  const outbox = createOutbox({ db, workerId: "worker-a", leaseDurationMs: 10 })
+  return outbox
+    .enqueue({ type: "claim.processed", tenantId: "ten_northwind", claimId: "clm_done" })
+    .then(() => outbox.drain(async () => {}))
+    .then((drainedCount) => {
+      assert.strictEqual(drainedCount, 1)
+      return new Promise((resolve) => setTimeout(resolve, 30))
+    })
+    .then(() => claimOutboxBatch(db, { workerId: "worker-b", leaseDurationMs: 30_000, limit: 10 }))
+    .then((reclaimed) => {
+      assert.strictEqual(
+        reclaimed.length,
+        0,
+        "a delivered entry must never come back as claimable, no matter how long afterward"
+      )
+    })

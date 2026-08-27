@@ -31,11 +31,14 @@ filesTouched:
   - "src/db/memory-db.ts"
   - "src/app.ts"
   - "src/http/compatibility-descriptor.ts"
+  # MER-402
   - "migrations/0014_outbox.sql"
+  - "src/db/client.ts"
+  - "src/db/repositories/outbox.ts"
+  - "src/domain/outbox-entry.ts"
   - "src/queue/outbox.ts"
-  - "src/db/repositories/webhook-deliveries.ts"
-  - "src/jobs/reconcile.ts"
-  - "src/queue/scheduler.ts"
+  - "src/http/routes/claims.ts"
+  - "test/support/failing-query-db.ts"
   - "migrations/0015_dead_letters.sql"
   - "src/delivery/retry.ts"
   - "src/delivery/webhooks.ts"
@@ -48,10 +51,14 @@ newSourceFiles:
   - "src/db/repositories/idempotency-keys.ts"
   - "src/http/idempotency.ts"
   - "src/http/routes/payment-authorizations.ts"
+  # MER-402
   - "migrations/0014_outbox.sql"
+  - "src/db/repositories/outbox.ts"
+  - "test/support/failing-query-db.ts"
   - "migrations/0015_dead_letters.sql"
   - "migrations/0016_outbox_ordering.sql"
 rewrittenFiles:
+  # MER-402: the in-process array is fully replaced by the durable outbox_entries table.
   - "src/queue/outbox.ts"
   - "src/delivery/retry.ts"
   - "src/delivery/signature.ts"

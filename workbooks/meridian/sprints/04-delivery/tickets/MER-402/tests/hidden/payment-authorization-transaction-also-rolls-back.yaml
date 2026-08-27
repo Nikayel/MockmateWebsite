@@ -1,0 +1,41 @@
+humanName: "Escaped: the payment-authorization endpoint's own transaction rolls back too, not just claim creation's"
+tags:
+  - transactional-outbox-skip-locked
+kind: probe
+body: |
+  const realDb = createMemoryDb()
+  const workingApp = buildTestApp({ db: realDb })
+
+  return workingApp.meridian.app
+    .inject({
+      method: "POST",
+      url: "/claims",
+      headers: { "x-tenant-id": "ten_northwind" },
+      payload: { externalRef: "NW-402-H1", amount: 100, claimantName: "Test Claimant", lossDate: "2026-01-01" },
+    })
+    .then((created) => {
+      const claimId = created.json().id
+      // Same underlying data, but every outbox insert against it now fails - proving the
+      // payment-authorization endpoint's own transaction rolls back too, not just claim
+      // creation's.
+      const failingDb = createFailingQueryDb(realDb, INSERT_OUTBOX_ENTRY)
+      const failingApp = buildTestApp({ db: failingDb })
+      return failingApp.meridian.app
+        .inject({
+          method: "POST",
+          url: `/claims/${claimId}/payment-authorizations`,
+          headers: { "x-tenant-id": "ten_northwind", "idempotency-key": "h1-key" },
+          payload: { approvedBy: "adjuster_test" },
+        })
+        .then((authResponse) => {
+          assert.strictEqual(authResponse.statusCode, 500)
+          return findIdempotencyKey(realDb, "ten_northwind", "h1-key")
+        })
+    })
+    .then((record) => {
+      assert.strictEqual(
+        record,
+        null,
+        "the idempotency record must not have been written when the same transaction's outbox insert failed"
+      )
+    })
