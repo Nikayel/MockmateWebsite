@@ -48,6 +48,12 @@ export const USAGE_SERVICES = [
   // partner's chat turns, via generateAIResponse in
   // app/api/sprint-labs/chat/route.ts.
   { id: "sprint-labs-chat", label: "Sprint Labs partner chat" },
+  // Ruling R9 (docs/sprint-labs/PLAN.md Task 9): the contamination gate's
+  // cold, pinned-model, one-shot solve attempt, via generateAIResponse in
+  // lib/sprint-labs/validate/contamination.ts. Runs only under `lab
+  // validate --contamination` (content-authoring CI), never in the live
+  // product, and only on a cache miss.
+  { id: "sprint-labs-validate", label: "Sprint Labs contamination gate" },
   { id: "voice-transcription", label: "Voice transcription" },
   { id: "rag-indexing", label: "RAG indexing embeddings" },
   { id: "rag-query-embeddings", label: "RAG query embeddings" },
