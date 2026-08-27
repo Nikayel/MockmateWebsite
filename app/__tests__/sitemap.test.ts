@@ -35,19 +35,17 @@ import {
   WORKSPACE_SEGMENT,
 } from "@/lib/tutorials/lesson-routes"
 import { getAllBlogPosts } from "@/lib/mdx"
-import { ALL_COMPANIES } from "@/lib/data/company-questions"
 import { listCaseLabs } from "@/lib/labs/case-labs"
 
 /**
- * Hand-listed non-Learn pages in `app/sitemap.ts`: marketing, guides, comparisons, the interview-prep
- * index, the roadmap preview, the blog index, samples, and the secondary pages. Company pages, blog
- * posts, and Case Lab detail pages are excluded here because all three are derived and counted
- * separately.
+ * Hand-listed non-Learn pages in `app/sitemap.ts`: marketing, guides, comparisons, the roadmap
+ * preview, the blog index, samples, and the secondary pages. Blog posts and Case Lab detail pages
+ * are excluded here because both are derived and counted separately.
  *
  * This is intentionally a literal. Adding a marketing page should be a deliberate act that shows up
  * as a one-line diff here, not something that silently changes the shape of the sitemap.
  */
-const STATIC_PAGE_COUNT = 32
+const STATIC_PAGE_COUNT = 31
 
 /** Learn URLs only, so the derived half can be checked independently of the hand-listed half. */
 function learnUrls(urls: string[]): string[] {
@@ -144,8 +142,7 @@ describe("sitemap", () => {
     // 2 = the hub plus the flat /learn/all lesson index.
     const expectedLearn = 2 + COURSE_IDS.length + listAllCourseLevels().length
     const expectedLessons = listAllCatalogEntries().length
-    const expectedStatic =
-      STATIC_PAGE_COUNT + ALL_COMPANIES.length + getAllBlogPosts().length + listCaseLabs().length
+    const expectedStatic = STATIC_PAGE_COUNT + getAllBlogPosts().length + listCaseLabs().length
 
     expect(urls.length).toBe(expectedLearn + expectedLessons + expectedStatic)
   })

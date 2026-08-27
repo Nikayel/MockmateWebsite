@@ -145,7 +145,6 @@ describe("resolveSafeRedirect - legitimate destinations", () => {
       "/learn/sql",
       "/learn/system-design",
       "/labs/palantir-fdse",
-      "/interview-prep/palantir",
       "/metrics",
       "/upgrade",
       "/limit-reached",
