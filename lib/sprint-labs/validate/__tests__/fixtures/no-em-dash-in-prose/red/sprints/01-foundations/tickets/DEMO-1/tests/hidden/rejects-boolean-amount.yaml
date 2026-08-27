@@ -1,0 +1,8 @@
+humanName: "Escaped — a boolean amount is still accepted as a claim amount"
+tags:
+  - typed-boundaries
+kind: io-case
+input:
+  amount: true
+expected:
+  ok: false

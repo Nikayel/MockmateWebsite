@@ -1,0 +1,8 @@
+number: 1
+title: "Foundations"
+standupQuote: "The parser just shrugged — and returned any."
+objectives:
+  - typed-boundaries
+filesTouched: []
+newSourceFiles: []
+rewrittenFiles: []
