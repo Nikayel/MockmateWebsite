@@ -128,6 +128,18 @@ describe("materializeInitialTree -- error paths", () => {
     expect(() => materializeInitialTree("does-not-exist", "DEMO-101")).toThrow("UNKNOWN_WORKBOOK")
   })
 
+  // Review round 1, MINOR-3: a workbookId that path.join would otherwise resolve OUTSIDE
+  // workbooks/ (via ".." segments) must never escape the root, even though today's one real caller
+  // only ever passes a registry-validated id (see materialize-initial-tree.ts's own doc comment on
+  // resolveWorkbookDir for why the primitive is hardened anyway).
+  it("throws UNKNOWN_WORKBOOK for a workbookId that would path-traverse outside workbooks/", () => {
+    expect(() => materializeInitialTree("../../../../../../etc", "DEMO-101")).toThrow(
+      "UNKNOWN_WORKBOOK"
+    )
+    expect(() => materializeInitialTree("..", "DEMO-101")).toThrow("UNKNOWN_WORKBOOK")
+    expect(() => materializeInitialTree("../meridian", "MER-101")).toThrow("UNKNOWN_WORKBOOK")
+  })
+
   it("throws UNKNOWN_TICKET for a ticket key not present in the workbook", () => {
     expect(() => materializeInitialTree("fixture-demo", "DEMO-999")).toThrow("UNKNOWN_TICKET")
   })

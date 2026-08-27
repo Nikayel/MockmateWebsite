@@ -14,16 +14,20 @@
  * This module imports `node:fs`/`node:child_process` (transitively, via `git-workspace.ts`) and
  * must never reach a client bundle. It has exactly one intended caller:
  * `app/api/sprint-labs/runs/provision/route.ts`, a Route Handler — inherently server-only in the
- * Next.js App Router regardless of bundler config, which is the real guarantee here. Do not import
- * this module from a "use client" component; call the route instead (see
- * `provisionSprintLabWorkspace` in `lib/sprint-labs/runs-client.ts`). The `server-only` npm package
- * is not an existing dependency of this repo (confirmed: absent from package.json, and no file
- * anywhere does a literal `import "server-only"`), and this task did not authorize adding one, so
- * this doc comment plus the route-handler-only import boundary is the guard, verified by grepping
- * the built client bundle rather than assumed from a build failure (see task-runtimeA-report.md —
- * this repo's own `next.config.mjs` webpack override stubs `fs`/`child_process` to `false` for the
- * client bundle rather than leaving them unresolved, so a leak would NOT reliably fail `pnpm build`
- * here; a bundle-content grep is the check that actually proves the absence).
+ * Next.js App Router regardless of bundler config, which is the real guarantee here (structurally:
+ * grepping the whole app/components/lib tree for this module's path confirms that route is the only
+ * import edge). Do not import this module from a "use client" component; call the route instead
+ * (see `provisionSprintLabWorkspace` in `lib/sprint-labs/runs-client.ts`).
+ *
+ * `import "server-only"` below is defense in depth on top of that structural guarantee (review
+ * round 1, MINOR-2): this repo's own `next.config.mjs` webpack override stubs `fs`/`child_process`
+ * to `false` for the client bundle rather than leaving them unresolved, and this repo's installed
+ * Next.js (16.1.1) runs `next build` on Turbopack by default (that `webpack()` callback likely
+ * doesn't even govern the build path in use) — so neither bundler is guaranteed to fail loudly on
+ * its own if a future stray client import ever creeps in. `server-only` is Next.js's own poison-pill
+ * package for exactly this gap: importing it throws a build-time error from ANY client-reachable
+ * module, regardless of bundler or of what else that module happens to import. Added as a real
+ * dependency (`pnpm add server-only`, package.json), not assumed present.
  *
  * WHAT SHIPS TO THE LEARNER, and why the strip is a strip (not a "mark read-only"):
  *   - editable `src/**` (role "editable") — the materialized tree's own source files.
@@ -66,8 +70,10 @@
  * and every check in task-runtimeA-report.md are unaffected — the whole repo, `workbooks/` included,
  * is on disk in both.
  */
+import "server-only"
+
 import { existsSync, readdirSync } from "node:fs"
-import { join } from "node:path"
+import { join, sep } from "node:path"
 
 import { logger } from "@/lib/logger"
 import { loadWorkbookTree } from "@/lib/sprint-labs/validate/load-tree"
@@ -146,11 +152,23 @@ function isForbiddenLearnerPath(path: string): boolean {
  * check covers the common case for zero extra I/O; the fallback scans every `workbooks/*`
  * subdirectory's own declared id, reusing `loadWorkbookTree` rather than a second, hand-rolled YAML
  * read — `workbooks/` holds a handful of entries today, so this is cheap even in the fallback case.
+ *
+ * The direct-path check joins the CALLER-INFLUENCEABLE `workbookId` onto `WORKBOOKS_ROOT` (review
+ * round 1, MINOR-3): `path.join` normalizes `..` segments, so an unvalidated id could otherwise walk
+ * the resolved path outside `workbooks/` entirely (e.g. `"../../lib/scenarios/sealed"`). Today's one
+ * caller (`materializeInitialTree`, reached only via `run.workbookId` — a value the run's own
+ * creation path already validated against the compiled registry, see `requireKnownWorkbookAndTickets`
+ * in `runs.ts`) never passes anything attacker-shaped, but hardening the primitive itself rather than
+ * trusting every future caller to re-derive that guarantee is the point of a shared resolver. The
+ * fallback scan needs no equivalent check: `entry.name` there always comes from a real
+ * `readdirSync(WORKBOOKS_ROOT)` listing, so `join(WORKBOOKS_ROOT, entry.name)` can only ever name an
+ * actual immediate child of `WORKBOOKS_ROOT`.
  */
 function resolveWorkbookDir(workbookId: string): string | null {
   if (!existsSync(WORKBOOKS_ROOT)) return null
 
   const direct = join(WORKBOOKS_ROOT, workbookId)
+  if (!direct.startsWith(WORKBOOKS_ROOT + sep)) return null
   if (existsSync(join(direct, "workbook.yaml"))) return direct
 
   for (const entry of readdirSync(WORKBOOKS_ROOT, { withFileTypes: true })) {
