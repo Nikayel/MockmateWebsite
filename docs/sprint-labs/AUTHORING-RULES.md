@@ -29,6 +29,16 @@ rules marked **[validate]**.
   as (sprint's `filesTouched`) − (seed ∪ all prior sprints). A second field
   `rewrittenFiles` lists seed files a sprint substantially replaces (S3, S4,
   S8 use this).
+- **[validate] Casing, per key (ruling R17):** each authored key follows the
+  spec's own spelling, checked in both directions by `lab validate`'s
+  `snake-case-authoring-keys` rule — `ai_policy`/`ai_policy_reason`/
+  `concession_triggers` are snake_case (WORKBOOK-SPEC.md §6); `filesTouched`/
+  `newSourceFiles`/`rewrittenFiles` are camelCase (this section, per
+  SPRINT-PLAN.md's own spelling). `pathEnumerationSignoff` (a `lab validate`
+  escape hatch on `ticket.md`, not spec-named elsewhere) is camelCase too: it
+  is a boolean a reviewer sets to attest that a ticket's file-path
+  enumeration was confirmed pedagogically necessary, not an accidental
+  spoiler of "the files to touch" (§6).
 
 ## 2. State fixes from the reconcile pass (apply, don't rediscover)
 
@@ -135,6 +145,12 @@ sign-off field attesting this.
   ambiguous PM ask. **The files to touch are never listed** — in body,
   criteria, or hints.
 - **No em dashes in learner-facing prose** (site-wide content rule).
+- **[validate] (ruling R18):** the em-dash rule covers `ticket.md`'s `title`
+  and `sprint.yaml`'s `goal` too, checked by `lab validate`'s
+  `no-em-dash-in-prose` rule alongside body/criteria/standupQuote/humanName/
+  objective text. This site-wide rule outranks spec punctuation: an
+  em-dashed title quoted verbatim from `SPRINT-PLAN.md` gets re-punctuated
+  at authoring, never preserved as-is.
 - `ai_policy_reason` is required on every `unassisted` ticket, written
   in-fiction, and renders on the board card, as a non-dismissible workspace
   banner, and at retro.
