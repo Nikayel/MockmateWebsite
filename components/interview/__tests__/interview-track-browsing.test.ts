@@ -4,7 +4,9 @@ import { filterScenarios, scenarios } from "@/lib/scenarios"
 import { useInterviewStore } from "@/lib/stores"
 
 import {
+  requestsInterviewWork,
   scenariosInTrack,
+  showsRoadmapPitch,
   trackProgress,
   willResumeExistingSession,
 } from "../interview-track-browsing"
@@ -73,6 +75,81 @@ describe("willResumeExistingSession", () => {
     expect(willResumeExistingSession(new URLSearchParams(""))).toBe(false)
     expect(willResumeExistingSession(null)).toBe(false)
     expect(willResumeExistingSession(undefined)).toBe(false)
+  })
+})
+
+/**
+ * Shared by `useSessionReopen` (may a spent-trial visitor stay, or do they get the sign-in
+ * bounce?) and by `showsRoadmapPitch` below. One definition on purpose: the two callers must
+ * never disagree about what a bare `/interview` address is.
+ */
+describe("requestsInterviewWork", () => {
+  it("counts a named track, session, or scenario as asking for work", () => {
+    expect(requestsInterviewWork(new URLSearchParams("track=dsa"))).toBe(true)
+    expect(requestsInterviewWork(new URLSearchParams("session=s1"))).toBe(true)
+    expect(requestsInterviewWork(new URLSearchParams("scenario=two-sum"))).toBe(true)
+    expect(requestsInterviewWork(new URLSearchParams("session=s1&scenario=two-sum"))).toBe(true)
+  })
+
+  it("counts a junk track value too, since the param still asks for the picker", () => {
+    expect(requestsInterviewWork(new URLSearchParams("track=not-a-track"))).toBe(true)
+  })
+
+  it("treats the bare address as asking for nothing", () => {
+    expect(requestsInterviewWork(new URLSearchParams(""))).toBe(false)
+    expect(requestsInterviewWork(null)).toBe(false)
+    expect(requestsInterviewWork(undefined)).toBe(false)
+  })
+
+  it("ignores rider flags that name nothing on their own", () => {
+    expect(requestsInterviewWork(new URLSearchParams("postInterview=true"))).toBe(false)
+    expect(requestsInterviewWork(new URLSearchParams("roadmap=true"))).toBe(false)
+    expect(requestsInterviewWork(new URLSearchParams("practice=true"))).toBe(false)
+  })
+})
+
+/** The branch `ScenarioBrowser.renderUntracked` takes between the pitch and the track cards. */
+describe("showsRoadmapPitch", () => {
+  it("pitches the roadmap to a signed-out visitor on the bare address", () => {
+    expect(showsRoadmapPitch(new URLSearchParams(""), true)).toBe(true)
+    expect(showsRoadmapPitch(null, true)).toBe(true)
+    expect(showsRoadmapPitch(undefined, true)).toBe(true)
+  })
+
+  it("keeps the track cards for signed-in users on the same address", () => {
+    expect(showsRoadmapPitch(new URLSearchParams(""), false)).toBe(false)
+    expect(showsRoadmapPitch(null, false)).toBe(false)
+  })
+
+  it("leaves a chosen track alone, junk values included", () => {
+    expect(showsRoadmapPitch(new URLSearchParams("track=dsa"), true)).toBe(false)
+    expect(showsRoadmapPitch(new URLSearchParams("track=debugging"), true)).toBe(false)
+    // Unrecognised values land on the picker (findInterviewTrack's rule), never the pitch.
+    expect(showsRoadmapPitch(new URLSearchParams("track=not-a-track"), true)).toBe(false)
+  })
+
+  /**
+   * The resume notice outranks the pitch by ordering in `renderUntracked`, but the ordering is
+   * also safe by construction: every combination the resume rule claims refuses the pitch, so a
+   * reshuffle of the branches could not flash a sales pitch at someone opening their session.
+   */
+  it("never claims a combination the resume notice owns", () => {
+    const resumes = [
+      "session=s1&scenario=two-sum",
+      "scenario=two-sum&roadmap=true",
+      "scenario=two-sum&practice=true",
+    ]
+    for (const combo of resumes) {
+      const params = new URLSearchParams(combo)
+      expect(willResumeExistingSession(params)).toBe(true)
+      expect(showsRoadmapPitch(params, true)).toBe(false)
+    }
+  })
+
+  it("bypasses the pitch for a named scenario or session even when it is not a resume", () => {
+    // These fall to the track cards exactly as they did before the pitch existed.
+    expect(showsRoadmapPitch(new URLSearchParams("scenario=two-sum"), true)).toBe(false)
+    expect(showsRoadmapPitch(new URLSearchParams("session=s1"), true)).toBe(false)
   })
 })
 
