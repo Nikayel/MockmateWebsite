@@ -135,6 +135,33 @@ describe("Sprint Labs workspace page", () => {
     expect(screen.getByText("Claim intake 500s on a technically-valid payload")).not.toBeNull()
   })
 
+  it("shows the not-playable panel instead of mounting WorkspaceView for a content stub", async () => {
+    registry.getWorkbookSummary.mockReturnValue(SUMMARY)
+    registry.getTicket.mockResolvedValue({
+      ...DEMO_101,
+      ticket: { ...DEMO_101.ticket, playable: false },
+    })
+    mockFetchRun.mockResolvedValue(activeRun())
+
+    render(<SprintLabWorkspacePage />)
+
+    await waitFor(() => {
+      expect(screen.getByText("This ticket isn't playable yet")).not.toBeNull()
+    })
+    expect(screen.queryByTestId("workspace-view")).toBeNull()
+  })
+
+  it("still mounts WorkspaceView when playable is true or unset", async () => {
+    registry.getWorkbookSummary.mockReturnValue(SUMMARY)
+    registry.getTicket.mockResolvedValue(DEMO_101) // DEMO_101's ticket carries no `playable` field at all
+    mockFetchRun.mockResolvedValue(activeRun())
+
+    render(<SprintLabWorkspacePage />)
+
+    await waitFor(() => expect(screen.getByTestId("workspace-view")).not.toBeNull())
+    expect(screen.queryByText("This ticket isn't playable yet")).toBeNull()
+  })
+
   it("shows the top bar with the ticket key and a back link to the ticket screen", async () => {
     registry.getWorkbookSummary.mockReturnValue(SUMMARY)
     registry.getTicket.mockResolvedValue(DEMO_101)

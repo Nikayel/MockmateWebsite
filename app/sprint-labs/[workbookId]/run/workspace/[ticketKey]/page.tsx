@@ -13,6 +13,10 @@
  * run," the Pro wall applies uniformly keyed off `run.currentSprint`). The only screen-6-specific
  * addition is `knowledgeOpen`, which this page owns because the button that opens it lives in this
  * page's own `SprintLabTopBar` mount (`rightSlot`), outside `WorkspaceView`'s subtree.
+ *
+ * `content.ticket.ticket.playable === false` (a compiled content stub) short-circuits before
+ * `WorkspaceView` ever mounts, rendering `TicketNotPlayablePanel` instead — see that guard's own
+ * comment below. This keeps a stub from ever reaching `WorkspaceView` with an empty seed/file tree.
  */
 
 import { useEffect, useMemo, useState } from "react"
@@ -27,6 +31,7 @@ import { SprintLabErrorPanel } from "@/components/sprint-labs/ui/SprintLabErrorP
 import { SparraLoader } from "@/components/brand/SparraLoader"
 import { WorkspaceView } from "@/components/sprint-labs/workspace/WorkspaceView"
 import { WorkspaceKnowledgeButton } from "@/components/sprint-labs/workspace/WorkspaceKnowledgeButton"
+import { TicketNotPlayablePanel } from "@/components/sprint-labs/ui/TicketNotPlayablePanel"
 import type { CompiledTicket } from "@/lib/sprint-labs/content/types"
 
 type WorkspaceContentState =
@@ -171,6 +176,20 @@ export default function SprintLabWorkspacePage() {
   }
 
   if (!content.ticket) notFound()
+
+  // A compiled content stub (no reference.diff/rubric.yaml yet — TicketPublic.playable's own doc
+  // comment) has no editable seed and no sealed bundle. Mounting WorkspaceView for one would render
+  // an empty file tree rather than a broken-but-plausible workspace, so this guard replaces the
+  // whole editor mount with an honest "not playable yet" panel instead. `undefined` (every ticket
+  // compiled before this field existed) reads the same as `true` — the check is strictly `=== false`.
+  if (content.ticket.ticket.playable === false) {
+    return (
+      <div className="flex h-screen flex-col bg-[var(--wb-page)] text-[var(--wb-text)]">
+        <SprintLabTopBar {...topBarCommon} />
+        <TicketNotPlayablePanel />
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-screen flex-col bg-[var(--wb-page)] text-[var(--wb-text)]">
