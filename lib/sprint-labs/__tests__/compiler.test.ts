@@ -285,8 +285,19 @@ describe("compile-workbooks: round-trip", () => {
       "missing-sunset-date",
       "just-remove-page-param",
     ])
+    // Sprint Labs Task 7 review round 2: DEMO-102's io-cases were retargeted at a real
+    // entryPoint (compatibilityDescriptor) with input/expected shapes that actually match its
+    // signature -- there is no HTTP layer anywhere in this fixture to produce a status code or
+    // header, so the original `{status, deprecationHeaderPresent}` shape could never have been
+    // executed by any mechanism.
     const ioCase = sealed102.hiddenCases.find((c) => c.id === "v1-still-accepts-page")
-    expect(ioCase?.expected).toEqual({ status: 200, deprecationHeaderPresent: true })
+    expect(ioCase?.expected).toEqual({
+      parameters: { page: { status: "deprecated" }, per_page: { status: "deprecated" } },
+    })
+    expect(ioCase?.entryPoint).toEqual({
+      module: "src/http/compatibility-descriptor.ts",
+      export: "compatibilityDescriptor",
+    })
     expect(sealed102.referenceDiff).toContain("compatibilityDescriptor")
     expect(sealed102.authorBrief?.intent).toBeTruthy()
 

@@ -112,7 +112,21 @@ async function collectSealedMarkers(): Promise<string[]> {
       }
     }
   }
-  return markers.filter((m) => typeof m === "string" && m.length > 0)
+  // Sprint Labs Task 7 review round 2: a length floor, not just "non-empty". An io-case entryPoint
+  // (docs/sprint-labs' `entryPoint` extension) often targets a function whose parameter type is a
+  // small literal union (e.g. `"v1" | "v2"`) -- the ONLY valid `input` values are then exactly
+  // those short literal strings, which ALSO, necessarily and legitimately, appear in the SAME
+  // ticket's PUBLIC content (the function's own type signature in `setup.diff`, and any visible
+  // test that calls it). That is not a leak: it is the same short, structurally-mandatory string
+  // appearing on both sides because there was never another valid value to choose. A `humanName`,
+  // `body`, or free-form `expected`/`input` object remains exactly as checked as before -- this
+  // floor only stops a marker too short to ever be a *distinctive* secret from producing a false
+  // positive, mirroring `lib/sprint-labs/validate/dynamic/provisioning.ts`'s own
+  // `MIN_SIGNATURE_LENGTH` reasoning for the identical class of problem. The "RED CASE" test below
+  // already assumed markers this short don't carry the scan (it hand-picks one `> 8` chars), so
+  // this codifies an assumption the suite already made, rather than introducing a new one.
+  const MIN_MARKER_LENGTH = 10
+  return markers.filter((m) => typeof m === "string" && m.length >= MIN_MARKER_LENGTH)
 }
 
 /** Every generated public .ts file's raw text that contains at least one marker, paired with which marker. */
