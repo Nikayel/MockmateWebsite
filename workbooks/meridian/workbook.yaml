@@ -24,8 +24,8 @@ ticketCount: 50
 estimatedHours: 58
 requiresServerExecution: false
 seedStats:
-  files: 59
-  nonTestLines: 1449
+  files: 62
+  nonTestLines: 1526
   testCases: 19
 inheritedDefects:
   - "money handled as floating point"
