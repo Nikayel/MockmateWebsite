@@ -109,6 +109,61 @@ export function divide(a: number, b: number): number {
     expect(result.results.some((r) => r.name === "adds two numbers")).toBe(true)
   })
 
+  it("refuses to leak a hidden test's content through a non-driver require (security regression)", async () => {
+    // src/leak.ts is an "editable" file that tries to smuggle the hidden suite in as a side-effect
+    // import; a visible test file requires it as part of its own dependency graph. Before the
+    // fix, the hidden suite's describe/it would register with isHidden:false (currentFile still
+    // said "visible test", not the hidden path) — a real name/message leak.
+    const result = await runTsWorkspace({
+      files: [
+        { path: "src/leak.ts", content: 'import "../tests/hidden/secret.test"\nexport {}\n' },
+        {
+          path: "tests/visible/uses-leak.test.ts",
+          content: `import { describe, expect, it } from "vitest"
+import "../../src/leak"
+
+describe("visible", () => {
+  it("passes", () => {
+    expect(1).toBe(1)
+  })
+})
+`,
+        },
+        {
+          path: "tests/hidden/secret.test.ts",
+          content: `import { describe, expect, it } from "vitest"
+
+describe("Secret Probe", () => {
+  it("should never leak", () => {
+    expect(true).toBe(true)
+  })
+})
+`,
+        },
+      ],
+      testPaths: ["tests/visible/uses-leak.test.ts"],
+      hiddenTestPaths: ["tests/hidden/secret.test.ts"],
+    })
+
+    // The leak attempt poisoned the visible file's own load (its nested require threw) — it did
+    // NOT silently succeed with the hidden suite mislabeled as visible.
+    const visibleFileFailure = result.results.find(
+      (r) => r.suite === "tests/visible/uses-leak.test.ts"
+    )
+    expect(visibleFileFailure).toMatchObject({ passed: false })
+    expect(visibleFileFailure?.error).toMatch(/Module not found/)
+
+    // The hidden suite still ran (via the driver's own legitimate direct require) and is
+    // correctly marked hidden — never surfaced as an ordinary visible result.
+    const secretResult = result.results.find((r) => r.name === "should never leak")
+    expect(secretResult).toMatchObject({ suite: "Secret Probe", passed: true, isHidden: true })
+
+    // No row anywhere claims the hidden suite's content while marked non-hidden.
+    expect(result.results.some((r) => r.suite === "Secret Probe" && r.isHidden !== true)).toBe(
+      false
+    )
+  })
+
   it("fails cleanly (no thrown exception) when the workspace has no files at all", async () => {
     const result = await runTsWorkspace({
       files: [],

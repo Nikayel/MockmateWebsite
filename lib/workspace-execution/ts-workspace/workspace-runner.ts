@@ -54,21 +54,32 @@ export async function executeWorkspaceScenarioTsClientSide(
       }
     }
 
-    const results: WorkspaceTestResult[] = []
-    const cleanLogs: TsWorkspaceRunResult["consoleLogs"] = []
+    // Marker lines are protocol-internal regardless of type or position: strip every one of them
+    // from what gets shown as console output.
+    const cleanLogs: TsWorkspaceRunResult["consoleLogs"] = runResult.logs.filter(
+      (log) => !log.message.startsWith(RESULTS_MARKER)
+    )
 
-    for (const log of runResult.logs) {
-      if (log.message.startsWith(RESULTS_MARKER)) {
-        try {
-          const parsed = JSON.parse(log.message.slice(RESULTS_MARKER.length))
-          if (Array.isArray(parsed)) {
-            results.push(...parsed)
-          }
-        } catch {
-          // Ignore malformed runner output and fall through to the no-results error below.
+    // Only "log"-typed entries are eligible, and only the LAST one counts — mirroring the
+    // existing defense in python-sandbox/pack-oracle-runner.ts's decodePackStdout: the shim's own
+    // finalize() call is always the last thing that logs this marker, so an earlier marker-shaped
+    // line is either stale or a candidate's own console.log trying to forge a passing result set;
+    // a marker written via console.error/warn/info cannot forge a match at all. Accumulating every
+    // match (the old behavior) let a single injected line replace or augment the real verdict.
+    const markerLogs = runResult.logs.filter(
+      (log) => log.type === "log" && log.message.startsWith(RESULTS_MARKER)
+    )
+    const lastMarker = markerLogs.length > 0 ? markerLogs[markerLogs.length - 1] : null
+
+    const results: WorkspaceTestResult[] = []
+    if (lastMarker) {
+      try {
+        const parsed = JSON.parse(lastMarker.message.slice(RESULTS_MARKER.length))
+        if (Array.isArray(parsed)) {
+          results.push(...parsed)
         }
-      } else {
-        cleanLogs.push(log)
+      } catch {
+        // Ignore malformed runner output and fall through to the no-results error below.
       }
     }
 

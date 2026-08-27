@@ -96,8 +96,13 @@ async function runTsWorkspaceMode(files, testPaths, hiddenTestPaths) {
   const normalizedHidden = hiddenTestPaths.map((path) => path.replace(/^\.\//, ""))
   const vitestShim = self.createVitestShim({ hiddenTestPaths: normalizedHidden })
 
+  // .js-normalized to match how `modules` and resolveTsWorkspacePath key everything. Mirrored in
+  // lib/workspace-execution/ts-workspace/require-graph.ts for the Node harness — see that file's
+  // header on `hiddenModulePaths` for why this exists.
+  const hiddenModulePaths = new Set(normalizedHidden.map((path) => path.replace(/\.tsx?$/, ".js")))
+
   const moduleCache = {}
-  function requireTsModule(path, currentDir) {
+  function requireTsModule(path, currentDir, asDriver) {
     if (path === "node:assert/strict" || path === "node:assert" || path === "assert") {
       return assertMock
     }
@@ -106,6 +111,15 @@ async function runTsWorkspaceMode(files, testPaths, hiddenTestPaths) {
     }
 
     const resolved = resolveTsWorkspacePath(currentDir || "", path)
+
+    // Checked BEFORE the cache lookup, unconditionally: a hidden path the driver already loaded
+    // must not become reachable to a non-driver caller just because it is now cached. `asDriver`
+    // is never forwarded through `localRequire` below, so any nested require — no matter how
+    // deeply — is treated as non-driver.
+    if (!asDriver && hiddenModulePaths.has(resolved)) {
+      throw new Error(`Module not found: ${path} (resolved as: ${resolved})`)
+    }
+
     if (moduleCache[resolved]) {
       return moduleCache[resolved].exports
     }
@@ -140,7 +154,8 @@ async function runTsWorkspaceMode(files, testPaths, hiddenTestPaths) {
   for (const testPath of orderedTestPaths) {
     vitestShim.setCurrentFile(testPath)
     try {
-      requireTsModule(testPath.replace(/\.tsx?$/, ".js"))
+      // asDriver: true — this is the ONE legitimate place a hidden path may be required directly.
+      requireTsModule(testPath.replace(/\.tsx?$/, ".js"), "", true)
     } catch (error) {
       setupFailures.push({
         suite: testPath,

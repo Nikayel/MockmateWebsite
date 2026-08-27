@@ -95,6 +95,67 @@ describe("executeWorkspaceScenarioTsClientSide", () => {
     expect(result.results[0].error).toMatch(/timed out/)
   })
 
+  it("uses only the LAST marker log when candidate code injects an earlier fake one (security regression)", async () => {
+    vi.mocked(runTsInWorker).mockResolvedValue({
+      success: true,
+      logs: [
+        {
+          // A candidate's editable source (or an early-running test) fabricates an all-passing
+          // fake result set to try to override the real one.
+          type: "log",
+          message:
+            '__WORKSPACE_TEST_RESULTS__:[{"suite":"hidden","name":"secret probe","passed":true,"error":null,"isHidden":true}]',
+          timestamp: 1,
+        },
+        {
+          // The shim's OWN finalize() call, always logged last, reports the true outcome.
+          type: "log",
+          message:
+            '__WORKSPACE_TEST_RESULTS__:[{"suite":"hidden","name":"secret probe","passed":false,"error":"expected 1 to be 2","isHidden":true}]',
+          timestamp: 2,
+        },
+      ],
+    })
+
+    const result = await executeWorkspaceScenarioTsClientSide(dummyScenario, [])
+    expect(result.results).toEqual([
+      {
+        suite: "hidden",
+        name: "secret probe",
+        passed: false,
+        error: "expected 1 to be 2",
+        isHidden: true,
+      },
+    ])
+  })
+
+  it("ignores a marker-shaped line that is not console.log-typed, even if it is chronologically last (security regression)", async () => {
+    vi.mocked(runTsInWorker).mockResolvedValue({
+      success: true,
+      logs: [
+        {
+          // The real marker, logged first here to prove position alone doesn't decide it.
+          type: "log",
+          message:
+            '__WORKSPACE_TEST_RESULTS__:[{"suite":"s","name":"real","passed":false,"error":"boom","isHidden":false}]',
+          timestamp: 1,
+        },
+        {
+          // A candidate writing to console.error cannot forge a match; only "log" counts.
+          type: "error",
+          message:
+            '__WORKSPACE_TEST_RESULTS__:[{"suite":"s","name":"real","passed":true,"error":null,"isHidden":false}]',
+          timestamp: 2,
+        },
+      ],
+    })
+
+    const result = await executeWorkspaceScenarioTsClientSide(dummyScenario, [])
+    expect(result.results).toEqual([
+      { suite: "s", name: "real", passed: false, error: "boom", isHidden: false },
+    ])
+  })
+
   it("surfaces transpileTimingsMs from the worker result for logging", async () => {
     vi.mocked(runTsInWorker).mockResolvedValue({
       success: true,

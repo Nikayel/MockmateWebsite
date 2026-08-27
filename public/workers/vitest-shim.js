@@ -85,6 +85,15 @@
       const yIsObject = typeof y === "object" && y !== null
       if (!xIsObject || !yIsObject) return false
 
+      // Checked BEFORE any branch that recurses (array elements, Map/Set contents, object keys),
+      // not just before the generic object-key comparison: a self-referential array or Map/Set
+      // recurses into its own contents just as much as a plain object does, so gating only the
+      // object-key path left those two container kinds free to recurse forever on a cycle.
+      for (let i = 0; i < seen.length; i += 1) {
+        if (seen[i][0] === x && seen[i][1] === y) return true
+      }
+      seen.push([x, y])
+
       if (Array.isArray(x) !== Array.isArray(y)) return false
       if (Array.isArray(x)) {
         if (x.length !== y.length) return false
@@ -121,11 +130,6 @@
       }
 
       if (checkPrototype && Object.getPrototypeOf(x) !== Object.getPrototypeOf(y)) return false
-
-      for (let i = 0; i < seen.length; i += 1) {
-        if (seen[i][0] === x && seen[i][1] === y) return true
-      }
-      seen.push([x, y])
 
       let keysX = Object.keys(x)
       let keysY = Object.keys(y)
@@ -282,7 +286,11 @@
         )
       },
       toHaveLength(length) {
-        const actualLength = actual && actual.length
+        // `actual && actual.length` short-circuits to `""` for an empty string (falsy) instead
+        // of evaluating `.length`, so `expect("").toHaveLength(0)` incorrectly failed. Only
+        // null/undefined should short-circuit (to avoid throwing on `.length`); anything else
+        // reads its real `.length`, whether that's falsy (0, "") or not.
+        const actualLength = actual == null ? undefined : actual.length
         finish(
           actualLength === length,
           describeValue(actual) +

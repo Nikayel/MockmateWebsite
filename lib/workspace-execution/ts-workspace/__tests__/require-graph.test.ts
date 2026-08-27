@@ -85,4 +85,58 @@ describe("createRequireGraph", () => {
     const info = requireModule("src/info.js") as { here: string }
     expect(info.here).toBe("src/info.js|src")
   })
+
+  describe("hiddenModulePaths (security)", () => {
+    it("the driver can require a hidden path directly (asDriver: true)", () => {
+      const requireModule = createRequireGraph({
+        modules: { "tests/hidden/secret.js": "exports.ran = true" },
+        specialModules: {},
+        hiddenModulePaths: new Set(["tests/hidden/secret.js"]),
+      })
+      const secret = requireModule("tests/hidden/secret.js", "", true) as { ran: boolean }
+      expect(secret.ran).toBe(true)
+    })
+
+    it("refuses a non-driver require of a hidden path with the standard module-not-found text", () => {
+      const requireModule = createRequireGraph({
+        modules: {
+          "tests/hidden/secret.js": "exports.ran = true",
+          "src/foo.js": 'exports.peek = function() { return require("../tests/hidden/secret") }',
+        },
+        specialModules: {},
+        hiddenModulePaths: new Set(["tests/hidden/secret.js"]),
+      })
+      const foo = requireModule("src/foo.js") as { peek: () => unknown }
+      expect(() => foo.peek()).toThrow(/Module not found/)
+    })
+
+    it("still refuses a hidden path even after the driver already loaded it (no cache-hit bypass)", () => {
+      const requireModule = createRequireGraph({
+        modules: {
+          "tests/hidden/secret.js": "exports.ran = true",
+          "src/foo.js": 'exports.peek = function() { return require("../tests/hidden/secret") }',
+        },
+        specialModules: {},
+        hiddenModulePaths: new Set(["tests/hidden/secret.js"]),
+      })
+      // Driver loads it first, legitimately.
+      requireModule("tests/hidden/secret.js", "", true)
+      // A later non-driver require of the SAME (now-cached) path is still refused.
+      const foo = requireModule("src/foo.js") as { peek: () => unknown }
+      expect(() => foo.peek()).toThrow(/Module not found/)
+    })
+
+    it("does not restrict a non-hidden path", () => {
+      const requireModule = createRequireGraph({
+        modules: {
+          "src/math.js": "exports.add = function(a, b) { return a + b }",
+          "src/foo.js": 'exports.peek = function() { return require("./math").add(1, 2) }',
+        },
+        specialModules: {},
+        hiddenModulePaths: new Set(["tests/hidden/secret.js"]),
+      })
+      const foo = requireModule("src/foo.js") as { peek: () => number }
+      expect(foo.peek()).toBe(3)
+    })
+  })
 })

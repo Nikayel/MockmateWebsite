@@ -152,6 +152,62 @@ describe("js-sandbox-worker.js TS branch (simulated)", () => {
     expect(byName.get("greets asynchronously")).toMatchObject({ passed: true, isHidden: true })
   })
 
+  it("refuses to leak a hidden test's content through a non-driver require (security regression)", async () => {
+    const { final } = await runWorkerMessage({
+      files: [
+        { path: "src/leak.ts", content: 'import "../tests/hidden/secret.test"\nexport {}\n' },
+        {
+          path: "tests/visible/uses-leak.test.ts",
+          content: `import { describe, expect, it } from "vitest"
+import "../../src/leak"
+
+describe("visible", () => {
+  it("passes", () => {
+    expect(1).toBe(1)
+  })
+})
+`,
+        },
+        {
+          path: "tests/hidden/secret.test.ts",
+          content: `import { describe, expect, it } from "vitest"
+
+describe("Secret Probe", () => {
+  it("should never leak", () => {
+    expect(true).toBe(true)
+  })
+})
+`,
+        },
+      ],
+      testPaths: ["tests/visible/uses-leak.test.ts"],
+      hiddenTestPaths: ["tests/hidden/secret.test.ts"],
+    })
+
+    const markerLog = (final.logs || []).find((log) =>
+      log.message.startsWith("__WORKSPACE_TEST_RESULTS__:")
+    )
+    expect(markerLog).toBeTruthy()
+    const results = JSON.parse(
+      markerLog!.message.slice("__WORKSPACE_TEST_RESULTS__:".length)
+    ) as Array<{
+      suite: string
+      name: string
+      passed: boolean
+      error: string | null
+      isHidden?: boolean
+    }>
+
+    const visibleFileFailure = results.find((r) => r.suite === "tests/visible/uses-leak.test.ts")
+    expect(visibleFileFailure).toMatchObject({ passed: false })
+    expect(visibleFileFailure?.error).toMatch(/Module not found/)
+
+    const secretResult = results.find((r) => r.name === "should never leak")
+    expect(secretResult).toMatchObject({ suite: "Secret Probe", passed: true, isHidden: true })
+
+    expect(results.some((r) => r.suite === "Secret Probe" && r.isHidden !== true)).toBe(false)
+  })
+
   it("does not emit transpile-start for a workspace with no .ts/.tsx files (plain-JS content unaffected)", async () => {
     const { phases, final } = await runWorkerMessage({
       files: [

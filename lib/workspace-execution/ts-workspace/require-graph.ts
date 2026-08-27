@@ -22,6 +22,17 @@ export interface RequireGraphOptions {
   modules: Record<string, string>
   /** Bare specifiers resolved directly to a value, bypassing path resolution entirely. */
   specialModules: Record<string, unknown>
+  /**
+   * .js-normalized paths (matching the `modules` keying) that only the DRIVER (the loop that
+   * requires each testPath/hiddenTestPath directly) may require. Any other require of one of
+   * these paths — an editable file, or a visible test, importing a hidden test directly or
+   * transitively — is refused with the same "Module not found" text a genuinely missing module
+   * gets, rather than resolving. Without this, `currentFile` (the vitest shim's hidden-detection
+   * signal) stays whatever the driver last set it to for a NON-driver require, so the hidden
+   * suite's describe/it calls would run and record with `isHidden: false` — its name and error
+   * text then get treated as an ordinary visible result instead of being redacted to a humanName.
+   */
+  hiddenModulePaths?: Set<string>
 }
 
 /**
@@ -58,22 +69,33 @@ export function resolveTsModulePath(currentDir: string, targetPath: string): str
 }
 
 /**
- * Builds a `require(path, currentDir?)` function closed over `modules` and a per-graph instance
- * cache, so requiring the same path twice from different files returns the SAME exports object
- * (real CommonJS singleton-module semantics).
+ * Builds a `require(path, currentDir?, asDriver?)` function closed over `modules` and a
+ * per-graph instance cache, so requiring the same path twice from different files returns the
+ * SAME exports object (real CommonJS singleton-module semantics).
+ *
+ * `asDriver` defaults to false and must never be threaded through `localRequire` (only the
+ * driver's own direct calls pass `true`), so any require reached transitively — no matter how
+ * deeply nested — is treated as a non-driver call.
  */
 export function createRequireGraph(
   options: RequireGraphOptions
-): (path: string, currentDir?: string) => unknown {
-  const { modules, specialModules } = options
+): (path: string, currentDir?: string, asDriver?: boolean) => unknown {
+  const { modules, specialModules, hiddenModulePaths } = options
   const cache: Record<string, ModuleRecord> = {}
 
-  function requireModule(path: string, currentDir = ""): unknown {
+  function requireModule(path: string, currentDir = "", asDriver = false): unknown {
     if (Object.prototype.hasOwnProperty.call(specialModules, path)) {
       return specialModules[path]
     }
 
     const resolved = resolveTsModulePath(currentDir, path)
+
+    // Checked BEFORE the cache lookup, unconditionally: a hidden path the driver already loaded
+    // must not become reachable to a non-driver caller just because it is now cached.
+    if (!asDriver && hiddenModulePaths && hiddenModulePaths.has(resolved)) {
+      throw new Error(`Module not found: ${path} (resolved as: ${resolved})`)
+    }
+
     if (cache[resolved]) {
       return cache[resolved].exports
     }
@@ -95,6 +117,8 @@ export function createRequireGraph(
       "__dirname",
       moduleCode
     ) as (...args: unknown[]) => void
+    // Never forwards `asDriver`: every nested require reached through this closure is, by
+    // definition, not the driver's own direct call.
     const localRequire = (target: string) => requireModule(target, nextDir)
     wrapper(moduleRecord.exports, localRequire, moduleRecord, resolved, nextDir)
     return moduleRecord.exports

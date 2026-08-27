@@ -200,6 +200,8 @@ export async function runTsWorkspace(input: TsWorkspaceInput): Promise<TsWorkspa
         "node:assert/strict": assertShim,
         vitest: vitestShim,
       },
+      // .js-normalized to match how `modules` and require-graph resolution key everything.
+      hiddenModulePaths: new Set(hiddenTestPaths.map((path) => path.replace(/\.tsx?$/, ".js"))),
     })
 
     // Visible before hidden, matching what a learner's own "run tests" click orders first.
@@ -208,7 +210,9 @@ export async function runTsWorkspace(input: TsWorkspaceInput): Promise<TsWorkspa
       const normalized = cleanPath(testPath)
       vitestShim.setCurrentFile(normalized)
       try {
-        requireModule(normalized.replace(/\.tsx?$/, ".js"))
+        // asDriver: true — this is the ONE legitimate place a hidden path may be required
+        // directly. Never propagated to any nested require (see require-graph.ts).
+        requireModule(normalized.replace(/\.tsx?$/, ".js"), "", true)
       } catch (error) {
         setupFailures.push({
           suite: normalized,

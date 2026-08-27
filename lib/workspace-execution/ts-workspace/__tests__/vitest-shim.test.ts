@@ -218,6 +218,28 @@ describe("vitest shim", () => {
       expect(results.every((r) => r.passed)).toBe(true)
     })
 
+    it("toEqual terminates on a cyclic array instead of a stack overflow (regression)", async () => {
+      const shim = loadVitestShim()
+      const a: unknown[] = ["a"]
+      const b: unknown[] = ["a"]
+      a.push(a)
+      b.push(b)
+      shim.it("t", () => shim.expect(a).toEqual(b))
+      const results = await shim.finalize()
+      expect(results[0].passed).toBe(true)
+    })
+
+    it("toEqual terminates on a cyclic Map instead of a stack overflow (regression)", async () => {
+      const shim = loadVitestShim()
+      const a = new Map<string, unknown>([["k", "v"]])
+      const b = new Map<string, unknown>([["k", "v"]])
+      a.set("self", a)
+      b.set("self", b)
+      shim.it("t", () => shim.expect(a).toEqual(b))
+      const results = await shim.finalize()
+      expect(results[0].passed).toBe(true)
+    })
+
     it("toStrictEqual distinguishes an explicit undefined from a missing key", async () => {
       const shim = loadVitestShim()
       shim.it("toEqual ignores undefined props", () =>
@@ -244,6 +266,20 @@ describe("vitest shim", () => {
       shim.it("string length", () => shim.expect("abc").toHaveLength(3))
       const results = await shim.finalize()
       expect(results.every((r) => r.passed)).toBe(true)
+    })
+
+    it("toHaveLength(0) passes for an empty string (regression: falsy short-circuit)", async () => {
+      const shim = loadVitestShim()
+      shim.it("t", () => shim.expect("").toHaveLength(0))
+      const results = await shim.finalize()
+      expect(results[0].passed).toBe(true)
+    })
+
+    it("toHaveLength(0) passes for an empty array (regression: falsy short-circuit)", async () => {
+      const shim = loadVitestShim()
+      shim.it("t", () => shim.expect([]).toHaveLength(0))
+      const results = await shim.finalize()
+      expect(results[0].passed).toBe(true)
     })
 
     it("toMatchObject checks a partial subset", async () => {
