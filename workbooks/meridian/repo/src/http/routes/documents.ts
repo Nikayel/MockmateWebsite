@@ -6,8 +6,7 @@ export interface DocumentRouteDeps {
   db: DbClient
 }
 
-/** Nothing here checks which tenant the caller belongs to - a claim id is all it takes to
- * see its documents. */
+/** Does not check which tenant the caller belongs to. */
 export function registerDocumentRoutes(app: App, deps: DocumentRouteDeps): void {
   app.get("/claims/:id/documents", async (req) => {
     const documents = await getDocumentsForClaim(deps.db, req.params.id)

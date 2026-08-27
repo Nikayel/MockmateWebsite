@@ -1,6 +1,6 @@
 /**
- * Whatever you pass in gets stringified and printed. No request id, no tenant id, no claim
- * id unless you remembered to put it in `message` yourself.
+ * Logs a message to the console, with an optional data object. No request id, tenant id, or
+ * claim id is attached automatically.
  */
 export function log(message: string, data?: Record<string, unknown>): void {
   if (data) {

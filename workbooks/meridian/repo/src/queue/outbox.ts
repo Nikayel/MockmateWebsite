@@ -13,8 +13,8 @@ export interface Outbox {
 }
 
 /**
- * An in-process array standing in for a durable outbox table. If this process restarts with
- * entries still queued, they are gone - there is nothing written to disk anywhere in here.
+ * An in-process array standing in for a durable outbox table. Nothing here is written to
+ * disk.
  */
 export function createOutbox(): Outbox {
   const entries: OutboxEntry[] = []

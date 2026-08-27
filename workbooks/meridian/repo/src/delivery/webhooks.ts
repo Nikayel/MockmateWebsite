@@ -18,7 +18,7 @@ export interface DeliverWebhookDeps {
 
 /**
  * Sends a claim's current status to its tenant's webhook URL, and records that we did.
- * Tenants with no webhook configured are skipped - there is nowhere to send it.
+ * Tenants with no webhook configured are skipped.
  */
 export async function deliverWebhook(deps: DeliverWebhookDeps, claim: Claim): Promise<void> {
   const tenant = await getTenantById(deps.db, claim.tenantId)

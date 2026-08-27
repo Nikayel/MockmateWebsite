@@ -1,4 +1,5 @@
 import type { Claim } from "../domain/claim"
+import { roundHalfUp } from "../money/round-half-up"
 
 export interface WebhookPayload {
   claimId: string
@@ -13,7 +14,7 @@ export function buildWebhookPayload(claim: Claim): WebhookPayload {
     claimId: claim.id,
     externalRef: claim.externalRef,
     status: claim.status,
-    amount: claim.amount,
+    amount: roundHalfUp(claim.amount),
     currency: claim.currency,
   }
 }

@@ -1,3 +1,5 @@
+import type { MeridianConfig } from "../config"
+
 /** What a caller passes to `App.inject()` - the same shape a real integration test would use. */
 export interface InjectRequest {
   method: string
@@ -41,4 +43,5 @@ export interface App {
   get(path: string, handler: RouteHandler): void
   post(path: string, handler: RouteHandler): void
   inject(request: InjectRequest): Promise<InjectResponse>
+  config: MeridianConfig
 }

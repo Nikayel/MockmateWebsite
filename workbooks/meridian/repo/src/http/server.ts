@@ -1,3 +1,5 @@
+import { loadConfig } from "../config"
+import type { MeridianConfig } from "../config"
 import type {
   App,
   HandlerRequest,
@@ -79,7 +81,7 @@ function toInjectResponse(response: HandlerResponse): InjectResponse {
  * entirely in memory, which is also what makes it possible to run this whole app inside a
  * test runner with no network at all.
  */
-export function createApp(): App {
+export function createApp(config: MeridianConfig = loadConfig()): App {
   const routes: RegisteredRoute[] = []
 
   function register(method: string, path: string, handler: RouteHandler): void {
@@ -126,5 +128,6 @@ export function createApp(): App {
     get: (path, handler) => register("GET", path, handler),
     post: (path, handler) => register("POST", path, handler),
     inject,
+    config,
   }
 }

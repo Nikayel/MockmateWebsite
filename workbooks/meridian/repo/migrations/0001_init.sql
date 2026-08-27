@@ -26,8 +26,7 @@ create table claims (
 );
 
 -- Photos, estimates, and adjuster notes attached to a claim. The extraction worker only
--- ever sees a claim_id off the queue envelope, so there is no tenant_id here yet - a
--- document's tenant is whatever tenant its parent claim belongs to.
+-- ever sees a claim_id off the queue envelope, so there is no tenant_id here yet.
 create table documents (
   id text primary key,
   claim_id text not null references claims(id),

@@ -40,8 +40,7 @@ export async function insertDocument(
   return toDocument(rows[0])
 }
 
-/** Documents have no tenant column of their own - a claim's tenant is the only thing that
- * scopes it, so callers that already have a claim_id can reach any claim's documents. */
+/** Documents have no tenant column of their own. */
 export async function getDocumentsForClaim(
   db: DbClient,
   claimId: string
@@ -50,8 +49,7 @@ export async function getDocumentsForClaim(
   return rows.map(toDocument)
 }
 
-/** One query per claim - convenient to write, since it just reuses `getDocumentsForClaim`,
- * but it means listing N claims costs N document queries instead of one. */
+/** One query per claim, reusing `getDocumentsForClaim`. */
 export async function getDocumentsForClaims(
   db: DbClient,
   claimIds: string[]

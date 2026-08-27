@@ -1,6 +1,6 @@
 /**
- * Nothing here is validated against a schema - a missing or malformed environment variable
- * just silently falls back to a default, and whatever reads it never finds out.
+ * Nothing here is validated against a schema. A missing or malformed environment variable
+ * falls back to a default.
  */
 export interface MeridianConfig {
   port: number
