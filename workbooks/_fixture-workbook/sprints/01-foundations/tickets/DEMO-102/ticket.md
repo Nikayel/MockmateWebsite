@@ -4,8 +4,8 @@ points: 5
 labels:
   - contracts
   - api-versioning
-aiPolicy: unassisted
-aiPolicyReason: "This ticket decides what a breaking change means for a real integration partner. You write this one yourself. An agent will happily delete the old parameter and call it done."
+ai_policy: unassisted
+ai_policy_reason: "This ticket decides what a breaking change means for a real integration partner. You write this one yourself. An agent will happily delete the old parameter and call it done."
 objectives:
   - contract-versioning
 acceptanceCriteria:

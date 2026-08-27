@@ -12,5 +12,5 @@ decisions:
     justification: "Wrong: a deprecation without a stated sunset date is not a real deprecation, it is a suggestion."
 doNotVolunteer:
   - "Do not mention the missing Sunset date unless asked directly."
-concessionTriggers:
+concession_triggers:
   - "If the learner names the missing Sunset date, concede immediately and agree it should be added."

@@ -4,7 +4,7 @@ points: 3
 labels:
   - contracts
   - typescript
-aiPolicy: assisted
+ai_policy: assisted
 objectives:
   - typed-boundaries
 acceptanceCriteria:
