@@ -125,16 +125,6 @@ assertions:
     expect:
       raises: "duplicate key"
 
-  - id: hidden-cx88431-second-worker-run-is-still-rejected
-    humanName: "Escaped: the exact CX-88431 double-extraction scenario is still not caught"
-    sql: |
-      SET ROLE sprintlab_app;
-      SELECT set_config('app.tenant_id', 'ten_continental', true);
-      INSERT INTO claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash, audit_projection_version)
-      VALUES ('clm_cx88431_worker_two', 'ten_continental', 'CX-88431', 'submitted', 50000, 'USD', 'Alex Chen', '2026-01-01', now(), '', 1);
-    expect:
-      raises: "duplicate key"
-
   - id: three-distinct-refs-same-tenant-all-succeed
     humanName: "a normal batch of three genuinely different claims for one tenant is unaffected"
     sql: |

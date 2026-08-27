@@ -136,23 +136,6 @@ assertions:
       rows:
         - ["photo.jpg"]
 
-  - id: hidden-escaped-document-attached-to-bekins-claim-from-continental-context
-    humanName: "Escaped: a document can be attached to another tenant's claim"
-    sql: |
-      SET ROLE sprintlab_app;
-      SELECT set_config('app.tenant_id', 'ten_bekins', true);
-      INSERT INTO documents (id, claim_id, file_name, content_type, legacy_path, created_at)
-      VALUES ('doc_hack_2', 'clm_continental_1', 'hack2.pdf', 'application/pdf', '/hack2', now());
-    expect:
-      raises: "row-level security"
-
-  - id: hidden-documents-carry-no-tenant-column-of-their-own
-    humanName: "Escaped: document visibility is derived from a tenant key copied onto the row instead of the parent claim"
-    sql: |
-      SELECT column_name FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name = 'documents' AND column_name = 'tenant_id';
-    expect: zero-rows
-
   - id: rls-enabled-and-forced-on-claims
     humanName: "claims has both ENABLE and FORCE row level security set"
     sql: |

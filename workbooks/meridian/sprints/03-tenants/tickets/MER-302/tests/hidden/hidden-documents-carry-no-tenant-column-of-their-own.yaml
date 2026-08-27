@@ -1,0 +1,8 @@
+humanName: "Escaped: document visibility is derived from a tenant key copied onto the row instead of the parent claim"
+tags:
+  - row-level-security-policy
+kind: sql-assertion
+sql: |
+  SELECT column_name FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = 'documents' AND column_name = 'tenant_id';
+expect: zero-rows
