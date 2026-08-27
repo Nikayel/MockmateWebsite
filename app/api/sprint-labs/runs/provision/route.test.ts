@@ -168,6 +168,26 @@ describe("POST /api/sprint-labs/runs/provision", () => {
     expect(mocks.seedWorkspaceFilesIfAbsent).toHaveBeenCalledWith(USER, "run1", [SAMPLE_FILES[0]])
   })
 
+  it("REGRESSION (review round 1): provisioning a completed run still returns 200 with the materialized files, not 409", async () => {
+    // A learner's most recent COMPLETED run is exactly what getActiveSprintLabRun can hand back for
+    // read-back, and the workspace renders it -- this must not 409 just because the run is closed.
+    // seedWorkspaceFilesIfAbsent resolving to [] (not throwing) is its OWN fixed behavior for a
+    // non-in_progress run; this test proves the ROUTE correctly passes the materialized files
+    // through regardless.
+    mocks.getSprintLabRun.mockResolvedValue(baseRun({ currentSprint: 1, status: "completed" }))
+    mocks.materializeInitialTree.mockReturnValue(SAMPLE_FILES)
+    mocks.seedWorkspaceFilesIfAbsent.mockResolvedValue([])
+    const { POST } = await import("./route")
+
+    const response = (await POST(
+      createRequest({ runId: "run1", ticketKey: "MER-101" })
+    )) as unknown as StubResponse
+
+    expect(response.status).toBe(200)
+    expect(mocks.materializeInitialTree).toHaveBeenCalledWith("meridian", "MER-101")
+    expect(mocks.seedWorkspaceFilesIfAbsent).toHaveBeenCalledWith(USER, "run1", [SAMPLE_FILES[0]])
+  })
+
   it("maps a materialization UNKNOWN_TICKET error to 404 without seeding", async () => {
     mocks.getSprintLabRun.mockResolvedValue(baseRun({ currentSprint: 1 }))
     mocks.materializeInitialTree.mockImplementation(() => {
