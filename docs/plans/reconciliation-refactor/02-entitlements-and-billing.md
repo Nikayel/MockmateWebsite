@@ -43,10 +43,11 @@ the documented enterprise bug (call that out in the PR + add tests).
   - [ ] `isPro`/`setIsPro` reimplemented **40+ times**; each component fetches
         `/api/user/subscription-status` and recomputes the tier check, with **inconsistent enterprise
         handling**: `dashboard/page.tsx:274`, `account/page.tsx:602`, `AuthenticatedDashboard.tsx:67`
-        use `=== "pro"` only → enterprise renders as Free; `interview-prep/*` include enterprise.
+        use `=== "pro"` only → enterprise renders as Free. (`interview-prep/*`, which included
+        enterprise, was deleted with the route family 2026-08-26.)
   - [ ] Hook wraps the fetch + shared `isProTier`; returns `{tier, isPro, isLoading}`. Migrate the
-        call sites (`CompanyHeroCTA.tsx:45`, `CompanyPrepContent.tsx:51`, `RoadmapPageParts.tsx:396`,
-        `practice/page.tsx:266`, `upgrade/page.tsx:40`, the three buggy ones above…).
+        call sites (`RoadmapPageParts.tsx:396`, `practice/page.tsx:266`, `upgrade/page.tsx:40`, the
+        three buggy ones above…; the two interview-prep call sites were deleted 2026-08-26).
 - [ ] **Tie Stripe price IDs to the plan catalog** — **Med**
   - [ ] `create-checkout:28-50` builds `STRIPE_PRICE_ID_*` env keys inline, disconnected from
         `PRICING_CONFIG` (`config.ts:6-132`, which has no `stripePriceId` field). Add the id to the plan

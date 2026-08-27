@@ -29,9 +29,11 @@ pass: 0 confirmed residual issues). typecheck + 55 labs/scenario tests green.
   coverage hole, but an L build (needs the first SQL workspace scenario + a timed/hidden-test mode
   that does not fit the 5-milestone arc).
 - **PF-06** Learning round (no-REPL SQL variant).
-- **PF-12** Behavioral / mission HM round — largely already served by `/interview-prep/palantir`
-  (`palantirData`), which the new scope panel links to; the code-centric Case Labs engine (Build
-  requires a codebase scenario) is a poor host for a pure behavioral round.
+- **PF-12** Behavioral / mission HM round — was largely served by `/interview-prep/palantir`
+  (`palantirData`), which the scope panel linked to. [Update 2026-08-26: the /interview-prep family
+  was retired and the scope panel now points at /roadmap/preview, so behavioral / mission-fit prep
+  has no dedicated surface; re-triage PF-12 on that basis.] The code-centric Case Labs engine (Build
+  requires a codebase scenario) remains a poor host for a pure behavioral round.
 - **PF-13** recruiter drill + Gotham/Foundry/AIP primer + `palantir.ts` RAG file.
 - **PF-14** type `CaseLab.role` with the RoleTag union + a Foundry SWE-track lab.
 - **PF-19** station/hook/store render tests. **PF-20** Palantir prep hub (after the catalog grows).
