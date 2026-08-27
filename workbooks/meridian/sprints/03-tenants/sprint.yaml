@@ -20,17 +20,14 @@ objectives:
   - n-plus-one-diagnosis-concurrent-index
   - isolation-level-race-condition
 filesTouched:
-  - "src/db/client.ts"
   - "src/db/queries.ts"
+  - "src/db/memory-db.ts"
   - "src/db/tenant-context.ts"
-  - "src/http/request-context.ts"
   - "test/fixtures/tenants.sql"
   - "test/fixtures/tenants.ts"
   - "migrations/0010_row_level_security.sql"
   - "src/db/repositories/claims.ts"
   - "src/db/repositories/documents.ts"
-  - "src/domain/tenant.ts"
-  - "src/db/repositories/tenants.ts"
   - "migrations/0011_claims_tenant_indexes.sql"
   - "src/http/routes/documents.ts"
   - "migrations/0012_claims_external_ref_unique.sql"
