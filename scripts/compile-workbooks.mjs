@@ -116,6 +116,37 @@
  * "constructor"/"__proto__" returns undefined instead of resolving an
  * inherited Object.prototype value or throwing.
  *
+ * STUB VS FULL TICKETS (this task — a content workbook can be authored
+ * incrementally, ticket.md first, without blocking the whole workbook from
+ * compiling): a ticket is FULL when its directory carries BOTH
+ * `reference.diff` AND `rubric.yaml` — the two artifacts a sealed bundle
+ * cannot be built without (nothing to compare a submission against without
+ * the diff, nothing to weight that comparison by without the rubric).
+ * Either or both missing makes it a STUB: `ticket.md`'s frontmatter/body
+ * still compile normally (everything the board card and ticket screen
+ * render), the public ticket gets `playable: false`, and the ENTIRE
+ * secret-side pipeline (hidden tests, `review.yaml`, `author_brief.yaml`,
+ * `reference.diff`, `rubric.yaml`) is skipped for it — not merely "not
+ * required," genuinely not read or validated — because a half-authored
+ * secret file (hidden tests dropped before the reference diff lands, say)
+ * must never partially leak through a half-built sealed bundle. `setup.diff`,
+ * `tests/visible/`, and `adversary/` stay independent of this gate: they
+ * were already optional and PUBLIC before this task, and reading them for a
+ * stub is exactly as harmless as it already was (default to null/[]).
+ * `compileTicket` returns `sealed: null` for a stub; `compileWorkbook` only
+ * adds a ticket key to `sealedByTicketKey` when `sealed` is non-null, so a
+ * stub's key is never even a property of that map. Two more places had to
+ * learn this split, or the split would be cosmetic: (a) `writeCompiledWorkbook`
+ * actively deletes any stale `<key>.server.ts` for a ticket that compiled as
+ * a stub THIS run (an author reverting/removing `reference.diff` or
+ * `rubric.yaml` after a prior full compile must not leave its old sealed
+ * bundle sitting on disk, readable by the registry, forever); (b)
+ * `discoverCompiledWorkbooks` derives the sealed registry's ticket-key list
+ * by scanning the SEALED dir directly (`sealedTicketKeys`), never by reusing
+ * the PUBLIC `ticketKeys` list — reusing it would make `renderSealedRegistry`
+ * emit a loader whose `import()` target does not exist on disk for every
+ * stub, which is a build-time-silent, load-time-broken dynamic import.
+ *
  * Two dependency decisions worth recording, per this task's brief (check
  * package.json before adding a YAML dependency):
  *
@@ -476,6 +507,14 @@ function compileTicket(ticketDir, ticketKey, workbookId, objectiveVocab) {
   const adversaryFiles = readFilesRecursive(join(ticketDir, "adversary"))
   const adversaryPresent = adversaryFiles.length > 0
 
+  // STUB vs FULL — see this file's header comment ("STUB VS FULL TICKETS")
+  // for the full rationale. FULL requires BOTH artifacts: a rubric with no
+  // reference to score against, or a reference with no rubric weighting it,
+  // are equally meaningless to seal.
+  const referenceDiffPath = join(ticketDir, "reference.diff")
+  const rubricPath = join(ticketDir, "rubric.yaml")
+  const isFullTicket = existsSync(referenceDiffPath) && existsSync(rubricPath)
+
   const rawTicket = {
     key: ticketKey,
     title: data.title,
@@ -487,6 +526,7 @@ function compileTicket(ticketDir, ticketKey, workbookId, objectiveVocab) {
     bodyMd,
     acceptanceCriteria: data.acceptanceCriteria ?? [],
     adversaryPresent,
+    playable: isFullTicket,
     ...(data.payoffFor !== undefined ? { payoffFor: data.payoffFor } : {}),
   }
   const ticketParse = ticketPublicSchema.safeParse(rawTicket)
@@ -500,111 +540,113 @@ function compileTicket(ticketDir, ticketKey, workbookId, objectiveVocab) {
 
   const hiddenTests = []
   const hiddenCases = []
-  for (const filePath of listYamlFiles(join(ticketDir, "tests/hidden"))) {
-    const raw = readYaml(filePath)
-    rejectWrongCasing(raw, filePath, "human_name", "humanName")
-    rejectWrongCasing(raw, filePath, "entry_point", "entryPoint")
-    const id = basenameNoExt(filePath)
-    const tags = raw.tags ?? []
-    const metaParse = ticketSecretMetaSchema.safeParse({
-      id,
-      humanName: raw.humanName,
-      tags,
-      kind: raw.kind,
-    })
-    if (!metaParse.success) throw new CompileError(filePath, metaParse.error)
-    hiddenTests.push(metaParse.data)
+  let review = null
+  let authorBrief = null
+  let referenceDiff = null
+  let rubric = null
 
-    if (raw.kind === "io-case") {
-      const payloadParse = sealedIoCasePayloadSchema.safeParse({
-        input: raw.input,
-        expected: raw.expected,
-        entryPoint: raw.entryPoint,
-      })
-      if (!payloadParse.success) throw new CompileError(filePath, payloadParse.error)
-      hiddenCases.push({
+  // Everything in this block is secret-side authoring content (hidden
+  // tests, the review round, the author brief, the reference diff, the
+  // rubric weights) — read and validated ONLY for a full ticket. A stub
+  // skips it entirely: there is nothing secret to seal yet, and any
+  // partial secret-side file already sitting in an in-progress authoring
+  // tree (a hidden test dropped before the reference diff lands, say) is
+  // deliberately left untouched rather than half-validated into a
+  // half-built sealed bundle.
+  if (isFullTicket) {
+    for (const filePath of listYamlFiles(join(ticketDir, "tests/hidden"))) {
+      const raw = readYaml(filePath)
+      rejectWrongCasing(raw, filePath, "human_name", "humanName")
+      rejectWrongCasing(raw, filePath, "entry_point", "entryPoint")
+      const id = basenameNoExt(filePath)
+      const tags = raw.tags ?? []
+      const metaParse = ticketSecretMetaSchema.safeParse({
         id,
         humanName: raw.humanName,
         tags,
         kind: raw.kind,
-        input: payloadParse.data.input,
-        expected: payloadParse.data.expected,
-        ...(payloadParse.data.entryPoint !== undefined
-          ? { entryPoint: payloadParse.data.entryPoint }
-          : {}),
       })
-    } else if (raw.kind === "probe") {
-      const payloadParse = sealedProbePayloadSchema.safeParse({ body: raw.body })
-      if (!payloadParse.success) throw new CompileError(filePath, payloadParse.error)
-      hiddenCases.push({ id, humanName: raw.humanName, tags, kind: raw.kind, body: payloadParse.data.body })
-    } else {
-      throw new CompileError(filePath, `unknown hidden-test kind "${raw.kind}" (expected "io-case" or "probe")`)
-    }
-  }
+      if (!metaParse.success) throw new CompileError(filePath, metaParse.error)
+      hiddenTests.push(metaParse.data)
 
-  // review.yaml — I-1/M-3: must parse as {comments: [...]} with >=1 comment,
-  // each carrying an author-supplied stable id. A bare top-level list or a
-  // zero-comment file is a CompileError, never a silently-empty round.
-  const reviewPath = join(ticketDir, "review.yaml")
-  let review = null
-  if (existsSync(reviewPath)) {
-    const reviewRaw = readYaml(reviewPath)
-    const reviewParse = authoredReviewSchema.safeParse(reviewRaw)
-    if (!reviewParse.success) throw new CompileError(reviewPath, reviewParse.error)
-    const seenCommentIds = new Set()
-    for (const comment of reviewParse.data.comments) {
-      if (seenCommentIds.has(comment.id)) {
-        throw new CompileError(reviewPath, `duplicate review comment id "${comment.id}"`)
+      if (raw.kind === "io-case") {
+        const payloadParse = sealedIoCasePayloadSchema.safeParse({
+          input: raw.input,
+          expected: raw.expected,
+          entryPoint: raw.entryPoint,
+        })
+        if (!payloadParse.success) throw new CompileError(filePath, payloadParse.error)
+        hiddenCases.push({
+          id,
+          humanName: raw.humanName,
+          tags,
+          kind: raw.kind,
+          input: payloadParse.data.input,
+          expected: payloadParse.data.expected,
+          ...(payloadParse.data.entryPoint !== undefined
+            ? { entryPoint: payloadParse.data.entryPoint }
+            : {}),
+        })
+      } else if (raw.kind === "probe") {
+        const payloadParse = sealedProbePayloadSchema.safeParse({ body: raw.body })
+        if (!payloadParse.success) throw new CompileError(filePath, payloadParse.error)
+        hiddenCases.push({ id, humanName: raw.humanName, tags, kind: raw.kind, body: payloadParse.data.body })
+      } else {
+        throw new CompileError(filePath, `unknown hidden-test kind "${raw.kind}" (expected "io-case" or "probe")`)
       }
-      seenCommentIds.add(comment.id)
     }
-    review = reviewParse.data.comments
-  }
 
-  const authorBriefPath = join(ticketDir, "author_brief.yaml")
-  let authorBrief = null
-  if (existsSync(authorBriefPath)) {
-    const rawBrief = readYaml(authorBriefPath)
-    rejectWrongCasing(rawBrief, authorBriefPath, "concessionTriggers", "concession_triggers")
-    rejectWrongCasing(rawBrief, authorBriefPath, "do_not_volunteer", "doNotVolunteer")
-    const briefParse = sealedAuthorBriefSchema.safeParse({
-      intent: rawBrief.intent,
-      decisions: rawBrief.decisions,
-      doNotVolunteer: rawBrief.doNotVolunteer,
-      concessionTriggers: rawBrief.concession_triggers,
-    })
-    if (!briefParse.success) throw new CompileError(authorBriefPath, briefParse.error)
-    authorBrief = briefParse.data
-  }
+    // review.yaml — I-1/M-3: must parse as {comments: [...]} with >=1 comment,
+    // each carrying an author-supplied stable id. A bare top-level list or a
+    // zero-comment file is a CompileError, never a silently-empty round.
+    const reviewPath = join(ticketDir, "review.yaml")
+    if (existsSync(reviewPath)) {
+      const reviewRaw = readYaml(reviewPath)
+      const reviewParse = authoredReviewSchema.safeParse(reviewRaw)
+      if (!reviewParse.success) throw new CompileError(reviewPath, reviewParse.error)
+      const seenCommentIds = new Set()
+      for (const comment of reviewParse.data.comments) {
+        if (seenCommentIds.has(comment.id)) {
+          throw new CompileError(reviewPath, `duplicate review comment id "${comment.id}"`)
+        }
+        seenCommentIds.add(comment.id)
+      }
+      review = reviewParse.data.comments
+    }
 
-  const referenceDiffPath = join(ticketDir, "reference.diff")
-  if (!existsSync(referenceDiffPath)) {
-    throw new CompileError(referenceDiffPath, "reference.diff is required for every ticket")
-  }
-  const referenceDiff = readFileSync(referenceDiffPath, "utf8")
+    const authorBriefPath = join(ticketDir, "author_brief.yaml")
+    if (existsSync(authorBriefPath)) {
+      const rawBrief = readYaml(authorBriefPath)
+      rejectWrongCasing(rawBrief, authorBriefPath, "concessionTriggers", "concession_triggers")
+      rejectWrongCasing(rawBrief, authorBriefPath, "do_not_volunteer", "doNotVolunteer")
+      const briefParse = sealedAuthorBriefSchema.safeParse({
+        intent: rawBrief.intent,
+        decisions: rawBrief.decisions,
+        doNotVolunteer: rawBrief.doNotVolunteer,
+        concessionTriggers: rawBrief.concession_triggers,
+      })
+      if (!briefParse.success) throw new CompileError(authorBriefPath, briefParse.error)
+      authorBrief = briefParse.data
+    }
 
-  const rubricPath = join(ticketDir, "rubric.yaml")
-  if (!existsSync(rubricPath)) {
-    throw new CompileError(rubricPath, "rubric.yaml is required for every ticket")
+    referenceDiff = readFileSync(referenceDiffPath, "utf8")
+
+    const rawRubric = readYaml(rubricPath)
+    rejectWrongCasing(rawRubric.weights, rubricPath, "problem_solving", "problemSolving")
+    rejectWrongCasing(rawRubric.weights, rubricPath, "code_quality", "codeQuality")
+    const rubricParse = sealedRubricSchema.safeParse(rawRubric)
+    if (!rubricParse.success) throw new CompileError(rubricPath, rubricParse.error)
+    rubric = rubricParse.data
   }
-  const rawRubric = readYaml(rubricPath)
-  rejectWrongCasing(rawRubric.weights, rubricPath, "problem_solving", "problemSolving")
-  rejectWrongCasing(rawRubric.weights, rubricPath, "code_quality", "codeQuality")
-  const rubricParse = sealedRubricSchema.safeParse(rawRubric)
-  if (!rubricParse.success) throw new CompileError(rubricPath, rubricParse.error)
 
   const compiledTicket = { ticket: ticketPublic, setupDiff, visibleTestFiles, hiddenTests }
 
-  const sealed = {
-    workbookId,
-    ticketKey,
-    hiddenCases,
-    adversaryFiles,
-    review,
-    authorBrief,
-    referenceDiff,
-    rubric: rubricParse.data,
-  }
+  // A stub emits NO sealed bundle at all -- not an empty/placeholder one.
+  // `compileWorkbook` only records this in `sealedByTicketKey` when it is
+  // non-null, so a stub's ticket key never becomes a property of that map.
+  const sealed = isFullTicket
+    ? { workbookId, ticketKey, hiddenCases, adversaryFiles, review, authorBrief, referenceDiff, rubric }
+    : null
 
   return { publicTicket: compiledTicket, sealed }
 }
@@ -693,7 +735,12 @@ function compileWorkbook(workbookDir) {
 
       const { publicTicket, sealed } = compileTicket(ticketContextPath, ticketKey, workbookId, objectiveVocab)
       ticketsByKey[ticketKey] = publicTicket
-      sealedByTicketKey[ticketKey] = sealed
+      // A stub ticket's `sealed` is null (compileTicket) -- never add it as
+      // a property of this map, so a stub's key is absent from
+      // sealedByTicketKey entirely, not present-with-a-null-value.
+      if (sealed !== null) {
+        sealedByTicketKey[ticketKey] = sealed
+      }
       sprintTicketCount += 1
       sprintPointsSum += publicTicket.ticket.points
     }
@@ -763,7 +810,7 @@ export const sealed: SealedTicketContent = ${JSON.stringify(sealed, null, 2)}
 // that pruning just deleted.
 // ============================================================
 
-function discoverCompiledWorkbooks(publicDir) {
+function discoverCompiledWorkbooks(publicDir, sealedDir) {
   const workbookIds = safeReaddirDirs(publicDir).sort()
   return workbookIds.map((workbookId) => {
     const sprintStems = safeReaddir(join(publicDir, workbookId, "sprints"))
@@ -774,7 +821,18 @@ function discoverCompiledWorkbooks(publicDir) {
       .filter((n) => n.endsWith(".ts"))
       .map((n) => n.replace(/\.ts$/, ""))
       .sort()
-    return { workbookId, sprintStems, ticketKeys }
+    // Discovered SEPARATELY from the sealed dir itself, never assumed to
+    // equal `ticketKeys` above: a stub ticket has a public tickets/<KEY>.ts
+    // (playable: false) but NO sealed <KEY>.server.ts (see this file's
+    // "STUB VS FULL TICKETS" header note). renderSealedRegistry must build
+    // its loader table from this list, not from the public one, or it
+    // would emit an import() whose target does not exist on disk for
+    // every stub.
+    const sealedTicketKeys = safeReaddir(join(sealedDir, workbookId))
+      .filter((n) => n.endsWith(".server.ts"))
+      .map((n) => n.replace(/\.server\.ts$/, ""))
+      .sort()
+    return { workbookId, sprintStems, ticketKeys, sealedTicketKeys }
   })
 }
 
@@ -890,8 +948,8 @@ export function workbookIds(): string[] {
 
 function renderSealedRegistry(workbooks) {
   const loaderLines = []
-  for (const { workbookId, ticketKeys } of workbooks) {
-    for (const ticketKey of ticketKeys) {
+  for (const { workbookId, sealedTicketKeys } of workbooks) {
+    for (const ticketKey of sealedTicketKeys) {
       loaderLines.push(
         `  ${JSON.stringify(`${workbookId}:${ticketKey}`)}: () => import("./${workbookId}/${ticketKey}.server"),`
       )
@@ -994,6 +1052,18 @@ async function writeCompiledWorkbook(workbookId, compiled, sealedByTicketKey, pu
   const sealWbDir = join(sealedDir, workbookId)
   for (const [ticketKey, sealed] of Object.entries(sealedByTicketKey)) {
     await writeSealedFile(join(sealWbDir, `${ticketKey}.server.ts`), renderSealedTicketModule(sealed))
+  }
+  // A ticket that compiled as a STUB this run (no entry in
+  // sealedByTicketKey) must never be shadowed by a sealed bundle left over
+  // from an earlier compile when it WAS full -- an author reverting or
+  // deleting reference.diff/rubric.yaml after a prior full compile must
+  // not leave the old secret bundle readable on disk forever. This makes
+  // "a stub has no sealed emit" an ACTIVE postcondition of every compile,
+  // not merely "wasn't written this run".
+  for (const ticketKey of Object.keys(compiled.ticketsByKey)) {
+    if (!Object.prototype.hasOwnProperty.call(sealedByTicketKey, ticketKey)) {
+      rmSync(join(sealWbDir, `${ticketKey}.server.ts`), { force: true })
+    }
   }
 }
 
@@ -1136,7 +1206,7 @@ function pruneStaleOutput(publicDir, sealedDir, workbooksRoot, justCompiledIds) 
 }
 
 async function regenerateRegistries(publicDir, sealedDir) {
-  const workbooks = discoverCompiledWorkbooks(publicDir)
+  const workbooks = discoverCompiledWorkbooks(publicDir, sealedDir)
   mkdirSync(publicDir, { recursive: true })
   mkdirSync(sealedDir, { recursive: true })
   // Review round 2 (I-3 residual): this PUBLIC write used to bypass
