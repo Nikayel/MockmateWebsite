@@ -10,24 +10,28 @@
  * reasoning that a second, independently-written "provisioning tree" builder would be a second
  * place to get the definition of "learner bundle" subtly wrong.
  *
- * Two scans:
- *  - `scanProvisionedBundleContent` -- greps every FILE's content in the bundle for four leak
- *    classes: hidden-test signatures (humanName/fileName/probe body/io-case input+expected, from
- *    EVERY ticket in the whole workbook, not just this one -- a hidden test must never leak
+ * Two scans, each checking BOTH content and PATH/NAME (PLAN.md Task 7 review round 1, Important
+ * 2b -- a leak that is itself a filename, not embedded in a blob's bytes, evaded a content-only
+ * scan entirely before this round):
+ *  - `scanProvisionedBundleContent` -- greps every FILE's content AND PATH in the bundle for four
+ *    leak classes: hidden-test signatures (humanName/fileName/probe body/io-case input+expected,
+ *    from EVERY ticket in the whole workbook, not just this one -- a hidden test must never leak
  *    regardless of timing), `reference.diff`/`review.yaml`/`author_brief.yaml` raw text, any
  *    LATER ticket's key, and any migration filename that exists somewhere in the workbook's
  *    `reference.diff`/`setup.diff` text but is not yet present in this bundle's OWN `migrations/`
  *    listing ("unshipped migration numbers", WORKBOOK-SPEC.md §6).
  *  - `scanFreshWorkspaceGitObjects` -- AGENT-CONTEXT.md §4 launch blocker 6's specific check: the
  *    bundle's `.git/objects` store (built by `git-workspace.ts`'s real `git init` + apply, never a
- *    clone) contains zero blobs matching a hidden-test signature, dumped via `git cat-file
- *    --batch-all-objects` exactly as a real exfiltration attempt would.
+ *    clone) contains zero blobs AND zero tree-entry NAMES matching a hidden-test signature, dumped
+ *    via `git cat-file --batch-all-objects` exactly as a real exfiltration attempt would.
  *
- * A signature shorter than `MIN_SIGNATURE_LENGTH` is excluded from both scans: a short, generic
- * string (a one-word `humanName`, a bare ticket key that also reads as ordinary prose) risks a
- * false-positive match against unrelated legitimate content, which would make a real leak
- * indistinguishable from noise. This is a precision/recall tradeoff stated once here rather than
- * silently at each call site.
+ * Signature length gating (`MIN_SIGNATURE_LENGTH`) applies ONLY to free-text bodies/expected/input
+ * values, never to `humanName`/`fileName` (review round 1, Important 2a): those are the core "zero
+ * hidden-test signatures" guarantee's own identifiers, and a short one ("zero", "empty") is exactly
+ * as real a leak as a long one -- length-gating them left a hole in the guarantee this module exists
+ * to make. A free-text body/expected/input value keeps the floor: a short, generic fragment risks a
+ * false-positive match against unrelated legitimate prose, which would make a real leak
+ * indistinguishable from noise.
  */
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -38,6 +42,7 @@ import {
   cleanupGitWorkspace,
   readAllFiles,
   readAllGitObjectBlobs,
+  readAllGitObjectNames,
   type MaterializedFile,
 } from "./git-workspace"
 import { allTicketsInOrder, findTicketLocation, materializeThroughSetup } from "./materialize"
@@ -54,28 +59,53 @@ interface Signature {
   text: string
 }
 
-/** Every hidden test's leak-worthy text, across every ticket in the workbook. */
+/** De-duplicates by exact `.text` (first occurrence wins), keeping insertion order. A ticket whose
+ *  hidden test names its own YAML file after its humanName (`humanName: "zero"`, filename
+ *  `zero.yaml`) would otherwise produce two IDENTICAL signature entries; scanning duplicates
+ *  against multiple matching files then inflates finding counts (2 real leak locations became 4
+ *  reported findings before this fix -- caught by this task's own short-signature-leak fixture). */
+function dedupeSignatures(signatures: Signature[]): Signature[] {
+  const seen = new Set<string>()
+  const out: Signature[] = []
+  for (const signature of signatures) {
+    if (seen.has(signature.text)) continue
+    seen.add(signature.text)
+    out.push(signature)
+  }
+  return out
+}
+
+/** Every hidden test's leak-worthy text, across every ticket in the workbook. `humanName`/
+ *  `fileName` are NEVER length-gated (see this file's header); `body`/`expected`/`input` keep the
+ *  free-text floor. */
 function collectHiddenTestSignatures(workbook: AuthoredWorkbook): Signature[] {
   const signatures: Signature[] = []
   for (const { ticket } of allTicketsInOrder(workbook)) {
     for (const hidden of ticket.hiddenTests) {
-      const candidates = [hidden.humanName, hidden.fileName, hidden.raw.body]
-      if (hidden.raw.expected !== undefined) candidates.push(JSON.stringify(hidden.raw.expected))
-      if (hidden.raw.input !== undefined) candidates.push(JSON.stringify(hidden.raw.input))
-      for (const candidate of candidates) {
+      for (const candidate of [hidden.humanName, hidden.fileName]) {
+        if (typeof candidate === "string" && candidate.trim().length > 0) {
+          signatures.push({ ticketKey: ticket.key, kind: "hidden-test", text: candidate })
+        }
+      }
+      const freeTextCandidates = [hidden.raw.body]
+      if (hidden.raw.expected !== undefined)
+        freeTextCandidates.push(JSON.stringify(hidden.raw.expected))
+      if (hidden.raw.input !== undefined) freeTextCandidates.push(JSON.stringify(hidden.raw.input))
+      for (const candidate of freeTextCandidates) {
         if (typeof candidate === "string" && longEnough(candidate)) {
           signatures.push({ ticketKey: ticket.key, kind: "hidden-test", text: candidate })
         }
       }
     }
   }
-  return signatures
+  return dedupeSignatures(signatures)
 }
 
 /** `reference.diff` (always read via `load-tree.ts`) plus `review.yaml`/`author_brief.yaml`'s raw
  *  file text, read fresh here since `load-tree.ts` never captures `review.yaml` at all (no Task 3
  *  static rule needs it) and only exposes `author_brief.yaml` pre-parsed -- a leak-scan wants the
- *  literal file bytes, not a re-serialization that could accidentally normalize away a leak. */
+ *  literal file bytes, not a re-serialization that could accidentally normalize away a leak. Free
+ *  text, so it keeps the length floor. */
 function collectSecretFileSignatures(workbook: AuthoredWorkbook): Signature[] {
   const signatures: Signature[] = []
   for (const { ticket } of allTicketsInOrder(workbook)) {
@@ -94,7 +124,7 @@ function collectSecretFileSignatures(workbook: AuthoredWorkbook): Signature[] {
       if (longEnough(raw)) signatures.push({ ticketKey: ticket.key, kind, text: raw as string })
     }
   }
-  return signatures
+  return dedupeSignatures(signatures)
 }
 
 /** Mirrors load-tree.ts's own `readFileIfExists` -- a leak-scan wants the literal file bytes. */
@@ -123,11 +153,25 @@ function bundleContainsPath(files: MaterializedFile[], path: string): boolean {
   return files.some((file) => file.path === path || file.path.endsWith(`/${path}`))
 }
 
-function scanTextsForSignatures(bundle: MaterializedFile[], signatures: Signature[]): Signature[] {
-  const hits: Signature[] = []
+interface SignatureHit {
+  signature: Signature
+  file: MaterializedFile
+}
+
+/** Checks both a file's CONTENT and its PATH against every signature (Important 2b: a leak that is
+ *  itself a filename, never embedded in any blob's bytes, must not evade this scan). Returns which
+ *  FILE each hit came from, so the caller's finding can point at it directly rather than leaving a
+ *  human to grep the whole bundle for a 60-character truncated signature snippet. */
+function scanFilesForSignatures(
+  bundle: MaterializedFile[],
+  signatures: Signature[]
+): SignatureHit[] {
+  const hits: SignatureHit[] = []
   for (const file of bundle) {
     for (const signature of signatures) {
-      if (file.content.includes(signature.text)) hits.push(signature)
+      if (file.content.includes(signature.text) || file.path.includes(signature.text)) {
+        hits.push({ signature, file })
+      }
     }
   }
   return hits
@@ -155,14 +199,15 @@ export function scanProvisionedBundleContent(
     const bundle = readAllFiles(materialized.ws)
     const findings: ValidationFinding[] = []
 
-    const hiddenHits = scanTextsForSignatures(bundle, collectHiddenTestSignatures(workbook))
-    const secretHits = scanTextsForSignatures(bundle, collectSecretFileSignatures(workbook))
+    const hiddenHits = scanFilesForSignatures(bundle, collectHiddenTestSignatures(workbook))
+    const secretHits = scanFilesForSignatures(bundle, collectSecretFileSignatures(workbook))
     for (const hit of [...hiddenHits, ...secretHits]) {
       findings.push({
         ruleId: "dynamic-provisioning-leak",
         severity: "error",
         ticketKey: ticket.key,
-        message: `learner bundle for "${ticket.key}" contains ${hit.kind} content authored for "${hit.ticketKey}" (leaked signature: ${JSON.stringify(hit.text.slice(0, 60))}...)`,
+        path: hit.file.path,
+        message: `learner bundle for "${ticket.key}" contains ${hit.signature.kind} content authored for "${hit.signature.ticketKey}" in ${hit.file.path} (leaked signature: ${JSON.stringify(hit.signature.text.slice(0, 60))}...)`,
       })
     }
 
@@ -171,12 +216,14 @@ export function scanProvisionedBundleContent(
     // already distinctive enough that a false positive in ordinary source/comment prose is not a
     // real risk -- gating this on length would have silently made the check a no-op for every
     // realistically-shaped key (caught by this task's own leak-future-marker fixture test, whose
-    // "LEAK-102" is 8 characters).
+    // "LEAK-102" is 8 characters). Checks path too, same reasoning as the hidden-test scan above.
     const allKeys = allTicketsInOrder(workbook)
     const thisIndex = allKeys.findIndex((entry) => entry.ticket.key === ticket.key)
     const futureKeys = allKeys.slice(thisIndex + 1).map((entry) => entry.ticket.key)
     for (const futureKey of futureKeys) {
-      const hit = bundle.find((file) => file.content.includes(futureKey))
+      const hit = bundle.find(
+        (file) => file.content.includes(futureKey) || file.path.includes(futureKey)
+      )
       if (hit) {
         findings.push({
           ruleId: "dynamic-provisioning-leak",
@@ -192,7 +239,9 @@ export function scanProvisionedBundleContent(
     for (const migrationName of migrationUniverse) {
       const shortName = migrationName.split("/").pop() as string
       if (bundleContainsPath(bundle, migrationName)) continue // already shipped into this bundle
-      const hit = bundle.find((file) => file.content.includes(shortName))
+      const hit = bundle.find(
+        (file) => file.content.includes(shortName) || file.path.includes(shortName)
+      )
       if (hit) {
         findings.push({
           ruleId: "dynamic-provisioning-leak",
@@ -211,7 +260,8 @@ export function scanProvisionedBundleContent(
 }
 
 /** AGENT-CONTEXT.md §4 launch blocker 6: a workspace provisioned by `git init` + copy (never a
- *  clone) has zero git OBJECTS (not just working-tree files) matching a hidden-test signature. */
+ *  clone) has zero git OBJECTS -- blob content AND tree-entry names -- matching a hidden-test
+ *  signature. */
 export function scanFreshWorkspaceGitObjects(
   workbook: AuthoredWorkbook,
   ticket: AuthoredTicket
@@ -221,19 +271,26 @@ export function scanFreshWorkspaceGitObjects(
     if (materialized.failure) return []
 
     const blobs = readAllGitObjectBlobs(materialized.ws)
+    const names = readAllGitObjectNames(materialized.ws)
     const signatures = collectHiddenTestSignatures(workbook)
     const findings: ValidationFinding[] = []
 
-    for (const blob of blobs) {
-      for (const signature of signatures) {
-        if (blob.includes(signature.text)) {
-          findings.push({
-            ruleId: "dynamic-fresh-workspace-git-objects",
-            severity: "error",
-            ticketKey: ticket.key,
-            message: `a git object in the freshly provisioned workspace for "${ticket.key}" matches a hidden-test signature authored for "${signature.ticketKey}" -- provisioning must never carry git history (git init + copy, never clone).`,
-          })
-        }
+    for (const signature of signatures) {
+      const blobHit = blobs.some((blob) => blob.includes(signature.text))
+      const nameHit = names.some((name) => name.includes(signature.text))
+      if (blobHit || nameHit) {
+        // Both evidence types are named when both matched -- defaulting to "blob content"
+        // whenever a blob ALSO happened to match would silently hide a real tree-entry-name hit
+        // whenever the same signature also appears in some unrelated file's content.
+        const evidence = [blobHit && "blob content", nameHit && "tree entry name"]
+          .filter((v): v is string => Boolean(v))
+          .join(" and ")
+        findings.push({
+          ruleId: "dynamic-fresh-workspace-git-objects",
+          severity: "error",
+          ticketKey: ticket.key,
+          message: `a git object (${evidence}) in the freshly provisioned workspace for "${ticket.key}" matches a hidden-test signature authored for "${signature.ticketKey}" -- provisioning must never carry git history (git init + copy, never clone).`,
+        })
       }
     }
 
