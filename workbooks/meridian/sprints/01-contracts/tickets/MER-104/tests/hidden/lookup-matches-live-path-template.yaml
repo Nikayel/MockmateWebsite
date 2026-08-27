@@ -1,0 +1,15 @@
+humanName: "Escaped: a compatibility lookup by the live route's own path template finds nothing"
+tags:
+  - openapi-contract-versioning
+kind: io-case
+input:
+  method: "GET"
+  path: "/claims/{id}"
+expected:
+  operationId: "getClaim"
+  method: "GET"
+  path: "/claims/{id}"
+  queryParameters: []
+entryPoint:
+  module: "src/http/compatibility-descriptor.ts"
+  export: "findOperationCompatibility"
