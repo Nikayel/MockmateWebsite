@@ -1,0 +1,11 @@
+weights:
+  understanding: 0.15
+  problemSolving: 0.3
+  codeQuality: 0.2
+  communication: 0.05
+  verification: 0.3
+notes:
+  understanding: "Keys off whether a calendar date and an instant become two distinct types, not a format string convention nobody enforces."
+  problemSolving: "Keys off the visible pass rate across zone-aware filing dates, calendar-day arithmetic, and a tenant in a half-hour offset."
+  codeQuality: "Keys off whether the fix reads the zone's real offset history (via the platform's own tz database) rather than a hand-maintained fixed-offset table."
+  verification: "Keys off escaped-defect rate on the hidden cases - a claim filed near a daylight-saving transition, in an unlisted zone, or in a half-hour offset must land on the correct calendar day every time."

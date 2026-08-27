@@ -1,0 +1,11 @@
+humanName: "Escaped: a tenant in a zone nobody hardcoded is silently treated as UTC"
+tags:
+  - date-time-zone-modeling
+kind: io-case
+input:
+  createdAt: "2026-01-09T18:45:00.000Z"
+  timeZone: "Asia/Kolkata"
+expected: "2026-01-10"
+entryPoint:
+  module: "src/domain/claim.ts"
+  export: "filedOnDate"

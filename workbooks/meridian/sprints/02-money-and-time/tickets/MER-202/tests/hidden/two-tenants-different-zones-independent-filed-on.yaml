@@ -1,0 +1,47 @@
+humanName: "Escaped: one tenant's configured zone leaks into another tenant's filedOn computation"
+tags:
+  - date-time-zone-modeling
+kind: probe
+body: |
+  const { meridian } = buildTestApp()
+  return seedTenant(meridian.db, { id: "ten_chicago", timeZone: "America/Chicago" })
+    .then(() => seedTenant(meridian.db, { id: "ten_kolkata", timeZone: "Asia/Kolkata" }))
+    .then(() =>
+      meridian.app.inject({
+        method: "POST",
+        url: "/claims",
+        headers: { "x-tenant-id": "ten_chicago" },
+        payload: {
+          externalRef: "NW-9401",
+          amount: 100,
+          claimantName: "Test Claimant",
+          lossDate: "2026-01-01",
+        },
+      })
+    )
+    .then((chicagoResponse) =>
+      meridian.app
+        .inject({
+          method: "POST",
+          url: "/claims",
+          headers: { "x-tenant-id": "ten_kolkata" },
+          payload: {
+            externalRef: "NW-9402",
+            amount: 100,
+            claimantName: "Test Claimant",
+            lossDate: "2026-01-01",
+          },
+        })
+        .then((kolkataResponse) => {
+          const chicagoBody = chicagoResponse.json()
+          const kolkataBody = kolkataResponse.json()
+          assert(
+            chicagoBody.filedOn === filedOnDate({ createdAt: chicagoBody.createdAt, timeZone: "America/Chicago" }),
+            "the Chicago tenant's filedOn must reflect its own zone"
+          )
+          assert(
+            kolkataBody.filedOn === filedOnDate({ createdAt: kolkataBody.createdAt, timeZone: "Asia/Kolkata" }),
+            "the Kolkata tenant's filedOn must reflect its own zone, not the previous tenant's"
+          )
+        })
+    )

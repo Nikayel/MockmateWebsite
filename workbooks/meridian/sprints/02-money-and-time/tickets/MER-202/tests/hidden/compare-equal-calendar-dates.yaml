@@ -1,0 +1,17 @@
+humanName: "Escaped: comparing a calendar date to itself does not report them as equal"
+tags:
+  - date-time-zone-modeling
+kind: io-case
+input:
+  a:
+    year: 2026
+    month: 4
+    day: 20
+  b:
+    year: 2026
+    month: 4
+    day: 20
+expected: 0
+entryPoint:
+  module: "src/domain/calendar-date.ts"
+  export: "compareCalendarDates"

@@ -1,0 +1,11 @@
+humanName: "Escaped: a west-coast claim filed just after midnight in summer lands in the previous month"
+tags:
+  - date-time-zone-modeling
+kind: io-case
+input:
+  createdAt: "2026-08-01T07:10:00.000Z"
+  timeZone: "America/Los_Angeles"
+expected: "2026-08-01"
+entryPoint:
+  module: "src/domain/claim.ts"
+  export: "filedOnDate"
