@@ -30,7 +30,12 @@
  * `chunk-*.js` files alongside it: `index.js` imports those chunks by relative specifier (see
  * task-5-report.md), so shipping it without them is a structurally broken worker that would 404 on
  * its own imports at runtime with no signal at install time — silently "succeeding" here would be
- * worse than a loud install failure a human notices immediately.
+ * worse than a loud install failure a human notices immediately. Separately, WARNS (does not fail
+ * the install) if any of the specific wasm/data assets PGlite actually needs to boot
+ * (`pglite.wasm`, `pglite.data`, `initdb.wasm`) did not get copied — a narrower, softer signal than
+ * the zero-chunks case, but one this script previously gave no signal for at all: a silently
+ * missing `pglite.wasm` would only surface much later, as an opaque fetch 404 when a real browser
+ * worker tries to boot, with nothing pointing back to `pnpm install` as the moment it went wrong.
  *
  * Run directly: node scripts/copy-pglite-vendor.mjs
  */
@@ -44,6 +49,7 @@ const DEST_DIR = join(ROOT, "public/wasm/pglite")
 
 const VENDORED_EXTENSIONS = [".js", ".wasm", ".data"]
 const EXCLUDED_SUFFIXES = [".map", ".d.ts", ".d.cts", ".cjs"]
+const REQUIRED_ASSETS = ["pglite.wasm", "pglite.data", "initdb.wasm"]
 
 function isVendoredAsset(fileName) {
   if (EXCLUDED_SUFFIXES.some((suffix) => fileName.endsWith(suffix))) return false
@@ -64,16 +70,27 @@ function copyVendorFiles() {
 
   const entries = readdirSync(SOURCE_DIR, { withFileTypes: true })
   const wanted = entries.filter((entry) => entry.isFile() && isVendoredAsset(entry.name))
+  const copiedNames = new Set()
 
   let hasIndex = false
   let chunkCount = 0
   for (const entry of wanted) {
     copyFileSync(join(SOURCE_DIR, entry.name), join(DEST_DIR, entry.name))
+    copiedNames.add(entry.name)
     if (entry.name === "index.js") hasIndex = true
     if (/^chunk-.*\.js$/.test(entry.name)) chunkCount++
   }
 
   console.log(`[copy-pglite-vendor] copied ${wanted.length} file(s) -> public/wasm/pglite/`)
+
+  const missingRequired = REQUIRED_ASSETS.filter((name) => !copiedNames.has(name))
+  if (missingRequired.length > 0) {
+    console.warn(
+      `[copy-pglite-vendor] WARNING: required asset(s) not found in dist/ and not copied: ` +
+        `${missingRequired.join(", ")}. The worker will fail to boot PGlite until these exist under ` +
+        `public/wasm/pglite/ — check that @electric-sql/pglite installed correctly.`
+    )
+  }
 
   if (hasIndex && chunkCount === 0) {
     throw new Error(
