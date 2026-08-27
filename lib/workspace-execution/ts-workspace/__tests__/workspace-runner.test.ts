@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest"
 
 import type { WorkspaceScenario } from "../../types"
 import { runTsInWorker } from "../worker-runner"
-import { executeWorkspaceScenarioTsClientSide } from "../workspace-runner"
+import {
+  executeWorkspaceScenarioTsClientSide,
+  TS_WORKSPACE_EXEC_TIMEOUT_MS,
+} from "../workspace-runner"
 
 vi.mock("../worker-runner", () => ({
   runTsInWorker: vi.fn(),
@@ -66,10 +69,18 @@ describe("executeWorkspaceScenarioTsClientSide", () => {
     const result = await executeWorkspaceScenarioTsClientSide(dummyScenario, edits)
 
     expect(runTsInWorker).toHaveBeenCalledTimes(1)
-    const payload = vi.mocked(runTsInWorker).mock.calls[0][0]
+    const call = vi.mocked(runTsInWorker).mock.calls[0]
+    const payload = call[0]
     expect(payload).not.toHaveProperty("entrypoint")
     expect(payload.testPaths).toEqual(["tests/visible/index.test.ts"])
     expect(payload.hiddenTestPaths).toEqual(["tests/hidden/index.test.ts"])
+    // R15 regression: the ts-workspace path must override the flat 5s default with its own 15s
+    // budget (tests run sequentially, so durations SUM against the exec budget) rather than
+    // silently relying on worker-runner.ts's DEFAULT_EXEC_TIMEOUT_MS. Asserted against the LITERAL
+    // value (not just the imported constant) so this test cannot pass by both sides reverting to
+    // `undefined` in lockstep if the override wiring is ever removed.
+    expect(call[1]).toBe(15_000)
+    expect(TS_WORKSPACE_EXEC_TIMEOUT_MS).toBe(15_000)
     // The overlay applied — the worker gets the LEARNER's edit, not the seed content — and it is
     // sent RAW (still .ts, untranspiled): transpilation happens inside the worker, not here.
     const sentIndexFile = payload.files.find((f) => f.path === "src/index.ts")

@@ -51,15 +51,36 @@ interface PendingTsRun {
 }
 
 // ~60 files, cold (first run in a fresh worker: importScripts of the ~9MB vendored compiler PLUS
-// transpiling every file with no cache hits) needs real headroom above the 5s a learner's actual
-// code execution gets. Measured per-file cost is in the task report; this is a generous ceiling,
-// not the expected common case (a warm worker with most files cache-hit finishes far sooner).
+// transpiling every file with no cache hits) needs real headroom above the execution budget a
+// learner's actual test run gets. Measured per-file cost is in the task report; this is a
+// generous ceiling, not the expected common case (a warm worker with most files cache-hit
+// finishes far sooner).
 const DEFAULT_TRANSPILE_TIMEOUT_MS = 20000
+// Conservative fallback ONLY: the real production call site (workspace-runner.ts's
+// TS_WORKSPACE_EXEC_TIMEOUT_MS) overrides this to 15s, because tests run sequentially (their
+// durations SUM against this budget, not just the slowest one — see buildExecTimeoutMessage
+// below). Left at 5s here so a caller that does not explicitly override it gets the same
+// conservative budget the flat single-file runners use, not a silently-widened one.
 const DEFAULT_EXEC_TIMEOUT_MS = 5000
 
 const TRANSPILE_TIMEOUT_MESSAGE =
   "TypeScript transpilation timed out. The workspace may be too large or contain a compiler edge case."
-const EXEC_TIMEOUT_MESSAGE = "Code execution timed out. Try checking for infinite loops."
+
+/**
+ * Cause-accurate exec-timeout message: tests now run SEQUENTIALLY (see vitest-shim.js's I2 fix),
+ * so the budget bounds the SUM of every test's duration, not the slowest one — a suite of
+ * individually-fast async tests can legitimately need more wall-clock time than a single-test
+ * budget would suggest. Derived from the ACTUAL `execTimeoutMs` in effect for this run (not a
+ * fixed string) so it stays accurate for whatever caller-supplied override was used, not just the
+ * ts-workspace runner's current 15s choice.
+ */
+export function buildExecTimeoutMessage(execTimeoutMs: number): string {
+  return (
+    "Test run exceeded the " +
+    Math.round(execTimeoutMs / 1000) +
+    "s budget. Tests run sequentially; check for slow awaits or infinite loops."
+  )
+}
 
 let tsWorker: Worker | null = null
 let pendingRun: PendingTsRun | null = null
@@ -95,11 +116,18 @@ function getTsWorker(): Worker {
       if (data.type === "exec-start") {
         // Transpiling is done; swap to the tight execution budget so a runaway loop is still
         // caught quickly without penalizing a large, legitimately-slow-to-transpile workspace.
+        // Captured into a local const (not read via `pendingRun!` inside the callback below) so
+        // the message it builds always matches the budget THIS run was actually given.
+        const execTimeoutMs = pendingRun.execTimeoutMs
         clearTimeout(pendingRun.timeoutId)
         pendingRun.timeoutId = setTimeout(() => {
-          resolveActive({ success: false, logs: pendingRun!.logs, error: EXEC_TIMEOUT_MESSAGE })
+          resolveActive({
+            success: false,
+            logs: pendingRun ? pendingRun.logs : [],
+            error: buildExecTimeoutMessage(execTimeoutMs),
+          })
           resetTsWorker()
-        }, pendingRun.execTimeoutMs)
+        }, execTimeoutMs)
         return
       }
 

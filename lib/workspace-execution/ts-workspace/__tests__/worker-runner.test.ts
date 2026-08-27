@@ -85,6 +85,36 @@ describe("runTsInWorker", () => {
     expect(result.logs.some((log) => log.message.includes("Transpiling TypeScript"))).toBe(true)
   })
 
+  it("honors a caller-supplied exec timeout override (not the module default) and reports a cause-accurate, budget-derived message (R15 regression)", async () => {
+    const { runTsInWorker, buildExecTimeoutMessage } = await import("../worker-runner")
+
+    // buildExecTimeoutMessage is a pure function: prove the EXACT wording for the real production
+    // value (ts-workspace/workspace-runner.ts's TS_WORKSPACE_EXEC_TIMEOUT_MS = 15_000) without
+    // needing to wait 15 real seconds for a timer to fire.
+    expect(buildExecTimeoutMessage(15_000)).toBe(
+      "Test run exceeded the 15s budget. Tests run sequentially; check for slow awaits or infinite loops."
+    )
+
+    // Separately, prove the OVERRIDE value (not DEFAULT_EXEC_TIMEOUT_MS = 5000) actually governs
+    // when the exec-phase timer fires: a short custom budget resolves quickly here; if the module
+    // default were used instead, this test would hang for 5s and this assertion would still see
+    // an unresolved promise well before that.
+    const customExecTimeoutMs = 20
+    const runPromise = runTsInWorker(
+      { files: [], testPaths: [], hiddenTestPaths: [] },
+      customExecTimeoutMs,
+      10_000
+    )
+    await yieldToMicrotasksAndOneMacrotask()
+    const worker = instances[0]
+    worker.onmessage?.({ data: { type: "exec-start" } })
+
+    // No further message ever arrives — only the short custom exec timeout can resolve this.
+    const result = await runPromise
+    expect(result.success).toBe(false)
+    expect(result.error).toBe(buildExecTimeoutMessage(customExecTimeoutMs))
+  })
+
   it("resets a stray worker on a late onerror with no pending run, so the next call spawns a fresh one (regression)", async () => {
     const { runTsInWorker } = await import("../worker-runner")
 

@@ -16,6 +16,17 @@ import { runTsInWorker } from "./worker-runner"
 
 const RESULTS_MARKER = "__WORKSPACE_TEST_RESULTS__:"
 
+/**
+ * Overrides worker-runner.ts's DEFAULT_EXEC_TIMEOUT_MS (5s, left untouched — it stays the
+ * conservative fallback for any caller that does not override it) for this specific call site.
+ * Tests now run SEQUENTIALLY (vitest-shim.js's I2 fix), so the exec budget bounds the SUM of
+ * every test's duration in the suite, not the slowest one; a flat 5s was calibrated for the old
+ * (buggy) concurrent-completion-time model and could newly time out a suite of individually-fast
+ * async tests with a cause-misattributing "infinite loop" message. 15s is a generous ceiling for a
+ * sequential run of a realistic test suite, not the expected common case.
+ */
+export const TS_WORKSPACE_EXEC_TIMEOUT_MS = 15_000
+
 export async function executeWorkspaceScenarioTsClientSide(
   scenario: WorkspaceScenario,
   edits: WorkspaceFileEdit[]
@@ -23,11 +34,14 @@ export async function executeWorkspaceScenarioTsClientSide(
   try {
     const files = overlayWorkspaceFiles(scenario, edits)
 
-    const runResult = await runTsInWorker({
-      files: files.map((file) => ({ path: file.path, content: file.content })),
-      testPaths: scenario.workspace.visibleTestPaths,
-      hiddenTestPaths: scenario.workspace.hiddenTestPaths,
-    })
+    const runResult = await runTsInWorker(
+      {
+        files: files.map((file) => ({ path: file.path, content: file.content })),
+        testPaths: scenario.workspace.visibleTestPaths,
+        hiddenTestPaths: scenario.workspace.hiddenTestPaths,
+      },
+      TS_WORKSPACE_EXEC_TIMEOUT_MS
+    )
 
     if (!runResult.success || runResult.error) {
       return {
