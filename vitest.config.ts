@@ -9,6 +9,16 @@ export default defineConfig({
     // *.integration.test.ts needs a live Firestore emulator and must NOT run
     // under this config (which globally mocks firebase-admin). See
     // vitest.integration.config.ts / `pnpm test:integration`.
+    //
+    // workbooks/** holds AUTHORED Sprint Labs content (docs/sprint-labs/
+    // WORKBOOK-SPEC.md §6): each ticket's tests/visible/*.test.ts is a real
+    // vitest-shaped file, but it is meant to run inside the learner's
+    // workspace via the TS-workspace runner (docs/sprint-labs/PLAN.md Task
+    // 4/7), against files that only exist in a provisioned workspace or
+    // seed repo. It is not part of THIS app's own module graph (its imports
+    // like "../../../src/http/claims-parser" resolve only inside a
+    // provisioned workspace), so it must never be picked up by this
+    // project's own `pnpm test`.
     exclude: [
       "node_modules",
       ".next",
@@ -16,6 +26,7 @@ export default defineConfig({
       "extension/**",
       "**/._*",
       "**/*.integration.test.ts",
+      "workbooks/**",
     ],
     coverage: {
       provider: "v8",
