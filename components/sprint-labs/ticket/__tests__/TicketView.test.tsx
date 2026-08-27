@@ -78,7 +78,7 @@ describe("TicketView", () => {
       />
     )
     const cta = screen.getByRole("link", { name: "Open the PR" })
-    expect(cta.getAttribute("href")).toBe("/sprint-labs/fixture-demo/run/ticket/MER-305/review")
+    expect(cta.getAttribute("href")).toBe("/sprint-labs/fixture-demo/run/review/MER-305")
   })
 
   it("resolves the CTA per board status: todo, doing, review, done", () => {
@@ -95,9 +95,7 @@ describe("TicketView", () => {
         <TicketView workbookId="fixture-demo" ticket={ticket({ aiPolicy })} status={status} />
       )
       const cta = screen.getByRole("link", { name: label })
-      expect(cta.getAttribute("href")).toBe(
-        `/sprint-labs/fixture-demo/run/ticket/MER-305/${segment}`
-      )
+      expect(cta.getAttribute("href")).toBe(`/sprint-labs/fixture-demo/run/${segment}/MER-305`)
       unmount()
     }
   })

@@ -59,7 +59,6 @@ function resolveCta(
 export function TicketView({ workbookId, ticket, status, escapedCount }: TicketViewProps) {
   const objectives = ticket.objectives.map(toNotStartedObjectiveView)
   const cta = resolveCta(ticket.aiPolicy, status)
-  const ticketBaseHref = `/sprint-labs/${workbookId}/run/ticket/${ticket.key}`
 
   return (
     <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start lg:gap-8">
@@ -132,7 +131,9 @@ export function TicketView({ workbookId, ticket, status, escapedCount }: TicketV
 
         <div className="flex flex-wrap items-center gap-4 border-t border-[var(--wb-border)] pt-4">
           <Button asChild size="lg" className={CTA_BUTTON_CLASS}>
-            <Link href={`${ticketBaseHref}/${cta.segment}`}>{cta.label}</Link>
+            <Link href={`/sprint-labs/${workbookId}/run/${cta.segment}/${ticket.key}`}>
+              {cta.label}
+            </Link>
           </Button>
           <span className="text-xs text-[var(--wb-text-secondary)]">
             {ticket.points} {ticket.points === 1 ? "point" : "points"}. Visible tests run in your
