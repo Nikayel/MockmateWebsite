@@ -19,6 +19,13 @@ export default defineConfig({
     // like "../../../src/http/claims-parser" resolve only inside a
     // provisioned workspace), so it must never be picked up by this
     // project's own `pnpm test`.
+    //
+    // lib/sprint-labs/validate/dynamic/__tests__/fixtures/** is the SAME
+    // shape of problem, one directory later: Task 7's own dynamic-gate test
+    // fixtures (small standalone workbooks, not workbooks/_fixture-workbook)
+    // also author real tests/visible/*.test.ts content that is only ever
+    // fed to runTsWorkspace as in-memory strings inside a materialized git
+    // temp dir -- never meant to be discovered and run directly here either.
     exclude: [
       "node_modules",
       ".next",
@@ -27,6 +34,7 @@ export default defineConfig({
       "**/._*",
       "**/*.integration.test.ts",
       "workbooks/**",
+      "lib/sprint-labs/validate/dynamic/__tests__/fixtures/**",
     ],
     coverage: {
       provider: "v8",
