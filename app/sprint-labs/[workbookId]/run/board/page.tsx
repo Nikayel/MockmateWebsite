@@ -202,6 +202,7 @@ export default function SprintLabBoardPage() {
         objectives: compiled.ticket.objectives.map(toNotStartedObjectiveView),
         // No GET endpoint exists yet to read a finalized attempt's escaped-defect count.
         escapedCount: undefined,
+        playable: compiled.ticket.playable,
       }
     })
 

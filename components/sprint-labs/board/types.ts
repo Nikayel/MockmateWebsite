@@ -15,6 +15,12 @@
  * (leave it `undefined`) until a future task exposes one; `TicketCard` renders the DONE state without
  * an escaped badge in that case rather than fabricating a number, the same graceful-degradation
  * convention Task 10 used for the overview's missing seed-stats panel.
+ *
+ * `playable` is a later, additive field (not in the UX-SPEC.md §1.7 block above): it threads
+ * `TicketPublic.playable` (`lib/sprint-labs/types.ts`) through from the board page's mapper so
+ * `TicketCard` can render a content-stub tag. Optional for the same reason the source field is
+ * optional: `undefined` reads as playable, same as `true` — only `false` (a compiled stub) changes
+ * the card.
  */
 
 import type { AiPolicy, TicketBoardStatus } from "@/lib/sprint-labs/types"
@@ -30,4 +36,5 @@ export interface TicketCardView {
   status: TicketBoardStatus
   objectives: ObjectiveView[]
   escapedCount?: number
+  playable?: boolean
 }

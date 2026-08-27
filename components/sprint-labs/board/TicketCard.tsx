@@ -11,6 +11,12 @@
  * clickable — §5's own instruction ("render the chip row outside the `<Link>` in the DOM... so a
  * nested interactive element never sits inside an anchor") is satisfied the same way WorkbookCard
  * satisfies it, not by a new mechanism.
+ *
+ * `playable === false` (a compiled content stub — no `reference.diff`/`rubric.yaml` yet, see
+ * `TicketPublic.playable`'s own doc comment): the card stays a normal link to the ticket screen — a
+ * learner can still read a stub's body/criteria there — but carries a muted "Content coming" tag so
+ * the board never implies there is a workspace to open. `undefined` (every ticket compiled before
+ * this field existed) reads the same as `true`.
  */
 
 import Link from "next/link"
@@ -66,7 +72,14 @@ export function TicketCard({ workbookId, ticket }: TicketCardProps) {
       )}
 
       <div className="flex items-center justify-between gap-2">
-        <AiPolicyBadge policy={ticket.aiPolicy} />
+        <div className="flex flex-wrap items-center gap-1.5">
+          <AiPolicyBadge policy={ticket.aiPolicy} />
+          {ticket.playable === false && (
+            <span className="inline-flex w-fit shrink-0 items-center rounded-full border border-[var(--wb-border)] bg-[var(--wb-panel)] px-2 py-0.5 text-[10px] font-semibold tracking-[0.04em] text-[var(--wb-disabled)] uppercase">
+              Content coming
+            </span>
+          )}
+        </div>
         {/* No GET endpoint exists yet to read a finalized attempt's escaped-defect count (see
             board/types.ts) — the escaped line is omitted entirely rather than rendered-then-hidden,
             so no "undefined escaped" text ever reaches the DOM while the count is unknown. */}

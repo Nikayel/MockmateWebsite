@@ -68,4 +68,17 @@ describe("SprintBoard", () => {
     render(<SprintBoard workbookId="fixture-demo" tickets={[ticket("MER-301", "done")]} />)
     expect(screen.getByText("Nothing left to pick up.")).not.toBeNull()
   })
+
+  // A stub-only sprint (e.g. sprints 3-10 before their content lands): every ticket on the board is
+  // playable: false. Nothing about grouping-by-status or the card itself assumes at least one
+  // playable ticket exists, but this pins that as a real render rather than an inference.
+  it("renders a stub-only board (every ticket playable: false) without crashing, tagging every card", () => {
+    const allStubs: TicketCardView[] = [
+      { ...ticket("MER-801", "todo"), playable: false },
+      { ...ticket("MER-802", "todo"), playable: false },
+      { ...ticket("MER-803", "doing"), playable: false },
+    ]
+    render(<SprintBoard workbookId="fixture-demo" tickets={allStubs} />)
+    expect(screen.getAllByText("Content coming")).toHaveLength(3)
+  })
 })
