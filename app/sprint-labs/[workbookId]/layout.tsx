@@ -24,6 +24,14 @@ export function generateStaticParams() {
 export const dynamicParams = false
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  // Mirror the layout's flag gate below: with the flag off this segment 404s, so its <head> must not
+  // advertise a workbook title/pitch either. Falls back to the same non-indexable head as an unknown
+  // id, keeping flag-off invisibility total (metadata included).
+  const enabled = await getFlagAsync("SPRINT_LABS_ENABLED")
+  if (!enabled) {
+    return { title: "Sprint Lab", robots: { index: false, follow: false } }
+  }
+
   const { workbookId } = await params
   const summary = getWorkbookSummary(workbookId)
 
