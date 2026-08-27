@@ -29,7 +29,7 @@ import { GradingOverviewPanel } from "@/components/sprint-labs/catalog/GradingOv
 import { SprintMap } from "@/components/sprint-labs/catalog/SprintMap"
 import { WorkbookOverviewShell } from "@/components/sprint-labs/catalog/WorkbookOverviewShell"
 import { ObjectiveList } from "@/components/sprint-labs/ui/ObjectiveList"
-import { toNotStartedObjectiveView } from "@/components/sprint-labs/ui/ObjectiveChip"
+import { toNotStartedObjectiveView } from "@/components/sprint-labs/ui/objective-view"
 import { formatWorkbookMeterLine } from "@/components/sprint-labs/catalog/format-meter-line"
 
 // UX-SPEC.md §1.2/§15.5: static and indexable, with the owner's flag flip landing within five

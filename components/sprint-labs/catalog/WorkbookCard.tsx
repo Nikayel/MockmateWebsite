@@ -27,7 +27,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { ObjectiveList } from "@/components/sprint-labs/ui/ObjectiveList"
-import { toNotStartedObjectiveView } from "@/components/sprint-labs/ui/ObjectiveChip"
+import { toNotStartedObjectiveView } from "@/components/sprint-labs/ui/objective-view"
 import { SERVER_EXECUTION_MESSAGE } from "@/lib/sprint-labs/platform-capabilities"
 import type { WorkbookSummary } from "@/lib/sprint-labs/types"
 import { formatWorkbookMeterLine } from "./format-meter-line"

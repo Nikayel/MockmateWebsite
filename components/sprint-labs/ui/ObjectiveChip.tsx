@@ -20,17 +20,14 @@
 import { useState } from "react"
 import { ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { ObjectiveState, ObjectiveView } from "./objective-view"
 
-/** UX-SPEC.md §1.4. Not the storage/mastery schema — this is the screens' view model. */
-export type ObjectiveState = "not_started" | "practicing" | "demonstrated" | "escaped"
-
-/** UX-SPEC.md §1.4's `ObjectiveView`. `sentence` is the full authored "I can ___" line. */
-export interface ObjectiveView {
-  id: string
-  label: string
-  sentence: string
-  state: ObjectiveState
-}
+// Re-exported for existing type-only importers (e.g. ObjectiveList.tsx). The
+// canonical definitions live in objective-view.ts, a non-"use client" module
+// — see its header for why. Type-only re-exports are always safe here: types
+// don't exist at runtime, so they never trip the client/server boundary that
+// bit `toNotStartedObjectiveView` (moved there in full, not re-exported).
+export type { ObjectiveState, ObjectiveView }
 
 const STATE_LABEL: Record<ObjectiveState, string> = {
   not_started: "Not started",
@@ -123,23 +120,4 @@ export function ObjectiveChip({
       )}
     </div>
   )
-}
-
-/**
- * Adapter for screens that show a workbook's authored objectives with no per-learner mastery signal
- * (the catalog card, the public overview): every objective renders `not_started`, which is the
- * honest state for a visitor who has not attempted anything yet. Screens with real mastery data
- * (retro, summary) build their own `ObjectiveView[]` instead of using this.
- */
-export function toNotStartedObjectiveView(objective: {
-  id: string
-  label: string
-  canDo: string
-}): ObjectiveView {
-  return {
-    id: objective.id,
-    label: objective.label,
-    sentence: objective.canDo,
-    state: "not_started",
-  }
 }

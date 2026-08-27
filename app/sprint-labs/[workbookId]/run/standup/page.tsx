@@ -41,7 +41,7 @@ import { SparraLoader } from "@/components/brand/SparraLoader"
 import { SlackQuote } from "@/components/sprint-labs/ui/SlackQuote"
 import { ArchMapDelta } from "@/components/sprint-labs/ui/ArchMapDelta"
 import { ObjectiveList } from "@/components/sprint-labs/ui/ObjectiveList"
-import { toNotStartedObjectiveView } from "@/components/sprint-labs/ui/ObjectiveChip"
+import { toNotStartedObjectiveView } from "@/components/sprint-labs/ui/objective-view"
 import { Button } from "@/components/ui/button"
 import type { SprintPublic } from "@/lib/sprint-labs/types"
 

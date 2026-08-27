@@ -29,7 +29,7 @@ import Link from "next/link"
 import { Check, ChevronDown, Lock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ObjectiveList } from "@/components/sprint-labs/ui/ObjectiveList"
-import { toNotStartedObjectiveView } from "@/components/sprint-labs/ui/ObjectiveChip"
+import { toNotStartedObjectiveView } from "@/components/sprint-labs/ui/objective-view"
 import { sprintRequiresPro } from "@/lib/sprint-labs/entitlements"
 import type { SprintPublic } from "@/lib/sprint-labs/types"
 

@@ -40,7 +40,7 @@ import { CodeMirrorEditor, CodeMirrorErrorBoundary } from "@/components/editor"
 import { CodeConsole, type TestResult, type TestSummary } from "@/components/interview/CodeConsole"
 import { AiPolicyBanner } from "@/components/sprint-labs/ui/AiPolicyBanner"
 import { ObjectiveList } from "@/components/sprint-labs/ui/ObjectiveList"
-import { toNotStartedObjectiveView } from "@/components/sprint-labs/ui/ObjectiveChip"
+import { toNotStartedObjectiveView } from "@/components/sprint-labs/ui/objective-view"
 import { useSprintLabRunSync } from "@/components/sprint-labs/useSprintLabRunSync"
 import {
   moveSprintLabRunTicket,
