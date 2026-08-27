@@ -44,6 +44,10 @@ export const USAGE_SERVICES = [
   // operations are visible in the same admin cost/activity breakdown as
   // every other product surface. See lib/sprint-labs/grading/attempts-service.ts.
   { id: "sprint-labs-grading", label: "Sprint Labs grading" },
+  // Ruling R9 (docs/sprint-labs/PLAN.md Task 14): the Sable in-workspace
+  // partner's chat turns, via generateAIResponse in
+  // app/api/sprint-labs/chat/route.ts.
+  { id: "sprint-labs-chat", label: "Sprint Labs partner chat" },
   { id: "voice-transcription", label: "Voice transcription" },
   { id: "rag-indexing", label: "RAG indexing embeddings" },
   { id: "rag-query-embeddings", label: "RAG query embeddings" },
