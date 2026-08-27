@@ -13,7 +13,14 @@ function formatClock(totalSeconds: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`
 }
 
-/** One code line, gutter + token-colored source — same idiom as CodeWindow.tsx. */
+/**
+ * One code line: a fixed-width gutter cell + token-colored source, laid out
+ * as its own two-column grid (not a `contents` row sharing the parent's grid
+ * — `display: contents` drops box properties entirely, so a row that needs
+ * to paint a background/border for the buggy line can't be `contents`).
+ * The transparent border on every row keeps the bad line's border from
+ * shifting its neighbors' text horizontally.
+ */
 function CodeLineRow({
   index,
   line,
@@ -26,8 +33,8 @@ function CodeLineRow({
   return (
     <div
       className={cn(
-        "contents",
-        bad && "bg-destructive/10 border-destructive -ml-[2px] border-l-2 pl-[2px]"
+        "-mx-1.5 grid grid-cols-[1.25rem_1fr] items-baseline gap-x-3 border-l-2 border-transparent px-1.5",
+        bad && "bg-destructive/10 border-destructive"
       )}
     >
       <span
@@ -180,7 +187,7 @@ export function GapWorkspace() {
 
               <div className="bg-editor-bg min-w-0 overflow-x-auto p-3">
                 <pre className="font-mono text-[12.5px] leading-relaxed">
-                  <code className="grid grid-cols-[auto_1fr] gap-x-3">
+                  <code className="grid">
                     {ticket.src.map((line, i) => (
                       <CodeLineRow key={i} index={i} line={line} bad={i === badLine} />
                     ))}
