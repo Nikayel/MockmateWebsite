@@ -19,4 +19,17 @@ describe(RULE_ID, () => {
     const findings = prNumbersMonotonic(workbook).filter((f) => f.ruleId === RULE_ID)
     expect(findings).toHaveLength(0)
   })
+
+  it("regression (review round 1, M-2): flags a PR number regression mentioned by an assisted ticket, not just review-only ones", () => {
+    const workbook = loadWorkbookTree(join(FIXTURES, "assisted-ticket-red"))
+    const findings = prNumbersMonotonic(workbook).filter((f) => f.ruleId === RULE_ID)
+    expect(findings).toHaveLength(1)
+    expect(findings[0].ticketKey).toBe("MER-206")
+  })
+
+  it("passes when an assisted ticket's mentioned PR number also increases", () => {
+    const workbook = loadWorkbookTree(join(FIXTURES, "assisted-ticket-green"))
+    const findings = prNumbersMonotonic(workbook).filter((f) => f.ruleId === RULE_ID)
+    expect(findings).toHaveLength(0)
+  })
 })

@@ -1,13 +1,15 @@
 /**
  * AUTHORING-RULES.md §1: "Agent PR numbers are monotonic ... Fix every
- * ticket body that says otherwise." PR numbers are narrated in a
- * review-only ticket's own title/body prose (SPRINT-PLAN.md's ticket
- * table rows read like "Review: agent PR #412 ..."), not a structured
- * frontmatter field, so this rule extracts `#<digits>` from title+body and
- * checks the workbook-wide sequence (ordered by sprint, then ticket key)
- * increases strictly. Deliberately does not hardcode Meridian's specific
- * allocation table (#412, #418, ...) -- that is content Task 16 is
- * responsible for authoring correctly; this rule checks the general
+ * ticket body that says otherwise." PR numbers are narrated in a ticket's
+ * own title/body prose (SPRINT-PLAN.md's ticket table rows read like
+ * "Review: agent PR #412 ..."), not a structured frontmatter field.
+ *
+ * Review round 1, M-2: scan every ticket, not just `review-only` ones
+ * (a PR can be mentioned in passing on any ticket type), using a GLOBAL
+ * match so a ticket that mentions more than one PR number contributes all
+ * of them, not just the first. Deliberately does not hardcode Meridian's
+ * specific allocation table (#412, #418, ...) -- that is content Task 16
+ * is responsible for authoring correctly; this rule checks the general
  * invariant so it stays useful for any workbook, not just Meridian.
  */
 
@@ -16,7 +18,7 @@ import type { ValidationFinding } from "../types"
 
 export const RULE_ID = "pr-numbers-monotonic"
 
-const PR_NUMBER_RE = /#(\d{2,})/
+const PR_NUMBER_RE = /#(\d{2,})/g
 
 interface PrEntry {
   sprintNumber: number
@@ -30,15 +32,18 @@ export function prNumbersMonotonic(workbook: AuthoredWorkbook): ValidationFindin
 
   for (const sprint of workbook.sprints) {
     for (const ticket of sprint.tickets) {
-      if (ticket.aiPolicy !== "review-only") continue
       const haystack = `${ticket.title ?? ""}\n${ticket.bodyMd}`
-      const match = PR_NUMBER_RE.exec(haystack)
-      if (match) {
-        entries.push({
-          sprintNumber: sprint.number,
-          ticketKey: ticket.key,
-          prNumber: Number.parseInt(match[1], 10),
-        })
+      // Dedupe within one ticket: a ticket's own PR number routinely
+      // appears in both its title and body (the "Review: agent PR #412
+      // ..." convention), which would otherwise read as two entries with
+      // the same number -- neither greater than the other -- and falsely
+      // flag the ticket as regressing against itself.
+      const seenInTicket = new Set<number>()
+      for (const match of haystack.matchAll(PR_NUMBER_RE)) {
+        const prNumber = Number.parseInt(match[1], 10)
+        if (seenInTicket.has(prNumber)) continue
+        seenInTicket.add(prNumber)
+        entries.push({ sprintNumber: sprint.number, ticketKey: ticket.key, prNumber })
       }
     }
   }
