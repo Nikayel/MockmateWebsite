@@ -5,6 +5,7 @@ import { requireTierForUser } from "@/lib/quota-enforcement"
 import { generatePersonalizedRoadmap } from "@/lib/roadmap/prioritization-algorithm"
 import { generateRAGEnhancedRoadmap, type RAGEnhancedRoadmap } from "@/lib/rag/roadmap-rag"
 import { scenarios } from "@/lib/scenarios"
+import { getCompanyById } from "@/lib/data/company-questions"
 import {
   UserRoadmapAssessment,
   PersonalizedRoadmap,
@@ -304,9 +305,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Membership, not just presence: an id outside the catalog would sail through
+    // resolveCategoryMix and the generator and come out as a silently broken roadmap.
+    // The wizard only offers catalog companies, so this rejects stale or hand-built
+    // payloads (the client restores saved walks from sessionStorage) rather than any
+    // path a user can reach normally.
+    if (!getCompanyById(targetCompany)) {
+      return NextResponse.json({ error: "Unknown target company" }, { status: 400 })
+    }
+
     // Calculate days remaining
     const now = new Date()
     const interview = new Date(interviewDate)
+    if (Number.isNaN(interview.getTime())) {
+      // Without this, daysRemaining is NaN and the generator divides work across it.
+      return NextResponse.json({ error: "Invalid interview date" }, { status: 400 })
+    }
     const daysRemaining = Math.max(
       1,
       Math.ceil((interview.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))

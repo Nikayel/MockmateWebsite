@@ -160,6 +160,15 @@ export default function NewRoadmapPage() {
       return
     }
 
+    // The saved id must still be in the catalog (the roster can change between save and
+    // resume, and the API now 400s on unknown companies). A stale walk starts over cleanly
+    // instead of auto-firing a doomed generation.
+    if (!getCompanyById(pending.companyId)) {
+      clearPendingWizard()
+      resetWizard()
+      return
+    }
+
     // Single shot: cleared before the attempt so a failure cannot loop. The one retryable
     // outcome, the Pro gate, saves the walk again itself inside generateRoadmap.
     clearPendingWizard()
