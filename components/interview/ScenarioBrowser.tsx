@@ -14,11 +14,13 @@ import { DSARoadmap } from "./DSARoadmap"
 import { InterviewTrackHeader } from "./InterviewTrackHeader"
 import { InterviewResumeNotice, InterviewTrackLanding } from "./InterviewTrackLanding"
 import { PatternBrowser } from "./PatternBrowser"
+import { RoadmapPitch } from "./RoadmapPitch"
 import { ScenarioFilters } from "./ScenarioFilters"
 import { ScenarioList } from "./ScenarioList"
 import { TrackViewTabs, type TrackViewTab } from "./TrackViewTabs"
 import {
   scenariosInTrack,
+  showsRoadmapPitch,
   trackProgress,
   willResumeExistingSession,
 } from "./interview-track-browsing"
@@ -32,6 +34,12 @@ interface ScenarioBrowserProps {
   usageLimit: UsageLimit | null
   completedProblems: string[]
   hasGuestBanner?: boolean
+  /**
+   * True when auth has resolved with no Firebase user (guests included). The page owns auth and
+   * only mounts this browser after resolution, so the flag can never flash the signed-out
+   * landing at a signed-in user mid-load.
+   */
+  isSignedOut?: boolean
 }
 
 /** DSA's own ways of looking at its problem set. Owned by the DSA track, not by the browser. */
@@ -56,6 +64,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   usageLimit,
   completedProblems,
   hasGuestBanner = false,
+  isSignedOut = false,
 }: ScenarioBrowserProps) {
   // Safe without a Suspense boundary of its own: page.tsx already wraps this whole tree in one.
   const searchParams = useSearchParams()
@@ -203,8 +212,14 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   // No track chosen. A deep link that is still resolving gets the holding state instead of the
   // picker, because page.tsx keeps this component mounted while `useSessionReopen` works and a
   // picker flashing in front of someone who already clicked their session is worse than nothing.
-  const renderUntracked = () =>
-    willResumeExistingSession(searchParams) ? <InterviewResumeNotice /> : <InterviewTrackLanding />
+  // A signed-out visitor on the truly bare address gets the roadmap pitch rather than the track
+  // cards; signed-in users keep the cards, and any named track/session/scenario bypasses the
+  // pitch entirely (see `showsRoadmapPitch`).
+  const renderUntracked = () => {
+    if (willResumeExistingSession(searchParams)) return <InterviewResumeNotice />
+    if (showsRoadmapPitch(searchParams, isSignedOut)) return <RoadmapPitch />
+    return <InterviewTrackLanding />
+  }
 
   return (
     <section className={`${topPadding} bg-background relative overflow-hidden pb-12`}>

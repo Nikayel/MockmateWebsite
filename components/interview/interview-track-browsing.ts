@@ -10,7 +10,7 @@
 
 import type { Scenario, ScenarioType } from "@/lib/scenarios/types"
 
-import type { InterviewTrack } from "./interview-tracks"
+import { INTERVIEW_TRACK_PARAM, type InterviewTrack } from "./interview-tracks"
 
 /**
  * The read side of a query string. Both `URLSearchParams` and Next's `ReadonlyURLSearchParams`
@@ -40,6 +40,37 @@ export function willResumeExistingSession(params: QueryParamReader | null | unde
   if (params.get("session")) return true
   // Case 2: a fresh run launched from the roadmap or the practice queue.
   return params.get("roadmap") === "true" || params.get("practice") === "true"
+}
+
+/**
+ * True when the address names interview work: a track to browse, a session to reopen, or a
+ * scenario to run. Checked on the raw params, not the resolved track, so `?track=junk` still
+ * counts as asking for a track and lands on the picker the way `findInterviewTrack` intends.
+ *
+ * Two callers deliberately share this one definition. `useSessionReopen` bounces a signed-out
+ * visitor with a spent trial to sign-in only when it is true (they are trying to open something
+ * the trial no longer covers), and the roadmap pitch below shows only when it is false, so the
+ * two can never disagree about what a bare landing is.
+ */
+export function requestsInterviewWork(params: QueryParamReader | null | undefined): boolean {
+  if (!params) return false
+  return Boolean(
+    params.get(INTERVIEW_TRACK_PARAM) || params.get("session") || params.get("scenario")
+  )
+}
+
+/**
+ * True when `/interview` should open on the roadmap pitch instead of the track cards: the
+ * visitor is signed out (guest-mode auto-entry included, since a guest has no Firebase user)
+ * and the address names nothing. The resume notice still takes precedence in `ScenarioBrowser`;
+ * that ordering is safe by construction, because a resume needs `?scenario=` and the pitch
+ * needs its absence.
+ */
+export function showsRoadmapPitch(
+  params: QueryParamReader | null | undefined,
+  isSignedOut: boolean
+): boolean {
+  return isSignedOut && !requestsInterviewWork(params)
 }
 
 /**

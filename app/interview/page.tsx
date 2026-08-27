@@ -2033,6 +2033,10 @@ function InterviewPageContent() {
           usageLimit={usageLimit}
           completedProblems={completedProblems}
           hasGuestBanner={isGuestMode && !showFeedback}
+          // Resolved by the time this renders: isLoading only flips false after
+          // useSessionReopen's auth check runs. Guests count as signed out on
+          // purpose, so the bare landing pitches the roadmap to them too.
+          isSignedOut={!firebaseUser}
         />
       )}
 
