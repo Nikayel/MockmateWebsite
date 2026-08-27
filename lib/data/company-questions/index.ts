@@ -91,9 +91,14 @@ export const COMPANY_TIERS = {
 
 /**
  * Get company data by ID
+ *
+ * Own-property check because COMPANY_MAP is a plain object: bare indexing with an
+ * untrusted id like "toString" or "constructor" would return an inherited function
+ * instead of undefined, quietly passing every "is this a real company?" guard built
+ * on this lookup (route validation, labs, the wizard's resume path).
  */
 export function getCompanyById(id: CompanyId): CompanyQuestionData | undefined {
-  return COMPANY_MAP[id]
+  return Object.hasOwn(COMPANY_MAP, id) ? COMPANY_MAP[id] : undefined
 }
 
 /**
