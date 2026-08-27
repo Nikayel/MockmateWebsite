@@ -155,10 +155,9 @@ it against a model answer. Level 0 through Level 11:
   which one actually improves recall on this material.
 - **Open learner model.** `/knowledge` shows the system's current belief about what you know, the
   evidence behind it, and a way to challenge or correct it.
-- **Company-specific prep.** 38 companies with pattern-frequency data, including Google, Meta,
-  Amazon, Apple, Netflix, Microsoft, Stripe, Airbnb, Uber, and Databricks.
 - **Personalized roadmap.** A prep plan built from your target company, interview date, and measured
-  skill gaps, blending DSA, bug-fix, and decomposition work.
+  skill gaps, blending DSA, bug-fix, and decomposition work. Company targeting spans 38 companies,
+  including Google, Meta, Amazon, Apple, Netflix, Microsoft, Stripe, Airbnb, Uber, and Databricks.
 - **Case labs.** Four company-style labs you carry end to end: 911 Dispatch Optimization, Usage
   Rollup Double-Count, Ontology Learning Round, and Billing Webhook Idempotency. They exercise
   the skills data and platform loops probe: idempotency, event ordering, deduplication, stale and
@@ -224,8 +223,6 @@ The Learn curriculum's reading half is free on every plan and requires no accoun
   $225/year for 35 sessions/month
 - [Why CodeSparring](https://www.codesparring.dev/why-codesparring): the retention science behind
   the product
-- [Company prep](https://www.codesparring.dev/interview-prep): 38 companies with pattern-frequency
-  data
 - [Sample graded interviews](https://www.codesparring.dev/samples): what the feedback reports look
   like
 - [Interview rounds](https://www.codesparring.dev/rounds): the round types the AI interviewer runs
