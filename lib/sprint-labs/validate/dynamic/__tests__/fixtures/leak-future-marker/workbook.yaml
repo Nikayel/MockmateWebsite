@@ -1,0 +1,20 @@
+# Fixture for lib/sprint-labs/validate/dynamic's own test suite. LEAK-101's
+# setup.diff deliberately embeds a future ticket's key AND its own hidden
+# test's humanName in a source comment -- proves scanProvisionedBundleContent
+# catches both leak classes. Not real learner content.
+id: dynamic-leak-future-marker
+title: "Dynamic gate provisioning-leak fixture"
+pitch: "A setup.diff that leaks a future ticket key and a hidden-test signature -- proves the provisioning scan catches both."
+track: "Test fixture"
+language: typescript
+level: "n/a"
+topics:
+  - arithmetic
+sprintCount: 1
+ticketCount: 2
+estimatedHours: 0
+requiresServerExecution: false
+objectives:
+  - id: arithmetic
+    label: "Arithmetic"
+    canDo: "n/a"

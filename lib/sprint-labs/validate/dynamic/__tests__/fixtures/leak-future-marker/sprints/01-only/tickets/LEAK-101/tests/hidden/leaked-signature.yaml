@@ -1,0 +1,6 @@
+humanName: "Escaped: this exact sentence must never appear in a provisioned learner bundle"
+tags:
+  - arithmetic
+kind: probe
+body: |
+  assert(true, "placeholder -- this fixture ticket is not run through the red/green gate")

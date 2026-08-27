@@ -1,0 +1,9 @@
+diff --git a/src/leaky.ts b/src/leaky.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/leaky.ts
+@@ -0,0 +1,3 @@
++// TODO: see LEAK-102 for the follow-up fix
++// Escaped: this exact sentence must never appear in a provisioned learner bundle
++export const leaky = 1

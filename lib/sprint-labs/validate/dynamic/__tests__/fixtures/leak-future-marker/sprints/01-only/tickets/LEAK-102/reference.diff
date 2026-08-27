@@ -1,0 +1,7 @@
+diff --git a/src/other.ts b/src/other.ts
+index 3333333..4444444 100644
+--- a/src/other.ts
++++ b/src/other.ts
+@@ -1,1 +1,1 @@
+-export const other = 1
++export const other = 2

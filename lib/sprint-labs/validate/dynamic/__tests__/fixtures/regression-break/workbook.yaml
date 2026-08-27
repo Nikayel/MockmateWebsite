@@ -1,0 +1,21 @@
+# Fixture for lib/sprint-labs/validate/dynamic's own test suite. REG-102's
+# reference.diff correctly fixes its own bug (src/util.ts) but ALSO
+# accidentally reverts REG-101's fix (src/math.ts) as a side effect -- proves
+# the regression gate catches a prior ticket's visible suite breaking. Not
+# real learner content.
+id: dynamic-regression-break
+title: "Dynamic gate regression-break fixture"
+pitch: "A reference.diff that fixes its own ticket but accidentally regresses an earlier one."
+track: "Test fixture"
+language: typescript
+level: "n/a"
+topics:
+  - arithmetic
+sprintCount: 1
+ticketCount: 2
+estimatedHours: 0
+requiresServerExecution: false
+objectives:
+  - id: arithmetic
+    label: "Arithmetic"
+    canDo: "n/a"

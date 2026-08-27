@@ -1,0 +1,7 @@
+humanName: "Escaped: multiplying by a zero count does not return zero"
+tags:
+  - arithmetic
+kind: probe
+body: |
+  const result = multiply(5, 0)
+  assert(result === 0, "multiplying by a zero count should give zero, got " + result)

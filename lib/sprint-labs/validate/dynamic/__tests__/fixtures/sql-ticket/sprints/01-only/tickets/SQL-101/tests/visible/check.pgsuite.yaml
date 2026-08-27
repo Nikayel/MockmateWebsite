@@ -1,0 +1,7 @@
+assertions:
+  - id: has-positive-five
+    humanName: "nums contains the value 5"
+    sql: "select n from nums;"
+    expect:
+      rows:
+        - [5]

@@ -1,0 +1,21 @@
+# Fixture for lib/sprint-labs/validate/dynamic's own test suite. Exercises the
+# SQL half of the replayer (buildPgSuiteForTicket -> runPgSuiteAndSummarize)
+# against an authored ticket -- see sql-replay.ts's header for why this
+# convention is a documented proposal, not a spec quote (no real SQL-shaped
+# Sprint Labs ticket exists anywhere yet). Not real learner content.
+id: dynamic-sql-ticket
+title: "Dynamic gate SQL ticket fixture"
+pitch: "A tiny SQL-routed ticket exercising buildPgSuiteForTicket + runPgSuiteAndSummarize."
+track: "Test fixture"
+language: sql
+level: "n/a"
+topics:
+  - arithmetic
+sprintCount: 1
+ticketCount: 1
+estimatedHours: 0
+requiresServerExecution: false
+objectives:
+  - id: arithmetic
+    label: "Arithmetic"
+    canDo: "n/a"
