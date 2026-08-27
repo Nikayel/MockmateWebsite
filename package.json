@@ -29,6 +29,7 @@
     "workbooks:compile": "tsx scripts/compile-workbooks.mjs",
     "lab:validate": "tsx scripts/lab-validate.mjs",
     "lab:validate:dynamic": "tsx scripts/lab-validate.mjs --dynamic",
+    "sprint-labs:dev": "node scripts/sprint-labs-dev.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:integration": "firebase emulators:exec --only firestore --project codesparring-integration \"vitest run --config vitest.integration.config.ts\"",
