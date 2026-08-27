@@ -146,18 +146,29 @@ describe("Sealing test 1 — every generated sealed module has the runtime windo
   })
 })
 
-describe("Sealing test 2 — sealed sprint-labs content is imported only by server routes", () => {
-  // Task 6 (runs) and Task 14 (Sable partner) add their own path here when
-  // they start calling loadSealedTicket/hasSealedTicket.
+describe("Sealing test 2 — sealed sprint-labs content is imported only by whitelisted server-side modules", () => {
+  // Task 6 (runs) adds its own path here if it starts calling
+  // loadSealedTicket/hasSealedTicket.
   //
   // Task 8 (grading/submit): lib/sprint-labs/grading/attempts-service.ts is
   // the ONLY file that imports the sealed registry for the attempts surface
   // — the three app/api/sprint-labs/attempts*/route.ts handlers stay thin
   // (parse -> auth -> validate -> service -> response, CLAUDE.md's house
   // style) and never import it directly, so they need no entry here.
-  const ALLOWED_IMPORTERS = new Set<string>(["lib/sprint-labs/grading/attempts-service.ts"])
+  //
+  // Task 14 (Sable partner): lib/sprint-labs/partner/resolve-mode.server.ts
+  // is the ONLY importer for the chat surface, for the same reason —
+  // app/api/sprint-labs/chat/route.ts stays thin and never imports
+  // loadSealedTicket directly. Kept out of lib/sprint-labs/partner/modes.ts
+  // (the pure resolver) deliberately: that file's TYPES must stay safe for a
+  // "use client" component (PartnerChat.tsx) to import, and
+  // registry.server.ts throws at module-load time in a browser.
+  const ALLOWED_IMPORTERS = new Set<string>([
+    "lib/sprint-labs/grading/attempts-service.ts",
+    "lib/sprint-labs/partner/resolve-mode.server.ts",
+  ])
 
-  it("only the whitelisted server routes import the sealed sprint-labs registry loader", () => {
+  it("only the whitelisted server-side modules import the sealed sprint-labs registry loader", () => {
     const importers = grepImporters("scenarios/sealed/sprint-labs/registry.server").filter(
       (path) => !path.includes("__tests__") && !path.startsWith("lib/scenarios/sealed/")
     )
