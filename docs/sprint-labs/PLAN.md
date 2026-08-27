@@ -34,9 +34,9 @@ Numbered tasks for the SDD loop. Spec authority: `WORKBOOK-SPEC.md`,
 Owned: `lib/sprint-labs/types.ts`, `lib/sprint-labs/platform-capabilities.ts`,
 `lib/sprint-labs/__tests__/types.test.ts`. Touch-with-care (additive lines
 only): `lib/feature-flags.ts` (add `SPRINT_LABS_ENABLED: false`),
-`lib/usage/services.ts` (append `"sprint-labs-chat"`,
-`"sprint-labs-grading"`, `"sprint-labs-validate"`),
-`docs/FIREBASE_STRUCTURE.md` (new collections section).
+`docs/FIREBASE_STRUCTURE.md` (new collections section). Service ids
+register with their call sites in Tasks 8/9/14, never earlier — the
+services-registry no-dead-entries test enforces this (ruling R9).
 
 Define (Zod schema + inferred type for anything crossing a trust boundary):
 - `WorkbookSummary` (catalog card: id, title, pitch, track, language, level,
@@ -241,8 +241,10 @@ grading.test.ts`, `__tests__/filter-directives.test.ts`. Touch-with-care:
 `lib/types.ts` (add `sprint_score_breakdown` sibling field),
 `lib/types/dsa-patterns.ts` (add `SPRINT_LAB: "sprint-lab"`),
 `lib/sprint-labs/mastery.ts` (recordSprintLabMastery →
-`completeSessionWithMastery`), `firestore.rules` (attempts read-only to
-owner, writes admin-only).
+`completeSessionWithMastery`), `lib/usage/services.ts` (append
+`"sprint-labs-grading"` with its call site, per R9). Verify Task 6's
+firestore.rules attempts block covers this task's needs (R5: Task 6 owns
+all rules; do not edit firestore.rules here).
 
 Scoring per WORKBOOK-SPEC §5: Understanding (files-touched vs reference
 manifest, time-to-first-edit), Problem-Solving (visible+hidden pass rates),
@@ -266,7 +268,8 @@ pastes test run.
 
 Owned: `lib/sprint-labs/validate/contamination.ts`, script flag
 `--contamination` in `scripts/lab-validate.mjs`, tests with a stubbed model
-seam. Touch-with-care: none.
+seam. Touch-with-care: `lib/usage/services.ts` (append
+`"sprint-labs-validate"` with its call site, per R9).
 
 Cold one-shot pinned-model run per ticket: prompt = ticket body + visible
 test sources only; model must output which hidden tests it can guess
@@ -359,8 +362,9 @@ typecheck/lint.
 Owned: `lib/sprint-labs/partner/**` (context builders A/B/C/D, mode
 resolver, prompt), `app/api/sprint-labs/chat/route.ts`,
 `components/sprint-labs/workspace/PartnerChat.tsx`,
-`lib/sprint-labs/partner/__tests__/**`. Touch-with-care: none (transcript
-shape landed in Task 1/6).
+`lib/sprint-labs/partner/__tests__/**`. Touch-with-care:
+`lib/usage/services.ts` (append `"sprint-labs-chat"` with its call site,
+per R9); otherwise none (transcript shape landed in Task 1/6).
 
 Fork the Case Lab chat trio per INTEGRATION §4. Layers: A = workbook
 invariants (from public bundle, MERIDIAN.md source), B = generated map
