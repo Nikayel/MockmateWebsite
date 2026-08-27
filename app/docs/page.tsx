@@ -220,7 +220,7 @@ export default function DocsPage() {
                   size="lg"
                   className="bg-card text-foreground hover:bg-muted rounded-full px-8"
                 >
-                  Start Practicing
+                  Start Free
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>

@@ -142,7 +142,7 @@ export default function SamplesPage() {
                 size="lg"
                 className="bg-accent hover:bg-accent/90 text-accent-foreground px-8 py-4 text-lg"
               >
-                Start Practicing Free
+                Start Free
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
