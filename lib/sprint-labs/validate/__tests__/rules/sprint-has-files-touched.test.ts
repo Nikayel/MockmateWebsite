@@ -20,4 +20,10 @@ describe(RULE_ID, () => {
     const findings = sprintHasFilesTouched(workbook).filter((f) => f.ruleId === RULE_ID)
     expect(findings).toHaveLength(0)
   })
+
+  it("regression (review round 2, item 3): passes a sprint with zero tickets and no filesTouched -- there's nothing to have forgotten yet", () => {
+    const workbook = loadWorkbookTree(join(FIXTURES, "zero-tickets-green"))
+    const findings = sprintHasFilesTouched(workbook).filter((f) => f.ruleId === RULE_ID)
+    expect(findings).toHaveLength(0)
+  })
 })

@@ -1,0 +1,6 @@
+# No tickets/ directory at all yet (a stub sprint, e.g. before Task 16's
+# ticket stubs land) and no filesTouched -- must NOT be flagged, since the
+# rule's whole premise is "a sprint that SHIPS tickets ships code changes."
+# A sprint with zero tickets has nothing to have forgotten.
+number: 1
+title: "Foundations"
