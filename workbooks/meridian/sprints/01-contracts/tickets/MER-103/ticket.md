@@ -23,3 +23,5 @@ From the adjuster's message:
 The list endpoint pages by an offset and a page size. New claims keep arriving while someone is paging through, which shifts every row after the insert point by one. Nobody plans around that when they wire up an offset query, and the deep-page slowness is a related symptom of the same design.
 
 Product's ask so far has just been "make the list not be slow," which does not by itself explain the duplicate row.
+
+Whatever you prove this with will need two claims recorded in the exact same millisecond on purpose, because that's the case an offset query gets wrong in a way a cursor has to get right on purpose too. A real clock will not reliably land two separate inserts on the same millisecond for you, so the workspace already gives you a way to seed a claim with whatever timestamp you choose instead of whatever the clock happens to say. The old, unused fixture list is gone; use that instead.
