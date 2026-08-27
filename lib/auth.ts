@@ -38,7 +38,6 @@ export const DEFAULT_REDIRECT_PATH = "/dashboard"
 const ALLOWED_REDIRECT_PATHS = [
   "dashboard",
   "interview",
-  "interview-prep",
   "practice",
   "account",
   "profile",

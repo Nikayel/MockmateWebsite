@@ -38,7 +38,6 @@
  */
 import type { MetadataRoute } from "next"
 import { getAllBlogPosts } from "@/lib/mdx"
-import { ALL_COMPANIES } from "@/lib/data/company-questions"
 import { listCaseLabs } from "@/lib/labs/case-labs"
 import { absoluteUrl } from "@/lib/seo/site"
 import {
@@ -225,22 +224,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }))
 
-  // Interview prep pages - high SEO value
-  const interviewPrepPages: MetadataRoute.Sitemap = [
-    {
-      url: absoluteUrl("/interview-prep"),
-      changeFrequency: "weekly",
-      priority: 0.9,
-    },
-    // Individual company prep pages
-    ...ALL_COMPANIES.map((company) => ({
-      url: absoluteUrl(`/interview-prep/${company.id}`),
-      changeFrequency: "monthly" as const,
-      priority: 0.85,
-    })),
-  ]
-
-  // Roadmap preview page
+  // Roadmap preview page. Also where the retired /interview-prep family 308s (next.config.mjs).
   const roadmapPages: MetadataRoute.Sitemap = [
     {
       url: absoluteUrl("/roadmap/preview"),
@@ -319,7 +303,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   return [
     ...marketingPages,
-    ...interviewPrepPages,
     ...roadmapPages,
     ...blogListPage,
     ...blogPostPages,
