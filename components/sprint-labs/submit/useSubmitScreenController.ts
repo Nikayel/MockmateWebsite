@@ -12,23 +12,27 @@
  * has a finalized result this tab cannot see) and only calls the network on
  * an explicit `start()`.
  *
- * ## The gate-execution seam (Task 13 report, item 1)
+ * ## The gate-execution seam (Task 13 report, item 1 — now wired, runtimeB task)
  *
- * `completeAttempt` is called with EMPTY `ioCaseOutputs`/`probeResults` and
- * no `visibleResults`/`regressionResults`/`adversaryResults`. There is no
- * Sprint-Labs-specific in-browser executor to run the learner's saved files
- * against the issued hidden io-cases yet (`lib/workspace-execution` is
- * scenario/pack-shaped, not wired to this ticket model — confirmed by
- * searching the tree before writing this). This is REAL behavior of the
- * real, unmodified API given no execution input, not a fabricated result:
- * every issued hidden case reads as failed (`gate-runner.ts`'s documented
- * "issued but unposted counts as failed" rule) and the three aggregate gates
- * read as `"errored"` ("this gate could not run", never a false failure).
- * Wiring a real executor is a single, isolated change at this call site.
+ * `completeAttempt` is now called with the REAL `ioCaseOutputs` the client-side io-case executor
+ * (`lib/sprint-labs/runtime/io-case-executor.ts`) produces by running the learner's CURRENT
+ * workspace files (seed + saved overlay — `fetchSprintLabWorkspaceFiles` +
+ * `reassembleWorkspaceFiles`, the same recipe `useSprintLabRunSync` uses for the workspace screen)
+ * against every io-case the open call issued. This never compares to an expected value client-side
+ * — the executor has no expecteds, only raw outputs; `gate-runner.ts` (server-side) is the only
+ * place a real comparison happens. `probeResults`/`visibleResults`/`regressionResults`/
+ * `adversaryResults` are still not wired here (out of this task's scope — see
+ * task-runtimeB-report.md), so the visible/regression/adversary gates still read as `"errored"`;
+ * only the HIDDEN gate is now fed real per-case outputs.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { AiPolicy, GateResult, TicketBoardStatus } from "@/lib/sprint-labs/types"
+import {
+  fetchSprintLabWorkspaceFiles,
+  reassembleWorkspaceFiles,
+} from "@/lib/sprint-labs/runs-client"
+import { runIoCases, toIoCaseOutputs } from "@/lib/sprint-labs/runtime/io-case-executor"
 import {
   cacheCompletedOutcome,
   completeAttempt,
@@ -37,6 +41,15 @@ import {
   openAttempt,
   type CachedAttempt,
 } from "./attempt-client"
+
+/**
+ * No compiled field carries a ticket's editable `src/` seed content yet (the same documented gap
+ * `WorkspaceView.tsx`'s own header names) — an empty seed here is not a shortcut, it is the ONLY
+ * correct value today. Reassembling against it (rather than against the overlay alone) means this
+ * call site lights up unchanged the moment that field exists, exactly like `WorkspaceView.tsx`'s
+ * own `EMPTY_SOURCE_SEED`.
+ */
+const EMPTY_SOURCE_SEED: Array<{ path: string; content: string }> = []
 
 export type SubmitPhase =
   | "loading"
@@ -133,12 +146,24 @@ export function useSubmitScreenController({
       return
     }
 
-    // Documented seam — see file header. Empty until a real in-browser executor is wired in.
+    // Real execution — see file header. Runs the LEARNER's current workspace code against every
+    // issued io-case; never the reference solution, never a comparison (the client has no
+    // expecteds). A load failure degrades to an empty file set rather than aborting the submit —
+    // every issued case then reports its own "did not run" captured error (still never a crash),
+    // consistent with how a genuinely-missing file already reads server-side.
+    const filesResult = await fetchSprintLabWorkspaceFiles(runId)
+    const workspaceFiles = reassembleWorkspaceFiles(
+      EMPTY_SOURCE_SEED,
+      filesResult.ok ? filesResult.files : []
+    )
+    const executions = await runIoCases(workspaceFiles, opened.data.ioCases)
+    const ioCaseOutputs = toIoCaseOutputs(executions)
+
     const completed = await completeAttempt({
       runId,
       ticketKey,
       attemptId: opened.data.attemptId,
-      ioCaseOutputs: {},
+      ioCaseOutputs,
       probeResults: {},
     })
     if (!completed.ok) {
