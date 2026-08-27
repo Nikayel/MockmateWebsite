@@ -4,13 +4,19 @@
  * own title/body prose (SPRINT-PLAN.md's ticket table rows read like
  * "Review: agent PR #412 ..."), not a structured frontmatter field.
  *
- * Review round 1, M-2: scan every ticket, not just `review-only` ones
- * (a PR can be mentioned in passing on any ticket type), using a GLOBAL
- * match so a ticket that mentions more than one PR number contributes all
- * of them, not just the first. Deliberately does not hardcode Meridian's
- * specific allocation table (#412, #418, ...) -- that is content Task 16
- * is responsible for authoring correctly; this rule checks the general
- * invariant so it stays useful for any workbook, not just Meridian.
+ * Review round 1, M-2: scan every ticket, not just `review-only` ones (a
+ * PR can be mentioned in passing on any ticket type), using a GLOBAL match
+ * so a ticket that mentions more than one PR number isn't reduced to just
+ * the first. Deliberately does not hardcode Meridian's specific allocation
+ * table (#412, #418, ...) -- that is content Task 16's job; this rule
+ * checks the general invariant so it stays useful for any workbook.
+ *
+ * Review round 2, item 2: a ticket's body can legitimately cite an OLDER
+ * PR for context ("follows up on #500; #480 didn't fix it") -- reproduced
+ * empirically as a false self-regression when every mention became its own
+ * entry. Fixed by never comparing two numbers mentioned by the SAME
+ * ticket: each ticket contributes exactly one entry, its MAXIMUM mentioned
+ * PR number, and monotonicity is enforced only across DIFFERENT tickets.
  */
 
 import type { AuthoredWorkbook } from "../tree"
@@ -33,17 +39,13 @@ export function prNumbersMonotonic(workbook: AuthoredWorkbook): ValidationFindin
   for (const sprint of workbook.sprints) {
     for (const ticket of sprint.tickets) {
       const haystack = `${ticket.title ?? ""}\n${ticket.bodyMd}`
-      // Dedupe within one ticket: a ticket's own PR number routinely
-      // appears in both its title and body (the "Review: agent PR #412
-      // ..." convention), which would otherwise read as two entries with
-      // the same number -- neither greater than the other -- and falsely
-      // flag the ticket as regressing against itself.
-      const seenInTicket = new Set<number>()
+      let maxPrNumber: number | null = null
       for (const match of haystack.matchAll(PR_NUMBER_RE)) {
         const prNumber = Number.parseInt(match[1], 10)
-        if (seenInTicket.has(prNumber)) continue
-        seenInTicket.add(prNumber)
-        entries.push({ sprintNumber: sprint.number, ticketKey: ticket.key, prNumber })
+        if (maxPrNumber === null || prNumber > maxPrNumber) maxPrNumber = prNumber
+      }
+      if (maxPrNumber !== null) {
+        entries.push({ sprintNumber: sprint.number, ticketKey: ticket.key, prNumber: maxPrNumber })
       }
     }
   }

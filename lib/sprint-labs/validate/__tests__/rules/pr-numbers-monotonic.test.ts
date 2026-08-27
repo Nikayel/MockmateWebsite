@@ -32,4 +32,17 @@ describe(RULE_ID, () => {
     const findings = prNumbersMonotonic(workbook).filter((f) => f.ruleId === RULE_ID)
     expect(findings).toHaveLength(0)
   })
+
+  it("regression (review round 2, item 2): flags a later ticket whose MAX mentioned PR number is still below an earlier ticket's max", () => {
+    const workbook = loadWorkbookTree(join(FIXTURES, "cross-ticket-max-regression-red"))
+    const findings = prNumbersMonotonic(workbook).filter((f) => f.ruleId === RULE_ID)
+    expect(findings).toHaveLength(1)
+    expect(findings[0].ticketKey).toBe("MER-206")
+  })
+
+  it("passes the reviewer's self-citation repro: a ticket citing an older PR for context ('follows up on #500; #480 didn't fix it') never self-flags", () => {
+    const workbook = loadWorkbookTree(join(FIXTURES, "self-citation-green"))
+    const findings = prNumbersMonotonic(workbook).filter((f) => f.ruleId === RULE_ID)
+    expect(findings).toHaveLength(0)
+  })
 })
