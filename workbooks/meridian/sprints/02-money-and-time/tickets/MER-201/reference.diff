@@ -297,8 +297,8 @@ index f32d569..e44fce8 100644
 +
 +/**
 + * The v1 wire representation of an exact `Money` value: a major-unit decimal number, the same
-+ * shape this API served before MER-201 existed. This is "the v1 money serializer" MER-204 keeps
-+ * unchanged and MER-205 traces an audit-hash mismatch back to - see those tickets. Converting
++ * shape this API served before this ticket existed. This is the one v1 money serializer, kept
++ * unchanged by every wire-format change that follows it in this codebase's future. Converting
 + * minor units back to a float is lossless for display (10^-scale of an exact integer is exactly
 + * representable for every scale this table uses), but the result is a float again, which is
 + * exactly why nothing downstream of the HTTP response body may ever read it back in as the
