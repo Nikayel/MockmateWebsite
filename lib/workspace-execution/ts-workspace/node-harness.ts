@@ -88,6 +88,18 @@ function cleanPath(path: string): string {
   return path.replace(/^\.\//, "")
 }
 
+/** Duck-typed message check (not `instanceof Error`), matching js-sandbox-worker.js's identical
+ *  per-file setup-failure catch so the SAME underlying failure produces the SAME error text on
+ *  both sides. */
+function hasMessage(value: unknown): value is { message: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "message" in value &&
+    typeof (value as { message: unknown }).message === "string"
+  )
+}
+
 /**
  * Applies learner edits over matching paths in `files`. Simpler than the browser's
  * `overlayWorkspaceFiles` (no `editableFilePaths` allowlist): this harness is an internal CI/test
@@ -218,7 +230,7 @@ export async function runTsWorkspace(input: TsWorkspaceInput): Promise<TsWorkspa
           suite: normalized,
           name: "Test file failed to load",
           passed: false,
-          error: error instanceof Error ? error.message : String(error),
+          error: hasMessage(error) ? error.message : String(error),
           isHidden: hiddenTestPaths.includes(normalized),
         })
       }

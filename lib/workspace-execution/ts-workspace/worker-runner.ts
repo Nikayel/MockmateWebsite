@@ -114,14 +114,19 @@ function getTsWorker(): Worker {
     }
 
     tsWorker.onerror = (error) => {
-      if (!pendingRun) return
-      clearTimeout(pendingRun.timeoutId)
-      const statusLogs = pendingRun.logs
-      resolveActive({
-        success: false,
-        logs: statusLogs,
-        error: error.message || "Unknown worker error",
-      })
+      // resetTsWorker() must run regardless of whether there was an active pending run: an error
+      // event on a worker with no pendingRun (a stray/late event after a run already settled)
+      // used to early-return before reaching it, leaving a worker that just errored alive to be
+      // reused by the next getTsWorker() call.
+      if (pendingRun) {
+        clearTimeout(pendingRun.timeoutId)
+        const statusLogs = pendingRun.logs
+        resolveActive({
+          success: false,
+          logs: statusLogs,
+          error: error.message || "Unknown worker error",
+        })
+      }
       resetTsWorker()
     }
   }
@@ -179,7 +184,14 @@ function startTsRun(
     // worker reports `exec-start` (immediately, with no transpile-start at all, for a workspace
     // with no .ts/.tsx files).
     const timeoutId = setTimeout(() => {
-      resolveActive({ success: false, logs: [], error: TRANSPILE_TIMEOUT_MESSAGE })
+      // `pendingRun` is guaranteed set by the time this fires (it is assigned synchronously right
+      // after this timer is created, below) — read its accumulated logs (e.g. the "Transpiling
+      // TypeScript..." status entry) rather than discarding them.
+      resolveActive({
+        success: false,
+        logs: pendingRun ? pendingRun.logs : [],
+        error: TRANSPILE_TIMEOUT_MESSAGE,
+      })
       resetTsWorker()
     }, transpileTimeoutMs)
 

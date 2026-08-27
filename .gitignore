@@ -80,8 +80,10 @@ docs/._*
 # Vendored TypeScript compiler build for the Sprint Labs worker
 # (public/vendor/typescript/typescript.js). Regenerated from node_modules/typescript by
 # scripts/copy-ts-vendor.mjs on every `pnpm install` (postinstall); never commit it, or it will
-# drift from the pinned devDependency version instead of tracking it.
-/public/vendor/
+# drift from the pinned devDependency version instead of tracking it. Scoped to this one
+# subdirectory, not all of public/vendor/, so a future hand-committed vendor asset elsewhere under
+# public/vendor/ is not silently swallowed by this rule.
+/public/vendor/typescript/
 
 # Firebase emulator artifacts (pnpm test:integration)
 firestore-debug.log
