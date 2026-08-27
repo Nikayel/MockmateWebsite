@@ -128,7 +128,7 @@ export function Footer() {
                     href="/interview"
                     className="text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    Try It Free
+                    Start Free
                   </a>
                 </li>
                 <li>
