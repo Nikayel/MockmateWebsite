@@ -1,0 +1,14 @@
+diff --git a/learner.sql b/learner.sql
+new file mode 100644
+index 0000000..b3050e0
+--- /dev/null
++++ b/learner.sql
+@@ -0,0 +1 @@
++insert into nums (n) values (-5);
+diff --git a/migrations/0001_nums.sql b/migrations/0001_nums.sql
+new file mode 100644
+index 0000000..efa3548
+--- /dev/null
++++ b/migrations/0001_nums.sql
+@@ -0,0 +1 @@
++create table nums (n int not null);

@@ -21,7 +21,31 @@
  *    which only the materialized (diff-applied) tree can represent.
  *  - `assertions[]`/`seedSql`/`options` = parsed from the ticket's OWN `tests/visible/*.pgsuite.yaml`
  *    (or `.yml`/`.json`) descriptor -- a new, minimal shape this task introduces (`{seedSql?,
- *    assertions[], options?}`), not an authored convention that predates this task.
+ *    assertions[], options?}`), not an authored convention that predates this task -- CONCATENATED
+ *    with this ticket's SEALED hidden assertions (below), so `assertions[]` always carries both
+ *    tiers together in one `PgSuite`.
+ *
+ * SEALED SQL HIDDEN ASSERTIONS (closes the S3 review's Critical finding -- a dormant answer leak):
+ * a `tests/hidden/*.yaml` file authored with `kind: sql-assertion` (validated at compile time by
+ * `lib/scenarios/sealed/sprint-labs/schemas.ts`'s `sealedSqlHiddenAssertionSchema`, sealed by
+ * `scripts/compile-workbooks.mjs` into the SEALED bundle only -- never the public one) is this
+ * ticket's hidden tier, read here directly off `AuthoredTicket.hiddenTests` (the authoring tree,
+ * exactly like every other hidden-test kind `lab validate` reads pre-compile -- see
+ * `hidden-tests.ts`'s own header for why this module reads the authoring tree directly rather than
+ * a compiled bundle). `hiddenAssertionsForTicket` below filters to `kind === "sql-assertion"` and
+ * reads `raw.sql`/`raw.expect` straight off `AuthoredHiddenTest.raw` (an untyped bag -- this module
+ * validates nothing here, mirroring how `toAssertions` below silently drops a structurally invalid
+ * VISIBLE assertion rather than crash; a genuinely malformed hidden entry is a `lab validate`
+ * STATIC-rule concern, out of this task's owned files, not a reason for the dynamic gate to throw).
+ *
+ * These hidden assertions are concatenated onto the SAME `assertions[]` array the visible
+ * descriptor's assertions populate, not run as a separate suite: `pg-suite-core.mjs`'s own
+ * `isHiddenAssertion` already infers hidden-ness from `${id} ${humanName}` containing "hidden"
+ * (case-insensitive) -- the exact convention every hidden SQL assertion in this codebase already
+ * uses for its id (a "hidden-" prefix) -- so the resulting `WorkspaceTestResult[]` carries a correct
+ * `isHidden` per assertion with no new field needed here. That is what lets red-green.ts's
+ * `runSqlRedGreen` reuse `splitVerdict`/`redTierViolations`/`greenTierViolated` (written for the TS
+ * path) UNCHANGED for SQL: same generic `WorkspaceTestResult[]` shape, same `isHidden` semantics.
  *
  * A SQL-routed ticket (`language.ts`) with no recognized descriptor is a `{gap}` result, not a
  * crash or a silent skip -- red-green.ts surfaces it as a named finding, the same honesty pattern
@@ -61,6 +85,37 @@ function toAssertions(value: unknown): PgSuiteAssertion[] {
   )
 }
 
+/**
+ * Reconstructs `PgSuiteAssertion.expect`'s four shapes from an untyped, authored value -- returns
+ * `null` for anything else (see this file's header: a malformed hidden entry is silently excluded,
+ * matching `toAssertions`' own tolerance for a malformed VISIBLE assertion just below).
+ */
+function toExpect(value: unknown): PgSuiteAssertion["expect"] | null {
+  if (value === "zero-rows" || value === "raises") return value
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>
+    if (typeof record.raises === "string") return { raises: record.raises }
+    if (Array.isArray(record.rows)) return { rows: record.rows as unknown[][] }
+  }
+  return null
+}
+
+/** This ticket's SEALED SQL hidden assertions (`tests/hidden/*.yaml`, `kind: sql-assertion`),
+ *  read directly off the already-loaded `AuthoredTicket.hiddenTests` -- see this file's header for
+ *  why this is the authoring tree, not a compiled bundle, and why a malformed entry (missing/wrong-
+ *  shaped `sql`/`expect`) is silently excluded rather than thrown. */
+function hiddenAssertionsForTicket(ticket: AuthoredTicket): PgSuiteAssertion[] {
+  const assertions: PgSuiteAssertion[] = []
+  for (const hidden of ticket.hiddenTests) {
+    if (hidden.kind !== "sql-assertion") continue
+    const sql = typeof hidden.raw.sql === "string" ? hidden.raw.sql : null
+    const expect = toExpect(hidden.raw.expect)
+    if (!sql || expect === null) continue
+    assertions.push({ id: hidden.fileName, humanName: hidden.humanName, sql, expect })
+  }
+  return assertions
+}
+
 function findPgSuiteDescriptor(ticket: AuthoredTicket): Record<string, unknown> | null {
   const visibleDir = join(ticket.dirPath, "tests", "visible")
   if (!existsSync(visibleDir)) return null
@@ -86,9 +141,13 @@ export interface BuildPgSuiteOk {
   suite: PgSuite
 }
 
-/** Builds this ticket's `PgSuite` from its `tests/visible/*.pgsuite.yaml` descriptor plus the
- *  materialized tree's `migrations/*.sql` files. Returns a `{gap}` (never throws) when no
- *  descriptor is authored -- see this file's header for why that is an honest gap, not a crash. */
+/** Builds this ticket's `PgSuite` from its `tests/visible/*.pgsuite.yaml` descriptor (visible tier)
+ *  CONCATENATED with its sealed `tests/hidden/*.yaml` (`kind: sql-assertion`) assertions (hidden
+ *  tier) -- see this file's header, "SEALED SQL HIDDEN ASSERTIONS" -- plus the materialized tree's
+ *  `migrations/*.sql` files. Returns a `{gap}` (never throws) when no VISIBLE descriptor is
+ *  authored -- see this file's header for why that is an honest gap, not a crash. A ticket with a
+ *  visible descriptor but zero hidden assertions builds exactly the suite this function always
+ *  built before the hidden tier existed (unchanged behavior). */
 export function buildPgSuiteForTicket(
   ticket: AuthoredTicket,
   materializedFiles: MaterializedFile[]
@@ -106,7 +165,7 @@ export function buildPgSuiteForTicket(
     }
   }
 
-  const assertions = toAssertions(descriptor.assertions)
+  const assertions = [...toAssertions(descriptor.assertions), ...hiddenAssertionsForTicket(ticket)]
   if (assertions.length === 0) {
     return {
       gap: {
@@ -114,7 +173,7 @@ export function buildPgSuiteForTicket(
         severity: "warn",
         ticketKey: ticket.key,
         message:
-          "ticket's *.pgsuite.yaml descriptor has zero valid assertions; excluded from the dynamic red/green gate.",
+          "ticket's *.pgsuite.yaml descriptor and sealed tests/hidden/ have zero valid assertions between them; excluded from the dynamic red/green gate.",
       },
     }
   }

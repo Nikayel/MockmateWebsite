@@ -1,0 +1,7 @@
+humanName: "Escaped: a hidden check that never actually looks at nums"
+tags: []
+kind: sql-assertion
+sql: "select 1;"
+expect:
+  rows:
+    - [1]

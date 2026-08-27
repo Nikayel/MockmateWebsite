@@ -1,0 +1,21 @@
+# Fixture for lib/sprint-labs/validate/dynamic's own test suite. Exercises the SQL hidden tier's
+# tier-independent RED check (runSqlRedGreen reusing redTierViolations, the sealed SQL-hidden-test
+# subsystem's fix for the S3 review's second finding): a hidden SQL assertion that does not
+# discriminate between the buggy setup state and the fixed reference state must fail the gate (an
+# escape test that does not catch its own escape). Not real learner content.
+id: dynamic-sql-hidden-tier-ticket
+title: "Dynamic gate SQL hidden-tier fixture"
+pitch: "A tiny SQL-routed ticket whose hidden tier is non-discriminating, exercising the tier-independent RED check."
+track: "Test fixture"
+language: sql
+level: "n/a"
+topics:
+  - arithmetic
+sprintCount: 1
+ticketCount: 1
+estimatedHours: 0
+requiresServerExecution: false
+objectives:
+  - id: arithmetic
+    label: "Arithmetic"
+    canDo: "n/a"

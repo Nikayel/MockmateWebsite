@@ -104,6 +104,46 @@ describe("runDynamicGateForTicket routes a sql-labeled ticket through the SQL pa
   }, 20_000)
 })
 
+// ============================================================
+// The sealed SQL-hidden-test subsystem's tier-independent RED check
+// (red-green.ts's runSqlRedGreen, rewritten to reuse splitVerdict/
+// redTierViolations exactly like runTsRedGreen -- the S3 review's second
+// finding: SQL suites had no way to even author a hidden tier that reached
+// this gate, let alone one checked independently of the visible tier).
+// ============================================================
+
+describe("runSqlRedGreen's hidden tier is genuinely red->green-verified, tier-independently", () => {
+  it("buildPgSuiteForTicket concatenates the sealed tests/hidden/*.yaml (kind: sql-assertion) assertions onto the visible descriptor's own", () => {
+    const workbook = loadWorkbookTree(join(FIXTURES, "sql-hidden-tier"))
+    const { ticket } = findTicketLocation(workbook, "SQLHID-1")
+    const materialized = materializeThroughSetup(workbook, "SQLHID-1")
+    try {
+      expect(materialized.failure).toBeNull()
+      const built = buildPgSuiteForTicket(ticket, readAllFiles(materialized.ws))
+      expect("suite" in built).toBe(true)
+      if (!("suite" in built)) throw new Error("expected a suite, got a gap")
+      // 1 visible (has-positive-five) + 1 hidden (hidden-always-true).
+      expect(built.suite.assertions).toHaveLength(2)
+      expect(built.suite.assertions.map((a) => a.id)).toEqual(
+        expect.arrayContaining(["has-positive-five", "hidden-always-true"])
+      )
+    } finally {
+      cleanupGitWorkspace(materialized.ws)
+    }
+  })
+
+  it("RED CASE: a non-discriminating hidden SQL assertion that already passes against the buggy setup state is a dynamic-red-green ERROR (an escape test that does not catch its own escape)", async () => {
+    const workbook = loadWorkbookTree(join(FIXTURES, "sql-hidden-tier"))
+    const { ticket } = findTicketLocation(workbook, "SQLHID-1")
+
+    const findings = await runDynamicGateForTicket(workbook, ticket)
+
+    expect(findings).toHaveLength(1)
+    expect(findings[0]).toMatchObject({ ruleId: "dynamic-red-green", severity: "error" })
+    expect(findings[0].message).toMatch(/hidden tier did not fail in the red state/)
+  }, 20_000)
+})
+
 // Sanity: materializeThroughReference genuinely produces the fixed learner.sql (guards against a
 // regression to the bug this task's own SQL-path work found and fixed -- learnerSql being read
 // from the ticket's static authoring dir instead of the materialized tree, which can never

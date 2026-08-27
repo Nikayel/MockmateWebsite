@@ -21,6 +21,17 @@
  * run) is a hard `dynamic-red-green` ERROR before either tier is ever inspected -- Important 1 of
  * the same review round: an empty `results` array must never read as "vacuously passed" the way an
  * empty TIER legitimately can.
+ *
+ * `splitVerdict`/`redTierViolations`/`greenTierViolated`/`tierLabel` are runtime-agnostic (they
+ * operate on the generic `WorkspaceTestResult[]` shape every workspace runner returns, keyed only on
+ * `.isHidden`/`.passed`), so `runSqlRedGreen` reuses them UNCHANGED for the SQL path (the sealed
+ * SQL-hidden-test subsystem's fix): before this, SQL had no way to even author a sealed hidden tier
+ * that reached this gate at all, and this file's SQL check was one combined `allPassed` union across
+ * whatever assertions existed -- the exact hole Critical 1 above closed for TS, now also closed here.
+ * `sql-replay.ts`'s `buildPgSuiteForTicket` concatenates the ticket's sealed hidden assertions onto
+ * the same suite the visible descriptor populates; `pg-suite-core.mjs`'s own `isHiddenAssertion`
+ * (an id/humanName containing "hidden") is what tags the resulting results with `isHidden`, so no
+ * new tier-detection logic was needed here, only reuse of what RED/GREEN already required per tier.
  */
 import type { WorkspaceExecutionResult, WorkspaceTestResult } from "@/lib/workspace-execution/types"
 
@@ -223,6 +234,20 @@ async function runTsRedGreen(
   return findings
 }
 
+/**
+ * SQL's red/green check, rewritten to be TIER-INDEPENDENT exactly like `runTsRedGreen` (the
+ * SQL-hidden-test subsystem's fix for the second half of the S3 review's finding: SQL suites
+ * previously had no way to even AUTHOR a hidden tier that reached this gate, and this function's
+ * old shape checked `allPassed` as one combined union across visible+hidden regardless -- the same
+ * hole Critical 1 closed for TS). `buildPgSuiteForTicket` (sql-replay.ts) now concatenates the
+ * ticket's sealed `tests/hidden/*.yaml` (`kind: sql-assertion`) assertions onto the same
+ * `assertions[]` the visible descriptor populates, and `pg-suite-core.mjs`'s own `isHiddenAssertion`
+ * heuristic (an id/humanName containing "hidden") tags each resulting `WorkspaceTestResult` with
+ * `isHidden` -- the exact shape `splitVerdict`/`redTierViolations`/`greenTierViolated` already
+ * consume for the TS path, reused here UNCHANGED rather than reimplemented: a SQL ticket's hidden
+ * tier must now show at least one failure in the red state (an escape test that does not catch its
+ * own escape is caught, not silently waved through), and both tiers must fully pass in green.
+ */
 async function runSqlRedGreen(
   workbook: AuthoredWorkbook,
   ticket: AuthoredTicket
@@ -241,14 +266,19 @@ async function runSqlRedGreen(
     if (harnessFailedToRun(redSummary.result)) {
       return [harnessErrorFinding(ticket.key, "the setup-applied (red) SQL run", redSummary.result)]
     }
-    if (redSummary.allPassed) {
+
+    const redVerdict = splitVerdict(redSummary.result.results)
+    const redViolations = redTierViolations(redVerdict)
+    const noTestsAtAll = redVerdict.visible.count === 0 && redVerdict.hidden.count === 0
+    if (noTestsAtAll) redViolations.push("no executable tests exist to verify a red state at all")
+
+    if (redViolations.length > 0) {
       return [
         {
           ruleId: "dynamic-red-green",
           severity: "error",
           ticketKey: ticket.key,
-          message:
-            "reference solution does not go red->green: the setup-applied SQL suite already passes every assertion, so reference.diff has nothing to fix.",
+          message: `reference solution does not go red->green: ${redViolations.join("; ")}.`,
         },
       ]
     }
@@ -276,14 +306,16 @@ async function runSqlRedGreen(
         ),
       ]
     }
-    if (!greenSummary.allPassed) {
+
+    const greenVerdict = splitVerdict(greenSummary.result.results)
+    if (greenTierViolated(greenVerdict)) {
       const failing = greenSummary.result.results.filter((r) => !r.passed).map((r) => r.name)
       return [
         {
           ruleId: "dynamic-red-green",
           severity: "error",
           ticketKey: ticket.key,
-          message: `reference solution does not go red->green: the reference-applied SQL suite still fails; failing: ${failing.join(", ") || "(unnamed)"}`,
+          message: `reference solution does not go red->green: after reference.diff, ${tierLabel(greenVerdict)}; failing: ${failing.join(", ") || "(unnamed)"}`,
         },
       ]
     }
