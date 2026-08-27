@@ -13,9 +13,12 @@ import {
   getSprintLabRun,
   moveSprintLabTicket,
   moveSprintLabTicketInputSchema,
+  requireKnownWorkbookAndTickets,
+  requireOwnedActiveRun,
+  SPRINT_LAB_RUN_ERRORS,
   sprintLabRunErrorStatus,
-  type StoredSprintLabRun,
 } from "@/lib/sprint-labs/runs"
+import { requireTierForSprint } from "@/lib/sprint-labs/route-guards"
 
 /** Not-yet-launched surface: a disabled flag reads as "this route doesn't exist" rather than 403. */
 async function requireSprintLabsEnabled(userId: string): Promise<NextResponse | null> {
@@ -30,21 +33,6 @@ function serviceErrorResponse(error: unknown, fallbackMessage: string): NextResp
   }
   logger.error(fallbackMessage, { error })
   return NextResponse.json({ error: fallbackMessage }, { status: 500 })
-}
-
-/**
- * Fix round 2026-08-26, I2: resuming a run already past sprint 1 IS entry
- * into Pro territory, not just the explicit advance-sprint action. Any
- * response that hands back a resolved run at currentSprint >= 2 gates on Pro
- * first — covers GET (both lookup forms) and POST's create-or-resume.
- */
-async function requireTierForSprint(
-  userId: string,
-  run: StoredSprintLabRun | null
-): Promise<NextResponse | null> {
-  if (!run || run.currentSprint < 2) return null
-  const tierCheck = await requireTierForUser(userId, "pro")
-  return tierCheck.response ?? null
 }
 
 /**
@@ -150,11 +138,20 @@ export async function POST(request: NextRequest) {
 /**
  * PATCH /api/sprint-labs/runs — board/sprint mutations, dispatched by
  * `action`:
- *   - `{ action: "move-ticket", runId, ticketKey, to }`
+ *   - `{ action: "move-ticket", runId, ticketKey, to }` — gated behind Pro
+ *     when the run's CURRENT sprint is already >= 2 (fix round 2,
+ *     controller addition 3: every mutation on a run past sprint 1 needs
+ *     Pro, not just the act of advancing into it).
  *   - `{ action: "advance-sprint", runId, toSprint, ticketKeys }` — entering
  *     sprint >= 2 requires Pro; quota is checked and enforced BEFORE the
- *     advance is applied (fix round 2026-08-26, I1), which needs the run's
- *     workbookId ahead of the mutation, hence the read below.
+ *     advance is applied (fix round 2026-08-26, I1). Fix round 2, OPEN 2:
+ *     the cheap validation (ownership+active, sequential sprint number,
+ *     registry legality) now ALSO runs before quota is spent, not just
+ *     before the write — an invalid advance must not burn a session/open on
+ *     every retry. `advanceSprintLabRun` re-validates internally before its
+ *     own write (one extra read; simplicity and correctness over shaving it
+ *     off), so nothing here is trusted past this point without also being
+ *     re-checked at the point of the actual mutation.
  */
 export async function PATCH(request: NextRequest) {
   const auth = await verifyAuth(request)
@@ -179,6 +176,11 @@ export async function PATCH(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 })
     }
+
+    const current = await getSprintLabRun(auth.userId, parsed.data.runId)
+    const tierBlocked = await requireTierForSprint(auth.userId, current)
+    if (tierBlocked) return tierBlocked
+
     try {
       const run = await moveSprintLabTicket(auth.userId, parsed.data)
       return NextResponse.json({ run })
@@ -193,28 +195,38 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 })
     }
 
-    // Read-only lookup, ahead of the mutation: gives us workbookId for the
-    // quota scenario id and fails fast (404/ownership) before spending a
-    // quota check on a call that would fail anyway.
-    const existing = await getSprintLabRun(auth.userId, parsed.data.runId)
-    if (!existing) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 })
-    }
-
-    if (parsed.data.toSprint >= 2) {
-      const tierCheck = await requireTierForUser(auth.userId, "pro")
-      if (tierCheck.response) return tierCheck.response
-    }
-
-    // Gate BEFORE advancing (I1): a quota failure must not leave the run
-    // advanced in Firestore while telling the client it wasn't.
-    const quotaBlocked = await requireSessionStart(
-      auth.userId,
-      `sprint-labs:${existing.workbookId}:${parsed.data.toSprint}`
-    )
-    if (quotaBlocked) return quotaBlocked
-
     try {
+      // Validate FIRST, spend quota SECOND (fix round 2, OPEN 2): ownership +
+      // active status, the sequential sprint number, and registry legality
+      // must all pass before a session/open is ever spent — otherwise a
+      // request that was always going to fail (wrong sequence, inactive
+      // run, forged sprint/ticket) could burn quota on every retry without
+      // ever actually advancing anything. The sequential check is the one
+      // piece duplicated from `advanceSprintLabRun` rather than shared
+      // (it's a single comparison); the ownership/active and registry
+      // checks reuse the exact same exported functions the mutator itself
+      // calls, so there is no separate copy of THEIR logic to drift.
+      const current = await requireOwnedActiveRun(auth.userId, parsed.data.runId)
+      if (parsed.data.toSprint !== current.currentSprint + 1) {
+        throw new Error(SPRINT_LAB_RUN_ERRORS.INVALID_SPRINT_ADVANCE)
+      }
+      await requireKnownWorkbookAndTickets(
+        current.workbookId,
+        parsed.data.toSprint,
+        parsed.data.ticketKeys
+      )
+
+      if (parsed.data.toSprint >= 2) {
+        const tierCheck = await requireTierForUser(auth.userId, "pro")
+        if (tierCheck.response) return tierCheck.response
+      }
+
+      const quotaBlocked = await requireSessionStart(
+        auth.userId,
+        `sprint-labs:${current.workbookId}:${parsed.data.toSprint}`
+      )
+      if (quotaBlocked) return quotaBlocked
+
       const run = await advanceSprintLabRun(auth.userId, parsed.data)
       return NextResponse.json({ run })
     } catch (error) {
