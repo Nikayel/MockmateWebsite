@@ -29,6 +29,14 @@ vi.mock("next/server", () => ({
   },
 }))
 
+// `server-only`'s own runtime check looks for a Next.js build-time marker that only exists inside
+// an actual `next build`/`next dev` bundling pass; under plain Vitest (no Next.js bundler involved
+// at all) it throws unconditionally on import, real server-side test code and all. Stubbed to a
+// no-op here -- exactly like `next/server` above -- so a module that legitimately does
+// `import "server-only"` (e.g. lib/sprint-labs/provisioning/materialize-initial-tree.ts) stays
+// testable under Vitest while still getting the real package's build-time guard in the actual app.
+vi.mock("server-only", () => ({}))
+
 // Mock Firebase (client-side)
 vi.mock("./lib/firebase", () => ({
   db: {

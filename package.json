@@ -96,6 +96,7 @@
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
+    "server-only": "^0.0.1",
     "sonner": "^1.7.4",
     "sql.js": "^1.14.1",
     "stripe": "^19.3.1",
