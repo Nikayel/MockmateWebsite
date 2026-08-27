@@ -29,7 +29,6 @@ export async function deliverWebhook(deps: DeliverWebhookDeps, claim: Claim): Pr
 
   const payload = JSON.stringify(buildWebhookPayload(claim))
 
-  // Recorded as delivered, then sent.
   await insertWebhookDelivery(deps.db, {
     id: generateId("whd"),
     tenantId: claim.tenantId,
