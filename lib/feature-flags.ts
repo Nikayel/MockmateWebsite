@@ -79,6 +79,14 @@ export const FLAGS = {
   // live demos run on conference wifi where a half-open microphone socket is a
   // worse failure than no microphone at all. Default OFF: voice works normally.
   DISABLE_VOICE_MODE: false,
+
+  // Sprint Labs: the whole surface (catalog, workbook, workspace) renders only
+  // when this is on (docs/sprint-labs/PLAN.md, global constraints). NOT an
+  // orphan: no reader exists yet because Task 1 lands this flag ahead of the
+  // screens that check it (PLAN.md Tasks 10-13) — it is wired before merge to
+  // main, per the owner's ship-behind-a-flag decision in
+  // docs/sprint-labs/EXECUTION-STATE.md.
+  SPRINT_LABS_ENABLED: false,
 } as const
 
 export type FlagName = keyof typeof FLAGS
@@ -92,7 +100,10 @@ export const FLAG_NAMES = Object.keys(FLAGS) as FlagName[]
  * flag created as `Disable-Voice-Mode` still lands on the same switch.
  */
 export function normalizeFlagKey(key: string): string {
-  return key.trim().toUpperCase().replace(/[\s-]+/g, "_")
+  return key
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_")
 }
 
 /** Whether a Firestore flag key corresponds to a flag some code path reads. */
@@ -271,7 +282,10 @@ async function fetchFlagOverrides(): Promise<Map<string, FlagOverride>> {
       if (parsed) overrides.set(parsed.key, parsed)
     }
   } catch (error) {
-    console.error("[FeatureFlags] Failed to read feature_flags; falling back to env/defaults", error)
+    console.error(
+      "[FeatureFlags] Failed to read feature_flags; falling back to env/defaults",
+      error
+    )
   }
 
   return overrides
