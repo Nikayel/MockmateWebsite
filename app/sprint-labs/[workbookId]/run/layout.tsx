@@ -28,5 +28,9 @@ export const metadata: Metadata = {
 }
 
 export default function SprintLabRunLayout({ children }: { children: ReactNode }) {
-  return <SprintLabAuthGuard>{children}</SprintLabAuthGuard>
+  return (
+    <SprintLabAuthGuard>
+      <div className="workbook-surface">{children}</div>
+    </SprintLabAuthGuard>
+  )
 }
