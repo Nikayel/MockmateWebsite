@@ -1,25 +1,32 @@
 /**
- * Run with `pnpm lab:validate <workbookDir>` or `pnpm lab:validate:dynamic
- * <workbookDir>` (both wrap `tsx scripts/lab-validate.mjs`) — not `node
+ * Run with `pnpm lab:validate <workbookDir>`, `pnpm lab:validate:dynamic
+ * <workbookDir>`, or `pnpm lab:validate:contamination <workbookDir>` (all
+ * three wrap `tsx scripts/lab-validate.mjs`) — not `node
  * scripts/lab-validate.mjs` directly: this file imports TypeScript
  * (`lib/sprint-labs/validate/index.ts`), which plain `node` cannot load. No
  * shebang here on purpose, for the same reason scripts/compile-workbooks.mjs
  * has none: this is never executed standalone in this repo's workflow, only
  * via `tsx` or an npm script.
  *
- * A thin CLI over `lib/sprint-labs/validate`'s static gates (PLAN.md Task 3)
- * AND, behind `--dynamic`, `lib/sprint-labs/validate/dynamic`'s red/green +
- * regression + provisioning gates (PLAN.md Task 7): parse argv for a
- * workbook directory and the `--dynamic` flag, load the authored tree, run
- * the static rules (always) and the dynamic gate (only with `--dynamic`),
- * print one line of PASS or a grouped failure report naming ticket keys,
- * exit 0/1. Static-only stays the default — `pnpm lab:validate` never pays
- * for a `git apply` + Node-harness replay of every ticket — so plain
- * `lab:validate` is still the cheap, fast, every-commit check; `--dynamic`
- * is the slower, thorough one for CI/content-authoring gates. All real
- * logic (the tree-snapshot loader, every static rule, the dynamic gate)
- * lives in `lib/sprint-labs/validate/*` as plain, unit-tested functions —
- * this file owns none of it, only argv/stdout/exit code.
+ * A thin CLI over `lib/sprint-labs/validate`'s static gates (PLAN.md Task 3),
+ * behind `--dynamic`, `lib/sprint-labs/validate/dynamic`'s red/green +
+ * regression + provisioning gates (PLAN.md Task 7), and behind
+ * `--contamination`, `lib/sprint-labs/validate/contamination`'s cold
+ * pinned-model gate (PLAN.md Task 9): parse argv for a workbook directory and
+ * the three flags, load the authored tree, run the static rules (always),
+ * the dynamic gate (only with `--dynamic`), and the contamination gate (only
+ * with `--contamination`, optionally `--force` to bypass its committed
+ * cache), print one line of PASS or a grouped failure report naming ticket
+ * keys plus (when `--contamination` ran) a per-ticket passRate/verdict
+ * summary, exit 0/1. Static-only stays the default — `pnpm lab:validate`
+ * never pays for a `git apply` + Node-harness replay, and never spends a
+ * model call — so plain `lab:validate` is still the free, every-commit
+ * check; `--dynamic` is the slower CI/content-authoring gate; `--contamination`
+ * is the one that costs real money and is opt-in for exactly that reason. All
+ * real logic (the tree-snapshot loader, every static rule, the dynamic gate,
+ * the contamination gate) lives in `lib/sprint-labs/validate/*` as plain,
+ * unit-tested functions — this file owns none of it, only argv/stdout/exit
+ * code.
  *
  * Imported via `createRequire`, not a static `import`, matching
  * scripts/compile-workbooks.mjs's own documented workaround: this repo's
@@ -36,15 +43,26 @@ import { existsSync } from "node:fs"
 import { createRequire } from "node:module"
 import { isAbsolute, relative, resolve as resolvePath } from "node:path"
 import { fileURLToPath } from "node:url"
+import * as dotenv from "dotenv"
+
+// Only `--contamination` needs real credentials (a pinned-model call, per lib/ai-providers.ts,
+// which itself needs Firebase Admin initialized for cost tracking) -- static and `--dynamic` never
+// read an env var. Loaded unconditionally anyway, matching the convention already established by
+// every other credentialed script in this repo (e.g. scripts/inspect-user-retention-state.ts):
+// harmless when `.env.local` is absent (dotenv.config is a silent no-op), and it is what makes
+// `pnpm lab:validate:contamination` work with zero extra ceremony once a real `.env.local` exists.
+// A bare `tsx`/`node` process, unlike `next dev`/`next build`, never loads it on its own.
+dotenv.config({ path: ".env.local" })
 
 const ROOT = resolvePath(fileURLToPath(import.meta.url), "..", "..")
 const require = createRequire(import.meta.url)
 const { loadWorkbookTree, validateWorkbook } = require("../lib/sprint-labs/validate/index.ts")
 const { validateWorkbookDynamic } = require("../lib/sprint-labs/validate/dynamic/index.ts")
+const { validateWorkbookContamination } = require("../lib/sprint-labs/validate/contamination.ts")
 
 function usageError(message) {
   console.error(message)
-  console.error("Usage: pnpm lab:validate [--dynamic] <workbookDir>")
+  console.error("Usage: pnpm lab:validate [--dynamic] [--contamination [--force]] <workbookDir>")
   process.exitCode = 1
 }
 
@@ -75,9 +93,17 @@ function groupByRule(findings) {
 
 export async function main(argv = process.argv.slice(2)) {
   const dynamic = argv.includes("--dynamic")
-  const [target] = argv.filter((arg) => arg !== "--dynamic")
+  const contamination = argv.includes("--contamination")
+  const force = argv.includes("--force")
+  const [target] = argv.filter(
+    (arg) => arg !== "--dynamic" && arg !== "--contamination" && arg !== "--force"
+  )
   if (!target) {
     usageError("Missing required <workbookDir> argument.")
+    return
+  }
+  if (force && !contamination) {
+    usageError("--force only applies alongside --contamination.")
     return
   }
 
@@ -98,7 +124,22 @@ export async function main(argv = process.argv.slice(2)) {
 
   const staticFindings = validateWorkbook(workbook)
   const dynamicFindings = dynamic ? await validateWorkbookDynamic(workbook) : []
-  const findings = [...staticFindings, ...dynamicFindings]
+  const contaminationResult = contamination
+    ? await validateWorkbookContamination(workbook, { force })
+    : { verdicts: [], findings: [] }
+
+  if (contaminationResult.verdicts.length > 0) {
+    console.log("contamination:")
+    for (const verdict of contaminationResult.verdicts) {
+      const pct = (verdict.passRate * 100).toFixed(1)
+      console.log(
+        `  ${verdict.ticketKey}: ${pct}% (${verdict.hiddenPassed}/${verdict.hiddenTotal} hidden) ${verdict.verdict} [${verdict.modelId}/${verdict.modelVersion}]`
+      )
+    }
+    console.log("")
+  }
+
+  const findings = [...staticFindings, ...dynamicFindings, ...contaminationResult.findings]
   const errors = findings.filter((f) => f.severity === "error")
   const warnings = findings.filter((f) => f.severity === "warn")
 

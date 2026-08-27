@@ -29,6 +29,7 @@
     "workbooks:compile": "tsx scripts/compile-workbooks.mjs",
     "lab:validate": "tsx scripts/lab-validate.mjs",
     "lab:validate:dynamic": "tsx scripts/lab-validate.mjs --dynamic",
+    "lab:validate:contamination": "tsx scripts/lab-validate.mjs --contamination",
     "sprint-labs:dev": "node scripts/sprint-labs-dev.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
