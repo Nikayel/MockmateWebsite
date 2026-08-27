@@ -85,12 +85,12 @@ docs/._*
 # public/vendor/ is not silently swallowed by this rule.
 /public/vendor/typescript/
 
-# Vendored PGlite (Postgres-in-WASM) browser build for the Sprint Labs pg-sandbox worker
-# (public/wasm/pglite/index.js + chunks + pglite.wasm/pglite.data/initdb.wasm). Regenerated from
-# node_modules/@electric-sql/pglite by scripts/copy-pglite-vendor.mjs on every `pnpm install`
-# (postinstall); never commit it, for the same drift reason as the TypeScript vendor copy above.
-# Scoped to this one subdirectory, not all of public/wasm/, so the existing committed
-# public/wasm/sql-wasm.{js,wasm} (sql.js, a different engine) is untouched by this rule.
+# Vendored PGlite (Postgres-in-WASM) browser build for the Sprint Labs pg-sandbox worker (every
+# top-level .js/.wasm/.data file under @electric-sql/pglite's dist/, glob-copied by
+# scripts/copy-pglite-vendor.mjs -- see that script's header for why a glob, not a fixed list).
+# Regenerated on every `pnpm install` (postinstall); never commit it, for the same drift reason as
+# the TypeScript vendor copy above. Scoped to this one subdirectory, not all of public/wasm/, so the
+# existing committed public/wasm/sql-wasm.{js,wasm} (sql.js, a different engine) is untouched.
 /public/wasm/pglite/
 
 # Firebase emulator artifacts (pnpm test:integration)
