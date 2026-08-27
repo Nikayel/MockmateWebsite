@@ -19,4 +19,16 @@ describe(RULE_ID, () => {
     const findings = filesTouchedExist(workbook).filter((f) => f.ruleId === RULE_ID)
     expect(findings).toHaveLength(0)
   })
+
+  it("regression (review round 1, I-2): correctly looks back across multiple earlier sprints (S3 touching a file S1 created), not just the immediately prior one", () => {
+    const threeSprintFixtures = join(__dirname, "../fixtures/new-source-files-set-difference")
+    const red = loadWorkbookTree(join(threeSprintFixtures, "three-sprint-red"))
+    const green = loadWorkbookTree(join(threeSprintFixtures, "three-sprint-green"))
+    // Neither fixture has a bad TOUCHED path -- both correctly touch a file
+    // that exists (created in S1) -- so this rule finds nothing in either;
+    // the point is proving a naive "only check the immediately prior
+    // sprint" accumulator would have nothing to break here either way.
+    expect(filesTouchedExist(red).filter((f) => f.ruleId === RULE_ID)).toHaveLength(0)
+    expect(filesTouchedExist(green).filter((f) => f.ruleId === RULE_ID)).toHaveLength(0)
+  })
 })

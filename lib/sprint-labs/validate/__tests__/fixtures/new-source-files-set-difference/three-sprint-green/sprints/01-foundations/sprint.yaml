@@ -1,0 +1,7 @@
+number: 1
+title: "Foundations"
+filesTouched:
+  - "src/queue/outbox.ts"
+newSourceFiles:
+  - "src/queue/outbox.ts"
+rewrittenFiles: []

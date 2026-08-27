@@ -10,5 +10,6 @@ filesTouched:
   - "src/queue/outbox.ts"
 newSourceFiles:
   - "src/db/repositories/claims.ts"
+  - "src/never/touched.ts"
 rewrittenFiles:
   - "src/queue/outbox.ts"

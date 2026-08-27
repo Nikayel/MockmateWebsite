@@ -1,0 +1,8 @@
+# S3 correctly recognizes src/queue/outbox.ts was already created in S1
+# (two sprints back) and does not re-list it as new.
+number: 3
+title: "Tenants"
+filesTouched:
+  - "src/queue/outbox.ts"
+newSourceFiles: []
+rewrittenFiles: []

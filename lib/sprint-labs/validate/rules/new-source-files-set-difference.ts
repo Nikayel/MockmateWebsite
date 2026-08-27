@@ -6,6 +6,14 @@
  * names (files listed as new that are already in the seed/prior; files
  * created but never listed). `rewrittenFiles` must be a subset of
  * seed ∪ prior (PLAN.md Task 3: "rewrittenFiles ⊆ seed ∪ prior").
+ *
+ * Review round 1, M-5: a `newSourceFiles` entry can fail to be in
+ * `computedNew` for two DIFFERENT reasons, and the original single message
+ * conflated them: (1) the path already exists in the seed or an earlier
+ * sprint (a genuine over-count), or (2) the path isn't even in this
+ * sprint's `filesTouched` at all -- a more basic authoring mistake ("listed
+ * as new" without also being "listed as touched"). The message now names
+ * which one it is.
  */
 
 import type { AuthoredWorkbook } from "../tree"
@@ -34,15 +42,13 @@ export function newSourceFilesSetDifference(workbook: AuthoredWorkbook): Validat
       }
     }
 
+    const touchedThisSprint = new Set(sprint.filesTouched)
     for (const path of authoredNew) {
-      if (!computedNew.has(path)) {
-        findings.push({
-          ruleId: RULE_ID,
-          severity: "error",
-          path,
-          message: `sprint ${sprint.number} (${sprint.dirName}): "${path}" is listed in newSourceFiles but already exists in the seed or an earlier sprint`,
-        })
-      }
+      if (computedNew.has(path)) continue
+      const message = !touchedThisSprint.has(path)
+        ? `sprint ${sprint.number} (${sprint.dirName}): "${path}" is listed in newSourceFiles but is not in this sprint's filesTouched at all`
+        : `sprint ${sprint.number} (${sprint.dirName}): "${path}" is listed in newSourceFiles but already exists in the seed or an earlier sprint`
+      findings.push({ ruleId: RULE_ID, severity: "error", path, message })
     }
 
     for (const path of sprint.rewrittenFiles) {
