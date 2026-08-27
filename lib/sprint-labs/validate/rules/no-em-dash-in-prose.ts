@@ -1,9 +1,16 @@
 /**
  * AUTHORING-RULES.md §6 / PLAN.md Global Constraints: "No em dashes in
- * learner-facing prose" (site-wide content rule). Checked on exactly the
- * fields named in PLAN.md Task 3: ticket bodies, ticket acceptanceCriteria,
- * sprint standupQuote, hidden-test humanName, and workbook.yaml's objective
+ * learner-facing prose" (site-wide content rule). Checked on: ticket
+ * bodies, ticket title, ticket acceptanceCriteria, sprint goal, sprint
+ * standupQuote, hidden-test humanName, and workbook.yaml's objective
  * label/canDo text (the vocabulary's own learner-facing sentences).
+ *
+ * `ticket.title` and `sprint.goal` (ruling R18, review round 1 I-1): both
+ * render to the learner (board card / standup) exactly like the fields
+ * already checked, so the same rule applies to them. R18 also settles the
+ * ordering question: this site-wide rule outranks spec punctuation, so an
+ * em-dashed title quoted verbatim from SPRINT-PLAN.md gets re-punctuated at
+ * authoring rather than preserved.
  */
 
 import type { AuthoredWorkbook } from "../tree"
@@ -59,8 +66,10 @@ export function noEmDashInProse(workbook: AuthoredWorkbook): ValidationFinding[]
       `sprint ${sprint.number} standupQuote`,
       sprint.standupQuote
     )
+    checkField(findings, undefined, sprint.dirPath, `sprint ${sprint.number} goal`, sprint.goal)
 
     for (const ticket of sprint.tickets) {
+      checkField(findings, ticket.key, ticket.dirPath, `ticket ${ticket.key} title`, ticket.title)
       checkField(findings, ticket.key, ticket.dirPath, `ticket ${ticket.key} body`, ticket.bodyMd)
 
       ticket.acceptanceCriteria.forEach((criterion, index) => {

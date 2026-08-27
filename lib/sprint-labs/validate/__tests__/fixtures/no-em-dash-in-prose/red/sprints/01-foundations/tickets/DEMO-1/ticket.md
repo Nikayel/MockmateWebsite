@@ -1,5 +1,5 @@
 ---
-title: "Fix the intake parser"
+title: "Fix the intake parser — Northwind escalation"
 points: 3
 labels: []
 ai_policy: assisted
