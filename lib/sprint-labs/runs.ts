@@ -578,11 +578,31 @@ export async function saveWorkspaceFiles(
  * ticket's reference solution would also touch is left exactly as the learner last saved it,
  * while a path no earlier ticket ever introduced is seeded fresh.
  *
+ * Ownership-checked via {@link requireOwnedRun}, deliberately NOT
+ * {@link requireOwnedActiveRun}: a completed run must still be openable for read-back (a learner's
+ * most recent completed run is exactly what `getActiveSprintLabRun` can hand back, and the
+ * workspace renders it), so a non-`in_progress` run is a silent no-op (`return []`) here, never a
+ * throw. Regression (review round 1): throwing `RUN_NOT_ACTIVE` here bubbled all the way out of the
+ * `/runs/provision` route as a 409, which meant the route never returned the materialized `files`
+ * at all -- the one thing that route exists to guarantee. A closed run's store already holds
+ * whatever the learner actually saved before it closed, and this function's whole contract is
+ * "never clobber," so skipping the write is correct here, not merely safe.
+ *
  * Deliberately does NOT reuse {@link saveWorkspaceFiles}: that function's whole contract is
  * "always write, incrementing revision" (the correct shape for the learner's own autosave), which
  * would silently overwrite a learner's saved edits if pointed at a stale seed on re-open — exactly
  * what this function exists to never do. Mirrors its validation and cap-enforcement instead of
  * reusing its write path, so the two never drift apart on what counts as a valid path/doc id.
+ *
+ * Writes via individual `DocumentReference.create()` calls (fails if a doc already exists at that
+ * path), not a batched `.set()` after a check-then-act read: the prior read-then-set shape was a
+ * TOCTOU window (review round 1, MINOR-1) -- two concurrent provision calls could both observe a
+ * path as absent and the second `.set()` would silently overwrite the first. `create()` makes each
+ * path strictly first-writer-wins. Deliberately NOT a single `WriteBatch` of `.create()` calls: a
+ * batch fails ALL of its operations if any ONE of them loses its create-race, which would turn one
+ * raced path into a lost seed for every OTHER, non-conflicting path in the same call.
+ * `Promise.allSettled` keeps every path's outcome independent; a lost race is silently dropped from
+ * the returned set, exactly like a malformed path is (see below), not surfaced as an error.
  *
  * A malformed candidate path (fails `isValidWorkspacePath` or the Firestore doc-id checks) is
  * silently skipped rather than thrown: this is a best-effort seed of server-computed content, not a
@@ -594,7 +614,8 @@ export async function seedWorkspaceFilesIfAbsent(
   files: readonly WorkspaceFileLike[]
 ): Promise<WorkspaceFileDoc[]> {
   if (files.length === 0) return []
-  await requireOwnedActiveRun(userId, runId)
+  const run = await requireOwnedRun(userId, runId)
+  if (run.status !== "in_progress") return []
 
   const filesCollection = adminDb.collection(COLLECTION).doc(runId).collection(FILES_SUBCOLLECTION)
   const existingSnap = await filesCollection.get()
@@ -608,8 +629,7 @@ export async function seedWorkspaceFilesIfAbsent(
   const bounded = candidates.slice(0, capacity)
 
   const now = new Date().toISOString()
-  const written: WorkspaceFileDoc[] = []
-  const batch = adminDb.batch()
+  const toAttempt: Array<{ docId: string; doc: WorkspaceFileDoc }> = []
   for (const file of bounded) {
     if (!isValidWorkspacePath(file.path)) continue
     const docId = encodeWorkspaceFilePathId(file.path)
@@ -623,13 +643,19 @@ export async function seedWorkspaceFilesIfAbsent(
       updatedAt: now,
       revision: 1,
     })
-    batch.set(filesCollection.doc(docId), doc)
-    written.push(doc)
+    toAttempt.push({ docId, doc })
   }
+  if (toAttempt.length === 0) return []
+
+  const results = await Promise.allSettled(
+    toAttempt.map(({ docId, doc }) => filesCollection.doc(docId).create(doc))
+  )
+  const written = toAttempt
+    .filter((_, index) => results[index].status === "fulfilled")
+    .map(({ doc }) => doc)
 
   if (written.length > 0) {
-    batch.update(adminDb.collection(COLLECTION).doc(runId), { updatedAt: now })
-    await batch.commit()
+    await adminDb.collection(COLLECTION).doc(runId).update({ updatedAt: now })
   }
   return written
 }
