@@ -430,7 +430,7 @@ export function ComparisonSection() {
               href="/interview"
               className="bg-accent-strong text-accent-foreground hover:bg-accent-strong/90 focus-visible:ring-ring inline-flex items-center rounded-full px-7 py-3 text-lg font-medium transition-transform focus-visible:ring-2 focus-visible:ring-offset-2 active:scale-95"
             >
-              Try your first mock free
+              Start free
               <ArrowRight aria-hidden className="ml-2 h-4 w-4" />
             </Link>
             <p className="text-muted-foreground mt-3 text-xs">No credit card required</p>

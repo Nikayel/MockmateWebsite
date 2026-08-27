@@ -67,7 +67,7 @@ describe("globals.css token contrast", () => {
   describe.each(THEMES)("%s theme", (theme) => {
     it("--accent-foreground on --accent-strong clears AA for button labels", () => {
       // The pairing both primary CTAs use: Subscribe (PricingPageClient) and
-      // "Try your first mock free" (comparison-section). This is the assertion
+      // "Start free" (comparison-section). This is the assertion
       // that rejects darkening --accent-foreground.
       const ratio = contrastRatio(
         readToken(theme, "accent-foreground"),
