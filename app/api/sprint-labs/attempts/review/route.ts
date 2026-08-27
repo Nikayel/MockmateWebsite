@@ -8,20 +8,14 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
-import { getFlagAsync } from "@/lib/feature-flags"
 import { apiRateLimit } from "@/lib/rate-limit"
 import { getSprintLabRun } from "@/lib/sprint-labs/runs"
-import { requireTierForSprint } from "@/lib/sprint-labs/route-guards"
+import { requireSprintLabsEnabled, requireTierForSprint } from "@/lib/sprint-labs/route-guards"
 import {
   reviewAttemptInputSchema,
   reviewSprintLabAttempt,
 } from "@/lib/sprint-labs/grading/attempts-service"
 import { attemptServiceErrorResponse } from "../route"
-
-async function requireSprintLabsEnabled(userId: string): Promise<NextResponse | null> {
-  if (await getFlagAsync("SPRINT_LABS_ENABLED", userId)) return null
-  return NextResponse.json({ error: "Not found" }, { status: 404 })
-}
 
 export async function POST(request: NextRequest) {
   const rateLimited = await apiRateLimit(request)

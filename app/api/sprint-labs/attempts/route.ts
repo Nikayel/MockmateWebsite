@@ -8,22 +8,15 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
-import { getFlagAsync } from "@/lib/feature-flags"
 import { apiRateLimit } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
 import { getSprintLabRun, sprintLabRunErrorStatus } from "@/lib/sprint-labs/runs"
-import { requireTierForSprint } from "@/lib/sprint-labs/route-guards"
+import { requireSprintLabsEnabled, requireTierForSprint } from "@/lib/sprint-labs/route-guards"
 import {
   openAttemptInputSchema,
   openSprintLabAttempt,
   sprintLabAttemptErrorStatus,
 } from "@/lib/sprint-labs/grading/attempts-service"
-
-/** Not-yet-launched surface: a disabled flag reads as "this route doesn't exist" rather than 403. */
-async function requireSprintLabsEnabled(userId: string): Promise<NextResponse | null> {
-  if (await getFlagAsync("SPRINT_LABS_ENABLED", userId)) return null
-  return NextResponse.json({ error: "Not found" }, { status: 404 })
-}
 
 /**
  * Maps a service error to its HTTP response. Every attempts-service function

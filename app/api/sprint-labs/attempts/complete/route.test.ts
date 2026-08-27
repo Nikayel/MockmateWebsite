@@ -50,7 +50,6 @@ const VALID_BODY = {
   runId: "run1",
   ticketKey: "MER-201",
   attemptId: "a1",
-  variantId: "v0-x",
   ioCaseOutputs: {},
   probeResults: {},
 }
@@ -90,13 +89,26 @@ describe("POST /api/sprint-labs/attempts/complete", () => {
   it("defaults optional fields via the real schema (thin body still validates)", async () => {
     mocks.completeSprintLabAttempt.mockResolvedValue({ attempt: {}, submissionsRemaining: 4 })
     const { POST } = await import("./route")
-    const minimalBody = { runId: "run1", ticketKey: "MER-201", attemptId: "a1", variantId: "v0-x" }
+    // R21: filesTouched/diffLineCount/learnerAddedTest/variantId are no longer
+    // request fields at all (server-derived / stub-lookup instead) — posting
+    // one is silently stripped by the (non-strict) Zod schema, never reaches
+    // the service. Confirmed below: the call args contain NEITHER key.
+    const minimalBody = {
+      runId: "run1",
+      ticketKey: "MER-201",
+      attemptId: "a1",
+      filesTouched: ["should-be-ignored.ts"],
+      variantId: "should-be-ignored",
+    }
     const response = (await POST(createRequest(minimalBody))) as unknown as StubResponse
     expect(response.status).toBe(200)
     expect(mocks.completeSprintLabAttempt).toHaveBeenCalledWith(
       USER,
-      expect.objectContaining({ ioCaseOutputs: {}, probeResults: {}, filesTouched: [] })
+      expect.objectContaining({ ioCaseOutputs: {}, probeResults: {} })
     )
+    const [, calledWith] = mocks.completeSprintLabAttempt.mock.calls[0]
+    expect(calledWith).not.toHaveProperty("filesTouched")
+    expect(calledWith).not.toHaveProperty("variantId")
   })
 
   it("gates on Pro when the resolved run is already at sprint >= 2", async () => {
@@ -125,11 +137,18 @@ describe("POST /api/sprint-labs/attempts/complete", () => {
     )
   })
 
-  it("maps a STALE_ATTEMPT service error to 409", async () => {
-    mocks.completeSprintLabAttempt.mockRejectedValue(new Error("STALE_ATTEMPT"))
+  it("maps an ATTEMPT_ALREADY_COMPLETED service error (C1: reused attemptId) to 409", async () => {
+    mocks.completeSprintLabAttempt.mockRejectedValue(new Error("ATTEMPT_ALREADY_COMPLETED"))
     const { POST } = await import("./route")
     const response = (await POST(createRequest(VALID_BODY))) as unknown as StubResponse
     expect(response.status).toBe(409)
+  })
+
+  it("maps an ATTEMPT_NOT_FOUND service error (C1: unknown/foreign attemptId) to 404", async () => {
+    mocks.completeSprintLabAttempt.mockRejectedValue(new Error("ATTEMPT_NOT_FOUND"))
+    const { POST } = await import("./route")
+    const response = (await POST(createRequest(VALID_BODY))) as unknown as StubResponse
+    expect(response.status).toBe(404)
   })
 
   it("maps an unrecognized error to a logged 500", async () => {
