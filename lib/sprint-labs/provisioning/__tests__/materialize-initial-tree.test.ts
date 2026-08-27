@@ -2,7 +2,8 @@
  * Security + shape tests for `materializeInitialTree`. The load-bearing claim: a learner opening a
  * ticket's workspace must never receive a hidden test, a reference diff, or any other secret-file
  * content, on top of the workspace actually looking like a real day-one Meridian ticket (src files,
- * MERIDIAN.md, visible tests all present).
+ * MERIDIAN.md, visible tests, and -- review round 2 -- the seed test scaffolding those visible tests
+ * actually import, all present).
  *
  * Two independent lines of evidence for the security claim, not one:
  *  1. Task 7's OWN provisioning scans (`scanProvisionedBundleContent`, `scanFreshWorkspaceGitObjects`)
@@ -27,6 +28,7 @@ import {
 import { materializeInitialTree, type ProvisionedFile } from "../materialize-initial-tree"
 
 const FIXTURE_WORKBOOK = join(__dirname, "../../../../workbooks/_fixture-workbook")
+const MERIDIAN_WORKBOOK = join(__dirname, "../../../../workbooks/meridian")
 
 function byRole(files: ProvisionedFile[], role: ProvisionedFile["role"]): ProvisionedFile[] {
   return files.filter((f) => f.role === role)
@@ -110,9 +112,58 @@ describe("materializeInitialTree -- DEMO-102 (already carries DEMO-101's shipped
   })
 })
 
-describe("materializeInitialTree -- meridian (real seed, direct-dirname resolution, MER-101 is a content stub)", () => {
-  it("degrades gracefully to the raw seed when a ticket has no setup/reference diff authored yet", () => {
+describe("materializeInitialTree -- meridian MER-101 (real seed, direct-dirname resolution, real playable content)", () => {
+  it("returns editable src files, MERIDIAN.md, the ticket's visible tests, AND the seed test scaffolding those visible tests import (review round 2)", () => {
     const files = materializeInitialTree("meridian", "MER-101")
+
+    const editable = byRole(files, "editable")
+    expect(editable.length).toBeGreaterThan(0)
+    expect(editable.every((f) => f.path === "src" || f.path.startsWith("src/"))).toBe(true)
+
+    expect(byRole(files, "docs").some((f) => f.path === "MERIDIAN.md")).toBe(true)
+
+    // The load-bearing assertion: MER-101's own tests/visible/create-claim.test.ts does
+    // `import { buildTestApp } from "../../test/support/build-app"` -- without this file mounted at
+    // the resolved workspace path, "Run Tests" fails to LOAD the suite at all (a missing-import
+    // error, not an assertion failure). Tagged "readonly": the learner reads it, doesn't edit it.
+    const readonly = byRole(files, "readonly")
+    const buildApp = readonly.find((f) => f.path === "test/support/build-app.ts")
+    expect(buildApp).toBeDefined()
+    expect(buildApp?.content).toContain("export function buildTestApp")
+
+    // The narrow allowlist, proven both ways: the two referenced directories are in, and the seed's
+    // OWN day-one test suite (nothing imports it) is NOT swept in by some accidental blanket match.
+    expect(
+      readonly.every(
+        (f) => f.path.startsWith("test/support/") || f.path.startsWith("test/fixtures/")
+      )
+    ).toBe(true)
+    expect(files.some((f) => f.path.startsWith("test/claims/"))).toBe(false)
+    expect(files.some((f) => f.path.startsWith("test/health/"))).toBe(false)
+    expect(files.some((f) => f.path.startsWith("test/delivery/"))).toBe(false)
+    expect(files.some((f) => f.path.startsWith("test/documents/"))).toBe(false)
+    expect(files.some((f) => f.path.startsWith("test/http/"))).toBe(false)
+    expect(files.some((f) => f.path.startsWith("test/money/"))).toBe(false)
+
+    assertNoForbiddenPaths(files)
+  })
+
+  it("carries zero hidden-test/secret signatures with test scaffolding included -- Task 7's own scans on the underlying materialized tree (MER-101 now has 4 real hidden-test YAMLs)", () => {
+    const workbook = loadWorkbookTree(MERIDIAN_WORKBOOK)
+    const { ticket } = findTicketLocation(workbook, "MER-101")
+    expect(ticket.hiddenTests.length).toBeGreaterThan(0) // sanity: this ticket actually has secrets to leak
+
+    // These scan the WHOLE materialized tree (`materializeThroughSetup`'s output), not just src/ --
+    // the same tree this module's expanded strip (src/** + test/support/** + test/fixtures/**) is a
+    // subset of. A clean result here is therefore a clean result on the expanded strip too.
+    expect(scanProvisionedBundleContent(workbook, ticket)).toEqual([])
+    expect(scanFreshWorkspaceGitObjects(workbook, ticket)).toEqual([])
+  })
+})
+
+describe("materializeInitialTree -- meridian MER-201 (still a content stub)", () => {
+  it("degrades gracefully to the raw seed (plus its test scaffolding) when a ticket has no setup/reference diff authored yet", () => {
+    const files = materializeInitialTree("meridian", "MER-201")
 
     const editable = byRole(files, "editable")
     expect(editable.length).toBeGreaterThan(0)

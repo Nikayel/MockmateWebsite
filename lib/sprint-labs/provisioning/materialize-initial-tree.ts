@@ -31,32 +31,50 @@
  *
  * WHAT SHIPS TO THE LEARNER, and why the strip is a strip (not a "mark read-only"):
  *   - editable `src/**` (role "editable") — the materialized tree's own source files.
+ *   - the seed's test SCAFFOLDING under `test/support/**` and `test/fixtures/**` (role "readonly")
+ *     — review round 2: every ticket's `tests/visible/*.test.ts` across the real Meridian content
+ *     imports shared helpers from there (`buildTestApp` from `test/support/build-app`, `seedClaim`/
+ *     `seedTenant`-shaped fixtures from `test/fixtures/*`), confirmed by grepping every authored
+ *     ticket's visible-test imports repo-wide. Without these two directories mounted, "Run Tests"
+ *     failed to even LOAD the suite (a missing-import error, before any assertion ran) — formative
+ *     only (io-case grading drives off `src/` entrypoints and never touches this), but visible tests
+ *     loading locally is core to the flow. Deliberately NOT a blanket `test/**`: the seed also ships
+ *     `test/claims/**`, `test/delivery/**`, `test/documents/**`, `test/health/**`, `test/http/**`,
+ *     `test/money/**` — the seed's OWN day-one test suite (`workbook.yaml`'s `seedStats.testCases`),
+ *     which nothing in any ticket's `tests/visible/` imports (confirmed by the same repo-wide grep)
+ *     and which is out of scope for this fix; allowlisting only the two directories actually
+ *     referenced as import targets is the narrower, correct fix, not a shortcut.
  *   - the workbook's hand-authored `MERIDIAN.md`, if any (role "docs") — Layer A, per
  *     docs/sprint-labs/AGENT-CONTEXT.md §3.
  *   - this ticket's `tests/visible/**` files (role "test"), read verbatim via Task 7's own
  *     `readVisibleTestFiles` (`dynamic/hidden-tests.ts`) — never re-derived from the compiled
  *     bundle, never re-parsed by hand here.
  * Everything else the materialized tree may legitimately carry today (`migrations/**`, `infra/**`,
- * root config like `package.json`/`tsconfig.json`/`.env.example`) is DROPPED, not merely tagged
- * non-editable: `lib/sprint-labs/workspace/tree.ts`'s three-group model (docs/src/tests) has no
- * fourth place to put them, and the server-side sandbox that would make them actionable for a
- * learner does not exist yet (EXECUTION-STATE.md: "no server-side sandbox yet"). If a later task
- * needs them mounted, that is a deliberate, separate decision — not an oversight of this pass.
+ * root config like `package.json`/`tsconfig.json`/`.env.example`, and the seed's own day-one test
+ * suite named above) is DROPPED, not merely tagged non-editable: `lib/sprint-labs/workspace/tree.ts`'s
+ * three-group model (docs/src/tests) has no fourth place to put them, and the server-side sandbox
+ * that would make most of them actionable for a learner does not exist yet (EXECUTION-STATE.md: "no
+ * server-side sandbox yet"). If a later task needs them mounted, that is a deliberate, separate
+ * decision — not an oversight of this pass.
  *
  * WHAT NEVER SHIPS: `tests/hidden/**`, `reference.diff`, `review.yaml`, `author_brief.yaml`,
  * `rubric.yaml`, `adversary/**`, any sealed artifact. These cannot appear in
  * `materializeThroughSetup`'s own output BY CONSTRUCTION — it only ever writes the seed tree plus
  * applied unified diffs, never a ticket's authoring-directory siblings (`ticket.md`, `rubric.yaml`,
- * hidden-test YAMLs, ... all live in a directory tree this function never reads). Sealed content
- * (the compiled secret bundle, `lib/scenarios/sealed/sprint-labs/`) lives in a third, entirely
- * separate module tree this function also never reads from. `isForbiddenLearnerPath` is a second,
- * independent, path-based guard applied to every category this module emits anyway — defense in
- * depth against the residual risk that some diff's own hunk text creates a path shaped like one of
- * these (e.g. `src/tests/hidden/x.ts`, which would otherwise pass the plain `src/` prefix filter).
- * See `__tests__/materialize-initial-tree.test.ts`, which additionally reuses Task 7's own
- * `scanProvisionedBundleContent`/`scanFreshWorkspaceGitObjects` against the SAME underlying
- * materialized tree this module strips, so a clean scan there is a clean scan of this module's own
- * input.
+ * hidden-test YAMLs, ... all live in a directory tree this function never reads, and never inside
+ * the seed's OWN `test/` dir either — confirmed by inspection of `workbooks/meridian/repo/test/**`,
+ * which is plain benign scaffolding: a fake HTTP client, an in-memory test-app builder, sample
+ * claim/tenant fixture data, no hidden-test YAML shape and no answer key). Sealed content (the
+ * compiled secret bundle, `lib/scenarios/sealed/sprint-labs/`) lives in a third, entirely separate
+ * module tree this function also never reads from. `isForbiddenLearnerPath` is a second, independent,
+ * path-based guard applied to every category this module emits anyway (src, scaffolding, docs, and
+ * tests alike) — defense in depth against the residual risk that some diff's own hunk text creates a
+ * path shaped like one of these (e.g. `src/tests/hidden/x.ts`, which would otherwise pass the plain
+ * `src/` prefix filter). See `__tests__/materialize-initial-tree.test.ts`, which additionally reuses
+ * Task 7's own `scanProvisionedBundleContent`/`scanFreshWorkspaceGitObjects` against the SAME
+ * underlying materialized tree this module strips (test scaffolding included — those scans cover the
+ * WHOLE materialized tree, not just `src/`), so a clean scan there is a clean scan of everything this
+ * module's expanded strip can possibly draw from.
  *
  * PRODUCTION NOTE (part of R27's own "deferred hardening" bucket, flagged rather than guessed at):
  * this module resolves `workbooks/<id>/**` from `process.cwd()` and reads it with plain `node:fs`
@@ -88,11 +106,11 @@ import { readVisibleTestFiles } from "@/lib/sprint-labs/validate/dynamic/hidden-
 /** Matches `WorkspaceScenarioFileRole` (`lib/scenarios/types.ts`) verbatim for naming consistency
  *  across the two (deliberately separate — see `lib/sprint-labs/workspace-files.ts`'s own header on
  *  why Sprint Labs' workspace types are not the DSA/bugfix scenario domain's types) workspace
- *  systems. Only three of the four values are ever produced today: "editable" (src/**),
- *  "docs" (MERIDIAN.md — matches `lib/sprint-labs/workspace/tree.ts`'s own "docs" group for the
- *  identical file), and "test" (visible tests, read-only reference — see that same file's header
- *  for why tests render locked). "readonly" is reserved for a future locked-src-file ticket shape
- *  that does not exist yet; carried in the union now so adding one later is not a breaking change. */
+ *  systems. All four values are produced: "editable" (src/**), "readonly" (the seed's test
+ *  scaffolding under test/support/** and test/fixtures/** — review round 2: mounted, but the
+ *  learner reads it rather than edits it), "docs" (MERIDIAN.md — matches
+ *  `lib/sprint-labs/workspace/tree.ts`'s own "docs" group for the identical file), and "test"
+ *  (visible tests, read-only reference — see that same file's header for why tests render locked). */
 export type ProvisionedFileRole = "editable" | "readonly" | "test" | "docs"
 
 export interface ProvisionedFile {
@@ -141,6 +159,23 @@ function isForbiddenLearnerPath(path: string): boolean {
     base === "author_brief.yaml" ||
     base === "rubric.yaml"
   )
+}
+
+/**
+ * The seed's non-secret test scaffolding a ticket's `tests/visible/*.test.ts` imports (review round
+ * 2): `test/support/build-app.ts` builds a fresh in-memory Fastify app + fake HTTP client per test,
+ * `test/fixtures/*` seeds sample tenant/claim rows through the repository layer — plain helpers, no
+ * hidden-test shape, no answer key (confirmed by direct inspection of every file currently under
+ * `workbooks/meridian/repo/test/support/` and `test/fixtures/`, and re-confirmed at scan time by
+ * `isForbiddenLearnerPath` below, applied uniformly). Deliberately two narrow, explicit prefixes,
+ * never a blanket `test/`: the seed also ships its own day-one test suite directly under `test/`
+ * (`test/claims/**`, `test/health/**`, ...), which nothing in any ticket's `tests/visible/` imports
+ * and which this allowlist does not reach.
+ */
+const TEST_SCAFFOLDING_PREFIXES = ["test/support/", "test/fixtures/"]
+
+function isTestScaffoldingPath(path: string): boolean {
+  return TEST_SCAFFOLDING_PREFIXES.some((prefix) => path.startsWith(prefix))
 }
 
 /**
@@ -228,9 +263,15 @@ export function materializeInitialTree(workbookId: string, ticketKey: string): P
     const files: ProvisionedFile[] = []
 
     for (const file of readAllFiles(materialized.ws)) {
-      if (file.path !== "src" && !file.path.startsWith("src/")) continue
+      const isSrc = file.path === "src" || file.path.startsWith("src/")
+      const isScaffolding = !isSrc && isTestScaffoldingPath(file.path)
+      if (!isSrc && !isScaffolding) continue
       if (isForbiddenLearnerPath(file.path)) continue
-      files.push({ path: file.path, content: file.content, role: "editable" })
+      files.push({
+        path: file.path,
+        content: file.content,
+        role: isSrc ? "editable" : "readonly",
+      })
     }
 
     const meridianMd = workbook.meridianMd
