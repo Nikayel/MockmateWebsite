@@ -18,7 +18,7 @@ describe("SUP-2291: reconciliation never crosses tenants", () => {
         externalRef: "SHARED-REF-1",
         amount: 900,
         claimantName: "Bekins Claimant",
-        lossDate: "2026-01-10",
+        lossDate: "2026-01-19",
       },
     })
 

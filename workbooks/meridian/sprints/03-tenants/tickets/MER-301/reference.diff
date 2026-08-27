@@ -82,9 +82,9 @@ index 0000000..229243f
 + * `DbClient` every connection in the pool shares - but `tenantId` is mutable and the object
 + * itself is REUSED across checkouts, the same way a real pooled connection is one physical
 + * object handed to many callers over its lifetime. A repository function reads `tenantId` off
-+ * whatever connection it was given instead of a tenant id passed as a loose parameter. See
-+ * migrations/0010_row_level_security.sql for where tenant scoping stops depending on this
-+ * object at all and moves into Postgres itself.
++ * whatever connection it was given instead of a tenant id passed as a loose parameter. A later
++ * ticket in this sprint moves tenant scoping out of this object entirely and into Postgres
++ * itself.
 + */
 +export interface PooledConnection {
 +  tenantId: string | null
@@ -346,7 +346,7 @@ index 0000000..394420e
 +        externalRef: "SHARED-REF-1",
 +        amount: 900,
 +        claimantName: "Bekins Claimant",
-+        lossDate: "2026-01-10",
++        lossDate: "2026-01-19",
 +      },
 +    })
 +
