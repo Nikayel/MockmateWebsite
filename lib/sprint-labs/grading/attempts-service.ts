@@ -114,6 +114,7 @@ import {
 } from "@/lib/sprint-labs/types"
 import { checkSubmissionBudget, SPRINT_LAB_SUBMISSION_BUDGET } from "./budget"
 import { countDiffChangedLines, extractDiffFilePaths } from "./diff-utils"
+import { projectFinalizedAttemptRelease } from "./finalized-attempt-projection"
 import { runHiddenGate } from "./gate-runner"
 import {
   computeOverallScore,
@@ -386,7 +387,24 @@ export interface OpenAttemptResult {
   ticketKey: string
   variantId: string
   aiPolicy: AiPolicy
-  ioCases: Array<{ id: string; humanName: string; input: unknown }>
+  /**
+   * `entryPoint` (runtimeB fix, additive): `SealedHiddenCase.entryPoint` already carried
+   * `{module, export}` (Task 7, `b1f0fbc2`) but this projection never issued it to the client --
+   * Task 8 was built before Task 7 introduced the field, and its own schema doc comment already
+   * says this half is "PUBLIC-issuable at submit time," the same framing already used for
+   * `input` two lines below. Without it, the client-side io-case executor
+   * (`lib/sprint-labs/runtime/io-case-executor.ts`) has no way to know which export to call --
+   * confirmed there is no other channel that carries it (not `TicketSecretMeta`, not any compiled
+   * public field). Optional: an io-case authored with no `entryPoint` is still issued (its input
+   * is still real, hidden-tier-relevant data) but cannot be executed client-side -- the executor
+   * reports that as a captured per-case error, never a crash.
+   */
+  ioCases: Array<{
+    id: string
+    humanName: string
+    input: unknown
+    entryPoint?: { module: string; export: string }
+  }>
   probes: Array<{ id: string; humanName: string; body: string }>
   regressionManifest: Array<{ ticketKey: string }>
   submissionsUsed: number
@@ -453,7 +471,7 @@ export async function openSprintLabAttempt(
   const issued = new Set(variant.issuedCaseIds)
   const ioCases = hiddenCases
     .filter((c) => c.kind === "io-case" && issued.has(c.id))
-    .map((c) => ({ id: c.id, humanName: c.humanName, input: c.input }))
+    .map((c) => ({ id: c.id, humanName: c.humanName, input: c.input, entryPoint: c.entryPoint }))
 
   const probes =
     compiledTicket.ticket.aiPolicy === "assisted"
@@ -856,5 +874,96 @@ export async function reviewSprintLabAttempt(
           referenceDiff: sealed.referenceDiff,
         }
       : undefined,
+  }
+}
+
+// ============================================================
+// Read: the finalized attempt (runtimeB task) — backs
+// GET /api/sprint-labs/attempts/[attemptId].
+// ============================================================
+
+export interface GetFinalizedAttemptInput {
+  runId: string
+  ticketKey: string
+}
+
+export interface FinalizedAttemptOutcome {
+  attemptId: string
+  /** Same shape `completeSprintLabAttempt` returns — reused verbatim so this route "matches
+   *  exactly what complete releases post-finalization" by construction, not by parallel logic. */
+  outcome: CompleteAttemptOutcome
+  /** `{id, correct}` per review comment — released only once BOTH finalized and the review round
+   *  has actually been submitted. See `finalized-attempt-projection.ts`'s file header for why this
+   *  is a STRICTER gate than `attempt.finalized` alone. `undefined` for a non-review-only ticket,
+   *  or before the round has been submitted. */
+  reviewCorrectness?: Array<{ id: string; correct: boolean }>
+}
+
+/**
+ * Read-only: returns the ONE finalized attempt for `(runId, ticketKey)`, or `null` if none exists
+ * yet (a genuinely fresh ticket, or one only ever practice-re-attempted). Finalize-once
+ * (`attemptsMeta/{ticketKey}`'s sentinel doc, see this file's header) guarantees at most one
+ * stored attempt for a ticket is ever `finalized: true`, so "the finalized attempt" is a
+ * well-defined, stable thing to look up by ticket key alone — there is no per-ticket attemptId
+ * reachable anywhere client-side before this call (confirmed: `SprintLabRun` carries no such
+ * field, and every other attempts-service function resolves "the attempt(s) for a ticket" via this
+ * SAME `.where("ticketKey", "==", ...)` query, never a stored lookup key), which is exactly why
+ * this function — and the route built on it — is keyed by ticketKey rather than a bare Firestore
+ * attemptId: a route reachable only by an id nothing hands you cold cannot satisfy "works in a
+ * fresh tab."
+ *
+ * Never touches `sealed.hiddenCases`/`expected`/probe `body` — only `sealed.review` (comment
+ * bodies + correctness, release-gated) and `sealed.referenceDiff` (finalize-gated), exactly the
+ * two secret-content fields `completeSprintLabAttempt`/`reviewSprintLabAttempt` already release
+ * post-finalization.
+ */
+export async function getFinalizedSprintLabAttempt(
+  userId: string,
+  input: GetFinalizedAttemptInput
+): Promise<FinalizedAttemptOutcome | null> {
+  const run = await requireOwnedActiveRun(userId, input.runId)
+
+  const compiledTicket = await getTicket(run.workbookId, input.ticketKey)
+  if (!compiledTicket) throw new Error(SPRINT_LAB_ATTEMPT_ERRORS.UNKNOWN_TICKET)
+
+  const snap = await attemptsCollection(run.id).where("ticketKey", "==", input.ticketKey).get()
+  const finalizedEntry = snap.docs
+    .map((doc) => ({ id: doc.id, parsed: parseStoredAttemptDoc(doc.data(), doc.id) }))
+    .find(
+      (entry): entry is { id: string; parsed: StoredAttemptDoc } =>
+        entry.parsed !== null &&
+        entry.parsed.status === "completed" &&
+        entry.parsed.finalized === true
+    )
+  if (!finalizedEntry) return null
+
+  const attemptId = finalizedEntry.id
+  const stored = finalizedEntry.parsed
+  const attempt = projectTicketAttempt(stored)
+
+  const sealed = await loadSealedTicket(run.workbookId, input.ticketKey)
+  const reviewDocSnap = await attemptsCollection(run.id)
+    .doc(attemptId)
+    .collection("reviewRound")
+    .doc("decision")
+    .get()
+
+  const release = projectFinalizedAttemptRelease({
+    aiPolicy: stored.aiPolicy,
+    finalized: attempt.finalized,
+    reviewRoundSubmitted: reviewDocSnap.exists,
+    sealedReview: sealed?.review ?? null,
+    sealedReferenceDiff: sealed?.referenceDiff ?? null,
+  })
+
+  return {
+    attemptId,
+    outcome: {
+      attempt,
+      submissionsRemaining: Math.max(0, SPRINT_LAB_SUBMISSION_BUDGET - stored.attemptIndex - 1),
+      reviewComments: release.reviewComments,
+      referenceDiff: release.referenceDiff,
+    },
+    reviewCorrectness: release.reviewCorrectness,
   }
 }

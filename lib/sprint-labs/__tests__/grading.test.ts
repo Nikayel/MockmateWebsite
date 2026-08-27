@@ -301,6 +301,7 @@ import {
   openSprintLabAttempt,
   completeSprintLabAttempt,
   reviewSprintLabAttempt,
+  getFinalizedSprintLabAttempt,
   SPRINT_LAB_ATTEMPT_ERRORS,
 } from "../grading/attempts-service"
 
@@ -329,12 +330,15 @@ beforeEach(() => {
 })
 
 describe("openSprintLabAttempt", () => {
-  it("persists a stub doc at open (C1) and issues io-case inputs (id/humanName/input only, never expected)", async () => {
+  it("persists a stub doc at open (C1) and issues io-case inputs (id/humanName/input/entryPoint only, never expected)", async () => {
     seedRun("run1")
     const result = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
     expect(result.ioCases.length).toBeGreaterThan(0)
     for (const c of result.ioCases) {
-      expect(Object.keys(c).sort()).toEqual(["humanName", "id", "input"])
+      // `entryPoint` (runtimeB task, additive): `{module, export}` only -- the client-side
+      // io-case executor needs it to know which export to call. Still never `expected`.
+      expect(Object.keys(c).sort()).toEqual(["entryPoint", "humanName", "id", "input"])
+      expect(c).not.toHaveProperty("expected")
     }
     expect(result.regressionManifest).toEqual([{ ticketKey: "MER-101" }])
     expect(result.submissionsUsed).toBe(0)
@@ -888,5 +892,128 @@ describe("reviewSprintLabAttempt", () => {
         decisions: [{ commentId: "c1", decision: "accept" }],
       })
     ).rejects.toThrow()
+  })
+})
+
+// ============================================================
+// getFinalizedSprintLabAttempt (runtimeB task) — backs
+// GET /api/sprint-labs/attempts/[attemptId]. Real Firestore-query behavior
+// against the fake harness; the pure release-gating logic itself is
+// exhaustively covered, with no Firestore at all, in
+// lib/sprint-labs/grading/__tests__/finalized-attempt-projection.test.ts.
+// ============================================================
+
+describe("getFinalizedSprintLabAttempt", () => {
+  it("returns null when the ticket has never been attempted at all", async () => {
+    seedRun("run1")
+    const result = await getFinalizedSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    expect(result).toBeNull()
+  })
+
+  it("returns null when an attempt exists but is only a practice (non-finalized) re-attempt", async () => {
+    seedRun("run1")
+    const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    // Seed a PRIOR finalized attempt so THIS completion is the non-finalized practice case (same
+    // sentinel-doc technique the reviewSprintLabAttempt fixtures above use).
+    h.store.set(`sprintLabRuns/run1/attemptsMeta/MER-201`, {
+      finalizedByAttemptId: "some-other-attempt",
+      finalizedAt: "2020-01-01T00:00:00.000Z",
+    })
+    await completeSprintLabAttempt(USER, completeInput({ attemptId: opened.attemptId }))
+
+    const result = await getFinalizedSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    expect(result).toBeNull()
+  })
+
+  it("returns the finalized attempt's scores/escapedDefects/referenceDiff, and the real attemptId, once one exists", async () => {
+    seedRun("run1")
+    const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    await completeSprintLabAttempt(
+      USER,
+      completeInput({
+        attemptId: opened.attemptId,
+        ioCaseOutputs: { [IO_CASE_A.id]: IO_CASE_A.expected }, // one passes, one escapes
+      })
+    )
+
+    const result = await getFinalizedSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    expect(result).not.toBeNull()
+    expect(result?.attemptId).toBe(opened.attemptId)
+    expect(result?.outcome.attempt.finalized).toBe(true)
+    expect(result?.outcome.attempt.escapedDefects).toEqual([IO_CASE_B.humanName])
+    expect(result?.outcome.referenceDiff).toContain("diff --git")
+    // Never the sealed expecteds/probe bodies -- only the whitelist-safe projection.
+    expect(JSON.stringify(result)).not.toContain("amount must be")
+  })
+
+  it("review-only: releases comment BODIES even before the review round is submitted, but never correctness", async () => {
+    seedRun("run1")
+    contentMocks.getTicket.mockResolvedValue(ticketFixture({ aiPolicy: "review-only" }))
+    sealedMocks.loadSealedTicket.mockResolvedValue(
+      sealedFixture({
+        review: [
+          { id: "c1", body: "looks fine", correct: true },
+          { id: "c2", body: "just delete it", correct: false },
+        ],
+      })
+    )
+    const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    await completeSprintLabAttempt(USER, completeInput({ attemptId: opened.attemptId }))
+
+    const result = await getFinalizedSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    expect(result?.outcome.attempt.finalized).toBe(true) // first-ever completion finalizes
+    expect(result?.outcome.reviewComments).toEqual([
+      { id: "c1", body: "looks fine" },
+      { id: "c2", body: "just delete it" },
+    ])
+    // The spoiler gate: finalized is true here, but the review round has not been SUBMITTED yet
+    // (reviewSprintLabAttempt was never called) -- correctness must stay hidden regardless.
+    expect(result?.reviewCorrectness).toBeUndefined()
+    expect(JSON.stringify(result)).not.toContain("correct")
+  })
+
+  it("review-only: releases correctness once the review round has actually been submitted", async () => {
+    seedRun("run1")
+    contentMocks.getTicket.mockResolvedValue(ticketFixture({ aiPolicy: "review-only" }))
+    sealedMocks.loadSealedTicket.mockResolvedValue(
+      sealedFixture({
+        review: [
+          { id: "c1", body: "looks fine", correct: true },
+          { id: "c2", body: "just delete it", correct: false },
+        ],
+      })
+    )
+    const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    await completeSprintLabAttempt(USER, completeInput({ attemptId: opened.attemptId }))
+    await reviewSprintLabAttempt(USER, {
+      runId: "run1",
+      ticketKey: "MER-201",
+      attemptId: opened.attemptId,
+      decisions: [
+        { commentId: "c1", decision: "accept" },
+        { commentId: "c2", decision: "push-back", reason: "would break the nightly sync" },
+      ],
+    })
+
+    const result = await getFinalizedSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    expect(result?.reviewCorrectness).toEqual([
+      { id: "c1", correct: true },
+      { id: "c2", correct: false },
+    ])
+  })
+
+  it("propagates the run-ownership error (delegates to requireOwnedActiveRun, same as every sibling function)", async () => {
+    seedRun("run1", { userId: "someone-else" })
+    await expect(
+      getFinalizedSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    ).rejects.toThrow("UNAUTHORIZED")
+  })
+
+  it("throws UNKNOWN_TICKET for a ticket key the compiled registry doesn't know", async () => {
+    seedRun("run1")
+    contentMocks.getTicket.mockResolvedValue(null)
+    await expect(
+      getFinalizedSprintLabAttempt(USER, { runId: "run1", ticketKey: "NOPE-1" })
+    ).rejects.toThrow(SPRINT_LAB_ATTEMPT_ERRORS.UNKNOWN_TICKET)
   })
 })
