@@ -232,6 +232,27 @@ export function buildPerTurnNote(state: PerTurnState): string {
   return note
 }
 
+/**
+ * The exact suffix shape `buildPerTurnNote` produces: always the LAST thing
+ * appended to the message, always starting `\n\n[TURN STATE:` and running to
+ * the string's end. Anchored so it only ever matches that trailing block,
+ * not incidental bracket text elsewhere in a learner's own message.
+ */
+const PER_TURN_NOTE_SUFFIX = /\n\n\[TURN STATE:[\s\S]*\]$/
+
+/**
+ * Strips a Layer D note before a message is PERSISTED, per review fix M2:
+ * the freshest note must still ride the live message sent to the model this
+ * turn (callers pass the raw, un-stripped message to `generateAIResponse`),
+ * but a stale per-turn note must never accumulate in the stored/replayed
+ * transcript — AGENT-CONTEXT.md §3's whole point is that at turn 30 the
+ * agent reasons from turn 30's state, not turn 1's frozen snapshot baked
+ * permanently into history. A message with no note is returned unchanged.
+ */
+export function stripPerTurnNote(message: string): string {
+  return message.replace(PER_TURN_NOTE_SUFFIX, "")
+}
+
 // ============================================================
 // Assisted-mode full file context (not a lettered layer; same pure-format family)
 // ============================================================

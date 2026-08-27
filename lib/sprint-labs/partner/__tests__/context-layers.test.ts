@@ -12,6 +12,7 @@ import {
   layerB,
   layerC,
   renderWorkspaceFiles,
+  stripPerTurnNote,
   type LayerBInput,
   type LayerCInput,
 } from "../context-layers"
@@ -200,6 +201,30 @@ describe("buildPerTurnNote (Layer D — rides the outgoing message string)", () 
     const note = buildPerTurnNote({ redVisibleTests: [], diffStat: "", turnIndex: 2 })
     expect(note.startsWith("\n\n[TURN STATE:")).toBe(true)
     expect(note.trimEnd().endsWith("]")).toBe(true)
+  })
+})
+
+describe("stripPerTurnNote (review fix M2 — the stored/replayed copy must not carry a stale Layer D note)", () => {
+  it("removes a plain note, leaving the raw learner text untouched", () => {
+    const note = buildPerTurnNote({ redVisibleTests: [], diffStat: "", turnIndex: 3 })
+    expect(stripPerTurnNote(`what does this endpoint do${note}`)).toBe("what does this endpoint do")
+  })
+
+  it("removes a note that names failing tests and a diff stat", () => {
+    const note = buildPerTurnNote({
+      redVisibleTests: [{ name: "duplicate submit", failingAssertion: "expected 1, got 2" }],
+      diffStat: "2 files changed",
+      turnIndex: 7,
+    })
+    expect(stripPerTurnNote(`why is this failing?${note}`)).toBe("why is this failing?")
+  })
+
+  it("returns the message unchanged when it carries no note at all", () => {
+    expect(stripPerTurnNote("just a plain message")).toBe("just a plain message")
+  })
+
+  it("does not touch an incidental bracket the learner typed themselves", () => {
+    expect(stripPerTurnNote("what does [foo] mean here?")).toBe("what does [foo] mean here?")
   })
 })
 
