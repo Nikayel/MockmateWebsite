@@ -91,6 +91,18 @@ is adapted, honestly:
 - **W7 — verification bar** (AGENT-PROMPT §4) + adversarial review + merge
   behind flag.
 
+## Standing architectural notes
+
+- **Browser-reported pass/fail is NEVER authoritative for anything scored.**
+  The visible tier is formative UI; the graded truth is the server-side
+  IO-case comparison (Task 8). The client marker channel carries the
+  pack-runner defenses (last marker, stdout-typed only) but remains
+  forgeable in principle — every scoring path must treat client-posted
+  booleans as display-only. (From Task 4's review, finding I3.)
+- The legacy js/python workspace runners share the accumulate-every-marker
+  parse weakness on their (unscored) paths — pre-existing, out of Sprint
+  Labs scope, disclosed for the final report.
+
 ## Rulings ledger
 
 - R1: Sprint 5 mis-sizing (SPRINT-PLAN §8) resolved by lengthening the
