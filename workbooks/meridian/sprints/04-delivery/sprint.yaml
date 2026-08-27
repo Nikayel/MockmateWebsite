@@ -39,12 +39,13 @@ filesTouched:
   - "src/queue/outbox.ts"
   - "src/http/routes/claims.ts"
   - "test/support/failing-query-db.ts"
+  # MER-403
   - "migrations/0015_dead_letters.sql"
+  - "src/delivery/types.ts"
   - "src/delivery/retry.ts"
   - "src/delivery/webhooks.ts"
-  - "src/delivery/signature.ts"
-  - "src/delivery/webhook-payload.ts"
-  - "migrations/0016_outbox_ordering.sql"
+  - "test/support/fake-http-client.ts"
+  - "test/support/build-app.ts"
 newSourceFiles:
   # MER-401
   - "migrations/0013_idempotency_keys.sql"
@@ -55,10 +56,12 @@ newSourceFiles:
   - "migrations/0014_outbox.sql"
   - "src/db/repositories/outbox.ts"
   - "test/support/failing-query-db.ts"
+  # MER-403
   - "migrations/0015_dead_letters.sql"
-  - "migrations/0016_outbox_ordering.sql"
 rewrittenFiles:
   # MER-402: the in-process array is fully replaced by the durable outbox_entries table.
   - "src/queue/outbox.ts"
+  # MER-403: withRetry's immediate in-process loop is replaced by classification + persisted
+  # backoff state; delivery no longer records a row before the send has actually succeeded.
   - "src/delivery/retry.ts"
-  - "src/delivery/signature.ts"
+  - "src/delivery/webhooks.ts"

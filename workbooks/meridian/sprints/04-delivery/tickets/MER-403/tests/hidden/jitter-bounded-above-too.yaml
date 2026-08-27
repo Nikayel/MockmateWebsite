@@ -1,0 +1,14 @@
+humanName: "Escaped: jitter is unbounded above instead of staying within its own window"
+tags:
+  - defensible-retry-policy-backoff-jitter
+kind: probe
+body: |
+  const capped = cappedBackoffDelayMs(20)
+  for (const randomValue of [0, 0.1, 0.5, 0.9, 0.999999]) {
+    const jittered = jitteredBackoffDelayMs(20, undefined, () => randomValue)
+    assert(jittered >= capped, `jittered delay ${jittered} must never fall below the capped value ${capped}`)
+    assert(
+      jittered < capped + 2000,
+      `jittered delay ${jittered} must stay within its own jitter window (capped value + 2000ms), got ${jittered - capped}ms of jitter`
+    )
+  }

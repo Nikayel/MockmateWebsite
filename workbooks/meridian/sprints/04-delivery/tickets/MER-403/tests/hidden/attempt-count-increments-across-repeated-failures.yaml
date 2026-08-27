@@ -1,0 +1,26 @@
+humanName: "Escaped: attempt_count does not increment correctly across repeated failures of the same entry"
+tags:
+  - defensible-retry-policy-backoff-jitter
+kind: probe
+body: |
+  const db = createMemoryDb()
+  const outbox = createOutbox({ db, workerId: "worker-a", maxAttempts: 8 })
+  return outbox
+    .enqueue({ type: "claim.processed", tenantId: "ten_northwind", claimId: "clm_counting" })
+    .then(() => {
+      const failOnce = async (entry) => {
+        throw new DeliveryFailureError({
+          message: "503",
+          classification: "retryable",
+          nextAttemptAt: new Date(Date.now() + 5).toISOString(),
+          payload: JSON.stringify({ attempt: entry.attemptCount }),
+        })
+      }
+      return outbox.drain(failOnce)
+    })
+    .then(() => new Promise((resolve) => setTimeout(resolve, 20)))
+    .then(() => claimOutboxBatch(db, { workerId: "inspector", leaseDurationMs: 30000, limit: 10 }))
+    .then((claimed) => {
+      assert.strictEqual(claimed.length, 1)
+      assert.strictEqual(claimed[0].attemptCount, 1, "one prior failure must show attempt_count 1")
+    })

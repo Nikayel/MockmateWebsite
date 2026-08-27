@@ -1,0 +1,13 @@
+humanName: "Escaped: the daily cooldown boundary drifted from its pinned, DST-verified value"
+tags:
+  - defensible-retry-policy-backoff-jitter
+kind: io-case
+input:
+  attemptCount: 20
+  retryAfterSeconds: null
+  now: "2026-03-08T18:00:00.000Z"
+  timeZone: "America/Chicago"
+expected: "2026-03-09T05:00:00.000Z"
+entryPoint:
+  module: "src/delivery/retry.ts"
+  export: "computeNextAttemptAt"
