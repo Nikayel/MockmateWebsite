@@ -145,7 +145,13 @@ sign-off field attesting this.
 
 ### 5.1 Hidden-test mechanics (found the hard way authoring Sprint 1)
 
-Apply these or the ticket fails `lab validate --dynamic` in a confusing way:
+Apply these or the ticket fails `lab validate --dynamic` in a confusing way.
+Enforcement note (S4 review finding): of the four rules below, only the
+`entryPoint` requirement is caught by a dedicated validator check today. The
+`Infinity`/`NaN` and async-probe-body rules are hand-authored conventions that
+currently surface only as generic, hard-to-diagnose red/green failures, not as
+named rule violations; dedicated `lab validate` checks for them are a tracked
+follow-up (T21-B). Treat all four as binding at authoring time regardless:
 
 - **A probe body's `it()` callback is not async.** Do not write `await` inside
   a hidden probe test body — the workspace vitest-shim runs the callback
