@@ -1,0 +1,22 @@
+# Fixture for lib/sprint-labs/validate/dynamic's own test suite (PLAN.md Task 7
+# review round 1, Critical 1). NONDISC-101's hidden probe passes even against
+# the buggy setup state (it checks add(2,3), which the bug never touches) --
+# an escape test that does not catch its own escape. The gate must reject
+# this even though the VISIBLE tier does fail in red (the old union check's
+# exact hole). Not real learner content.
+id: dynamic-non-discriminating-hidden
+title: "Dynamic gate non-discriminating hidden probe fixture"
+pitch: "A hidden probe that passes even in the red state -- proves the per-tier red check catches it."
+track: "Test fixture"
+language: typescript
+level: "n/a"
+topics:
+  - arithmetic
+sprintCount: 1
+ticketCount: 1
+estimatedHours: 0
+requiresServerExecution: false
+objectives:
+  - id: arithmetic
+    label: "Arithmetic"
+    canDo: "n/a"

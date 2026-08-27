@@ -70,7 +70,7 @@ describe("bridgeHiddenTests", () => {
     expect(greenHidden).toMatchObject({ passed: true, suite: "hidden" })
   })
 
-  it("reports an io-case hidden test as a named, non-crashing WARN gap (real content: DEMO-102)", async () => {
+  it("reports an io-case hidden test with no entryPoint as a named, non-crashing gap -- ERROR, since DEMO-102 is ai_policy: unassisted (score-feeding)", async () => {
     const FIXTURE_WORKBOOK = join(__dirname, "../../../../../workbooks/_fixture-workbook")
     const workbook = loadWorkbookTree(FIXTURE_WORKBOOK)
     const { ticket } = findTicketLocation(workbook, "DEMO-102")
@@ -84,7 +84,7 @@ describe("bridgeHiddenTests", () => {
     for (const finding of bridged.findings) {
       expect(finding).toMatchObject({
         ruleId: "dynamic-hidden-test-not-executable",
-        severity: "warn",
+        severity: "error",
         ticketKey: "DEMO-102",
       })
       expect(finding.message).toContain("io-case")

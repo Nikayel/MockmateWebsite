@@ -1,0 +1,11 @@
+humanName: "Escaped: a positive number is not labelled positive"
+tags:
+  - arithmetic
+kind: io-case
+input:
+  n: 10
+expected:
+  label: "positive"
+entryPoint:
+  module: "src/classify.ts"
+  export: "classify"

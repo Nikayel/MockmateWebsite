@@ -19,14 +19,23 @@
  * The workbook was recompiled (`pnpm workbooks:compile workbooks/_fixture-workbook`) after the
  * fix so the generated public/sealed bundles stay byte-consistent with the corrected diffs;
  * `compiler.test.ts`/`sealing.test.ts` both still pass unchanged.
+ *
+ * Review round 1 update: DEMO-102 is `ai_policy: unassisted` (a score-feeding policy, per
+ * WORKBOOK-SPEC.md §5 -- corrects this file's own earlier "review-only" mischaracterization). Its
+ * two io-case hidden tests author no `entryPoint`, so under Critical 2's new severity split they
+ * are now `dynamic-hidden-test-not-executable` ERRORs, not WARNs: an unverifiable hidden tier on a
+ * score-feeding ticket is a real content gap, correctly surfaced rather than silently passed. This
+ * is a genuinely correct, intended behavior change from before this review round, not a
+ * regression -- content authoring (Task 2/15, or a follow-up) needs to either author an
+ * `entryPoint` matching a real callable, or convert these to `probe`-kind hidden tests.
  */
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { loadWorkbookTree } from "../../load-tree"
+import { validateWorkbookDynamic } from "../index"
 import { findTicketLocation } from "../materialize"
 import { runDynamicGateForTicket } from "../red-green"
-import { validateWorkbookDynamic } from "../index"
 
 const FIXTURE_WORKBOOK = join(__dirname, "../../../../../workbooks/_fixture-workbook")
 
@@ -40,26 +49,29 @@ describe("workbooks/_fixture-workbook (real content, not a synthetic fixture)", 
     expect(findings).toEqual([])
   }, 20_000)
 
-  it("DEMO-102 (review-only, io-case hidden tests, depends on DEMO-101 same-sprint): visible tier goes red->green; both io-cases are honestly reported as not dynamically executable (D1: no server-side io-case execution exists anywhere yet)", async () => {
+  it("DEMO-102 (unassisted, io-case hidden tests with no entryPoint authored, depends on DEMO-101 same-sprint): visible tier still goes red->green, but the unverifiable hidden tier is correctly an ERROR on a score-feeding ticket", async () => {
     const workbook = loadWorkbookTree(FIXTURE_WORKBOOK)
     const { ticket } = findTicketLocation(workbook, "DEMO-102")
 
     const findings = await runDynamicGateForTicket(workbook, ticket)
 
-    // No red/green or regression ERROR -- the visible tier's own red->green holds.
-    expect(findings.filter((f) => f.severity === "error")).toEqual([])
-    // Exactly the two io-case gaps, named, not silently swallowed.
+    // No red/green or regression ERROR from the VISIBLE tier itself -- that half still holds.
+    expect(findings.some((f) => f.ruleId === "dynamic-red-green")).toBe(false)
+    expect(findings.some((f) => f.ruleId === "dynamic-regression")).toBe(false)
+    // Exactly the two io-case gaps, named, ERROR (unassisted is score-feeding).
     const ioCaseGaps = findings.filter((f) => f.ruleId === "dynamic-hidden-test-not-executable")
     expect(ioCaseGaps).toHaveLength(2)
-    expect(ioCaseGaps.every((f) => f.ticketKey === "DEMO-102" && f.severity === "warn")).toBe(true)
+    expect(ioCaseGaps.every((f) => f.ticketKey === "DEMO-102" && f.severity === "error")).toBe(true)
+    expect(findings).toHaveLength(2)
   }, 20_000)
 
-  it("validateWorkbookDynamic runs the whole fixture workbook end to end and reports only the two known io-case gaps", async () => {
+  it("validateWorkbookDynamic runs the whole fixture workbook end to end and reports only the two known (now ERROR) io-case gaps", async () => {
     const workbook = loadWorkbookTree(FIXTURE_WORKBOOK)
 
     const findings = await validateWorkbookDynamic(workbook)
 
     expect(findings.every((f) => f.ruleId === "dynamic-hidden-test-not-executable")).toBe(true)
+    expect(findings.every((f) => f.severity === "error")).toBe(true)
     expect(findings).toHaveLength(2)
   }, 30_000)
 })

@@ -1,0 +1,8 @@
+diff --git a/src/util.ts b/src/util.ts
+index 1111111..3333333 100644
+--- a/src/util.ts
++++ b/src/util.ts
+@@ -1,2 +1,2 @@
+ // zero placeholder
+-export const x = 1
++export const x = 2

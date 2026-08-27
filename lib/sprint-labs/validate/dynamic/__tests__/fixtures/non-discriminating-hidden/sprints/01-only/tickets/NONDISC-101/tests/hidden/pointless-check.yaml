@@ -1,0 +1,7 @@
+humanName: "Escaped: adding two positive numbers still sums correctly"
+tags:
+  - arithmetic
+kind: probe
+body: |
+  const result = add(2, 3)
+  assert(result === 5, "adding two positives should sum correctly, got " + result)
