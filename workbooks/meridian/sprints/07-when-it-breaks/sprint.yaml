@@ -1,0 +1,60 @@
+number: 7
+title: "When It Breaks"
+topic: "Observability and operations"
+goal: "Make Meridian explain itself under load: request-scoped structured logs, trace context that survives the queue boundary, an honest latency signal, an SLO with alerts that fire once, and close the 14:05 incident with a review that would actually prevent it."
+standupQuote: "p99 on POST /claims went 380ms → 2.1s at 14:05 and it has not come back. Rico grabbed one trace before the tab died: it's a single 2.1s span called POST /claims with nothing inside it. Logs for that minute are 40-line pretty-printed blobs with no claim id. Nobody can tell me if this is us or Postgres."
+archMapDelta:
+  added:
+    - "Request-scoped structured logging carrying trace, tenant, and claim identity"
+    - "W3C trace context propagated across the outbox and SQS boundary"
+    - "A written SLI and multi-window burn-rate alerts for the claims API"
+  changed:
+    - "Log lines are single structured records instead of multi-line pretty-printed blobs"
+  broke:
+    - "p99 on POST /claims regressed from 380ms to 2.1s at 14:05 with no diagnosis available"
+  invariants:
+    - "Every request-scoped log line carries trace, tenant, and claim identity without leaking across concurrent requests"
+    - "A trace started by an API request continues through the outbox row, the queued message, and the delivery worker as one trace"
+sizingNotes: "SPRINT-PLAN.md's own sizing table under-points this sprint at 19 (§'Fixes to apply' item 8: 'Sprint 7 is under-pointed... 25-point work wearing a 19-point label,' citing five new source files plus AsyncLocalStorage-based context propagation). Per AUTHORING-RULES.md §3 ('Sprint 7 re-points to match its real weight, ~24-25 pts across the same 5 tickets'), tickets are re-pointed from the original 3/5/5/3/3 to 5/6/6/5/3, summing to 25 across the same five tickets. MER-702 (trace propagation across the outbox/SQS boundary) and MER-703 (unassisted regression diagnosis) absorb the largest increases, matching where the extra source files and the AsyncLocalStorage work actually land."
+objectives:
+  - request-scoped-structured-logging
+  - distributed-trace-context-propagation
+  - latency-regression-diagnosis-wait-vs-service-time
+  - slo-error-budget-burn-rate-alerts
+  - review-postmortem-systemic-causes
+# validate-only fields (lab validate's sprint-file-set rules; the compiler
+# never reads these). infra/slo/ and infra/alerts/ are named as directories
+# only in SPRINT-PLAN.md's "Fixes to apply" item 5 ("S7's infra/slo/ and
+# infra/alerts/"), with no file enumerated inside either -- the two paths
+# below are this task's honest reconstruction of one representative file per
+# directory, matching this sprint's own SLO/alerting ticket (MER-704).
+# Every other path here is either a seed file (confirmed against
+# `ls workbooks/meridian/repo`) or new within this sprint; nothing here
+# depends on sprints 1-5.
+filesTouched:
+  - "migrations/0021_outbox_trace_context.sql"
+  - "src/observability/tracing.ts"
+  - "src/observability/latency.ts"
+  - "src/observability/slo.ts"
+  - "test/http/latency-regression.test.ts"
+  - "infra/slo/claims-api.yaml"
+  - "infra/alerts/burn-rate.tf"
+  - "docs/postmortem-1405.md"
+  - "src/util/logger.ts"
+  - "src/http/request-context.ts"
+  - "src/queue/outbox.ts"
+  - "src/delivery/webhooks.ts"
+newSourceFiles:
+  - "migrations/0021_outbox_trace_context.sql"
+  - "src/observability/tracing.ts"
+  - "src/observability/latency.ts"
+  - "src/observability/slo.ts"
+  - "test/http/latency-regression.test.ts"
+  - "infra/slo/claims-api.yaml"
+  - "infra/alerts/burn-rate.tf"
+  - "docs/postmortem-1405.md"
+rewrittenFiles:
+  - "src/util/logger.ts"
+  - "src/http/request-context.ts"
+  - "src/queue/outbox.ts"
+  - "src/delivery/webhooks.ts"
