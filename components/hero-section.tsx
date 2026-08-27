@@ -96,7 +96,7 @@ export function HeroSection() {
                 }
                 className="bg-foreground text-background hover:bg-foreground/90 inline-flex rounded-[8px] px-8 py-3.5 text-base font-semibold transition-colors duration-200"
               >
-                Start practicing free
+                Start free
               </Link>
               {/* Microcopy lives directly under the primary button. The second
                   line quietly surfaces the free courses without adding a
