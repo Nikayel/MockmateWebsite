@@ -88,9 +88,7 @@ const APP_NAV: AppNavItem[] = [
     label: "Interview",
     picker: "interview",
     icon: Terminal,
-    // Guard against /interview-prep, which is a separate marketing route.
-    isActive: (pathname) =>
-      pathname.startsWith("/interview") && !pathname.startsWith("/interview-prep"),
+    isActive: (pathname) => pathname.startsWith("/interview"),
   },
   {
     kind: "link",
@@ -152,11 +150,6 @@ const MARKETING_NAV: MarketingNavItem[] = [
     // here does not drag the multi-megabyte curriculum registries into the client bundle.
     href: LEARN_HUB_PATH,
     isActive: isLearnPath,
-  },
-  {
-    label: "Interviews",
-    href: "/interview-prep",
-    isActive: (pathname) => pathname.startsWith("/interview-prep"),
   },
   {
     label: "Pricing",

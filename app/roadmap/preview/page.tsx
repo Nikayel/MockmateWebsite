@@ -183,12 +183,12 @@ export default function RoadmapPreviewPage() {
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
-                <Link href="/interview-prep">
+                <Link href="/interview">
                   <Button
                     variant="outline"
                     className="border-border text-muted-foreground hover:bg-muted"
                   >
-                    Browse companies first
+                    Try a practice interview
                   </Button>
                 </Link>
               </div>
