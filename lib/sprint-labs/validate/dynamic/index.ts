@@ -47,20 +47,33 @@ export async function validateWorkbookDynamic(
   for (const { ticket } of allTicketsInOrder(workbook)) {
     if (!ticket.referenceDiff) continue // stub: nothing authored yet, nothing to check
 
-    if (!hasAnyVisibleTest(ticket.dirPath)) {
+    // One ticket's uncaught exception (a real bug in this module, an unexpected filesystem/git
+    // error) must not abort the whole workbook run and hide every OTHER ticket's result behind
+    // it -- it becomes a finding naming the ticket, exactly like every other failure mode here,
+    // and the loop continues.
+    try {
+      if (!hasAnyVisibleTest(ticket.dirPath)) {
+        findings.push({
+          ruleId: "dynamic-no-visible-tests",
+          severity: "warn",
+          ticketKey: ticket.key,
+          message:
+            "ticket authors a reference.diff but no tests/visible/*.test.ts; red->green cannot be verified.",
+        })
+      }
+
+      findings.push(...(await runDynamicGateForTicket(workbook, ticket)))
+
+      const provisioning = scanProvisioning(workbook, ticket.key)
+      findings.push(...provisioning.contentFindings, ...provisioning.gitObjectFindings)
+    } catch (error) {
       findings.push({
-        ruleId: "dynamic-no-visible-tests",
-        severity: "warn",
+        ruleId: "dynamic-ticket-crashed",
+        severity: "error",
         ticketKey: ticket.key,
-        message:
-          "ticket authors a reference.diff but no tests/visible/*.test.ts; red->green cannot be verified.",
+        message: `dynamic gate threw while validating this ticket: ${error instanceof Error ? error.message : String(error)}`,
       })
     }
-
-    findings.push(...(await runDynamicGateForTicket(workbook, ticket)))
-
-    const provisioning = scanProvisioning(workbook, ticket.key)
-    findings.push(...provisioning.contentFindings, ...provisioning.gitObjectFindings)
   }
 
   return findings

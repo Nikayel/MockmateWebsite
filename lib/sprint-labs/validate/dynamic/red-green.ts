@@ -1,19 +1,28 @@
 /**
  * The per-ticket dynamic gate (PLAN.md Task 7 / docs/sprint-labs/WORKBOOK-SPEC.md §6's "sbx
- * history gate pointed at your own content"): apply `setup.diff`, assert visible+hidden are NOT
- * all passing (RED); apply `reference.diff` on top, assert they ARE all passing (GREEN); then
- * replay every PRIOR ticket's visible suite against the same GREEN tree (regression).
+ * history gate pointed at your own content"): apply `setup.diff`, assert EVERY tier that has
+ * executable tests actually fails (RED); apply `reference.diff` on top, assert every tier fully
+ * passes (GREEN); then replay every PRIOR ticket's visible suite against the same GREEN tree
+ * (regression).
  *
- * "Not all passing" / "all passing" -- not "every individual test fails in the red state" -- is a
- * deliberate reading, not a looser stand-in for the brief's parenthetical own wording ("assert
- * not all-pass"): DEMO-101's own fixture content proves the stricter reading is wrong. Its buggy
- * setup-state parser (`return {ok:true, value:body}` unconditionally) makes visible test "accepts
- * a well-formed payload" pass even in the RED state -- only "rejects a payload missing tenantId"
- * fails. Requiring every visible test to fail pre-fix would reject correctly-authored content.
- * `visiblePassed`/`hiddenPassed` are still tracked SEPARATELY (not just one combined boolean) so a
- * GREEN failure names which tier didn't flip, per the brief's own requirement.
+ * RED is checked PER TIER, not as one combined "not everything passes" union (PLAN.md Task 7
+ * review round 1, Critical 1). The union check has a real hole: a hidden escape test that PASSES
+ * even against the buggy setup state (an escape test that does not catch its own escape) sails
+ * through as long as the VISIBLE tier fails for some unrelated reason -- the very thing the hidden
+ * tier exists to prove (that this specific escape is caught) is never actually checked. So a tier
+ * with executable tests must show at least one failure in the red state, independently for visible
+ * and for hidden; GREEN still requires every tier with tests to fully pass (a tier with zero tests
+ * has nothing to require either way -- see `splitVerdict`'s doc comment for the exact semantics).
+ * `visiblePassed`/`hiddenPassed` from the union-check era are gone; `TierVerdict` now separates
+ * "has executable tests" from "all of them currently pass" so RED and GREEN can each apply their
+ * own (different) rule to the same shape.
+ *
+ * A harness that could not run at all (`result.error !== null`, or zero results from a non-success
+ * run) is a hard `dynamic-red-green` ERROR before either tier is ever inspected -- Important 1 of
+ * the same review round: an empty `results` array must never read as "vacuously passed" the way an
+ * empty TIER legitimately can.
  */
-import type { WorkspaceTestResult } from "@/lib/workspace-execution/types"
+import type { WorkspaceExecutionResult, WorkspaceTestResult } from "@/lib/workspace-execution/types"
 
 import type { AuthoredTicket, AuthoredWorkbook } from "../tree"
 import type { ValidationFinding } from "../types"
@@ -28,24 +37,65 @@ import {
 import { buildPgSuiteForTicket, runPgSuiteAndSummarize } from "./sql-replay"
 import { runTicketFullSuite, runTicketVisibleSuite } from "./ts-replay"
 
+interface TierState {
+  count: number
+  allPass: boolean
+}
+
 interface TierVerdict {
-  visiblePassed: boolean
-  hiddenPassed: boolean
+  visible: TierState
+  hidden: TierState
   failingNames: string[]
 }
 
+/** `allPass` is only meaningful when `count > 0` -- a tier with zero executable tests is neither
+ *  "passing" nor "failing", it has nothing to report either way. Callers decide what a zero-count
+ *  tier means for THEIR purposes (RED: nothing required of it; GREEN: nothing required of it
+ *  either, since there is nothing there to fail; "no tests exist at all": both callers separately
+ *  guard the all-zero case). */
 function splitVerdict(results: WorkspaceTestResult[]): TierVerdict {
   const visible = results.filter((r) => !r.isHidden)
   const hidden = results.filter((r) => r.isHidden)
   return {
-    visiblePassed: visible.length === 0 || visible.every((r) => r.passed),
-    hiddenPassed: hidden.length === 0 || hidden.every((r) => r.passed),
+    visible: {
+      count: visible.length,
+      allPass: visible.length > 0 && visible.every((r) => r.passed),
+    },
+    hidden: { count: hidden.length, allPass: hidden.length > 0 && hidden.every((r) => r.passed) },
     failingNames: results.filter((r) => !r.passed).map((r) => r.name),
   }
 }
 
 function tierLabel(verdict: TierVerdict): string {
-  return `visible=${verdict.visiblePassed ? "PASS" : "FAIL"} hidden=${verdict.hiddenPassed ? "PASS" : "FAIL"}`
+  const label = (tier: TierState): string =>
+    tier.count === 0 ? "n/a (0 tests)" : tier.allPass ? "PASS" : "FAIL"
+  return `visible=${label(verdict.visible)} hidden=${label(verdict.hidden)}`
+}
+
+/** Important 1: a harness that couldn't run at all must never be read as a pass. `error !== null`
+ *  covers the top-level catch path; `!success && results.length === 0` covers the "workspace has
+ *  no files at all" / equivalent shapes that report failure but leave nothing for `splitVerdict`
+ *  to see, which would otherwise default every tier to a vacuous, wrongly-green `count === 0`.
+ *  Exported for a direct unit test of the exact boolean the review asked for -- reproducing a
+ *  genuine `runTsWorkspace` internal crash through real content is difficult by design (its own
+ *  test suite is built specifically to fail cleanly instead; see node-harness.test.ts's "fails
+ *  cleanly... when the workspace has no files at all"), so this function's own logic is tested
+ *  directly, and `__tests__/red-green.test.ts`'s mocked-harness test covers the integration path. */
+export function harnessFailedToRun(result: WorkspaceExecutionResult): boolean {
+  return result.error !== null || (!result.success && result.results.length === 0)
+}
+
+function harnessErrorFinding(
+  ticketKey: string,
+  stage: string,
+  result: WorkspaceExecutionResult
+): ValidationFinding {
+  return {
+    ruleId: "dynamic-red-green",
+    severity: "error",
+    ticketKey,
+    message: `${stage} could not run at all (harness error), which is never a pass: ${result.error ?? "zero results with success:false"}`,
+  }
 }
 
 function diffApplyFailedFinding(
@@ -63,6 +113,28 @@ function diffApplyFailedFinding(
   }
 }
 
+/** Critical 1: every tier that HAS executable tests must show at least one failure in the red
+ *  state. Returns the violating tier descriptions (empty = a genuine red state, or no tests exist
+ *  to check at all -- the latter handled by the caller's all-zero guard). */
+function redTierViolations(verdict: TierVerdict): string[] {
+  const violations: string[] = []
+  if (verdict.visible.count > 0 && verdict.visible.allPass) {
+    violations.push("visible tier did not fail in the red state")
+  }
+  if (verdict.hidden.count > 0 && verdict.hidden.allPass) {
+    violations.push(
+      "hidden tier did not fail in the red state -- an escape test that does not catch its escape"
+    )
+  }
+  return violations
+}
+
+function greenTierViolated(verdict: TierVerdict): boolean {
+  const visibleOk = verdict.visible.count === 0 || verdict.visible.allPass
+  const hiddenOk = verdict.hidden.count === 0 || verdict.hidden.allPass
+  return !visibleOk || !hiddenOk
+}
+
 async function runTsRedGreen(
   workbook: AuthoredWorkbook,
   ticket: AuthoredTicket
@@ -76,15 +148,21 @@ async function runTsRedGreen(
     }
 
     const redRun = await runTicketFullSuite(redMaterialized.ws, ticket)
-    const redVerdict = splitVerdict(redRun.result.results)
+    if (harnessFailedToRun(redRun.result)) {
+      return [harnessErrorFinding(ticket.key, "the setup-applied (red) run", redRun.result)]
+    }
 
-    if (redVerdict.visiblePassed && redVerdict.hiddenPassed) {
+    const redVerdict = splitVerdict(redRun.result.results)
+    const redViolations = redTierViolations(redVerdict)
+    const noTestsAtAll = redVerdict.visible.count === 0 && redVerdict.hidden.count === 0
+    if (noTestsAtAll) redViolations.push("no executable tests exist to verify a red state at all")
+
+    if (redViolations.length > 0) {
       findings.push({
         ruleId: "dynamic-red-green",
         severity: "error",
         ticketKey: ticket.key,
-        message:
-          "reference solution does not go red->green: the setup-applied state already passes every visible and hidden test, so reference.diff has nothing to fix.",
+        message: `reference solution does not go red->green: ${redViolations.join("; ")}.`,
       })
       return findings
     }
@@ -100,9 +178,17 @@ async function runTsRedGreen(
 
     const greenRun = await runTicketFullSuite(greenMaterialized.ws, ticket)
     findings.push(...greenRun.hiddenFindings)
+
+    if (harnessFailedToRun(greenRun.result)) {
+      findings.push(
+        harnessErrorFinding(ticket.key, "the reference-applied (green) run", greenRun.result)
+      )
+      return findings
+    }
+
     const greenVerdict = splitVerdict(greenRun.result.results)
 
-    if (!greenVerdict.visiblePassed || !greenVerdict.hiddenPassed) {
+    if (greenTierViolated(greenVerdict)) {
       findings.push({
         ruleId: "dynamic-red-green",
         severity: "error",
@@ -126,7 +212,7 @@ async function runTsRedGreen(
           ruleId: "dynamic-regression",
           severity: "error",
           ticketKey: ticket.key,
-          message: `regression: "${prior.ticket.key}"'s visible suite fails after this ticket's reference.diff landed; failing: ${failing.join(", ") || "(unnamed)"}`,
+          message: `regression: "${prior.ticket.key}"'s visible suite fails after this ticket's reference.diff landed; failing: ${failing.join(", ") || "(unnamed, or the harness could not run at all)"}`,
         })
       }
     }
@@ -152,6 +238,9 @@ async function runSqlRedGreen(
     if ("gap" in redSuite) return [redSuite.gap]
 
     const redSummary = await runPgSuiteAndSummarize(redSuite.suite)
+    if (harnessFailedToRun(redSummary.result)) {
+      return [harnessErrorFinding(ticket.key, "the setup-applied (red) SQL run", redSummary.result)]
+    }
     if (redSummary.allPassed) {
       return [
         {
@@ -178,6 +267,15 @@ async function runSqlRedGreen(
     if ("gap" in greenSuite) return [greenSuite.gap]
 
     const greenSummary = await runPgSuiteAndSummarize(greenSuite.suite)
+    if (harnessFailedToRun(greenSummary.result)) {
+      return [
+        harnessErrorFinding(
+          ticket.key,
+          "the reference-applied (green) SQL run",
+          greenSummary.result
+        ),
+      ]
+    }
     if (!greenSummary.allPassed) {
       const failing = greenSummary.result.results.filter((r) => !r.passed).map((r) => r.name)
       return [

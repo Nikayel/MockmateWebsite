@@ -130,6 +130,22 @@ export function applyDiff(ws: GitWorkspace, diffText: string): ApplyDiffResult {
       // out of the terminal; `errorText` below still reads it from the caught exception.
       stdio: ["pipe", "pipe", "pipe"],
     })
+
+    // Defense in depth against the "Skipped patch" gotcha this file's header documents: `git init`
+    // always happening at the workspace root (never a subdirectory) is the ROOT-CAUSE fix, but a
+    // future regression there (or any other git version/config quirk producing the same silent
+    // no-op-yet-exit-0 shape) must not silently read as a successful apply. `git status
+    // --porcelain` empty after a real hunk applied is exactly that signature: nothing on disk
+    // changed relative to the last commit even though `git apply` reported success.
+    const statusAfterApply = runGit(ws.dir, ["status", "--porcelain"])
+    if (statusAfterApply.trim().length === 0) {
+      return {
+        applied: false,
+        error:
+          "git apply exited 0 but the working tree is unchanged (a silent no-op, e.g. a 'Skipped patch' -- see this file's header)",
+      }
+    }
+
     return { applied: true }
   } catch (error) {
     return { applied: false, error: errorText(error) }
@@ -181,6 +197,42 @@ export function readAllGitObjectBlobs(ws: GitWorkspace): string[] {
           encoding: "utf8",
         }),
       ]
+    } catch {
+      return []
+    }
+  })
+}
+
+/** Every entry NAME (file/dir basename) appearing in any `tree` object across the whole object
+ *  store — the companion to `readAllGitObjectBlobs`'s content scan. A leak that is itself a
+ *  FILENAME (a hidden test's humanName or a secret's basename used as a path, not embedded in a
+ *  blob's content) would otherwise evade a content-only scan entirely; `git cat-file -p <tree-sha>`
+ *  emits `<mode> <type> <sha>\t<name>` lines per entry, so the name is everything after the tab. */
+export function readAllGitObjectNames(ws: GitWorkspace): string[] {
+  const listing = execFileSync("git", ["cat-file", "--batch-all-objects", "--batch-check"], {
+    cwd: ws.dir,
+    env: GIT_ENV,
+    encoding: "utf8",
+  })
+
+  const treeShas = listing
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => / tree /.test(line))
+    .map((line) => line.split(" ")[0])
+    .filter((sha): sha is string => Boolean(sha))
+
+  return treeShas.flatMap((sha) => {
+    try {
+      const entries = execFileSync("git", ["cat-file", "-p", sha], {
+        cwd: ws.dir,
+        env: GIT_ENV,
+        encoding: "utf8",
+      })
+      return entries
+        .split("\n")
+        .map((line) => line.split("\t")[1])
+        .filter((name): name is string => Boolean(name))
     } catch {
       return []
     }

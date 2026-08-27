@@ -111,6 +111,26 @@ export function materializeThroughSetup(
   const location = findTicketLocation(workbook, ticketKey)
   const ws = createGitWorkspace()
 
+  // Every step below (writeWorkspaceFiles, commitAll, applyDiff's own internal git calls) can
+  // throw on a genuinely unexpected error (not the "diff didn't apply" case, which is already a
+  // controlled `{failure}` return) -- a temp dir with no `ws` ever handed back to a caller would
+  // otherwise leak forever, since `createGitWorkspace()` already created it on disk before any of
+  // this runs. Catches, cleans up, and re-throws: the caller still sees the real error, but the
+  // `mkdtemp` directory never survives it.
+  try {
+    return materializeThroughSetupUnguarded(workbook, ticketKey, location, ws)
+  } catch (error) {
+    cleanupGitWorkspace(ws)
+    throw error
+  }
+}
+
+function materializeThroughSetupUnguarded(
+  workbook: AuthoredWorkbook,
+  ticketKey: string,
+  location: TicketLocation,
+  ws: GitWorkspace
+): MaterializeResult {
   const seed = readSeedFiles(workbook)
   if (seed.length > 0) {
     writeWorkspaceFiles(ws, seed)
@@ -176,23 +196,34 @@ export function materializeThroughReference(
   const base = materializeThroughSetup(workbook, ticketKey)
   if (base.failure) return base
 
-  const location = findTicketLocation(workbook, ticketKey)
-  if (!location.ticket.referenceDiff) {
-    return {
-      ws: base.ws,
-      failure: { ticketKey, diffKind: "reference", error: "ticket has no reference.diff authored" },
+  // Same leak guard as materializeThroughSetup's own try/catch: `base.ws` already exists on disk
+  // by this point, so any unexpected throw from here on must still clean it up before propagating.
+  try {
+    const location = findTicketLocation(workbook, ticketKey)
+    if (!location.ticket.referenceDiff) {
+      return {
+        ws: base.ws,
+        failure: {
+          ticketKey,
+          diffKind: "reference",
+          error: "ticket has no reference.diff authored",
+        },
+      }
     }
-  }
 
-  const result = applyDiff(base.ws, location.ticket.referenceDiff)
-  if (!result.applied) {
-    return {
-      ws: base.ws,
-      failure: { ticketKey, diffKind: "reference", error: result.error ?? "unknown" },
+    const result = applyDiff(base.ws, location.ticket.referenceDiff)
+    if (!result.applied) {
+      return {
+        ws: base.ws,
+        failure: { ticketKey, diffKind: "reference", error: result.error ?? "unknown" },
+      }
     }
+    commitAll(base.ws, `reference: ${ticketKey} (own)`)
+    return { ws: base.ws, failure: null }
+  } catch (error) {
+    cleanupGitWorkspace(base.ws)
+    throw error
   }
-  commitAll(base.ws, `reference: ${ticketKey} (own)`)
-  return { ws: base.ws, failure: null }
 }
 
 export { cleanupGitWorkspace }
