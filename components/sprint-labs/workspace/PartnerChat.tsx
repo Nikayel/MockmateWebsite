@@ -176,7 +176,14 @@ export function PartnerChat({
     setError(null)
 
     const turnIndex = turnIndexRef.current
-    const perTurn = getPerTurnState?.()
+    // C1 fix (review round 1, Critical): Layer B (the src/tests map) and
+    // Layer D (the per-turn red-test/diff-stat note) are gated on
+    // `slot === "partner"`, exactly like `files` below -- a repo-blind tutor
+    // must never even POST the map or live test state, not just trust the
+    // server to discard it. The server (route.ts) enforces the same gate
+    // independently on `layerB`, since a client bug here must not be the
+    // only thing standing between a repo-blind ticket and its map.
+    const perTurn = slot === "partner" ? getPerTurnState?.() : undefined
     const message = perTurn ? text + buildPerTurnNote({ ...perTurn, turnIndex }) : text
 
     const body: SendPartnerChatMessageInput = {
@@ -185,7 +192,7 @@ export function PartnerChat({
       message,
       turnIndex,
       mode: slot,
-      layerB: getLayerBInput?.(),
+      layerB: slot === "partner" ? getLayerBInput?.() : undefined,
       files: slot === "partner" ? getWorkspaceFiles?.() : undefined,
     }
 

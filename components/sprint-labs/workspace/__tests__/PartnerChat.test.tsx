@@ -76,6 +76,41 @@ describe("PartnerChat — unassisted ticket", () => {
     ).not.toBeNull()
     expect(screen.getByLabelText("Message Sable")).not.toBeNull()
   })
+
+  it("C1 (review round 1, Critical): the repo-blind tutor never posts Layer B or the per-turn note, even when the parent supplies them", async () => {
+    mocks.sendPartnerChatMessage.mockResolvedValue({ ok: true, reply: "reply" })
+    render(
+      <PartnerChat
+        runId="run-1"
+        ticketKey="MER-201"
+        aiPolicy="unassisted"
+        aiPolicyReason="reason"
+        getLayerBInput={() => ({
+          sha: "abc",
+          generatedAt: "2026-08-27T00:00:00.000Z",
+          files: [],
+          routes: [],
+          migrations: [],
+          tests: [],
+          diffStat: "",
+        })}
+        getWorkspaceFiles={() => [{ path: "src/secret.ts", content: "SHOULD NOT LEAK" }]}
+        getPerTurnState={() => ({ redVisibleTests: [], diffStat: "" })}
+      />
+    )
+    fireEvent.click(screen.getByText("Talk to a tutor instead"))
+    await waitFor(() => expect(screen.getByLabelText("Message Sable")).not.toBeNull())
+
+    fireEvent.change(screen.getByLabelText("Message Sable"), { target: { value: "hi" } })
+    fireEvent.click(screen.getByLabelText("Send"))
+
+    await waitFor(() => expect(mocks.sendPartnerChatMessage).toHaveBeenCalledTimes(1))
+    const sent = mocks.sendPartnerChatMessage.mock.calls[0][0]
+    expect(sent.mode).toBe("tutor")
+    expect(sent.layerB).toBeUndefined()
+    expect(sent.files).toBeUndefined()
+    expect(sent.message).toBe("hi") // no [TURN STATE ...] note appended
+  })
 })
 
 describe("PartnerChat — assisted ticket", () => {
