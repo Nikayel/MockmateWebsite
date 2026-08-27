@@ -331,11 +331,19 @@ export function assertPublicSafe(value, context) {
  * (`resolveConfig`, not hardcoded defaults) makes the hook's pass a no-op
  * on already-clean output. Config is resolved once and cached: it is the
  * same for every generated file in this repo.
+ *
+ * `resolveConfig` searches upward from a FILE, not a directory — passed
+ * `ROOT` itself it silently returns `null` (it looks one level above ROOT,
+ * where there is no .prettierrc) rather than throwing, so this fell back
+ * to `{}` and every generated file was formatted with prettier's bare
+ * defaults (`semi: true`) instead of this repo's `semi: false`. Anchoring
+ * on `package.json`, which always exists at ROOT, makes the upward search
+ * start in the right directory.
  */
 let _prettierConfig = null
 async function prettierConfig() {
   if (_prettierConfig === null) {
-    _prettierConfig = (await resolvePrettierConfig(ROOT)) ?? {}
+    _prettierConfig = (await resolvePrettierConfig(join(ROOT, "package.json"))) ?? {}
   }
   return _prettierConfig
 }
