@@ -3,10 +3,11 @@
  * EXECUTION-STATE.md owner decision 4, PLAN.md Task 14).
  *
  * Enforced as CAPABILITY, never as prompt-side conscience: `PartnerMode` is a
- * typed union where the illegal combination has no representable slot,
- * mirroring lib/interview/topic-ledger.ts's `NextAction` (the leak-shaped
- * move is absent from the option set, not merely forbidden in prose). Here
- * the thing made unrepresentable is "a mode with no repo-read capability
+ * typed union where the illegal combination has no representable slot -- the
+ * same discipline the interview module's inert action-ledger applies to its
+ * own `NextAction` union (the leak-shaped move is absent from the option
+ * set, not merely forbidden in prose). Here the thing made unrepresentable
+ * is "a mode with no repo-read capability
  * that nonetheless carries file content": `filesContext` exists ONLY on
  * `{kind: "chat"}`, so `tutor-blind` and `none` cannot be constructed with
  * file content attached, and `resolvePartnerMode` is the one place that
