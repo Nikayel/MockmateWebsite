@@ -202,6 +202,7 @@ describe("runContaminationGateForTicket -- replay through Task 7's harness", () 
       expect(verdict.modelProducedParseableSolution).toBe(true)
       expect(verdict.modelId).toBe("gemini")
       expect(verdict.modelVersion).toBe(getProviderStatus().gemini.model)
+      expect(verdict.hiddenTestsNotBridged).toBe(0)
     })
   }, 30_000)
 
@@ -250,6 +251,64 @@ describe("runContaminationGateForTicket -- replay through Task 7's harness", () 
       expect(verdict.hiddenTotal).toBe(1)
       expect(verdict.hiddenPassed).toBe(1)
       expect(verdict.verdict).toBe("FAIL-too-guessable")
+      expect(verdict.hiddenTestsNotBridged).toBe(0)
+    })
+  }, 30_000)
+})
+
+describe("runContaminationGateForTicket -- an incompletely-bridged hidden tier must never read as OK (review round 1, Important 2)", () => {
+  it("a ticket with one bridgeable hidden test AND one unbridgeable one (io-case, no entryPoint) gets ERROR-hidden-tier-not-exercised, never OK", async () => {
+    await withTempWorkbook(HAPPY_PATH_FIXTURE, async (workbook) => {
+      const { ticket } = findTicketLocation(workbook, "FIX-101")
+      // FIX-101 already carries one bridgeable probe (rejects-double-negative.yaml). Adding a
+      // second, unbridgeable hidden test (an io-case with no entryPoint authored) in memory --
+      // exactly what Task 7's own bridgeHiddenTests reports a WARN finding for on an assisted
+      // ticket -- means this ticket now has a MIX: one test that genuinely ran, one that never
+      // could. That is the stronger of the two reproductions (the other being "zero of N bridge"),
+      // because the old logic had a real, non-empty hiddenTotal to point to as false reassurance.
+      ticket.hiddenTests.push({
+        fileName: "unbridgeable-io-case",
+        path: "tests/hidden/unbridgeable-io-case.yaml",
+        raw: { input: { x: 1 }, expected: { y: 2 } }, // no entryPoint -> Task 7 cannot bridge this
+        humanName: "Escaped: something unbridgeable",
+        kind: "io-case",
+        tags: [],
+      })
+
+      // A WRONG solution: the one bridgeable probe legitimately FAILS against it (0/1 passed).
+      // Under the pre-fix logic this computed passRate 0 and reported "OK" -- confidently safe --
+      // while never having looked at the second hidden test at all. That silence is the bug.
+      const verdict = await runContaminationGateForTicket(workbook, "FIX-101", {
+        modelCaller: stubModel(ADD_SOLUTION_WRONG),
+      })
+
+      expect(verdict.verdict).toBe("ERROR-hidden-tier-not-exercised")
+      expect(verdict.hiddenTestsNotBridged).toBe(1)
+      expect(verdict.hiddenTotal).toBe(1) // the one probe still ran; it just isn't the whole picture
+    })
+  }, 30_000)
+
+  it("also overrides what would otherwise be a passing FAIL-too-guessable verdict -- an unknown rate is never reported as a confident number either way", async () => {
+    await withTempWorkbook(HAPPY_PATH_FIXTURE, async (workbook) => {
+      const { ticket } = findTicketLocation(workbook, "FIX-101")
+      ticket.hiddenTests.push({
+        fileName: "unbridgeable-io-case",
+        path: "tests/hidden/unbridgeable-io-case.yaml",
+        raw: { input: { x: 1 }, expected: { y: 2 } },
+        humanName: "Escaped: something unbridgeable",
+        kind: "io-case",
+        tags: [],
+      })
+
+      // A CORRECT solution: the bridgeable probe passes (1/1), which alone would be
+      // FAIL-too-guessable (passRate 1.0). Still ERROR -- the unbridged test means the true rate
+      // over the FULL hidden tier is unknown, not "at least as bad as this subset suggests."
+      const verdict = await runContaminationGateForTicket(workbook, "FIX-101", {
+        modelCaller: stubModel(ADD_SOLUTION_CORRECT),
+      })
+
+      expect(verdict.verdict).toBe("ERROR-hidden-tier-not-exercised")
+      expect(verdict.hiddenTestsNotBridged).toBe(1)
     })
   }, 30_000)
 })

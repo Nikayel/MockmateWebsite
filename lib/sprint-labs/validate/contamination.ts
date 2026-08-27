@@ -206,12 +206,25 @@ export interface ContaminationVerdict {
   hiddenPassed: number
   hiddenTotal: number
   passRate: number
-  verdict: "OK" | "FAIL-too-guessable"
+  /**
+   * `"ERROR-hidden-tier-not-exercised"` (review round 1, Important 2) fires whenever
+   * `hiddenTestsNotBridged > 0` -- REGARDLESS of what `passRate` happened to compute over the
+   * bridged subset, and it takes priority over both other values. An incompletely-exercised hidden
+   * tier means the true rate is unknown, and an unknown rate reported as "OK" is a confident lie in
+   * exactly the direction this gate must never be wrong in: a ticket whose every hidden test
+   * happens to be an un-entryPoint'd io-case would otherwise ALWAYS read as a safe 0% (hiddenTotal
+   * 0), the emptiest possible measurement mistaken for the strongest possible one.
+   */
+  verdict: "OK" | "FAIL-too-guessable" | "ERROR-hidden-tier-not-exercised"
   /** `false` when `parseModelSolution` could not extract any files at all (bad JSON, empty
    *  `files[]`, ...) -- surfaced so a human reading a low passRate can tell "the model tried and
    *  mostly failed" apart from "the model's output could not even be read," without changing the
    *  shape PLAN.md Task 9 specifies for the rest of the verdict. */
   modelProducedParseableSolution: boolean
+  /** Count of this ticket's authored hidden tests that Task 7's own bridging could not turn into
+   *  something runnable (an io-case with no `entryPoint`, a malformed probe). Zero on every "OK" or
+   *  "FAIL-too-guessable" verdict by construction -- see `verdict`'s own doc comment. */
+  hiddenTestsNotBridged: number
 }
 
 export interface ContaminationGateOptions {
@@ -306,12 +319,19 @@ function writeCacheEntry(
  *  ticket's full suite (visible + bridged hidden), reusing Task 7's `runTicketFullSuite` unchanged.
  *  A path that fails `isValidWorkspacePath` (absolute, `..`, embedded NUL -- the same validator
  *  `writeWorkspaceFiles` itself enforces) is dropped rather than thrown: a blind model inventing a
- *  bad path is an expected failure mode of this gate, not a reason to crash the whole ticket. */
+ *  bad path is an expected failure mode of this gate, not a reason to crash the whole ticket.
+ *
+ *  `hiddenTestsNotBridged` (from Task 7's own `hiddenFindings`, never dropped) is what lets a
+ *  caller tell "the hidden tier ran and the model failed it" apart from "the hidden tier could not
+ *  be exercised at all" -- an io-case with no `entryPoint`, or a malformed probe, produces a
+ *  finding there instead of a runnable case, and `hiddenPassed`/`hiddenTotal` below reflect ONLY
+ *  the subset that did bridge. Silently reading that subset's rate as the whole truth is exactly
+ *  the risk-understating failure this gate exists to prevent (review round 1, Important 2). */
 async function replayProposedSolution(
   workbook: AuthoredWorkbook,
   ticket: AuthoredTicket,
   proposedFiles: Array<{ path: string; content: string }>
-): Promise<{ hiddenPassed: number; hiddenTotal: number }> {
+): Promise<{ hiddenPassed: number; hiddenTotal: number; hiddenTestsNotBridged: number }> {
   const materialized = materializeThroughSetup(workbook, ticket.key)
   try {
     if (materialized.failure) {
@@ -337,6 +357,7 @@ async function replayProposedSolution(
     return {
       hiddenTotal: hiddenResults.length,
       hiddenPassed: hiddenResults.filter((r) => r.passed).length,
+      hiddenTestsNotBridged: run.hiddenFindings.length,
     }
   } finally {
     cleanupGitWorkspace(materialized.ws)
@@ -375,7 +396,7 @@ export async function runContaminationGateForTicket(
   const modelResult = await modelCaller({ systemPrompt, userMessage })
   const proposedFiles = parseModelSolution(modelResult.text)
 
-  const { hiddenPassed, hiddenTotal } = await replayProposedSolution(
+  const { hiddenPassed, hiddenTotal, hiddenTestsNotBridged } = await replayProposedSolution(
     workbook,
     ticket,
     proposedFiles
@@ -389,8 +410,14 @@ export async function runContaminationGateForTicket(
     hiddenPassed,
     hiddenTotal,
     passRate,
-    verdict: passRate > CONTAMINATION_THRESHOLD ? "FAIL-too-guessable" : "OK",
+    verdict:
+      hiddenTestsNotBridged > 0
+        ? "ERROR-hidden-tier-not-exercised"
+        : passRate > CONTAMINATION_THRESHOLD
+          ? "FAIL-too-guessable"
+          : "OK",
     modelProducedParseableSolution: proposedFiles.length > 0,
+    hiddenTestsNotBridged,
   }
 
   writeCacheEntry(workbook, ticketKey, {
@@ -456,6 +483,13 @@ export async function validateWorkbookContamination(
           severity: "error",
           ticketKey: ticket.key,
           message: `passRate ${(verdict.passRate * 100).toFixed(1)}% (${verdict.hiddenPassed}/${verdict.hiddenTotal} hidden) exceeds the ${(CONTAMINATION_THRESHOLD * 100).toFixed(0)}% contamination threshold -- too guessable to ship as a graded-assisted ticket [${verdict.modelId}/${verdict.modelVersion}].`,
+        })
+      } else if (verdict.verdict === "ERROR-hidden-tier-not-exercised") {
+        findings.push({
+          ruleId: "contamination-gate-hidden-tier-not-exercised",
+          severity: "error",
+          ticketKey: ticket.key,
+          message: `${verdict.hiddenTestsNotBridged} of this ticket's hidden test(s) could not be bridged into something runnable (an io-case with no entryPoint, or a malformed probe), so the contamination gate could not exercise the hidden tier at all and cannot report a trustworthy passRate. Author entryPoint on every io-case hidden test for this ticket before it can ship as graded-assisted.`,
         })
       }
     } catch (error) {
