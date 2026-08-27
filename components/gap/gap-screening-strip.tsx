@@ -76,7 +76,7 @@ export function GapScreeningStrip() {
                   The basics — still worth knowing cold
                 </p>
                 <div
-                  role="tablist"
+                  role="group"
                   aria-label="Screening round examples"
                   className="flex shrink-0 items-center gap-1.5"
                 >
@@ -84,8 +84,7 @@ export function GapScreeningStrip() {
                     <button
                       key={s.filename}
                       type="button"
-                      role="tab"
-                      aria-selected={i === slideIndex}
+                      aria-pressed={i === slideIndex}
                       aria-label={`Show ${s.filename}`}
                       onClick={() => setSlideIndex(i)}
                       className={cn(
