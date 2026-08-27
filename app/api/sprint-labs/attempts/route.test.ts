@@ -25,7 +25,11 @@ vi.mock("@/lib/feature-flags", () => ({ getFlagAsync: mocks.getFlagAsync }))
 vi.mock("@/lib/rate-limit", () => ({ apiRateLimit: mocks.apiRateLimit }))
 vi.mock("@/lib/quota-enforcement", () => ({ requireTierForUser: mocks.requireTierForUser }))
 vi.mock("@/lib/logger", () => ({ logger: { error: mocks.loggerError } }))
-vi.mock("@/lib/sprint-labs/runs", () => ({ getSprintLabRun: mocks.getSprintLabRun }))
+vi.mock("@/lib/sprint-labs/runs", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/sprint-labs/runs")>("@/lib/sprint-labs/runs")
+  return { ...actual, getSprintLabRun: mocks.getSprintLabRun }
+})
 
 vi.mock("@/lib/sprint-labs/grading/attempts-service", async () => {
   const actual = await vi.importActual<typeof import("@/lib/sprint-labs/grading/attempts-service")>(
@@ -141,5 +145,15 @@ describe("POST /api/sprint-labs/attempts", () => {
     const response = (await POST(createRequest(VALID_BODY))) as unknown as StubResponse
     expect(response.status).toBe(500)
     expect(mocks.loggerError).toHaveBeenCalledTimes(1)
+  })
+
+  it("maps a run-ownership error from requireOwnedActiveRun (runs.ts's OWN vocabulary, not attempts-service's) to 403, not a bare 500", async () => {
+    // openSprintLabAttempt calls requireOwnedActiveRun internally, which
+    // throws runs.ts's error constants — the route must recognize those too.
+    mocks.openSprintLabAttempt.mockRejectedValue(new Error("UNAUTHORIZED"))
+    const { POST } = await import("./route")
+    const response = (await POST(createRequest(VALID_BODY))) as unknown as StubResponse
+    expect(response.status).toBe(403)
+    expect(mocks.loggerError).not.toHaveBeenCalled()
   })
 })
