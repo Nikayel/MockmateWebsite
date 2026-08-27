@@ -19,6 +19,8 @@ const SEALED_TICKET_LOADERS: Record<string, () => Promise<{ sealed: SealedTicket
   "meridian:MER-103": () => import("./meridian/MER-103.server"),
   "meridian:MER-104": () => import("./meridian/MER-104.server"),
   "meridian:MER-105": () => import("./meridian/MER-105.server"),
+  "meridian:MER-302": () => import("./meridian/MER-302.server"),
+  "meridian:MER-305": () => import("./meridian/MER-305.server"),
 }
 
 function loaderKey(workbookId: string, ticketKey: string): string {
