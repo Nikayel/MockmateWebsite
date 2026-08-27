@@ -44,7 +44,7 @@
  */
 
 import Link from "next/link"
-import { ArrowDown, Layers } from "lucide-react"
+import { ArrowDown } from "lucide-react"
 
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -77,9 +77,11 @@ export const revalidate = 300
 export default async function CaseLabsGalleryPage() {
   const labs = listCaseLabs()
   const starter = getStarterCaseLab()
-  // UX-SPEC.md §1.2/§2 "flag off": the Sprint Labs section, the jump strip and the Case Labs
-  // wrapper header all render only when the flag is on. When off, everything below this line is
-  // byte-identical to before Sprint Labs existed.
+  // UX-SPEC.md §1.2/§2 "flag off": the Sprint Labs section, the jump strip and the workbook
+  // CourseListJsonLd entries all render only when the flag is on. `CaseLabGallery` always carries
+  // its `id="case-labs"` scroll target regardless of flag state (a harmless, unused attribute when
+  // the jump strip that targets it isn't rendered), so it is the one deliberate exception to
+  // "byte-identical when off" and not a regression.
   const sprintLabsEnabled = await getFlagAsync("SPRINT_LABS_ENABLED")
   const workbookSummaries = sprintLabsEnabled ? listWorkbookSummaries() : []
 
@@ -197,43 +199,14 @@ export default async function CaseLabsGalleryPage() {
             </nav>
           )}
 
-          {sprintLabsEnabled ? (
-            // The only edit "inside" the Case Labs region UX-SPEC.md §2 asks for: an outer wrapper
-            // matching `SprintLabsSection`'s header shape, added here rather than inside
-            // `CaseLabGallery.tsx` (not one of this task's owned paths) so its own "Pick a case lab"
-            // heading and round groups stay untouched underneath.
-            <section
-              id="case-labs"
-              aria-labelledby="case-labs-heading"
-              className="flex flex-col rounded-2xl border border-[var(--wb-border)] p-4 sm:p-5"
-            >
-              <div className="flex flex-wrap items-center gap-2.5">
-                <span
-                  aria-hidden
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--wb-accent-soft)] text-[var(--wb-accent-strong)]"
-                >
-                  <Layers className="h-[18px] w-[18px]" />
-                </span>
-                <h2
-                  id="case-labs-heading"
-                  className="text-[17px] font-semibold tracking-[-0.01em] text-[var(--wb-text)] sm:text-lg"
-                >
-                  Case labs
-                </h2>
-                <span className="rounded-full bg-[var(--wb-panel)] px-2 py-[3px] text-[11px] font-semibold tracking-[0.04em] text-[var(--wb-text-secondary)] uppercase">
-                  {labs.length} {labs.length === 1 ? "lab" : "labs"}
-                </span>
-              </div>
-              <p className="mt-1.5 max-w-[62ch] text-[13px] leading-relaxed text-[var(--wb-text-secondary)]">
-                one scenario, one sitting.
-              </p>
-              <div className="mt-4">
-                <CaseLabGallery labs={labs} />
-              </div>
-            </section>
-          ) : (
-            <CaseLabGallery labs={labs} />
-          )}
+          {/* Fix round 1, C1: a bordered "Case labs" wrapper used to sit here, double-boxing and
+              double-headlining the gallery (its own "Pick a case lab" h2 was already the section
+              header) and pushing the first card down by the exact amount this page was rebuilt to
+              claw back. `CaseLabGallery` carries its own `id="case-labs"` now (the jump strip's
+              scroll target), so no wrapper is needed at any flag state. Outline is h1 -> h2 "Pick a
+              case lab" -> h3 round groups -> h2 "Sprint labs", with `SprintLabsSection` standing as
+              the one symmetric round-group-style box. */}
+          <CaseLabGallery labs={labs} />
 
           {sprintLabsEnabled && <SprintLabsSection workbooks={workbookSummaries} />}
 
