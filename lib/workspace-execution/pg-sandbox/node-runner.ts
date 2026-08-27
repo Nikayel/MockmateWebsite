@@ -42,6 +42,7 @@ export interface PgConnection {
 
 interface PgSuiteCoreModule {
   runPgSuiteCore: (pg: PgConnection, suite: PgSuite) => Promise<WorkspaceTestResult[]>
+  summarizeResults: (results: WorkspaceTestResult[]) => WorkspaceExecutionResult
   APP_ROLE_NAME: string
 }
 
@@ -60,25 +61,6 @@ function emptySummary(): WorkspaceExecutionResult["summary"] {
   return { total: 0, passed: 0, failed: 0, passRate: 0, serviceErrors: 0, effectiveTotal: 0 }
 }
 
-function summarize(results: WorkspaceTestResult[]): WorkspaceExecutionResult {
-  const passed = results.filter((result) => result.passed).length
-  const total = results.length
-  return {
-    success: total > 0 && passed === total,
-    results,
-    consoleLogs: [],
-    summary: {
-      total,
-      passed,
-      failed: total - passed,
-      passRate: total > 0 ? Math.round((passed / total) * 100) : 0,
-      serviceErrors: 0,
-      effectiveTotal: total,
-    },
-    error: null,
-  }
-}
-
 /**
  * Runs a PgSuite to completion against a FRESH, in-memory PGlite instance (constructed and closed
  * within this call — no state survives between calls, matching every other workspace runner's
@@ -91,7 +73,7 @@ export async function runPgSuiteNode(suite: PgSuite): Promise<WorkspaceExecution
     pg = new PGlite()
     await pg.waitReady
     const results = await core.runPgSuiteCore(pg, suite)
-    return summarize(results)
+    return core.summarizeResults(results)
   } catch (error) {
     return {
       success: false,
@@ -107,21 +89,6 @@ export async function runPgSuiteNode(suite: PgSuite): Promise<WorkspaceExecution
       })
     }
   }
-}
-
-/**
- * Test/CI-only escape hatch: runs the shared core against a CALLER-PROVIDED connection instead of
- * a fresh one, so a test file can share ONE PGlite instance across many sub-scenarios (resetting
- * schema between them) to stay under the suite's time budget, while still exercising the real,
- * unmodified core logic. Production callers must use `runPgSuiteNode`, which always boots (and
- * closes) its own fresh instance.
- */
-export async function runPgSuiteCoreForTest(
-  pg: PgConnection,
-  suite: PgSuite
-): Promise<WorkspaceTestResult[]> {
-  const core = await loadCore()
-  return core.runPgSuiteCore(pg, suite)
 }
 
 /**

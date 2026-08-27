@@ -2,6 +2,11 @@ import type { WorkspaceExecutionResult, WorkspaceTestResult } from "../types"
 import { parseWorkspaceMarker } from "../sql-sandbox/workspace-marker"
 import { runPgInWorker } from "./worker-runner"
 import type { PgSuite } from "./types"
+// A static import of the shared, browser-safe core (see its own header) — it has no Node-specific
+// import of its own, so bundling it into the client is fine, and it is the ONE place
+// pass/total/summary computation is written (node-runner.ts calls the same function), rather than
+// two independently-maintained copies drifting apart.
+import { summarizeResults } from "../../../public/workers/pg-suite-core.mjs"
 
 /**
  * Browser-side entry point for the PGlite suite engine. Posts the suite to
@@ -35,23 +40,8 @@ export async function runPgSuite(suite: PgSuite): Promise<WorkspaceExecutionResu
             },
           ]
 
-    const passed = results.filter((result) => result.passed).length
-    const total = results.length
-
-    return {
-      success: passed === total,
-      results,
-      consoleLogs: cleanLogs,
-      summary: {
-        total,
-        passed,
-        failed: total - passed,
-        passRate: total > 0 ? Math.round((passed / total) * 100) : 0,
-        serviceErrors: 0,
-        effectiveTotal: total,
-      },
-      error: null,
-    }
+    const summarized = summarizeResults(results) as WorkspaceExecutionResult
+    return { ...summarized, consoleLogs: cleanLogs }
   } catch (error) {
     return {
       success: false,
