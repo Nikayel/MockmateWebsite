@@ -25,12 +25,14 @@
  * session) is rendered as an honest "not available in this session" state,
  * never a fabricated result — see each screen's empty-state handling.
  *
- * Flagged for follow-up (Task 13 report): the clean fix is a
- * `GET /api/sprint-labs/attempts?runId=&ticketKey=` endpoint that returns the
- * most recent completed attempt (plus its review-round decision doc). That
- * is outside this task's owned paths (`lib/sprint-labs/grading/
- * attempts-service.ts` and the route files are Task 8's, stable, not to be
- * modified), so it is reported rather than added here.
+ * ## The GET endpoint (runtimeB task — the follow-up this file used to just flag)
+ *
+ * `GET /api/sprint-labs/attempts/[attemptId]` (the dynamic segment is the ticket key — see that
+ * route's own header) now exists: it returns the ONE finalized attempt for `(runId, ticketKey)`,
+ * or 404 if none exists yet. `fetchFinalizedAttempt` below is the client wrapper: session cache
+ * first (a same-tab re-render should never re-fetch), then the GET, writing a hit back into the
+ * cache so a second same-tab read stays free. The GET is the source of truth and works in a fresh
+ * tab; the cache is purely an optimization on top of it, same as before.
  */
 
 import { getCurrentUserToken } from "@/lib/firebase-lazy"
@@ -171,6 +173,53 @@ export function cacheCompletedOutcome(
   const existing = getCachedCompletedOutcome(runId, ticketKey)
   if (existing?.outcome.attempt.finalized && !cached.outcome.attempt.finalized) return
   writeCache(completedKey(runId, ticketKey), cached)
+}
+
+interface FinalizedAttemptResponse {
+  attemptId: string
+  outcome: CompleteAttemptOutcome
+  reviewCorrectness?: Array<{ id: string; correct: boolean }>
+}
+
+/**
+ * Retro/review's read path (runtimeB task): a same-tab session-cache hit short-circuits (no
+ * network call); otherwise calls `GET /api/sprint-labs/attempts/[attemptId]` (ticket-keyed — see
+ * that route's header) and, on a hit, writes the result into the SAME session cache
+ * `cacheCompletedOutcome`/`getCachedCompletedOutcome` already maintain, so a later same-tab read
+ * (including from `useSubmitScreenController`, which still reads the cache directly) sees it too.
+ * Returns `null` for a 401/403/404/network failure alike — every one of those means "there is no
+ * finalized result to show right now," and the caller (retro's "not-available" state, review's
+ * open+complete bootstrap fallback) already has an honest empty/fallback path for exactly that.
+ */
+export async function fetchFinalizedAttempt(
+  runId: string,
+  ticketKey: string
+): Promise<CachedAttempt | null> {
+  const cached = getCachedCompletedOutcome(runId, ticketKey)
+  if (cached) return cached
+
+  const headers = await authHeaders()
+  if (!headers) return null
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    const res = await fetch(
+      `/api/sprint-labs/attempts/${encodeURIComponent(ticketKey)}?runId=${encodeURIComponent(runId)}`,
+      { method: "GET", headers, signal: controller.signal }
+    )
+    if (!res.ok) return null
+    const data = (await res.json()) as FinalizedAttemptResponse
+    if (!data.attemptId || !data.outcome) return null
+
+    const result: CachedAttempt = { attemptId: data.attemptId, outcome: data.outcome }
+    cacheCompletedOutcome(runId, ticketKey, result)
+    return result
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /**
