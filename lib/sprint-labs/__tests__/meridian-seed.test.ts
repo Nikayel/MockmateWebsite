@@ -150,12 +150,12 @@ describe("Meridian seed repo (workbooks/meridian/repo)", () => {
   })
 
   /**
-   * Pins the ten canonical planted defects (WORKBOOK-SPEC.md §3) structurally, by content, so
+   * Pins the twelve canonical planted defects (WORKBOOK-SPEC.md §3) structurally, by content, so
    * a later authoring pass that "helpfully" fixes one of them (tightens tsconfig, adds a
    * tenant filter, indexes documents, reorders the delivery write, ...) fails this test loudly
    * instead of silently invalidating the ticket that was supposed to introduce that fix.
    */
-  it("pins all ten canonical planted defects structurally", () => {
+  it("pins all twelve canonical planted defects structurally", () => {
     const { files } = loadSeedRepo()
     const byPath = new Map(files.map((file) => [file.path, file.content]))
     const read = (path: string): string => {
@@ -211,5 +211,18 @@ describe("Meridian seed repo (workbooks/meridian/repo)", () => {
 
     // 10. /health still never touches the db seam.
     expect(read("src/http/routes/health.ts")).not.toContain("db/client")
+
+    // 11. infra/task-definition.json still carries a long-lived AKIA access key in `environment`
+    // (SPRINT-PLAN.md §6 standupQuote: "a 412-day-old AKIA in the task definition"), not a
+    // secret store.
+    const taskDefinition = read("infra/task-definition.json")
+    expect(taskDefinition).toContain('"AWS_ACCESS_KEY_ID"')
+    expect(taskDefinition).toMatch(/AKIA[A-Z0-9]{16}/)
+
+    // 12. infra/iam-policy.json still grants a wildcard action on a wildcard resource
+    // (SEC-2211 / MER-602: "the API role can write every bucket in the account").
+    const iamPolicy = read("infra/iam-policy.json")
+    expect(iamPolicy).toContain('"Action": "s3:*"')
+    expect(iamPolicy).toContain('"Resource": "*"')
   })
 })
