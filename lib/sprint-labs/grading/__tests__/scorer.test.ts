@@ -1,10 +1,10 @@
 /**
  * Table-driven tests for the five-dimension scorer
- * (docs/sprint-labs/WORKBOOK-SPEC.md §5). See scorer.ts's file header for the
- * exact formulas and the reasoning behind what is, and is not, an input to
- * each dimension (in particular: only server-verified hidden IO-case
- * verdicts ever feed a numeric score — see the STANDING NOTE in
- * docs/sprint-labs/EXECUTION-STATE.md).
+ * (docs/sprint-labs/WORKBOOK-SPEC.md §5, RULING R21, fix round 1 I6). See
+ * scorer.ts's file header for the exact formulas and the reasoning behind
+ * what is, and is not, an input to each dimension (in particular: only
+ * server-verified/server-derived facts ever feed a numeric score — no
+ * client-posted judgment, per R21).
  */
 
 import { describe, expect, it } from "vitest"
@@ -14,7 +14,6 @@ import {
   scoreCommunication,
   scoreDiffSizeBand,
   scoreFilesTouched,
-  scorePrDescription,
   scoreProblemSolving,
   scoreTimeToFirstEdit,
   scoreUnderstanding,
@@ -57,6 +56,14 @@ describe("scoreTimeToFirstEdit (Understanding's time-band component)", () => {
   ])("seconds=$seconds -> $expected", ({ seconds, expected }) => {
     expect(scoreTimeToFirstEdit(seconds)).toBe(expected)
   })
+
+  it("null (no server timestamp signal available yet) is the documented graceful-degradation path, not an error", () => {
+    // fix round 1: timeToFirstEditSeconds is now derived from server timestamps
+    // (a per-ticket "entered doing at" mark this codebase does not yet store),
+    // so null is the CURRENT, expected, common case — not a placeholder for a
+    // bug. The neutral default keeps Understanding fair until that lands.
+    expect(scoreTimeToFirstEdit(null)).toBe(70)
+  })
 })
 
 describe("scoreUnderstanding", () => {
@@ -71,7 +78,7 @@ describe("scoreUnderstanding", () => {
     ).toBe(86)
   })
 
-  it("uses the neutral time default when no timing signal was reported", () => {
+  it("uses the neutral time default when no timing signal was available", () => {
     // filesScore 100, timeScore 70 (null default) -> 100*0.7 + 70*0.3 = 91
     expect(
       scoreUnderstanding({
@@ -93,7 +100,7 @@ describe("scoreUnderstanding", () => {
   })
 })
 
-describe("scoreProblemSolving (hidden IO-case pass rate ONLY — never visible/regression/adversary booleans)", () => {
+describe("scoreProblemSolving (hidden IO-case pass rate ONLY — never visible/regression/adversary/probe booleans)", () => {
   it.each([
     { passed: 4, total: 4, expected: 100 },
     { passed: 3, total: 4, expected: 75 },
@@ -106,8 +113,8 @@ describe("scoreProblemSolving (hidden IO-case pass rate ONLY — never visible/r
     )
   })
 
-  it("defaults to full credit when the ticket has zero io-case hidden tests (e.g. an assisted, probe-only ticket)", () => {
-    expect(scoreProblemSolving({ hiddenIoCasePassed: 0, hiddenIoCaseTotal: 0 })).toBe(100)
+  it("I6: returns null (never 100) when the ticket has zero io-case hidden tests — a content mistake must surface", () => {
+    expect(scoreProblemSolving({ hiddenIoCasePassed: 0, hiddenIoCaseTotal: 0 })).toBeNull()
   })
 })
 
@@ -135,57 +142,44 @@ describe("scoreDiffSizeBand / scoreCodeQuality", () => {
   })
 })
 
-describe("scorePrDescription (Communication's PR-description length heuristic)", () => {
-  it.each([
-    { text: "a", expected: 40 },
-    { text: "x".repeat(39), expected: 40 },
-    { text: "x".repeat(40), expected: 70 },
-    { text: "x".repeat(119), expected: 70 },
-    { text: "x".repeat(120), expected: 100 },
-    { text: "x".repeat(500), expected: 100 },
-  ])("length band for %j", ({ text, expected }) => {
-    expect(scorePrDescription(text)).toBe(expected)
-  })
-
-  it("trims whitespace before measuring length", () => {
-    expect(scorePrDescription("   ")).toBe(0)
-  })
-})
-
-describe("scoreCommunication (null unless the ticket collects prose)", () => {
-  it("is null when neither a PR description nor any review decision was posted", () => {
-    expect(scoreCommunication({})).toBeNull()
-    expect(scoreCommunication({ prDescription: "   " })).toBeNull()
-    expect(scoreCommunication({ reviewDecisionsTotal: 0 })).toBeNull()
-  })
-
-  it("scores from the PR description alone when no review round has happened", () => {
-    expect(scoreCommunication({ prDescription: "x".repeat(50) })).toBe(70)
-  })
-
-  it("scores from the review-round reason rate alone when no PR description was given", () => {
-    expect(scoreCommunication({ reviewReasonsGiven: 1, reviewDecisionsTotal: 2 })).toBe(50)
-    expect(scoreCommunication({ reviewReasonsGiven: 2, reviewDecisionsTotal: 2 })).toBe(100)
-    expect(scoreCommunication({ reviewReasonsGiven: 0, reviewDecisionsTotal: 2 })).toBe(0)
-  })
-
-  it("averages the PR-description score and the review-reason rate when both are present", () => {
-    // prScore 70 (len 50), reviewScore 100 (2/2 reasons given) -> 85
+describe("scoreCommunication (R21: review-only tickets ONLY, driven by push-back correctness — never prose)", () => {
+  it("is null on a non-review-only ticket, full stop — no prose input exists in this function's signature at all", () => {
+    expect(scoreCommunication({ isReviewOnly: false })).toBeNull()
     expect(
       scoreCommunication({
-        prDescription: "x".repeat(50),
-        reviewReasonsGiven: 2,
+        isReviewOnly: false,
+        reviewCorrectDecisions: 2,
         reviewDecisionsTotal: 2,
       })
-    ).toBe(85)
+    ).toBeNull()
+  })
+
+  it("is null on a review-only ticket before the review round has happened", () => {
+    expect(scoreCommunication({ isReviewOnly: true })).toBeNull()
+    expect(scoreCommunication({ isReviewOnly: true, reviewDecisionsTotal: 0 })).toBeNull()
+  })
+
+  it.each([
+    { correct: 2, total: 2, expected: 100 },
+    { correct: 1, total: 2, expected: 50 },
+    { correct: 0, total: 2, expected: 0 },
+    { correct: 1, total: 3, expected: 33 },
+  ])("review-only, correct=$correct total=$total -> $expected", ({ correct, total, expected }) => {
+    expect(
+      scoreCommunication({
+        isReviewOnly: true,
+        reviewCorrectDecisions: correct,
+        reviewDecisionsTotal: total,
+      })
+    ).toBe(expected)
   })
 })
 
 describe("scoreVerification", () => {
-  it("is 100 when there is no hidden signal, no bonus, no review round", () => {
+  it("I6: returns null (never 100) when there is no hidden signal at all, regardless of the test-presence bonus", () => {
     expect(
-      scoreVerification({ hiddenIoCasePassed: 0, hiddenIoCaseTotal: 0, learnerAddedTest: false })
-    ).toBe(100)
+      scoreVerification({ hiddenIoCasePassed: 0, hiddenIoCaseTotal: 0, learnerAddedTest: true })
+    ).toBeNull()
   })
 
   it("is the plain (1 - escaped-rate) *100 with no test-presence bonus", () => {
@@ -243,13 +237,13 @@ describe("scoreVerification", () => {
 describe("computeOverallScore", () => {
   const scores = {
     understanding: 80,
-    problemSolving: 90,
+    problemSolving: 90 as number | null,
     codeQuality: 70,
     communication: 60 as number | null,
-    verification: 85,
+    verification: 85 as number | null,
   }
 
-  it("matches the DEMO-101 fixture rubric (communication weight already 0)", () => {
+  it("matches the DEMO-101 fixture rubric (communication weight already 0, communication null)", () => {
     const weights = {
       understanding: 0.2,
       problemSolving: 0.35,
@@ -283,14 +277,35 @@ describe("computeOverallScore", () => {
     }
     const nullCommScores = {
       understanding: 80,
-      problemSolving: 90,
+      problemSolving: 90 as number | null,
       codeQuality: 70,
       communication: null,
-      verification: 60,
+      verification: 60 as number | null,
     }
     // active weight sum = 0.85; weighted sum = 80*.15+90*.3+70*.15+60*.25 = 12+27+10.5+15 = 64.5
     // 64.5 / 0.85 = 75.88... -> 76 (NOT 64.5/1.0=65, which would be the un-renormalized bug)
     expect(computeOverallScore(nullCommScores, weights)).toBe(76)
+  })
+
+  it("I6: renormalizes across the remaining dimensions when problemSolving AND verification are both null (zero io-cases)", () => {
+    const weights = {
+      understanding: 0.2,
+      problemSolving: 0.3,
+      codeQuality: 0.2,
+      communication: 0.1,
+      verification: 0.2,
+    }
+    const zeroIoCaseScores = {
+      understanding: 80,
+      problemSolving: null as number | null,
+      codeQuality: 70,
+      communication: 60 as number | null,
+      verification: null as number | null,
+    }
+    // active weight sum = 0.2(u)+0.2(cq)+0.1(comm) = 0.5
+    // weighted sum = 80*.2 + 70*.2 + 60*.1 = 16+14+6 = 36
+    // 36/0.5 = 72
+    expect(computeOverallScore(zeroIoCaseScores, weights)).toBe(72)
   })
 
   it("falls back to a plain average when every rubric weight is zero (defensive, malformed content)", () => {

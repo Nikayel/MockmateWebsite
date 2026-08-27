@@ -5,12 +5,21 @@
  * how many attempts already exist for (userId, ticketKey) and when the most
  * recent one landed, decide whether a NEW attempt may be opened.
  *
- * Enforced at BOTH ends of an attempt's lifecycle by the attempts service:
- * once when `/api/sprint-labs/attempts` issues fresh hidden-case inputs (so a
- * learner who is already out of budget never even receives a new variant to
- * probe with), and again, independently, when `/api/sprint-labs/attempts/
- * complete` is about to persist a graded submission (so a client that skips
- * the open call, or races two opens, cannot exceed the same limits).
+ * Enforced at `/api/sprint-labs/attempts` (open), folded into the SAME
+ * transaction that creates the attempt's stub doc (fix round 1, I3 — the
+ * budget slot and the stub are consumed atomically, decided on a fresh
+ * in-transaction read, closing the race a separate pre-check could leave).
+ * `/api/sprint-labs/attempts/complete` does not re-check budget: completing
+ * an already-opened stub transitions its status, it does not consume a new
+ * slot, so there is nothing left to over-spend there.
+ *
+ * DEFERRED (fix round 1, M12, by ruling): WORKBOOK-SPEC.md §5's
+ * "fixed-latency reporting" — padding every `/attempts/complete` response to
+ * a constant wall-clock time regardless of how much work grading did, so a
+ * learner (or a scripted attacker) cannot use response latency itself as a
+ * side channel to infer which hidden cases ran or how many passed. NOT
+ * implemented in this task. If/when it lands, it belongs beside the route
+ * handlers, not in this pure decision function.
  */
 
 /** Max graded submissions a user may make against one ticket, ever. */

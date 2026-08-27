@@ -32,9 +32,10 @@
  *
  * `variantId` is a short, fully reproducible string derived from the exact
  * same seed as the selection, so the attempts service can cheaply re-derive
- * "what variantId WOULD attemptIndex N draw right now" and compare it
- * against what a client echoes back, as an optimistic-concurrency guard
- * against a stale/replayed attempt.
+ * "what variantId WOULD attemptIndex N draw right now." It is a pure hash —
+ * `attemptIndex` is never embedded as a readable substring (fix round 1,
+ * M11: an earlier revision formatted it as `v${attemptIndex}-${hash}`,
+ * which handed a learner "this is my 3rd attempt" in plaintext for free).
  */
 
 import { createHash } from "node:crypto"
@@ -55,6 +56,12 @@ function seededUint32(seed: string): number {
   return createHash("sha256").update(seed).digest().readUInt32BE(0)
 }
 
+/** A pure, opaque hash string — no attemptIndex or other input echoed back in readable form (M11). */
+function opaqueVariantId(seed: string): string {
+  const digest = createHash("sha256").update(seed).digest()
+  return "v" + digest.readUInt32BE(0).toString(36) + digest.readUInt32BE(4).toString(36)
+}
+
 /** Deterministic Fisher-Yates: re-hashes `${seed}:${i}` per step so the permutation is reproducible from the seed alone. */
 function seededShuffle<T>(items: readonly T[], seed: string): T[] {
   const arr = [...items]
@@ -71,7 +78,7 @@ export function selectHiddenVariant(
   ticketKey: string,
   attemptIndex: number
 ): VariantSelection {
-  const variantId = `v${attemptIndex}-${seededUint32(`${userId}:${ticketKey}:${attemptIndex}`).toString(36)}`
+  const variantId = opaqueVariantId(`${userId}:${ticketKey}:${attemptIndex}`)
 
   if (ioCaseIds.length === 0) {
     return { variantId, issuedCaseIds: [], heldBackCaseIds: [] }

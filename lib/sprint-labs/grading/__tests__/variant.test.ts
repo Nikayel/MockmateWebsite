@@ -139,4 +139,15 @@ describe("selectHiddenVariant", () => {
       selectHiddenVariant(shuffled, "user-1", TICKET, 0)
     )
   })
+
+  it("fix round 1, M11: variantId is an opaque hash, never the old leaky `v<attemptIndex>-<hash>` shape", () => {
+    const ids = Array.from({ length: 8 }, (_, i) => `case-${i}`)
+    for (let attemptIndex = 0; attemptIndex < SPRINT_LAB_SUBMISSION_BUDGET; attemptIndex++) {
+      const { variantId } = selectHiddenVariant(ids, "user-1", TICKET, attemptIndex)
+      // The retired format was literally `v${attemptIndex}-${hash}` (e.g. "v2-abc123"),
+      // handing "this is my 3rd attempt" to the client in plaintext. Guard against that
+      // exact shape (digits then a hyphen right after the leading "v") reappearing.
+      expect(variantId).not.toMatch(/^v\d+-/)
+    }
+  })
 })
