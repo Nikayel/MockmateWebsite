@@ -117,6 +117,76 @@ contract defined by `CaseLabRun` in `lib/labs/types.ts` — keep them in sync.
 
 ---
 
+### `sprintLabRuns` - Sprint Lab Runs (resumable) — PLANNED
+
+Sprint Labs is the third practice surface beside Case Labs and Mock Rounds: a
+learner joins one persistent codebase (a "workbook") and ships tickets across
+ten sprints. Documented here ahead of the persistence layer so the shape is
+recorded ONE place: types land in `lib/sprint-labs/types.ts`
+(`docs/sprint-labs/PLAN.md` Task 1); the read/write service, the client hook,
+and the `firestore.rules` blocks (copying the `caseLabRuns` defense-in-depth
+pattern) land with Task 6; the `attempts` subcollection's write path lands
+with Task 8. Until those tasks ship, no code writes this collection and no
+rules block exists for it — this section is the contract they will build to,
+kept in sync per this doc's own instruction at the top of `caseLabRuns`.
+
+```typescript
+// sprintLabRuns/{runId}
+{
+  userId: string,                // Firebase Auth UID
+  workbookId: string,             // WorkbookSummary.id, e.g. "meridian"
+  contentVersion: string,         // compiled content version this run started against
+  currentSprint: number,          // 1-10
+  currentTicketKey?: string,      // e.g. "MER-401"
+  board: {                        // Record<ticketKey, status>
+    [ticketKey: string]: "todo" | "doing" | "review" | "done",
+  },
+  status: "in_progress" | "completed" | "abandoned",
+
+  startedAt: string,              // ISO timestamp, server-owned
+  updatedAt: string,              // ISO timestamp, server-owned
+  completedAt?: string,           // ISO timestamp, server-owned
+}
+
+// sprintLabRuns/{runId}/files/{fileDocId} — one doc per workspace file path
+{
+  path: string,                   // e.g. "src/http/server.ts"
+  content: string,                // <= 100,000 chars (MAX_WORKSPACE_FILE_CONTENT_CHARS)
+  updatedAt: string,               // ISO timestamp, server-stamped
+  revision: number,
+}
+
+// sprintLabRuns/{runId}/attempts/{attemptDocId} — one doc per ticket submission
+{
+  ticketKey: string,
+  aiPolicy: "assisted" | "unassisted" | "review-only",
+  variantId: string,               // hidden-suite variant; rotates on re-attempt
+  finalized: boolean,               // score/escapedDefects release only once true
+  gateResults: {
+    gate: "visible" | "hidden" | "regression" | "adversary",
+    cases: { testId: string, humanName: string, passed: boolean }[],
+  }[],
+  escapedDefects: string[],        // curated humanNames, released only once finalized
+  scores: {
+    understanding: number,          // 0-100
+    problemSolving: number,         // 0-100
+    codeQuality: number,            // 0-100
+    communication: number | null,   // 0-100, or null when the ticket collects no prose
+    verification: number,           // 0-100
+    overall: number,                // 0-100
+  },
+  modelId?: string,                 // dates the score to a model/version
+  submittedAt: string,              // ISO timestamp
+}
+```
+
+**Not yet in Firestore rules.** `caseLabRuns`' rules block (`firestore.rules:420-436`)
+is the copy-verbatim pattern Task 6 applies here (owner read/write on the run
+and `files`; `attempts` read-only to its owner, writes admin-only per
+`docs/sprint-labs/PLAN.md` Task 8).
+
+---
+
 ### `analytics_events` - Custom Events
 
 ```typescript
