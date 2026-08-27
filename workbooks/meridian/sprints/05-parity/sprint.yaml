@@ -1,0 +1,44 @@
+number: 5
+title: "Parity: Works on My Machine"
+goal: "Ship one image that behaves the same everywhere it runs: config validated once at boot, health signals that are able to say no, a runtime image under 300 MB that stops when you ask it to, and migrations that survive three replicas booting in the same second."
+standupQuote: "[#incident-staging 09:14] deploy went green, all six replicas reported healthy for eleven minutes, and every webhook we sent in that window came back invalid_signature. Priya: works on my machine, I just run it with tsx."
+topic: "Containers & environment parity"
+archMapDelta:
+  added:
+    - "A boot-time environment schema that fails the process before it can serve traffic"
+    - "A migration ledger guarded by a Postgres advisory lock"
+  changed:
+    - "The runtime image is built in a separate stage from the build tools and ships without them"
+    - "/healthz and a separate readiness check report distinct liveness and readiness signals"
+  invariants:
+    - "A missing or invalid environment variable stops the process at boot, before it can sign or serve anything."
+    - "Two replicas that boot at the same moment can never apply the same migration twice."
+sizingNotes: "This sprint was originally scoped at 3.5 hours against 28 points and 44 hidden tests, the most hidden coverage and the shortest sprint in the workbook. Rather than split MER-504 (advisory locks, a migration ledger, CONCURRENTLY, moving migrations off the boot path, which is sprint-sized on its own), the sprint keeps its 5 tickets and its stated hours lengthen to roughly 6.5."
+objectives:
+  - boot-time-config-validation
+  - multistage-docker-image-size-graceful-shutdown
+  - liveness-readiness-separation
+  - concurrent-safe-schema-migrations
+  - review-deploy-change-parity
+filesTouched:
+  - "src/config.ts"
+  - "src/delivery/signature.ts"
+  - "Dockerfile"
+  - "docker/healthcheck.js"
+  - ".dockerignore"
+  - "src/http/server.ts"
+  - "src/http/routes/health.ts"
+  - "src/db/client.ts"
+  - "migrations/0017_delivery_attempts.sql"
+  - "src/db/migration-runner.ts"
+  - "infra/deploy.yml"
+  - "docker-compose.yml"
+newSourceFiles:
+  - "Dockerfile"
+  - "docker/healthcheck.js"
+  - ".dockerignore"
+  - "migrations/0017_delivery_attempts.sql"
+  - "src/db/migration-runner.ts"
+  - "infra/deploy.yml"
+  - "docker-compose.yml"
+rewrittenFiles: []
