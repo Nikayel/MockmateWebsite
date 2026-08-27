@@ -16,7 +16,8 @@
  *      possible);
  *   5. (review round 1, I-4) no distinctive SEALED string (a reference.diff
  *      hunk, a review comment body, a probe body, an io-case expected
- *      value) appears as TEXT inside any generated PUBLIC file. This is
+ *      value, a SQL hidden assertion's own sql) appears as TEXT inside any
+ *      generated PUBLIC file. This is
  *      the only one of the five that catches a secret smuggled under a
  *      non-secret key — `assertPublicSafe` (compiler.test.ts) only checks
  *      KEY names, so a bug that copied `sealed.referenceDiff`'s value into
@@ -110,6 +111,25 @@ async function collectSealedMarkers(): Promise<string[]> {
         markers.push(decision.decision)
         markers.push(decision.justification)
       }
+    }
+    // The sealed SQL-hidden-test subsystem: mark each hidden assertion's own
+    // `sql` text (never `expect`, deliberately -- see below). `sql` is always
+    // ticket-specific, literal SQL (real row ids/values unique to one
+    // assertion), so it is exactly as distinctive a marker as `body`/
+    // `referenceDiff` above and carries zero realistic false-positive risk.
+    // `expect` is NOT marked: its two structured shapes ("zero-rows", a bare
+    // "raises"/`{raises: "row-level security"}`-style short phrase) are
+    // GENUINELY SHARED, non-secret vocabulary that MANY unrelated, legitimately
+    // PUBLIC visible assertions in the same compiled ticket already use --
+    // marking it would risk exactly the false-positive class Task 7 review
+    // round 2's own MIN_MARKER_LENGTH floor exists to avoid, for markers this
+    // scan cannot make length-floor-safe (a JSON-stringified `{"raises":
+    // "row-level security"}` is well past 10 chars, yet no more secret than
+    // "zero-rows" itself). Marking `sql` alone still fully proves the
+    // assertion's actual substance -- what it does, on what literal data --
+    // never appears in a public file.
+    for (const sqlHidden of sealed.sqlHiddenAssertions ?? []) {
+      markers.push(sqlHidden.sql)
     }
   }
   // Sprint Labs Task 7 review round 2: a length floor, not just "non-empty". An io-case entryPoint

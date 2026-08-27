@@ -358,6 +358,11 @@ describe("compile-workbooks: leak-gate (secret-classification allowlist)", () =>
       "correct",
       "rubric",
       "authorBrief",
+      // The sealed SQL-hidden-test subsystem (S3 review Critical finding):
+      // a SQL hidden assertion's own SQL and its expected outcome.
+      "sql",
+      "expect",
+      "sqlHiddenAssertions",
     ]) {
       expect(SECRET_FIELDS.has(field)).toBe(true)
     }
@@ -392,6 +397,28 @@ describe("compile-workbooks: leak-gate (secret-classification allowlist)", () =>
     const poisoned = { hiddenTests: [{ id: "1" }, { id: "2", body: "assert(true)" }] }
     expect(() => assertPublicSafe(poisoned, "poisoned-array")).toThrow(
       /secret-classified field "body"/
+    )
+  })
+
+  it("RED CASE: throws when a SQL hidden assertion's sql leaks into a public-shaped payload (the S3 review's leak class)", () => {
+    // Nested under "hiddenTests" (a legitimate PUBLIC wrapper key, not itself
+    // secret-classified -- see the "correct"/"body" RED CASEs above for the
+    // same pattern), so the walk reaches "sql" itself rather than stopping
+    // one level up at a wrapper key.
+    const poisoned = {
+      hiddenTests: [{ id: "1", humanName: "h", tags: [], sql: "SELECT secret FROM answers;" }],
+    }
+    expect(() => assertPublicSafe(poisoned, "poisoned-sql")).toThrow(
+      /secret-classified field "sql"/
+    )
+  })
+
+  it("RED CASE: throws when a SQL hidden assertion's expect leaks into a public-shaped payload, even without the sqlHiddenAssertions wrapper key", () => {
+    // Nested under a non-secret key, mirroring the "correct" RED CASE below --
+    // proves the scan catches `expect` on its own, not only alongside `sql`.
+    const poisoned = { hiddenTests: [{ id: "1", expect: { raises: "row-level security" } }] }
+    expect(() => assertPublicSafe(poisoned, "poisoned-sql-expect")).toThrow(
+      /secret-classified field "expect"/
     )
   })
 
@@ -691,6 +718,39 @@ describe("compile-workbooks: rubric.yaml / author_brief.yaml / hidden payloads a
     writeFileText(
       join(ticketDir, "tests/hidden/case-1.yaml"),
       ["humanName: Escaped case", "tags: []", "kind: probe", 'body: ""', ""].join("\n")
+    )
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain("case-1.yaml")
+  })
+
+  it("a sql-assertion hidden test missing `sql` is a CompileError", () => {
+    const base = makeTmpDir("sprint-labs-sqlassertion-nosql-")
+    const { wbDir, ticketDir } = scaffoldMinimalWorkbook(base)
+    writeFileText(
+      join(ticketDir, "tests/hidden/case-1.yaml"),
+      ["humanName: Escaped case", "tags: []", "kind: sql-assertion", "expect: zero-rows", ""].join(
+        "\n"
+      )
+    )
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain("case-1.yaml")
+  })
+
+  it("a sql-assertion hidden test with an unrecognized `expect` shape is a CompileError", () => {
+    const base = makeTmpDir("sprint-labs-sqlassertion-badexpect-")
+    const { wbDir, ticketDir } = scaffoldMinimalWorkbook(base)
+    writeFileText(
+      join(ticketDir, "tests/hidden/case-1.yaml"),
+      [
+        "humanName: Escaped case",
+        "tags: []",
+        "kind: sql-assertion",
+        "sql: select 1;",
+        "expect: not-a-real-shape",
+        "",
+      ].join("\n")
     )
     const result = compile(wbDir)
     expect(result.status).not.toBe(0)
@@ -1339,6 +1399,73 @@ describe("compile-workbooks: stub vs full tickets (reference.diff/rubric.yaml op
     // `compileTicket` produced for a full ticket.
     expect(() => assertPublicSafe(compiledTicket, "full-ticket:public")).not.toThrow()
     expect(() => assertPublicSafe(sealed, "full-ticket:sealed")).toThrow(/secret-classified field/)
+  })
+
+  // ============================================================
+  // The sealed SQL-hidden-test subsystem (S3 review Critical finding): a
+  // `tests/hidden/*.yaml` file authored with `kind: sql-assertion` must
+  // compile into the SEALED bundle only -- never the public one, and never
+  // even as a public `hiddenTests` metadata entry (unlike io-case/probe).
+  // ============================================================
+
+  it("a sql-assertion hidden test compiles into the SEALED bundle only -- absent from the public ticket, its hiddenTests array, AND its raw text", async () => {
+    const base = makeTmpDir("sprint-labs-sql-hidden-")
+    const { wbDir, ticketDir } = scaffoldMinimalWorkbook(base, {
+      workbookId: "sql-hidden-wb",
+      ticketKey: "SQLH-1",
+    })
+    const distinctiveSql = "SELECT 'leak-marker-9f3c2a' AS probe;"
+    writeFileText(
+      join(ticketDir, "tests/hidden/hidden-leak-marker-check.yaml"),
+      [
+        'humanName: "Escaped: the leak-marker check"',
+        "tags: []",
+        "kind: sql-assertion",
+        `sql: "${distinctiveSql}"`,
+        "expect:",
+        "  rows:",
+        '    - ["leak-marker-9f3c2a"]',
+        "",
+      ].join("\n")
+    )
+
+    const outBase = makeTmpDir("sprint-labs-sql-hidden-out-")
+    const publicDir = join(outBase, "public")
+    const sealedDir = join(outBase, "sealed")
+    const result = runCompiler(wbDir, publicDir, sealedDir)
+    expect(result.stderr + result.stdout).not.toContain("FAILED")
+    expect(result.status).toBe(0)
+
+    // Public: the ticket compiles, but carries NOTHING about this hidden
+    // test -- not its id, humanName, count, or (above all) its sql/expect
+    // text, anywhere in the emitted file.
+    const registry = await import(/* @vite-ignore */ join(publicDir, "registry.ts"))
+    const content = await registry.loadWorkbookContent("sql-hidden-wb")
+    const compiledTicket = content.ticketsByKey["SQLH-1"] as CompiledTicket
+    expect(compiledTicket.hiddenTests).toEqual([])
+    const publicFileText = readFileSync(join(publicDir, "sql-hidden-wb/tickets/SQLH-1.ts"), "utf8")
+    expect(publicFileText).not.toContain(distinctiveSql)
+    expect(publicFileText).not.toContain("leak-marker-9f3c2a")
+    expect(() => assertPublicSafe(compiledTicket, "sql-hidden:public")).not.toThrow()
+
+    // Sealed: the real sql/expect, reachable ONLY through the sealed loader.
+    const sealedRegistry = await import(/* @vite-ignore */ join(sealedDir, "registry.server.ts"))
+    const sealed = (await sealedRegistry.loadSealedTicket(
+      "sql-hidden-wb",
+      "SQLH-1"
+    )) as SealedTicketContent
+    expect(sealed.sqlHiddenAssertions).toHaveLength(1)
+    expect(sealed.sqlHiddenAssertions?.[0]).toMatchObject({
+      id: "hidden-leak-marker-check",
+      humanName: "Escaped: the leak-marker check",
+      sql: distinctiveSql,
+      expect: { rows: [["leak-marker-9f3c2a"]] },
+    })
+    // The real sealed bundle trips the leak gate if it ever reached public
+    // (matches the existing FULL-ticket precedent above) -- the dedicated RED
+    // CASE tests in the "leak-gate" describe block above prove `sql`/`expect`
+    // specifically, independent of whichever secret key the walk meets first.
+    expect(() => assertPublicSafe(sealed, "sql-hidden:sealed")).toThrow(/secret-classified field/)
   })
 
   it("a ticket demoted from full back to stub (reference.diff/rubric.yaml removed) loses its stale sealed bundle on the next compile", async () => {
