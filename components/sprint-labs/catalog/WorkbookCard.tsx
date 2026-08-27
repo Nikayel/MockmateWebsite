@@ -77,9 +77,11 @@ export function WorkbookCard({ summary, variant, meterOverride }: WorkbookCardPr
           <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[var(--wb-disabled)]" aria-hidden />
         )}
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <h4 className="text-base leading-snug font-semibold text-[var(--wb-text)]">
+          {/* Fix round 1, M1: `SprintLabsSection` -> "Sprint labs" (h2) -> this card's title is the
+              next real level down, h3 (was h4, which skipped a level since nothing here is h3). */}
+          <h3 className="text-base leading-snug font-semibold text-[var(--wb-text)]">
             {summary.title}
-          </h4>
+          </h3>
           <p className="text-sm leading-relaxed text-[var(--wb-text-secondary)]">{summary.pitch}</p>
         </div>
       </div>
@@ -95,6 +97,7 @@ export function WorkbookCard({ summary, variant, meterOverride }: WorkbookCardPr
       <div className="relative flex flex-col gap-2">
         <ObjectiveList
           heading="What you'll learn"
+          headingLevel="none"
           density="chip"
           objectives={visibleObjectives.map(toNotStartedObjectiveView)}
         />
@@ -114,7 +117,23 @@ export function WorkbookCard({ summary, variant, meterOverride }: WorkbookCardPr
         curve is the artifact.
       </p>
 
-      <div className="relative mt-auto flex items-center gap-3 border-t border-[var(--wb-border)] pt-3 text-xs text-[var(--wb-text-secondary)]">
+      {/*
+       * Fix round 1, I1: `relative` here used to be unconditional. On the playable card that gave
+       * this static footer its own step-6 stacking slot (CSS2.1 stacking order: a `position:auto`
+       * positioned box, in tree order) at the SAME level as the stretched link, and being later in
+       * the DOM it painted (and hit-tested) on top of the link across its whole bounding box, even
+       * though nothing inside it but decorative `aria-hidden` text. The "Open" strip looked right
+       * and consumed every click meant for the card. `locked` needs `relative` for the Dialog
+       * trigger to lay out predictably; `playable` must stay `position: static` so this footer
+       * falls back to step 3 (in-flow, non-positioned) and the absolutely-positioned link above it
+       * in step 6 wins every pixel, exactly like the rest of the card.
+       */}
+      <div
+        className={cn(
+          "mt-auto flex items-center gap-3 border-t border-[var(--wb-border)] pt-3 text-xs text-[var(--wb-text-secondary)]",
+          locked && "relative"
+        )}
+      >
         {locked ? (
           <>
             <p className="min-w-0 flex-1">{SERVER_EXECUTION_MESSAGE}</p>
@@ -127,12 +146,17 @@ export function WorkbookCard({ summary, variant, meterOverride }: WorkbookCardPr
                   What runs today
                 </button>
               </DialogTrigger>
-              <DialogContent>
+              {/* Fix round 1, M4: this dialog opens from a workbook surface screen, so it carries
+                  --wb-* tokens (the `.workbook-surface` class scopes them) rather than the global
+                  bg-background/text-muted-foreground the primitive defaults to. */}
+              <DialogContent className="workbook-surface border-[var(--wb-border)] bg-[var(--wb-card)] text-[var(--wb-text)]">
                 <DialogHeader>
-                  <DialogTitle>What runs today</DialogTitle>
-                  <DialogDescription>{SERVER_EXECUTION_MESSAGE}</DialogDescription>
+                  <DialogTitle className="text-[var(--wb-text)]">What runs today</DialogTitle>
+                  <DialogDescription className="text-[var(--wb-text-secondary)]">
+                    {SERVER_EXECUTION_MESSAGE}
+                  </DialogDescription>
                 </DialogHeader>
-                <p className="text-muted-foreground text-sm">
+                <p className="text-sm text-[var(--wb-text-secondary)]">
                   Everything else in Sprint Labs already runs in your browser: TypeScript,
                   JavaScript, Python and SQL, with a real Postgres engine for SQL work.{" "}
                   {summary.title} needs the parts that are not built yet.

@@ -65,6 +65,30 @@ describe("WorkbookCard playable variant", () => {
     expect(screen.getByText("Contract versioning")).not.toBeNull()
     expect(screen.queryByText(SERVER_EXECUTION_MESSAGE)).toBeNull()
   })
+
+  it("titles the card h3 (SprintLabsSection's h2 is the level above) and keeps 'What you'll learn' off the heading outline", () => {
+    render(<WorkbookCard summary={SUMMARY} variant="playable" />)
+    expect(screen.getByRole("heading", { level: 3, name: SUMMARY.title })).not.toBeNull()
+    // "What you'll learn" is real, visible text, just not a heading (ObjectiveList's headingLevel="none").
+    expect(screen.getByText("What you'll learn").tagName).toBe("SPAN")
+  })
+
+  it("fix round 1, I1: the footer is not its own stacking layer, so the stretched link stays on top", () => {
+    // jsdom has no real layout/paint engine, so a pixel-accurate hit-test can't run here; this pins
+    // the mechanism the fix actually relies on (CSS2.1 stacking order, see WorkbookCard.tsx's
+    // comment at the footer) rather than the visual symptom. Before the fix this div carried
+    // `relative` unconditionally, which put it in the SAME step-6 stacking slot as the stretched
+    // link and, being later in the DOM, painted (and hit-tested) on top of it everywhere in its
+    // bounds — including over the decorative "Open" text, with nothing underneath to catch the
+    // click.
+    const { container } = render(<WorkbookCard summary={SUMMARY} variant="playable" />)
+    const footer = screen.getByText("Open").closest("div")
+    expect(footer).not.toBeNull()
+    expect(footer?.className.split(" ")).not.toContain("relative")
+    // The stretched link is still there, unobstructed, covering the whole card.
+    const stretchedLink = container.querySelector('a[href="/sprint-labs/fixture-demo"]')
+    expect(stretchedLink).not.toBeNull()
+  })
 })
 
 describe("WorkbookCard locked variant", () => {
