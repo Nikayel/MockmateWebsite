@@ -148,4 +148,68 @@ describe("Meridian seed repo (workbooks/meridian/repo)", () => {
     expect(result.results.every((testCase) => testCase.passed)).toBe(true)
     expect(result.success).toBe(true)
   })
+
+  /**
+   * Pins the ten canonical planted defects (WORKBOOK-SPEC.md §3) structurally, by content, so
+   * a later authoring pass that "helpfully" fixes one of them (tightens tsconfig, adds a
+   * tenant filter, indexes documents, reorders the delivery write, ...) fails this test loudly
+   * instead of silently invalidating the ticket that was supposed to introduce that fix.
+   */
+  it("pins all ten canonical planted defects structurally", () => {
+    const { files } = loadSeedRepo()
+    const byPath = new Map(files.map((file) => [file.path, file.content]))
+    const read = (path: string): string => {
+      const content = byPath.get(path)
+      if (content === undefined) throw new Error(`expected seed file missing: ${path}`)
+      return content
+    }
+
+    // 1. tsconfig.json: strict mode is off.
+    expect(read("tsconfig.json")).toContain('"strict": false')
+
+    // 2. eslint.config.mjs: no-explicit-any is off.
+    expect(read("eslint.config.mjs")).toContain('"@typescript-eslint/no-explicit-any": "off"')
+
+    // 3. claims.amount is a float column, not integer minor units.
+    expect(read("migrations/0001_init.sql")).toContain("amount double precision")
+
+    // 4. documents has claim_id but no tenant_id column.
+    const documentsTable = read("migrations/0001_init.sql").match(
+      /create table documents \(([\s\S]*?)\);/
+    )?.[1]
+    expect(documentsTable).toBeDefined()
+    expect(documentsTable).toContain("claim_id")
+    expect(documentsTable).not.toContain("tenant_id")
+
+    // 5. no migration indexes documents (on claim_id or anything else).
+    expect(read("migrations/0003_indexes.sql")).not.toMatch(/on\s+documents\s*\(/i)
+
+    // 6. the one query that forgets the tenant filter still forgets it.
+    const findByExternalRef = read("src/db/queries.ts").match(
+      /FIND_CLAIM_BY_EXTERNAL_REF = "([^"]*)"/
+    )?.[1]
+    expect(findByExternalRef).toBeDefined()
+    expect(findByExternalRef).not.toContain("tenant_id")
+
+    // 7. the per-claim documents loop (N+1) is still a loop, not a batch.
+    const documentsRepo = read("src/db/repositories/documents.ts")
+    expect(documentsRepo).toContain("for (const claimId of claimIds)")
+    expect(documentsRepo).toContain("getDocumentsForClaim(db, claimId)")
+
+    // 8. the outbox is still an in-process array, never database-backed.
+    const outbox = read("src/queue/outbox.ts")
+    expect(outbox).toContain("entries: OutboxEntry[] = []")
+    expect(outbox).not.toContain("db.query")
+
+    // 9. the webhook delivery row is still written "delivered" before the http call.
+    const webhooks = read("src/delivery/webhooks.ts")
+    const deliveredIndex = webhooks.indexOf('"delivered"')
+    const postIndex = webhooks.indexOf(".post(")
+    expect(deliveredIndex).toBeGreaterThan(-1)
+    expect(postIndex).toBeGreaterThan(-1)
+    expect(deliveredIndex).toBeLessThan(postIndex)
+
+    // 10. /health still never touches the db seam.
+    expect(read("src/http/routes/health.ts")).not.toContain("db/client")
+  })
 })
