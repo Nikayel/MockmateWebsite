@@ -1,0 +1,6 @@
+diff --git a/migrations/0002_second.sql b/migrations/0002_second.sql
+new file mode 100644
+--- /dev/null
++++ b/migrations/0002_second.sql
+@@ -0,0 +1,1 @@
++CREATE TABLE tenants (id uuid PRIMARY KEY);

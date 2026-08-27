@@ -1,0 +1,6 @@
+diff --git a/migrations/0002_claims.sql b/migrations/0002_claims.sql
+--- a/migrations/0002_claims.sql
++++ b/migrations/0002_claims.sql
+@@ -1,1 +1,2 @@
+ ALTER TABLE claims ADD COLUMN amount_cents integer;
++ALTER TABLE claims ALTER COLUMN amount_cents SET NOT NULL;
