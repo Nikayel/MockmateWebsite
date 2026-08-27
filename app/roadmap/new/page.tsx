@@ -161,6 +161,10 @@ export default function NewRoadmapPage() {
     error?.toLowerCase().includes("limit") ||
     error?.toLowerCase().includes("too many")
   const isProRequired = error === "PRO_REQUIRED"
+  // The signed-out branch of handleAssessmentComplete. The banner must carry a way to sign in:
+  // steps 1-3 need no auth, so a signed-out visitor genuinely reaches this error, and a message
+  // with no affordance strands them at the end of the wizard.
+  const isAuthRequired = error === "You must be logged in to create a roadmap"
 
   return (
     <div className="bg-background min-h-screen">
@@ -261,6 +265,18 @@ export default function NewRoadmapPage() {
                     <RefreshCw className="h-3.5 w-3.5" />
                     Dismiss & Try Again
                   </button>
+                )}
+                {isAuthRequired && (
+                  // Same redirect form the preview page's CTA uses. Signing in lands back on
+                  // this wizard; the mount effect resets it, so the visitor re-walks the three
+                  // short steps, which beats the dead end this banner used to be.
+                  <Link
+                    href="/login?redirect=/roadmap/new"
+                    className="bg-accent text-accent-foreground hover:bg-accent/90 mt-3 inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors"
+                  >
+                    Sign in to continue
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
                 )}
               </div>
             </div>
