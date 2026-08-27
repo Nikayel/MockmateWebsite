@@ -313,7 +313,7 @@ index 35c7658..43b2b15 100644
 +): Promise<DeliveryFailureOutcome> {
 +  const isTyped = error instanceof DeliveryFailureError
 +  const classification = isTyped ? error.classification : "retryable"
-+  const payload = isTyped ? error.payload : ""
++  const payload = isTyped ? error.payload : JSON.stringify({ tenantId: entry.tenantId, claimId: entry.claimId, eventType: entry.eventType })
 +  const nextAttemptAt = isTyped ? error.nextAttemptAt : new Date(Date.now() + 60_000).toISOString()
 +  const message = error instanceof Error ? error.message : String(error)
 +  const attemptCount = entry.attemptCount + 1
