@@ -12,8 +12,9 @@ import { BreadcrumbJsonLd } from "@/components/seo/JsonLd"
  * BreadcrumbList is one of the few schema types Google still renders a rich result for: the trail
  * replaces the raw URL in the result, which is the difference between a searcher seeing
  * `codesparring.dev/new-grad-coding-interview-practice` and seeing
- * `CodeSparring > New Grad Coding Interview Practice`. It was mounted on Learn, blog posts and
- * interview-prep, and on none of the fourteen marketing landing, comparison and guide pages.
+ * `CodeSparring > New Grad Coding Interview Practice`. It was mounted on Learn, blog posts and the
+ * since-retired interview-prep pages, and on none of the fourteen marketing landing, comparison and
+ * guide pages.
  *
  * The trail needs the page's own URL, and `LandingPageTemplate` is handed a title but never a path.
  * Adding a required `path` prop would mean editing all fourteen callers to repeat a string the
@@ -29,7 +30,7 @@ import { BreadcrumbJsonLd } from "@/components/seo/JsonLd"
  * `Home > {title}`, even for the `/guides/*` pages. There is no `/guides` index route, and Google
  * validates breadcrumb `item` URLs. A middle "Guides" crumb would point at a 404 and disqualify the
  * whole trail, which is worse than the shorter but honest one. The same two-level shape is what
- * `/interview-prep` and `/roadmap/preview` already publish.
+ * `/roadmap/preview` already publishes.
  */
 export function LandingPageBreadcrumb({ title }: { title: string }) {
   const pathname = usePathname()

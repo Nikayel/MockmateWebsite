@@ -69,9 +69,8 @@ export default async function CaseLabDetailLayout({
   const { labId } = await params
   const lab = getCaseLabById(labId)
 
-  // The explicit guard, mirroring `app/interview-prep/[company]`. `dynamicParams = false` already
-  // rejects unknown ids at the router, but that is a config flag one refactor away from being lost,
-  // and the failure it prevents is silent.
+  // The explicit guard. `dynamicParams = false` already rejects unknown ids at the router, but that
+  // is a config flag one refactor away from being lost, and the failure it prevents is silent.
   if (!lab) notFound()
 
   return (

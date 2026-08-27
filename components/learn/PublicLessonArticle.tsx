@@ -224,7 +224,7 @@ export function PublicLessonArticle({
             see and click on this exact page.
 
             The trail starts at Home. Every other breadcrumb on the site does - the level pages, the
-            Learn hub, blog posts, interview-prep - and a lesson trail that began at "Learn" made the
+            Learn hub, blog posts - and a lesson trail that began at "Learn" made the
             deepest pages on the site the only ones claiming no parent above their section. In a
             rendered rich result that is the difference between "CodeSparring > Learn > Python > ..."
             and a trail that starts mid-site. */}

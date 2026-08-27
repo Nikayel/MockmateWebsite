@@ -49,8 +49,8 @@ export const palantirUsageRollup: CaseLab = {
       },
       {
         round: "Behavioral, “why Palantir,” and mission fit",
-        cta: "Palantir prep",
-        href: "/interview-prep/palantir",
+        cta: "Plan your prep",
+        href: "/roadmap/preview",
       },
     ],
   },

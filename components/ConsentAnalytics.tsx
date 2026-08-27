@@ -34,7 +34,7 @@ import { applyPostHogConsent } from "@/lib/posthog-consent"
  * mistake than that. Narrow these only with a test pinning every editor route.
  *
  * Matching is per path segment, so "/interview" excludes the live interview and
- * leaves the "/interview-prep" landing pages recording.
+ * its subtree without sweeping up sibling routes that merely share the prefix.
  */
 const REPLAY_EXCLUDED_ROUTES = [
   "/interview", // the interviewer chat and the CodeMirror editor
