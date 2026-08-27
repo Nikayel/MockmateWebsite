@@ -2,9 +2,9 @@
  * MER-101, played through all four gates + the retro (docs/sprint-labs/AGENT-PROMPT.md §4 /
  * PLAN.md Task 22's acceptance bar: "one end-to-end test that plays MER-101 through all four
  * gates and the retro"). Headless vitest, not a live-browser Playwright spec, because this
- * sandbox has no Firebase env and no running dev server -- see e2e/sprint-labs-mer-101.spec.ts
- * for the browser counterpart, which is `test.skip`ped for exactly that reason and meant for the
- * owner to run with real env. Every function this file calls is the REAL, unmodified production
+ * sandbox has no Firebase env and no running dev server -- e2e/sprint-labs-mer-101.spec.ts is the
+ * owner-run live proof of the same journey through a real browser + real Firestore, skipped here
+ * for exactly that reason. Every function this file calls is the REAL, unmodified production
  * code; the only substitution is documented in "THE ONE SUBSTITUTION" below.
  *
  * ## What gets exercised, module by module
@@ -19,13 +19,24 @@
  *    `lib/sprint-labs/validate/dynamic/provisioning.ts` (`scanProvisioning`) are the exact
  *    functions `pnpm lab:validate:dynamic` runs per ticket -- called here scoped to MER-101 only,
  *    per this task's brief ("invoke them on MER-101's provisioned bundle").
+ *  - `lib/sprint-labs/content/registry.ts` (`getTicket`) and `lib/scenarios/sealed/sprint-labs/
+ *    registry.server.ts` (`loadSealedTicket`) are called FOR REAL, unmocked. MER-101 is genuinely
+ *    compiled into both registries today (`scripts/compile-workbooks.mjs`'s `isFullTicket` gate
+ *    compiles any ticket authoring both `reference.diff` and `rubric.yaml` -- MER-101 does --
+ *    into a full public ticket AND a sealed `<KEY>.server.ts`; confirmed on disk at
+ *    `lib/sprint-labs/content/meridian/tickets/MER-101.ts` and `lib/scenarios/sealed/sprint-labs/
+ *    meridian/MER-101.server.ts`). Nothing about MER-101's own content pipeline is mocked.
  *  - `lib/sprint-labs/runtime/io-case-executor.ts` (`runIoCases`/`toIoCaseOutputs`) is the REAL
  *    client-side io-case executor, run against the GREEN materialized tree.
  *  - `lib/sprint-labs/grading/attempts-service.ts` (`openSprintLabAttempt`,
  *    `completeSprintLabAttempt`, `getFinalizedSprintLabAttempt`) is the REAL server orchestration
  *    -- open, the hidden-gate comparison (`gate-runner.ts`'s `runHiddenGate`, server-side,
  *    `deepEqual` against a sealed `expected` this test never lets the "client" side see), scoring,
- *    finalize-once, and the retro read.
+ *    finalize-once, and the retro read. It calls the two registry functions above for real, and
+ *    `lib/sprint-labs/mastery.ts`'s `recordSprintLabMastery` for real too (also unmocked): that
+ *    function's own first line is `if (attempt.aiPolicy === "assisted" || !attempt.finalized)
+ *    return`, and MER-101 is an `assisted` ticket, so it deterministically no-ops here without
+ *    touching anything beyond that guard -- there is nothing to mock.
  *
  * ## THE ONE SUBSTITUTION -- browser Worker -> Node harness
  *
@@ -40,28 +51,19 @@
  * unmodified. This is the one seam a from-scratch Node run cannot avoid; it is the same seam
  * `ts-replay.ts` already stands on for the CI dynamic-validate path.
  *
- * ## Why the content/sealed registries are mocked with REAL-file-derived fixtures, not the
- * compiled `lib/sprint-labs/content`/`lib/scenarios/sealed/sprint-labs` registries
+ * ## What else is mocked, and why (nothing about MER-101's own content or grading logic)
  *
- * `workbooks/meridian` cannot compile as a whole today: `scripts/compile-workbooks.mjs` requires
- * `reference.diff` + `rubric.yaml` on EVERY ticket in the workbook, and only sprint 1 (MER-101
- * through MER-105) currently authors them -- sprints 2-10 are still `ticket.md`-only stubs (see
- * this task's own report for the pasted `pnpm workbooks:compile workbooks/meridian` failure).
- * So `getTicket("meridian", "MER-101")` / `loadSealedTicket("meridian", "MER-101")` return nothing
- * useful via the real generated registries yet. Firestore is mocked exactly like the established
- * pattern in `lib/sprint-labs/__tests__/grading.test.ts` (same fake-store shape, same
- * `runTransaction`/`tx.create` support); the content/sealed registries are mocked the same way
- * that file already does (`vi.mock` returning fixture objects), except the fixture DATA here is
- * read straight off MER-101's real authored files (`ticket.md`, the four `tests/hidden/*.yaml`
- * io-cases, `reference.diff`, `rubric.yaml`) via `gray-matter` -- the same library and the same
- * `matter.engines.yaml.parse` entry point `compile-workbooks.mjs` itself uses -- so this test can
- * never silently drift from what MER-101 actually says.
+ * Only three things: Firestore (`@/lib/firebase-admin`, faked with the same path->data-map,
+ * `runTransaction`/`tx.create` harness `lib/sprint-labs/__tests__/grading.test.ts` already
+ * established -- there is no Firestore emulator in this sandbox, so a real `adminDb` cannot run
+ * here at all), `@/lib/logger` (silenced, not asserted on), and `@/lib/usage-tracking`'s
+ * `trackUsageEvent` (a real usage-tracking write is out of scope for what this test proves and
+ * would need its own live backend). Everything else -- content registry, sealed registry,
+ * attempts-service, gate-runner, mastery -- is the real, unmodified module.
  */
 
-import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import matter from "gray-matter"
 
 // ============================================================
 // THE ONE SUBSTITUTION -- see file header. Must be declared before importing
@@ -213,29 +215,12 @@ vi.mock("@/lib/logger", () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }))
 
-// ============================================================
-// Content + sealed registry mocks -- fixture DATA sourced from MER-101's real authored files (see
-// file header). getTicket/loadSealedTicket are the only two functions attempts-service.ts reads
-// from these modules.
-// ============================================================
-const contentMocks = vi.hoisted(() => ({ getTicket: vi.fn() }))
-vi.mock("@/lib/sprint-labs/content/registry", () => ({ getTicket: contentMocks.getTicket }))
-
-const sealedMocks = vi.hoisted(() => ({ loadSealedTicket: vi.fn() }))
-vi.mock("@/lib/scenarios/sealed/sprint-labs/registry.server", () => ({
-  loadSealedTicket: sealedMocks.loadSealedTicket,
-}))
-
 const usageMocks = vi.hoisted(() => ({ trackUsageEvent: vi.fn() }))
 vi.mock("@/lib/usage-tracking", () => ({ trackUsageEvent: usageMocks.trackUsageEvent }))
 
-const masteryMocks = vi.hoisted(() => ({ recordSprintLabMastery: vi.fn() }))
-vi.mock("@/lib/sprint-labs/mastery", () => ({
-  recordSprintLabMastery: masteryMocks.recordSprintLabMastery,
-}))
-
 // ============================================================
-// Real production imports -- everything below is unmocked, real code.
+// Real production imports -- everything below is unmocked, real code, including the content and
+// sealed registries (MER-101 is genuinely compiled into both -- see file header).
 // ============================================================
 import { loadWorkbookTree } from "@/lib/sprint-labs/validate"
 import {
@@ -254,83 +239,25 @@ import {
   getFinalizedSprintLabAttempt,
   openSprintLabAttempt,
 } from "@/lib/sprint-labs/grading/attempts-service"
-import type { CompiledTicket } from "@/lib/sprint-labs/content/types"
-import type {
-  SealedHiddenCase,
-  SealedTicketContent,
-} from "@/lib/scenarios/sealed/sprint-labs/types"
+import { loadSealedTicket } from "@/lib/scenarios/sealed/sprint-labs/registry.server"
+import type { SealedTicketContent } from "@/lib/scenarios/sealed/sprint-labs/types"
 
 const MERIDIAN_DIR = join(__dirname, "../../../workbooks/meridian")
-const MER_101_DIR = join(MERIDIAN_DIR, "sprints/01-contracts/tickets/MER-101")
 const TICKET_KEY = "MER-101"
+const WORKBOOK_ID = "meridian"
 
-// ============================================================
-// Fixture builders -- read MER-101's REAL authored files, never a hand-typed copy.
-// ============================================================
-
-function loadMer101TicketFixture(): CompiledTicket {
-  const { data } = matter(readFileSync(join(MER_101_DIR, "ticket.md"), "utf8"))
-  return {
-    ticket: {
-      key: TICKET_KEY,
-      title: data.title,
-      points: data.points,
-      labels: data.labels ?? [],
-      aiPolicy: data.ai_policy,
-      objectives: [],
-      bodyMd: "",
-      acceptanceCriteria: data.acceptanceCriteria ?? [],
-      adversaryPresent: false,
-    },
-    setupDiff: null,
-    visibleTestFiles: [],
-    hiddenTests: [],
-  }
+/** MER-101's real sealed content, via the real (unmocked) `loadSealedTicket` -- fails loudly
+ *  rather than silently proceeding with `null` if MER-101 is ever demoted back to a stub. */
+async function requireMer101Sealed(): Promise<SealedTicketContent> {
+  const sealed = await loadSealedTicket(WORKBOOK_ID, TICKET_KEY)
+  if (!sealed) throw new Error(`loadSealedTicket returned null for ${WORKBOOK_ID}:${TICKET_KEY}`)
+  return sealed
 }
-
-function loadMer101SealedFixture(): SealedTicketContent {
-  const hiddenDir = join(MER_101_DIR, "tests/hidden")
-  const hiddenCases: SealedHiddenCase[] = readdirSync(hiddenDir)
-    .filter((name) => name.endsWith(".yaml"))
-    .sort()
-    .map((fileName) => {
-      const raw = matter.engines.yaml.parse(
-        readFileSync(join(hiddenDir, fileName), "utf8")
-      ) as Record<string, unknown>
-      return {
-        id: fileName.replace(/\.yaml$/, ""),
-        humanName: raw.humanName as string,
-        tags: (raw.tags as string[]) ?? [],
-        kind: raw.kind as SealedHiddenCase["kind"],
-        input: raw.input,
-        expected: raw.expected,
-        entryPoint: raw.entryPoint as SealedHiddenCase["entryPoint"],
-      }
-    })
-
-  const rubricRaw = matter.engines.yaml.parse(
-    readFileSync(join(MER_101_DIR, "rubric.yaml"), "utf8")
-  ) as SealedTicketContent["rubric"]
-
-  return {
-    workbookId: "meridian",
-    ticketKey: TICKET_KEY,
-    hiddenCases,
-    adversaryFiles: [],
-    review: null,
-    authorBrief: null,
-    referenceDiff: readFileSync(join(MER_101_DIR, "reference.diff"), "utf8"),
-    rubric: rubricRaw,
-  }
-}
-
-// MER-101 is authored entirely as io-cases (confirmed: all four tests/hidden/*.yaml files declare
-// `kind: io-case`, zero `kind: probe`) -- asserted directly in the first attempt-flow test below.
 
 function seedRun(runId: string, userId: string) {
   h.store.set(`sprintLabRuns/${runId}`, {
     userId,
-    workbookId: "meridian",
+    workbookId: WORKBOOK_ID,
     contentVersion: "v1",
     currentSprint: 1,
     board: {},
@@ -400,26 +327,25 @@ describe("MER-101 provisioning: zero leaks in the learner's own bundle", () => {
 
 // ============================================================
 // Gates 2-4 + retro: open -> the real io-case executor over the GREEN tree -> server-side
-// hidden-gate comparison -> finalize -> retro read.
+// hidden-gate comparison -> finalize -> retro read. getTicket/loadSealedTicket are called for
+// real (MER-101 is genuinely compiled into both registries -- see file header); only Firestore,
+// logger, and usage-tracking are mocked.
 // ============================================================
 describe("MER-101 attempt flow: open -> io-case executor -> complete -> finalize -> retro", () => {
   const USER = "user_mer_101_e2e_test"
 
   beforeEach(() => {
     h.reset()
-    contentMocks.getTicket.mockReset().mockResolvedValue(loadMer101TicketFixture())
-    sealedMocks.loadSealedTicket.mockReset().mockResolvedValue(loadMer101SealedFixture())
     usageMocks.trackUsageEvent.mockReset().mockResolvedValue(true)
-    masteryMocks.recordSprintLabMastery.mockReset().mockResolvedValue(undefined)
   })
 
-  it("MER-101 is authored entirely as io-cases (no probes) -- confirms which hidden-gate channel this flow exercises", () => {
-    const sealed = loadMer101SealedFixture()
+  it("MER-101 is compiled into the real sealed registry, entirely as io-cases (no probes) -- confirms which hidden-gate channel this flow exercises", async () => {
+    const sealed = await requireMer101Sealed()
     expect(sealed.hiddenCases.length).toBe(4)
     expect(sealed.hiddenCases.every((c) => c.kind === "io-case")).toBe(true)
   })
 
-  it("the reference solution: opens, runs the REAL io-case executor against the GREEN materialized tree, completes with zero escapes, finalizes, and releases the retro data", async () => {
+  it("the reference solution: opens against the REAL content/sealed registries, runs the REAL io-case executor against the GREEN materialized tree, completes with zero escapes, finalizes, and releases the retro data", async () => {
     seedRun("run-happy", USER)
 
     const opened = await openSprintLabAttempt(USER, { runId: "run-happy", ticketKey: TICKET_KEY })
@@ -438,7 +364,7 @@ describe("MER-101 attempt flow: open -> io-case executor -> complete -> finalize
     let ioCaseOutputs: Record<string, unknown>
     try {
       const files = readAllFiles(green.ws)
-      const sealed = loadMer101SealedFixture()
+      const sealed = await requireMer101Sealed()
       const allIoCases = sealed.hiddenCases.map((c) => ({
         id: c.id,
         input: c.input,
@@ -496,7 +422,7 @@ describe("MER-101 attempt flow: open -> io-case executor -> complete -> finalize
 
   it("a wrong output for an issued io-case is named as an escaped defect by its real curated humanName", async () => {
     seedRun("run-escape", USER)
-    const sealed = loadMer101SealedFixture()
+    const sealed = await requireMer101Sealed()
     const opened = await openSprintLabAttempt(USER, { runId: "run-escape", ticketKey: TICKET_KEY })
     expect(opened.ioCases.length).toBeGreaterThan(0)
 
