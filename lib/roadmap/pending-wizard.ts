@@ -1,40 +1,74 @@
+import { z } from "zod"
+
 import type { CompanyId, RoadmapCategory, RoadmapMixMode } from "@/lib/data/company-questions/types"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
+
+// The pattern id gets only a string check here. The strict membership validator
+// (DSAPatternSchema) lives in lib/validations/api-schemas.ts, which imports
+// next/server and has no business in this client-bundled module; `/api/roadmap`
+// re-validates membership server-side on every replay anyway.
+const dsaPatternSchema = z.custom<DSAPattern>((value) => typeof value === "string")
+
+// Same trade for the company id: presence here, catalog membership at the two
+// places that act on it (the resume guard's getCompanyById check, the API).
+const companyIdSchema = z.custom<CompanyId>(
+  (value) => typeof value === "string" && value.length > 0
+)
 
 /**
  * The answers the roadmap wizard's skill-assessment step hands back. Canonical home of the
  * shape: `SkillAssessment` re-exports it, and `savePendingWizard` persists it, so the wizard
- * and the resume path can never drift apart.
+ * and the resume path can never drift apart. The type is derived from the schema below for
+ * the same reason: the validator IS the shape, so the two cannot disagree.
  */
-export interface AssessmentResult {
-  experienceLevel: "intern" | "beginner" | "intermediate" | "advanced"
-  targetTrack?: "swe" | "fdse"
-  problemsSolved: number
-  hoursPerDay: number
-  patternFamiliarity: {
-    pattern: DSAPattern
-    level: "unknown" | "seen" | "practiced" | "confident"
-  }[]
-  mixMode: RoadmapMixMode
-  selectedCategories?: RoadmapCategory[]
-}
+const assessmentResultSchema = z.object({
+  experienceLevel: z.enum(["intern", "beginner", "intermediate", "advanced"]),
+  targetTrack: z.enum(["swe", "fdse"]).optional(),
+  problemsSolved: z.number(),
+  hoursPerDay: z.number(),
+  patternFamiliarity: z.array(
+    z.object({
+      pattern: dsaPatternSchema,
+      level: z.enum(["unknown", "seen", "practiced", "confident"]),
+    })
+  ),
+  mixMode: z.enum(["full", "dsa-only", "custom"]) satisfies z.ZodType<RoadmapMixMode>,
+  selectedCategories: z
+    .array(
+      z.enum([
+        "dsa",
+        "bugfix",
+        "decomposition",
+        "system-design",
+      ]) satisfies z.ZodType<RoadmapCategory>
+    )
+    .optional(),
+})
+
+export type AssessmentResult = z.infer<typeof assessmentResultSchema>
 
 /** A finished wizard walk that could not generate yet: everything `/api/roadmap` needs. */
-export interface PendingWizard {
-  companyId: CompanyId
+const pendingWizardSchema = z.object({
+  companyId: companyIdSchema,
   /** ISO string, because this crosses JSON. */
-  interviewDate: string
-  result: AssessmentResult
-}
+  interviewDate: z
+    .string()
+    .refine((value) => !Number.isNaN(new Date(value).getTime()), "Unparseable interview date"),
+  result: assessmentResultSchema,
+})
 
-interface StoredEnvelope {
-  version: number
-  savedAt: number
-  wizard: PendingWizard
-}
+export type PendingWizard = z.infer<typeof pendingWizardSchema>
 
 const STORAGE_KEY = "cs-pending-roadmap-wizard"
 const VERSION = 1
+
+const storedEnvelopeSchema = z.object({
+  version: z.literal(VERSION),
+  savedAt: z.number(),
+  wizard: pendingWizardSchema,
+})
+
+type StoredEnvelope = z.infer<typeof storedEnvelopeSchema>
 
 /**
  * An hour: long enough for the sign-in or upgrade round trip the save exists for, short
@@ -59,8 +93,8 @@ export function savePendingWizard(wizard: PendingWizard, now: number = Date.now(
 
 /**
  * The saved walk, or null when there is none worth resuming. Anything expired, from another
- * version, or structurally broken is removed and reported as absent. The checks below are
- * crash-safety for JSON that this module wrote; they are not a trust boundary, because
+ * version, or structurally broken is removed and reported as absent. The schema parse is
+ * crash-safety for JSON that this module wrote; it is not a trust boundary, because
  * `/api/roadmap` re-validates everything server-side.
  */
 export function loadPendingWizard(now: number = Date.now()): PendingWizard | null {
@@ -69,29 +103,12 @@ export function loadPendingWizard(now: number = Date.now()): PendingWizard | nul
     const raw = window.sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return null
 
-    const envelope = JSON.parse(raw) as Partial<StoredEnvelope>
-    const wizard = envelope?.wizard
-    const intact =
-      envelope?.version === VERSION &&
-      typeof envelope.savedAt === "number" &&
-      now - envelope.savedAt <= PENDING_WIZARD_TTL_MS &&
-      typeof wizard?.companyId === "string" &&
-      wizard.companyId.length > 0 &&
-      typeof wizard.interviewDate === "string" &&
-      !Number.isNaN(new Date(wizard.interviewDate).getTime()) &&
-      typeof wizard.result === "object" &&
-      wizard.result !== null &&
-      typeof wizard.result.experienceLevel === "string" &&
-      typeof wizard.result.mixMode === "string" &&
-      typeof wizard.result.problemsSolved === "number" &&
-      typeof wizard.result.hoursPerDay === "number" &&
-      Array.isArray(wizard.result.patternFamiliarity)
-
-    if (!intact) {
+    const parsed = storedEnvelopeSchema.safeParse(JSON.parse(raw))
+    if (!parsed.success || now - parsed.data.savedAt > PENDING_WIZARD_TTL_MS) {
       clearPendingWizard()
       return null
     }
-    return wizard as PendingWizard
+    return parsed.data.wizard
   } catch {
     clearPendingWizard()
     return null

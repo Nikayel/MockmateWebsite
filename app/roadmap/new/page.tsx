@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { ChevronLeft, AlertCircle, RefreshCw, Crown, ArrowRight } from "lucide-react"
 import { Sparra } from "@/components/brand/Sparra"
+import { SparraLoader } from "@/components/brand/SparraLoader"
 import { AnimatedEllipsis } from "@/components/brand/AnimatedEllipsis"
 import Link from "next/link"
 
@@ -58,7 +59,15 @@ export default function NewRoadmapPage() {
   }
 
   const generateRoadmap = useCallback(
-    async (result: AssessmentResult, companyId: CompanyId, interviewDate: Date) => {
+    async (
+      result: AssessmentResult,
+      companyId: CompanyId,
+      interviewDate: Date,
+      // True when this call replays a walk restored from sessionStorage. The Pro wall
+      // saves the walk only for a NOT-fromResume call: a resumed walk that walls again
+      // must not re-save, or it would loop forever (see the PRO_REQUIRED branch).
+      fromResume: boolean
+    ) => {
       if (!firebaseUser) {
         setError(AUTH_REQUIRED_ERROR)
         setStep("assessment")
@@ -101,16 +110,39 @@ export default function NewRoadmapPage() {
           if (errorData.code === "PRO_REQUIRED") {
             // The walk is done and only the plan is gated: keep the finished walk through the
             // upgrade round trip the same way savePendingWizard keeps it through sign-in.
-            savePendingWizard({
-              companyId,
-              interviewDate: interviewDate.toISOString(),
-              result,
-            })
+            // Only on a DIRECT wall hit, though. A resumed walk that walls again must not
+            // re-save: for a free signed-in user, every re-save means every /roadmap/new
+            // visit inside the TTL auto-fires a doomed generation, re-lands here, and
+            // refreshes the TTL — a lockout loop. Skipping the save on resume caps the
+            // loop at one extra visit (plus the "Start over" escape on the wall itself).
+            if (!fromResume) {
+              savePendingWizard({
+                companyId,
+                interviewDate: interviewDate.toISOString(),
+                result,
+              })
+            }
             // Brief delay so user sees the generation started
             await new Promise((resolve) => setTimeout(resolve, 1500))
             setError("PRO_REQUIRED")
             setIsGenerating(false)
             // Stay on generating step - don't go back to assessment
+            return
+          }
+          if (response.status === 401) {
+            // The server refused the token even though the client believed it was signed in
+            // (expired/revoked session, clock skew). Throwing would surface a raw error and
+            // lose the finished walk. Park it instead, exactly like the signed-out path:
+            // save the walk — always, even on a resume, because the visitor needs it to
+            // survive the sign-in round trip — and show the auth banner, whose
+            // isAuthRequired check renders the "Sign in to continue" link.
+            savePendingWizard({
+              companyId,
+              interviewDate: interviewDate.toISOString(),
+              result,
+            })
+            setError(AUTH_REQUIRED_ERROR)
+            setStep("assessment")
             return
           }
           throw new Error(errorData.error || "Failed to create roadmap")
@@ -145,12 +177,32 @@ export default function NewRoadmapPage() {
   // On arrival, either resume a finished walk or start clean. Resume exists for the visitor
   // who completed all three steps, hit the sign-in (or Pro) wall, and came back through a
   // full-page round trip: their answers are in sessionStorage, so they go straight to
-  // generation instead of re-walking the steps. Decided once per visit, after auth settles,
-  // so a signed-in return never flashes the company step first.
-  const resumeDecidedRef = useRef(false)
+  // generation instead of re-walking the steps.
+  //
+  // The decision gates rendering: until it runs, `wizardReady` is false and the step region
+  // shows a loader, so nothing is interactive while the reset/resume below is still pending
+  // and the deferred reset is unobservable. It is normally decided once per visit, after
+  // auth settles — with one deliberate exception. The auth provider force-settles
+  // `authLoading` after a 2s safety timeout even when Firebase has not answered yet, so a
+  // slow session restore can first report "signed out" and deliver the user moments later.
+  // When that happens before the visitor has touched anything, the decision upgrades ONCE
+  // to signed-in, so a saved walk still resumes now instead of stranding in sessionStorage
+  // to auto-fire as a surprise on some later visit. The ref therefore records WHAT was
+  // decided for ("signed-in" | "signed-out"), not just that a decision happened.
+  const [wizardReady, setWizardReady] = useState(false)
+  const resumeDecidedRef = useRef<"signed-in" | "signed-out" | null>(null)
   useEffect(() => {
-    if (authLoading || resumeDecidedRef.current) return
-    resumeDecidedRef.current = true
+    if (authLoading) return
+    if (resumeDecidedRef.current === "signed-in") return
+    if (resumeDecidedRef.current === "signed-out") {
+      // Re-decide only for the late-arriving sign-in described above, and only while the
+      // visitor has not advanced: yanking a wizard someone is already walking would be worse
+      // than letting the saved walk wait for its normal resume on the next visit.
+      const hasAdvanced = step !== "company" || !!selectedCompany || !!selectedDate
+      if (!firebaseUser || hasAdvanced) return
+    }
+    resumeDecidedRef.current = user?.id && firebaseUser ? "signed-in" : "signed-out"
+    setWizardReady(true)
 
     const pending = user?.id && firebaseUser ? loadPendingWizard() : null
     if (!pending) {
@@ -170,12 +222,24 @@ export default function NewRoadmapPage() {
     }
 
     // Single shot: cleared before the attempt so a failure cannot loop. The one retryable
-    // outcome, the Pro gate, saves the walk again itself inside generateRoadmap.
+    // outcome, the Pro gate, saves the walk again itself inside generateRoadmap — and only
+    // when the walk was NOT already a resume, which caps the Pro-wall loop at one visit.
     clearPendingWizard()
     selectCompany(pending.companyId)
     selectDate(new Date(pending.interviewDate))
-    void generateRoadmap(pending.result, pending.companyId, new Date(pending.interviewDate))
-  }, [authLoading, user, firebaseUser, resetWizard, selectCompany, selectDate, generateRoadmap])
+    void generateRoadmap(pending.result, pending.companyId, new Date(pending.interviewDate), true)
+  }, [
+    authLoading,
+    user,
+    firebaseUser,
+    step,
+    selectedCompany,
+    selectedDate,
+    resetWizard,
+    selectCompany,
+    selectDate,
+    generateRoadmap,
+  ])
 
   const handleAssessmentComplete = async (result: AssessmentResult) => {
     if (!selectedCompany || !selectedDate) return
@@ -193,7 +257,7 @@ export default function NewRoadmapPage() {
       return
     }
 
-    await generateRoadmap(result, selectedCompany, selectedDate)
+    await generateRoadmap(result, selectedCompany, selectedDate, false)
   }
 
   const handleBack = () => {
@@ -334,132 +398,155 @@ export default function NewRoadmapPage() {
           </motion.div>
         )}
 
-        {/* Step content */}
+        {/* Step content. Held on a loader until the resume decision above has run, so the
+            visitor can never interact with a wizard that is about to be reset or resumed. */}
         <div className="mx-auto max-w-4xl">
-          <AnimatePresence mode="wait">
-            {step === "company" && (
-              <motion.div
-                key="company"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-              >
-                <CompanySelector onSelect={handleCompanySelect} selectedCompany={selectedCompany} />
-              </motion.div>
-            )}
+          {!wizardReady && <SparraLoader label="Loading" />}
+          {wizardReady && (
+            <AnimatePresence mode="wait">
+              {step === "company" && (
+                <motion.div
+                  key="company"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                >
+                  <CompanySelector
+                    onSelect={handleCompanySelect}
+                    selectedCompany={selectedCompany}
+                  />
+                </motion.div>
+              )}
 
-            {step === "date" && selectedCompany && (
-              <motion.div
-                key="date"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="mx-auto max-w-lg"
-              >
-                <InterviewDatePicker
-                  companyId={selectedCompany}
-                  onSelect={handleDateSelect}
-                  selectedDate={selectedDate}
-                />
-                {selectedDate && (
-                  <div className="mt-6 flex justify-center">
-                    <button
-                      onClick={() => setStep("assessment")}
-                      className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg px-6 py-3 font-medium transition-colors"
+              {step === "date" && selectedCompany && (
+                <motion.div
+                  key="date"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="mx-auto max-w-lg"
+                >
+                  <InterviewDatePicker
+                    companyId={selectedCompany}
+                    onSelect={handleDateSelect}
+                    selectedDate={selectedDate}
+                  />
+                  {selectedDate && (
+                    <div className="mt-6 flex justify-center">
+                      <button
+                        onClick={() => setStep("assessment")}
+                        className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg px-6 py-3 font-medium transition-colors"
+                      >
+                        Continue to Assessment
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {step === "assessment" && (
+                <motion.div
+                  key="assessment"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="mx-auto max-w-2xl"
+                >
+                  <SkillAssessment onComplete={handleAssessmentComplete} onBack={handleBack} />
+                </motion.div>
+              )}
+
+              {step === "generating" && (
+                <motion.div
+                  key="generating"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="py-16 text-center"
+                >
+                  {isProRequired ? (
+                    // Show Pro upgrade prompt on generating step
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mx-auto max-w-lg"
                     >
-                      Continue to Assessment
-                    </button>
-                  </div>
-                )}
-              </motion.div>
-            )}
-
-            {step === "assessment" && (
-              <motion.div
-                key="assessment"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="mx-auto max-w-2xl"
-              >
-                <SkillAssessment onComplete={handleAssessmentComplete} onBack={handleBack} />
-              </motion.div>
-            )}
-
-            {step === "generating" && (
-              <motion.div
-                key="generating"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="py-16 text-center"
-              >
-                {isProRequired ? (
-                  // Show Pro upgrade prompt on generating step
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mx-auto max-w-lg"
-                  >
-                    <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-orange-500">
-                      <Crown className="h-10 w-10 text-white" />
-                    </div>
-                    <h2 className="text-foreground mb-3 text-2xl font-bold">
-                      Unlock Your Personalized Roadmap
-                    </h2>
-                    <p className="text-muted-foreground mx-auto mb-6 max-w-md">
-                      We've analyzed {companyData?.name || "your target company"}'s interview
-                      patterns and prepared a custom study plan. Upgrade to Pro to access your
-                      personalized roadmap with:
-                    </p>
-                    <div className="mx-auto mb-8 grid max-w-md grid-cols-1 gap-3 text-left sm:grid-cols-2">
-                      <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                        <span className="text-green-500">✓</span> Company-specific questions
+                      <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-orange-500">
+                        <Crown className="h-10 w-10 text-white" />
                       </div>
-                      <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                        <span className="text-green-500">✓</span> Daily practice schedules
+                      <h2 className="text-foreground mb-3 text-2xl font-bold">
+                        Unlock Your Personalized Roadmap
+                      </h2>
+                      <p className="text-muted-foreground mx-auto mb-6 max-w-md">
+                        We've analyzed {companyData?.name || "your target company"}'s interview
+                        patterns and prepared a custom study plan. Upgrade to Pro to access your
+                        personalized roadmap with:
+                      </p>
+                      <div className="mx-auto mb-8 grid max-w-md grid-cols-1 gap-3 text-left sm:grid-cols-2">
+                        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                          <span className="text-green-500">✓</span> Company-specific questions
+                        </div>
+                        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                          <span className="text-green-500">✓</span> Daily practice schedules
+                        </div>
+                        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                          <span className="text-green-500">✓</span> Spaced repetition tracking
+                        </div>
+                        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                          <span className="text-green-500">✓</span> Pattern mastery insights
+                        </div>
                       </div>
-                      <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                        <span className="text-green-500">✓</span> Spaced repetition tracking
+                      <div className="flex flex-col justify-center gap-3 sm:flex-row">
+                        <Link
+                          href="/upgrade"
+                          className="bg-accent text-accent-foreground hover:bg-accent/90 inline-flex items-center justify-center gap-2 rounded-lg px-6 py-3 font-semibold shadow-lg transition-all"
+                        >
+                          Upgrade to Pro
+                          <ArrowRight className="h-4 w-4" />
+                        </Link>
+                        <Link
+                          href="/dashboard"
+                          className="text-muted-foreground hover:text-foreground inline-flex items-center justify-center px-6 py-3 transition-colors"
+                        >
+                          Continue with Free
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // The quiet exit from the wall: abandon the parked walk (saved
+                            // answers included) and hand back a blank wizard. Without it,
+                            // the saved walk's only outcomes are upgrade or leave-and-wall-
+                            // again on the next visit inside the TTL.
+                            clearPendingWizard()
+                            resetWizard()
+                            setError(null)
+                            setStep("company")
+                          }}
+                          className="text-muted-foreground hover:text-foreground inline-flex items-center justify-center px-6 py-3 transition-colors"
+                        >
+                          Start over
+                        </button>
                       </div>
-                      <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                        <span className="text-green-500">✓</span> Pattern mastery insights
+                    </motion.div>
+                  ) : (
+                    // Show loading state
+                    <>
+                      <div className="mb-6 flex justify-center" role="status">
+                        <Sparra state="thinking" size={64} label="Creating your roadmap" />
                       </div>
-                    </div>
-                    <div className="flex flex-col justify-center gap-3 sm:flex-row">
-                      <Link
-                        href="/upgrade"
-                        className="bg-accent text-accent-foreground hover:bg-accent/90 inline-flex items-center justify-center gap-2 rounded-lg px-6 py-3 font-semibold shadow-lg transition-all"
-                      >
-                        Upgrade to Pro
-                        <ArrowRight className="h-4 w-4" />
-                      </Link>
-                      <Link
-                        href="/dashboard"
-                        className="text-muted-foreground hover:text-foreground inline-flex items-center justify-center px-6 py-3 transition-colors"
-                      >
-                        Continue with Free
-                      </Link>
-                    </div>
-                  </motion.div>
-                ) : (
-                  // Show loading state
-                  <>
-                    <div className="mb-6 flex justify-center" role="status">
-                      <Sparra state="thinking" size={64} label="Creating your roadmap" />
-                    </div>
-                    <h2 className="text-foreground mb-2 text-2xl font-bold">
-                      Creating Your Personalized Roadmap
-                      <AnimatedEllipsis />
-                    </h2>
-                    <p className="text-muted-foreground mx-auto max-w-md">
-                      We're analyzing {companyData?.name || "company"} interview patterns and
-                      building a study plan tailored to your timeline and skill level...
-                    </p>
-                  </>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                      <h2 className="text-foreground mb-2 text-2xl font-bold">
+                        Creating Your Personalized Roadmap
+                        <AnimatedEllipsis />
+                      </h2>
+                      <p className="text-muted-foreground mx-auto max-w-md">
+                        We're analyzing {companyData?.name || "company"} interview patterns and
+                        building a study plan tailored to your timeline and skill level...
+                      </p>
+                    </>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )}
         </div>
       </div>
     </div>

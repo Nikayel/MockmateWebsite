@@ -83,6 +83,10 @@ describe("savePendingWizard / loadPendingWizard", () => {
       "patternFamiliarity not an array",
       { ...wizard, result: { ...wizard.result, patternFamiliarity: {} } },
     ],
+    // Enum membership, not just string-ness: the zod schema rejects values outside
+    // the declared unions, so a hand-edited or version-skewed walk cannot replay a
+    // mixMode the API has never heard of.
+    ["mixMode outside the enum", { ...wizard, result: { ...wizard.result, mixMode: "yolo" } }],
   ])("rejects a misshapen walk (%s) and clears it", (_name, broken) => {
     window.sessionStorage.setItem(
       STORAGE_KEY,

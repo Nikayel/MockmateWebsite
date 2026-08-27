@@ -1968,13 +1968,22 @@ function InterviewPageContent() {
     return <SparraLoader fullPage label="Loading interview…" />
   }
 
+  // One eligibility formula for the roadmap pitch, used by both the null-return
+  // gate below and the ScenarioBrowser prop. Resolved by the time either reads
+  // it: isLoading only flips false after useSessionReopen's auth check runs. A
+  // fresh-trial guest is in guest mode by then and is deliberately NOT
+  // pitch-eligible: they get the track cards and run their session like before,
+  // scores waiting behind sign-up. Only the spent-trial signed-out visitor, who
+  // cannot practice anyway, gets the roadmap pitch.
+  const roadmapPitchEligible = !firebaseUser && !isGuestMode
+
   // Allow both authenticated users and guest mode. One more state renders: a
   // signed-out visitor whose trial is spent, parked on the bare landing.
   // useSessionReopen no longer bounces that state to /login (nothing on the
   // bare address consumes anything), so the browser renders and shows them the
   // roadmap pitch instead of a blank page. Any address that names real work
   // still redirects before isLoading clears, so this never exposes a session.
-  if (!user && !isGuestMode && !showsRoadmapPitch(searchParams, !firebaseUser && !isGuestMode)) {
+  if (!user && !isGuestMode && !showsRoadmapPitch(searchParams, roadmapPitchEligible)) {
     return null
   }
 
@@ -2039,13 +2048,9 @@ function InterviewPageContent() {
           usageLimit={usageLimit}
           completedProblems={completedProblems}
           hasGuestBanner={isGuestMode && !showFeedback}
-          // Resolved by the time this renders: isLoading only flips false after
-          // useSessionReopen's auth check runs. A fresh-trial guest is in guest
-          // mode by then and is deliberately NOT pitch-eligible: they get the
-          // track cards and run their session like before, scores waiting
-          // behind sign-up. Only the spent-trial signed-out visitor, who cannot
-          // practice anyway, gets the roadmap pitch.
-          roadmapPitchEligible={!firebaseUser && !isGuestMode}
+          // Same formula as the null-return gate above; see the hoisted const
+          // for why a fresh-trial guest is deliberately NOT pitch-eligible.
+          roadmapPitchEligible={roadmapPitchEligible}
         />
       )}
 
