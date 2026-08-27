@@ -18,6 +18,7 @@
  */
 
 import type { TicketSecretKind } from "@/lib/sprint-labs/types"
+import type { PgSuiteAssertion } from "@/lib/workspace-execution/pg-sandbox/types"
 
 /**
  * One hidden test's SEALED half. `humanName`/`tags`/`kind` are duplicated
@@ -97,6 +98,28 @@ export interface SealedFile {
 }
 
 /**
+ * One SQL-routed ticket's hidden assertion, SEALED. The sql-routed analog of `SealedHiddenCase`,
+ * authored under `tests/hidden/*.yaml` with `kind: sql-assertion` -- the sealed SQL-hidden-test
+ * subsystem this type exists to support (see schemas.ts's `sealedSqlHiddenAssertionSchema` for the
+ * authoring-side validator, and scripts/compile-workbooks.mjs's SECRET_FIELDS for why `sql`/`expect`
+ * must never reach a public emit).
+ *
+ * NOT folded into `SealedHiddenCase`/`hiddenCases`: that shape's `kind` is `TicketSecretKind`
+ * (io-case | probe only, `lib/sprint-labs/types.ts`), and unlike io-case/probe -- whose {id,
+ * humanName, tags, kind} DOES ship publicly via `ticketSecretMetaSchema` -- a SQL hidden assertion
+ * never joins the public `hiddenTests` metadata array at all (the compiler skips that schema
+ * entirely for this kind), so it needs no shared `kind` enum to extend and gets its own array here
+ * instead.
+ */
+export interface SealedSqlHiddenAssertion {
+  id: string
+  humanName: string
+  tags: string[]
+  sql: string
+  expect: PgSuiteAssertion["expect"]
+}
+
+/**
  * The full sealed bundle for one ticket. `review` and `authorBrief` are
  * null when the ticket authored no `review.yaml` / `author_brief.yaml`.
  */
@@ -109,4 +132,13 @@ export interface SealedTicketContent {
   authorBrief: SealedAuthorBrief | null
   referenceDiff: string
   rubric: SealedRubric
+  /**
+   * SQL-routed hidden assertions (the sealed SQL-hidden-test subsystem). Optional, matching
+   * `TicketPublic.playable`'s own precedent: every hand-built `SealedTicketContent` literal
+   * predating this field (e.g. lib/sprint-labs/grading's attempts-service test fixtures) must keep
+   * parsing without an edit. `scripts/compile-workbooks.mjs`, the only real producer going forward,
+   * always sets this explicitly (`[]` when the ticket authors no `tests/hidden/*.yaml` file with
+   * `kind: sql-assertion`), so no genuinely compiled content ever leaves it unset.
+   */
+  sqlHiddenAssertions?: SealedSqlHiddenAssertion[]
 }

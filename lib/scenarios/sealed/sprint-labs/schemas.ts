@@ -125,3 +125,42 @@ export const sealedProbePayloadSchema = z.object({
   body: z.string().min(1, "a probe's body must be non-empty runnable assertion source"),
 })
 export type SealedProbePayload = z.infer<typeof sealedProbePayloadSchema>
+
+// ============================================================
+// SQL hidden-test payload (the sealed SQL-hidden-test subsystem). Authored
+// under `tests/hidden/*.yaml` with `kind: sql-assertion`, exactly like an
+// io-case/probe hidden test -- but this kind is NOT added to
+// `ticketSecretKindSchema` (lib/sprint-labs/types.ts), because unlike
+// io-case/probe it never joins the public `hiddenTests` metadata array at
+// all: the compiler skips `ticketSecretMetaSchema` entirely for this kind
+// (see compile-workbooks.mjs's tests/hidden loop), so nothing about a SQL
+// hidden assertion -- not its id, humanName, tags, or existence -- reaches
+// the public bundle. This is the fix for the S3 review's Critical finding:
+// SQL tickets previously had NO sealed hidden-test mechanism at all, so a
+// hidden assertion's `sql`/`expect` had to live inside
+// `tests/visible/*.pgsuite.yaml` (a "hidden-" id PREFIX was the only signal,
+// enforced by convention, not by the compiler), which the compiler ships
+// verbatim into the PUBLIC bundle. `tests/hidden/` is the sealed location;
+// this schema is what validates an authored entry there.
+// ============================================================
+
+/**
+ * Mirrors `lib/workspace-execution/pg-sandbox/types.ts`'s `PgSuiteAssertion["expect"]` union
+ * exactly (a bare "zero-rows" sentinel, a positional `{rows}` literal, a bare "raises" sentinel, or
+ * `{raises: <substring>}`) -- redefined here as a runtime Zod validator (that file is types-only, no
+ * runtime schema) rather than imported, since compiling an authored ticket needs to VALIDATE a
+ * value at compile time, not just describe one already trusted.
+ */
+const pgSuiteExpectSchema = z.union([
+  z.literal("zero-rows"),
+  z.object({ rows: z.array(z.array(z.unknown())) }).strict(),
+  z.literal("raises"),
+  z.object({ raises: z.string().min(1) }).strict(),
+])
+
+export const sealedSqlHiddenAssertionSchema = z.object({
+  humanName: z.string().min(1, "a SQL hidden assertion needs a humanName"),
+  sql: z.string().min(1, "a SQL hidden assertion's sql must be non-empty runnable SQL"),
+  expect: pgSuiteExpectSchema,
+})
+export type SealedSqlHiddenAssertionPayload = z.infer<typeof sealedSqlHiddenAssertionSchema>
