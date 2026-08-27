@@ -216,7 +216,7 @@ export function PricingPageClient({ faqs, courses, children }: PricingPageClient
                       })
                     }
                   >
-                    Start practicing free
+                    Start free
                   </Link>
                 </Button>
 
