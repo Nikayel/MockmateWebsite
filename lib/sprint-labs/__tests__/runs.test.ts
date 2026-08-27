@@ -143,22 +143,41 @@ vi.mock("@/lib/logger", () => ({
  * test should not break if that content changes shape, and it lets every
  * existing fixture below keep using "meridian"/"MER-*" without rewriting them
  * against "fixture-demo"/"DEMO-*".
+ *
+ * Every stub is `async` (fix round 2, OPEN 1): the real
+ * `getSprint`/`getTicket` return Promises (lazy dynamic-import content
+ * loading), and `requireKnownWorkbookAndTickets` used to call them
+ * synchronously — `!aPromise` is always `false`, so the "unknown" branches
+ * never fired in production, but a plain-synchronous mock here made every
+ * assertion pass anyway and hid it. Stubbing these as `async function`s
+ * (real Promises, not synchronous values) is what makes this test file
+ * exercise the actual contract instead of masking a missing `await` again.
  */
 const KNOWN_WORKBOOK_ID = "meridian"
 const KNOWN_SPRINTS = new Set([1, 2])
 const KNOWN_TICKET_KEYS = new Set(["MER-101", "MER-102", "MER-201", "MER-202"])
-vi.mock("@/lib/sprint-labs/content/registry", () => ({
-  getWorkbookSummary: (workbookId: string) =>
-    workbookId === KNOWN_WORKBOOK_ID ? { id: workbookId } : undefined,
-  getSprint: (workbookId: string, sprintNumber: number) =>
-    workbookId === KNOWN_WORKBOOK_ID && KNOWN_SPRINTS.has(sprintNumber)
-      ? { number: sprintNumber }
-      : undefined,
-  getTicket: (workbookId: string, ticketKey: string) =>
-    workbookId === KNOWN_WORKBOOK_ID && KNOWN_TICKET_KEYS.has(ticketKey)
-      ? { key: ticketKey }
-      : undefined,
+// vi.fn()-wrapped (not plain arrow functions) so a specific test can override
+// one call's resolution timing with mockImplementationOnce — see the
+// deliberately macrotask-delayed regression test below.
+const registryMocks = vi.hoisted(() => ({
+  getWorkbookSummary: vi.fn(),
+  getSprint: vi.fn(),
+  getTicket: vi.fn(),
 }))
+registryMocks.getWorkbookSummary.mockImplementation(async (workbookId: string) =>
+  workbookId === KNOWN_WORKBOOK_ID ? { id: workbookId } : undefined
+)
+registryMocks.getSprint.mockImplementation(async (workbookId: string, sprintNumber: number) =>
+  workbookId === KNOWN_WORKBOOK_ID && KNOWN_SPRINTS.has(sprintNumber)
+    ? { number: sprintNumber }
+    : undefined
+)
+registryMocks.getTicket.mockImplementation(async (workbookId: string, ticketKey: string) =>
+  workbookId === KNOWN_WORKBOOK_ID && KNOWN_TICKET_KEYS.has(ticketKey)
+    ? { key: ticketKey }
+    : undefined
+)
+vi.mock("@/lib/sprint-labs/content/registry", () => registryMocks)
 
 import {
   SPRINT_LAB_RUN_ERRORS,
@@ -292,6 +311,27 @@ describe("createSprintLabRun", () => {
         workbookId: "meridian",
         contentVersion: "v1",
         ticketKeys: ["MER-101", "MER-FORGED"],
+      })
+    ).rejects.toThrow(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+  })
+
+  // Fix round 2, OPEN 1 regression: requireKnownWorkbookAndTickets used to
+  // call getTicket synchronously (`if (!getTicket(...))`), which is always
+  // false on a Promise, so this branch never fired in production even though
+  // it was covered by the test above — a plain synchronous mock made
+  // "!examplePromise" moot by never producing a Promise in the first place.
+  // Forcing THIS call's resolution onto a real macrotask (setTimeout, not
+  // just an already-queued microtask) proves the validator genuinely awaits
+  // the registry rather than happening to work by synchronous coincidence.
+  it("rejects a fabricated ticket key even when the registry resolves on a later tick (regression: must await, not synchronously truth-test, a Promise)", async () => {
+    registryMocks.getTicket.mockImplementationOnce(
+      () => new Promise((resolve) => setTimeout(() => resolve(undefined), 0))
+    )
+    await expect(
+      createSprintLabRun(USER, {
+        workbookId: "meridian",
+        contentVersion: "v1",
+        ticketKeys: ["MER-DELAYED-FORGED"],
       })
     ).rejects.toThrow(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
   })

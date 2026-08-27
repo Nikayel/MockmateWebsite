@@ -226,8 +226,16 @@ async function requireOwnedRun(userId: string, runId: string): Promise<StoredSpr
  * 2026-08-26, M8) — reads (`listWorkspaceFiles`, `getSprintLabRun`) stay on
  * the plain `requireOwnedRun`/no-check path, since viewing a finished run's
  * final state (retro/summary) must keep working.
+ *
+ * Exported (fix round 2, OPEN 2): the route needs to run this SAME check
+ * ahead of spending quota on a sprint advance, so an invalid/inactive-run
+ * request never burns a session before being rejected. See
+ * `app/api/sprint-labs/runs/route.ts`'s PATCH advance-sprint handler.
  */
-async function requireOwnedActiveRun(userId: string, runId: string): Promise<StoredSprintLabRun> {
+export async function requireOwnedActiveRun(
+  userId: string,
+  runId: string
+): Promise<StoredSprintLabRun> {
   const run = await requireOwnedRun(userId, runId)
   if (run.status !== "in_progress") throw new Error(SPRINT_LAB_RUN_ERRORS.RUN_NOT_ACTIVE)
   return run
@@ -240,24 +248,42 @@ async function requireOwnedActiveRun(userId: string, runId: string): Promise<Sto
  * gap where a client could forge an arbitrary board with made-up ticket keys
  * or advance into a workbook/sprint that was never authored.
  *
- * Known limitation: `lib/sprint-labs/content/registry.ts` (Task 2) indexes
- * tickets by key across the whole workbook (`ticketsByKey`), not per sprint —
- * there is no exposed "ticket keys for sprint N" lookup. `getTicket` here
- * therefore confirms a ticket exists SOMEWHERE in the compiled workbook, not
- * that it belongs to exactly `sprintNumber`. Tightening this to an exact
- * per-sprint set needs a Task-2-owned registry addition; noted in the fix
- * report rather than forked around here.
+ * `lib/sprint-labs/content/registry.ts`'s `getSprint`/`getTicket` are async
+ * (they lazy-load a workbook's compiled content behind a dynamic import;
+ * `getWorkbookSummary` is not, today, but is awaited here too so this
+ * function does not silently break if that changes). Fix round 2, OPEN 1:
+ * an earlier version of this function called them synchronously — `!aPromise`
+ * is always `false`, so the "unknown workbook/sprint/ticket" branches never
+ * fired in production even though the unit tests (which stubbed the registry
+ * as plain synchronous functions) passed. Every call is now properly
+ * `await`ed, and the test mocks were fixed to return Promises so a
+ * regression here would fail the tests again.
+ *
+ * Known limitation: the registry indexes tickets by key across the whole
+ * workbook (`ticketsByKey`), not per sprint — there is no exposed "ticket
+ * keys for sprint N" lookup. `getTicket` here therefore confirms a ticket
+ * exists SOMEWHERE in the compiled workbook, not that it belongs to exactly
+ * `sprintNumber`. Tightening this to an exact per-sprint set needs a
+ * Task-2-owned registry addition; noted in the fix report rather than forked
+ * around here.
+ *
+ * Exported (fix round 2, OPEN 2): needed at the route layer for the same
+ * pre-quota validation reason as `requireOwnedActiveRun` above.
  */
-function requireKnownWorkbookAndTickets(
+export async function requireKnownWorkbookAndTickets(
   workbookId: string,
   sprintNumber: number,
   ticketKeys: string[]
-): void {
-  if (!getWorkbookSummary(workbookId)) throw new Error(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
-  if (!getSprint(workbookId, sprintNumber)) throw new Error(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
-  for (const key of ticketKeys) {
-    if (!getTicket(workbookId, key)) throw new Error(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
-  }
+): Promise<void> {
+  const [summary, sprint] = await Promise.all([
+    getWorkbookSummary(workbookId),
+    getSprint(workbookId, sprintNumber),
+  ])
+  if (!summary) throw new Error(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+  if (!sprint) throw new Error(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+
+  const tickets = await Promise.all(ticketKeys.map((key) => getTicket(workbookId, key)))
+  if (tickets.some((ticket) => !ticket)) throw new Error(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
 }
 
 // ============================================================
@@ -330,7 +356,7 @@ export async function createSprintLabRun(
   // before this ever runs, so a stale/irrelevant ticketKeys array on a resume
   // call is never rejected for content it will never touch. A genuine create
   // always validates before anything is written.
-  requireKnownWorkbookAndTickets(workbookId, 1, ticketKeys)
+  await requireKnownWorkbookAndTickets(workbookId, 1, ticketKeys)
 
   const now = new Date().toISOString()
   const board = Object.fromEntries(ticketKeys.map((key) => [key, "todo" as const])) as Record<
@@ -375,7 +401,7 @@ export async function advanceSprintLabRun(
   if (toSprint !== run.currentSprint + 1) {
     throw new Error(SPRINT_LAB_RUN_ERRORS.INVALID_SPRINT_ADVANCE)
   }
-  requireKnownWorkbookAndTickets(run.workbookId, toSprint, ticketKeys)
+  await requireKnownWorkbookAndTickets(run.workbookId, toSprint, ticketKeys)
 
   const now = new Date().toISOString()
   const board = { ...run.board }
