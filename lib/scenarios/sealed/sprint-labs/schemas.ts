@@ -101,9 +101,23 @@ export type SealedRubricParsed = z.infer<typeof sealedRubricSchema>
 
 const definedValue = z.unknown().refine((v) => v !== undefined, { message: "value is required" })
 
+/**
+ * PLAN.md Task 7 review round 1, Critical 2: names the module + export `lab validate --dynamic`
+ * calls with `input` and compares against `expected`. OPTIONAL -- existing io-case content authored
+ * before this field existed (e.g. `_fixture-workbook`'s DEMO-102) must keep parsing; the dynamic
+ * gate treats an io-case with no `entryPoint` as an unverifiable hidden tier (see
+ * `SealedHiddenCase.entryPoint`'s own doc comment for the WARN/ERROR split).
+ */
+export const sealedEntryPointSchema = z.object({
+  module: z.string().min(1),
+  export: z.string().min(1),
+})
+export type SealedEntryPoint = z.infer<typeof sealedEntryPointSchema>
+
 export const sealedIoCasePayloadSchema = z.object({
   input: definedValue,
   expected: definedValue,
+  entryPoint: sealedEntryPointSchema.optional(),
 })
 export type SealedIoCasePayload = z.infer<typeof sealedIoCasePayloadSchema>
 

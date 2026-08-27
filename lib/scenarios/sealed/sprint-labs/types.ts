@@ -49,6 +49,16 @@ export interface SealedHiddenCase {
   input?: unknown
   /** io-case only. SECRET, period: the server-held comparison value. */
   expected?: unknown
+  /**
+   * io-case only, OPTIONAL. Names the module + export `lab validate --dynamic`'s CI replay calls
+   * with `input` to obtain the value compared against `expected` (PLAN.md Task 7 review round 1,
+   * Critical 2). Sealed: it does not reveal the reference implementation, but it does say WHICH
+   * export is under test, which is more than a learner is meant to know pre-submit. An io-case
+   * with no `entryPoint` cannot be dynamically verified at all -- the dynamic gate reports this as
+   * a WARN for `assisted` tickets, an ERROR for `unassisted`/`review-only` ones (a score-feeding
+   * ticket cannot ship an unverifiable hidden tier).
+   */
+  entryPoint?: { module: string; export: string }
   /** probe only. SECRET until submit: client-executed assertion source. */
   body?: string
 }

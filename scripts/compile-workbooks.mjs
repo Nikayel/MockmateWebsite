@@ -215,6 +215,10 @@ export const SECRET_FIELDS = new Set([
   "input",
   "body",
   "hiddenCases",
+  // io-case entryPoint (PLAN.md Task 7 review round 1, Critical 2) — names WHICH export is under
+  // test, more than a learner is meant to know pre-submit, even though it doesn't itself reveal
+  // the reference implementation.
+  "entryPoint",
   // adversary
   "adversaryFiles",
   // review.yaml
@@ -499,6 +503,7 @@ function compileTicket(ticketDir, ticketKey, workbookId, objectiveVocab) {
   for (const filePath of listYamlFiles(join(ticketDir, "tests/hidden"))) {
     const raw = readYaml(filePath)
     rejectWrongCasing(raw, filePath, "human_name", "humanName")
+    rejectWrongCasing(raw, filePath, "entry_point", "entryPoint")
     const id = basenameNoExt(filePath)
     const tags = raw.tags ?? []
     const metaParse = ticketSecretMetaSchema.safeParse({
@@ -511,7 +516,11 @@ function compileTicket(ticketDir, ticketKey, workbookId, objectiveVocab) {
     hiddenTests.push(metaParse.data)
 
     if (raw.kind === "io-case") {
-      const payloadParse = sealedIoCasePayloadSchema.safeParse({ input: raw.input, expected: raw.expected })
+      const payloadParse = sealedIoCasePayloadSchema.safeParse({
+        input: raw.input,
+        expected: raw.expected,
+        entryPoint: raw.entryPoint,
+      })
       if (!payloadParse.success) throw new CompileError(filePath, payloadParse.error)
       hiddenCases.push({
         id,
@@ -520,6 +529,9 @@ function compileTicket(ticketDir, ticketKey, workbookId, objectiveVocab) {
         kind: raw.kind,
         input: payloadParse.data.input,
         expected: payloadParse.data.expected,
+        ...(payloadParse.data.entryPoint !== undefined
+          ? { entryPoint: payloadParse.data.entryPoint }
+          : {}),
       })
     } else if (raw.kind === "probe") {
       const payloadParse = sealedProbePayloadSchema.safeParse({ body: raw.body })

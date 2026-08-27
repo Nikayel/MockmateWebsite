@@ -24,25 +24,45 @@
  *    to (node-harness.ts's `specialModules`), matching every observed probe body's own calling
  *    convention (`assert(cond, message)`).
  *
- * `kind: "io-case"` hidden tests are NOT bridged here. An io-case's `input`/`expected` (WORKBOOK-
- * SPEC.md §6) are opaque, per-ticket data with no declared callable to invoke them against --
- * EXECUTION-STATE.md's deviation D1 states plainly that no server-side io-case execution exists
- * ANYWHERE in this product yet (the client runs the learner's code and posts raw output; the server
- * only ever COMPARES, never executes -- see `lib/sprint-labs/grading/gate-runner.ts`). Inventing an
- * entry-point-guessing heuristic here would risk a WRONG-REASON failure (calling a real export with
- * nonsense arguments and reporting "reference doesn't go red->green" for a ticket whose reference is
- * actually correct) -- worse than an honest gap. `describeIoCaseGap` reports the gap as a named,
- * ticket-scoped finding instead of silently skipping or crashing; `red-green.ts` excludes these
- * cases from the pass/fail computation and surfaces the finding alongside the verdict.
+ * `kind: "io-case"` hidden tests are bridged ONLY when authored with an explicit `entryPoint`
+ * (`{module, export}` -- PLAN.md Task 7 review round 1, Critical 2). EXECUTION-STATE.md's
+ * deviation D1 ("no server-side execution yet") is about the LIVE product, where the client runs
+ * the learner's code and the server only ever compares, never executes (`lib/sprint-labs/grading/
+ * gate-runner.ts`). This CI replay gate is a different context: it ALREADY executes probe hidden
+ * tests via `runTsWorkspace` against the materialized reference solution, so calling a NAMED
+ * export with `input` and comparing to `expected` is exactly the same category of thing, not a
+ * new capability. What genuinely does NOT exist is an entry-point-GUESSING heuristic: without an
+ * authored `entryPoint`, there is no way to know which export an io-case's opaque `input`/
+ * `expected` shape is even meant to call, and guessing risks a WRONG-REASON failure (calling a
+ * real export with nonsense arguments and reporting "reference doesn't go red->green" for a
+ * ticket whose reference is actually correct) -- worse than an honest gap. `describeIoCaseGap`
+ * reports THAT gap (no `entryPoint` authored) as a named, ticket-scoped finding -- ERROR for a
+ * score-feeding policy (`unassisted`/`review-only`: a hidden tier that cannot be verified is not
+ * a shippable score-feeding tier), WARN for `assisted` (formative only, per WORKBOOK-SPEC.md §5).
+ *
+ * An io-case WITH an entryPoint is bridged the same way a probe is: a synthesized `.test.ts` file
+ * imports the named export (relative-path-computed from `tests/hidden/` to `entryPoint.module`,
+ * matching how a probe reuses the visible tests' own import depth) and asserts
+ * `assert.deepStrictEqual(await <export>(input), expected)`. `assert.deepStrictEqual` is the
+ * SAME comparator `public/workers/assert-shim.js` already implements (loaded via the identical
+ * `require("assert")` every probe uses) -- reusing it instead of duplicating
+ * `lib/sprint-labs/grading/deep-equal.ts`'s logic here, which cannot be imported into this
+ * sandboxed require-graph anyway (it only resolves paths inside the materialized workspace).
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs"
-import { join } from "node:path"
+import { join, posix } from "node:path"
 
 import type { TsWorkspaceFile } from "@/lib/workspace-execution/ts-workspace/types"
 
 import type { AuthoredHiddenTest, AuthoredTicket } from "../tree"
 import type { ValidationFinding } from "../types"
 import { toWorkspaceRelativePath } from "./git-workspace"
+
+/** The score-feeding `ai_policy` values WORKBOOK-SPEC.md §5 says are held to a higher bar: an
+ *  io-case with no `entryPoint` is an ERROR for these (not a WARN) because these are exactly the
+ *  attempts that feed the readiness score and escaped-defect rate -- an unverifiable hidden tier
+ *  on one of them is a content defect, not a formative gap. */
+const SCORE_FEEDING_AI_POLICIES = new Set(["unassisted", "review-only"])
 
 const NAMED_IMPORT_LINE = /^import\s*\{[^}]+\}\s*from\s*["'][^"']+["']\s*;?\s*$/
 
@@ -91,6 +111,62 @@ function collectNamedImportLines(files: TsWorkspaceFile[]): string[] {
   return lines
 }
 
+export interface EntryPointRef {
+  module: string
+  export: string
+}
+
+/** Reads and structurally validates `hidden.raw.entryPoint` -- the AUTHORED tree's copy of the
+ *  same optional field `lib/scenarios/sealed/sprint-labs/schemas.ts`'s `sealedEntryPointSchema`
+ *  now validates at compile time. Read directly here (not via the compiled bundle) for the same
+ *  reason every other io-case field is: this module reads the authoring tree directly. Returns
+ *  `null` for anything malformed (missing, wrong shape) rather than throwing -- a validation
+ *  concern for `lab validate`'s STATIC rules (out of this task's owned files), not a reason to
+ *  crash the dynamic gate. */
+export function readEntryPoint(hidden: AuthoredHiddenTest): EntryPointRef | null {
+  const raw = hidden.raw.entryPoint
+  if (!raw || typeof raw !== "object") return null
+  const record = raw as Record<string, unknown>
+  if (typeof record.module !== "string" || typeof record.export !== "string") return null
+  if (record.module.length === 0 || record.export.length === 0) return null
+  return { module: record.module, export: record.export }
+}
+
+/** Every synthesized hidden test file lives at `tests/hidden/<name>.test.ts` (2 segments deep,
+ *  matching `tests/visible/`'s own depth -- see the file header's note on why probe imports reuse
+ *  that depth verbatim). Computes the relative specifier from there to an entryPoint's `module`
+ *  path (extension stripped, since the require-graph re-keys every `.ts`/`.tsx` file to `.js`). */
+function computeRelativeImportPath(modulePath: string): string {
+  const withoutExt = modulePath.replace(/\.tsx?$/, "")
+  const rel = posix.relative("tests/hidden", withoutExt)
+  return rel.startsWith(".") ? rel : `./${rel}`
+}
+
+function synthesizeIoCaseTestFile(
+  hidden: AuthoredHiddenTest,
+  entryPoint: EntryPointRef
+): TsWorkspaceFile {
+  const humanName = hidden.humanName ?? hidden.fileName
+  const importPath = computeRelativeImportPath(entryPoint.module)
+  const path = `tests/hidden/${hidden.fileName}.test.ts`
+  const content = [
+    `import { describe, it } from "vitest"`,
+    `const assert = require("assert")`,
+    `import { ${entryPoint.export} } from "${importPath}"`,
+    ``,
+    `describe("hidden", () => {`,
+    `  it(${JSON.stringify(humanName)}, async () => {`,
+    `    const input = ${JSON.stringify(hidden.raw.input)}`,
+    `    const expected = ${JSON.stringify(hidden.raw.expected)}`,
+    `    const actual = await ${entryPoint.export}(input)`,
+    `    assert.deepStrictEqual(actual, expected)`,
+    `  })`,
+    `})`,
+    ``,
+  ].join("\n")
+  return { path, content }
+}
+
 function indentBody(body: string): string {
   return body
     .replace(/\n$/, "")
@@ -110,13 +186,20 @@ export interface HiddenTestBridgeResult {
   findings: ValidationFinding[]
 }
 
-function describeIoCaseGap(ticketKey: string, hidden: AuthoredHiddenTest): ValidationFinding {
+function describeIoCaseGap(
+  ticketKey: string,
+  hidden: AuthoredHiddenTest,
+  aiPolicy: string | undefined
+): ValidationFinding {
+  const scoreFeeding = aiPolicy !== undefined && SCORE_FEEDING_AI_POLICIES.has(aiPolicy)
   return {
     ruleId: "dynamic-hidden-test-not-executable",
-    severity: "warn",
+    severity: scoreFeeding ? "error" : "warn",
     ticketKey,
     path: hidden.path,
-    message: `io-case hidden test "${hidden.humanName ?? hidden.fileName}" has no dynamic-execution entry point convention yet (no server-side io-case execution exists anywhere in this product today -- EXECUTION-STATE.md deviation D1); excluded from the red/green gate.`,
+    message: scoreFeeding
+      ? `io-case hidden test "${hidden.humanName ?? hidden.fileName}" has no entryPoint authored, so its hidden tier cannot be dynamically verified -- a score-feeding ticket (ai_policy: "${aiPolicy}") cannot ship an unverifiable hidden tier. Author entryPoint: {module, export} on this hidden test's YAML.`
+      : `io-case hidden test "${hidden.humanName ?? hidden.fileName}" has no entryPoint authored; excluded from the red/green gate (formative only -- ai_policy: "${aiPolicy ?? "(none)"}").`,
   }
 }
 
@@ -146,7 +229,14 @@ export function bridgeHiddenTests(
 
   for (const hidden of ticket.hiddenTests) {
     if (hidden.kind === "io-case") {
-      findings.push(describeIoCaseGap(ticket.key, hidden))
+      const entryPoint = readEntryPoint(hidden)
+      if (!entryPoint) {
+        findings.push(describeIoCaseGap(ticket.key, hidden, ticket.aiPolicy))
+        continue
+      }
+      const file = synthesizeIoCaseTestFile(hidden, entryPoint)
+      files.push(file)
+      paths.push(file.path)
       continue
     }
 
