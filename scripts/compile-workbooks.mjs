@@ -643,7 +643,18 @@ function compileWorkbook(workbookDir) {
     }
     const sprintParse = sprintPublicSchema.safeParse(rawSprintResolved)
     if (!sprintParse.success) throw new CompileError(sprintYamlPath, sprintParse.error)
-    sprints.push(sprintParse.data)
+    const sprintPublic = sprintParse.data
+    sprints.push(sprintPublic)
+
+    // PLAN.md Task 16: ticketCount/points are DERIVED from this sprint's own
+    // compiled tickets, never authored in sprint.yaml -- computed here, after
+    // the schema parse above, and attached onto the same object reference
+    // already pushed into `sprints` so no second pass over the array is
+    // needed. A stub sprint.yaml (no tickets yet) compiles with both left
+    // undefined, since ticketPublicSchema/sprintPublicSchema require them
+    // positive when present, never zero.
+    let sprintTicketCount = 0
+    let sprintPointsSum = 0
 
     const ticketsDir = join(sprintDir, "tickets")
     for (const ticketKey of listSubdirs(ticketsDir)) {
@@ -671,6 +682,13 @@ function compileWorkbook(workbookDir) {
       const { publicTicket, sealed } = compileTicket(ticketContextPath, ticketKey, workbookId, objectiveVocab)
       ticketsByKey[ticketKey] = publicTicket
       sealedByTicketKey[ticketKey] = sealed
+      sprintTicketCount += 1
+      sprintPointsSum += publicTicket.ticket.points
+    }
+
+    if (sprintTicketCount > 0) {
+      sprintPublic.ticketCount = sprintTicketCount
+      sprintPublic.points = sprintPointsSum
     }
   }
 

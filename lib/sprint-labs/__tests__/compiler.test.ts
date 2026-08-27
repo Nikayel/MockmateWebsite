@@ -983,3 +983,207 @@ describe("compile-workbooks: fails loudly on an invalid workbook", () => {
     expect(listFilesRecursive(sealedDir)).toEqual([])
   })
 })
+
+// ============================================================
+// ticketCount/points/topic and workbook-level seedStats/inheritedDefects
+// (PLAN.md Task 16: `SprintPublic` gains optional ticketCount/points/topic;
+// `WorkbookSummary` gains optional seedStats/inheritedDefects). Both are
+// additive, optional fields, so the negative-authoring suites above (which
+// never author any of them) are an implicit regression check that omitting
+// them still compiles -- these two suites cover the field-computation and
+// pass-through behavior itself.
+// ============================================================
+
+describe("compile-workbooks: sprint ticketCount/points are derived, topic passes through (Task 16)", () => {
+  it("computes ticketCount/points as the count and point-sum of the sprint's own compiled tickets, never authored", async () => {
+    const authoringDir = makeTmpDir("sprint-labs-sprint-derived-")
+    const { wbDir, sprintYamlPath } = scaffoldMinimalWorkbook(authoringDir, {
+      workbookId: "derived-wb",
+    })
+
+    // The scaffold's own ticket (TMP-1) is worth 1 point. Add a second,
+    // 5-point ticket to the same sprint so ticketCount/points can only be
+    // right if BOTH tickets are counted and summed, not just one echoed back.
+    const secondTicketDir = join(wbDir, "sprints/01-x/tickets/TMP-2")
+    writeFileText(
+      join(secondTicketDir, "ticket.md"),
+      [
+        "---",
+        "title: Second ticket",
+        "points: 5",
+        "labels: []",
+        "ai_policy: assisted",
+        "objectives: [obj-1]",
+        "---",
+        "",
+        "Body.",
+        "",
+      ].join("\n")
+    )
+    writeFileText(join(secondTicketDir, "tests/visible/y.test.ts"), "// placeholder\n")
+    writeFileText(join(secondTicketDir, "reference.diff"), "diff --git a/y b/y\n")
+    writeFileText(
+      join(secondTicketDir, "rubric.yaml"),
+      [
+        "weights:",
+        "  understanding: 0.2",
+        "  problemSolving: 0.2",
+        "  codeQuality: 0.2",
+        "  communication: 0.2",
+        "  verification: 0.2",
+        "notes: {}",
+        "",
+      ].join("\n")
+    )
+    // sprint.yaml gains a `topic` -- purely passed through, no computation
+    // involved, unlike ticketCount/points.
+    writeFileText(
+      sprintYamlPath,
+      [
+        "number: 1",
+        "title: X",
+        "goal: X",
+        "standupQuote: X",
+        "topic: Derived fields exercise",
+        "archMapDelta: {}",
+        "objectives: [obj-1]",
+        "",
+      ].join("\n")
+    )
+
+    const base = makeTmpDir("sprint-labs-sprint-derived-out-")
+    const publicDir = join(base, "public")
+    const sealedDir = join(base, "sealed")
+    const result = runCompiler(wbDir, publicDir, sealedDir)
+    expect(result.stderr + result.stdout).not.toContain("FAILED")
+    expect(result.status).toBe(0)
+
+    const registry = await import(/* @vite-ignore */ join(publicDir, "registry.ts"))
+    const content = await registry.loadWorkbookContent("derived-wb")
+    const sprint = content.sprints.find((s: { number: number }) => s.number === 1)
+    expect(sprintPublicSchema.safeParse(sprint).success).toBe(true)
+    expect(sprint.ticketCount).toBe(2)
+    expect(sprint.points).toBe(6)
+    expect(sprint.topic).toBe("Derived fields exercise")
+  })
+
+  it("leaves ticketCount and points undefined on a stub sprint with zero tickets yet", async () => {
+    const authoringDir = makeTmpDir("sprint-labs-sprint-stub-")
+    const wbDir = join(authoringDir, "wb")
+    writeFileText(
+      join(wbDir, "workbook.yaml"),
+      [
+        "id: stub-wb",
+        "title: Stub",
+        "pitch: Stub",
+        "track: Test",
+        "language: typescript",
+        "level: Test",
+        "topics: [test]",
+        "sprintCount: 1",
+        // The workbook-level ticketCount is an authored, aspirational total
+        // (workbookSummarySchema requires it positive) -- unrelated to the
+        // per-sprint, compiler-derived ticketCount this test is actually
+        // about. It stays a plausible future total even while this sprint's
+        // own tickets/ directory is still empty.
+        "ticketCount: 5",
+        "estimatedHours: 1",
+        "requiresServerExecution: false",
+        "objectives: []",
+        "",
+      ].join("\n")
+    )
+    // A sprint.yaml with no tickets/ directory at all yet -- the shape a
+    // Task 16 stub sprint has before any tickets are authored under it.
+    writeFileText(
+      join(wbDir, "sprints/01-x/sprint.yaml"),
+      [
+        "number: 1",
+        "title: X",
+        "goal: X",
+        "standupQuote: X",
+        "archMapDelta: {}",
+        "objectives: []",
+        "",
+      ].join("\n")
+    )
+
+    const base = makeTmpDir("sprint-labs-sprint-stub-out-")
+    const publicDir = join(base, "public")
+    const sealedDir = join(base, "sealed")
+    const result = runCompiler(wbDir, publicDir, sealedDir)
+    expect(result.status).toBe(0)
+
+    const registry = await import(/* @vite-ignore */ join(publicDir, "registry.ts"))
+    const content = await registry.loadWorkbookContent("stub-wb")
+    const sprint = content.sprints.find((s: { number: number }) => s.number === 1)
+    expect(sprintPublicSchema.safeParse(sprint).success).toBe(true)
+    expect(sprint.ticketCount).toBeUndefined()
+    expect(sprint.points).toBeUndefined()
+  })
+})
+
+describe("compile-workbooks: workbook-level seedStats/inheritedDefects pass through when authored (Task 16)", () => {
+  it("compiles seedStats and inheritedDefects unchanged into the public WorkbookSummary", async () => {
+    const authoringDir = makeTmpDir("sprint-labs-seed-stats-")
+    const { wbDir } = scaffoldMinimalWorkbook(authoringDir, { workbookId: "seed-stats-wb" })
+    writeFileText(
+      join(wbDir, "workbook.yaml"),
+      [
+        "id: seed-stats-wb",
+        "title: Temp",
+        "pitch: Temp",
+        "track: Test",
+        "language: typescript",
+        "level: Test",
+        "topics: [test]",
+        "sprintCount: 1",
+        "ticketCount: 1",
+        "estimatedHours: 1",
+        "requiresServerExecution: false",
+        "seedStats:",
+        "  files: 59",
+        "  nonTestLines: 1449",
+        "  testCases: 19",
+        "inheritedDefects:",
+        "  - money handled as floating point",
+        "  - tenant scoping written by hand in each query",
+        "objectives:",
+        "  - id: obj-1",
+        "    label: Obj",
+        "    canDo: I can do the thing.",
+        "",
+      ].join("\n")
+    )
+
+    const base = makeTmpDir("sprint-labs-seed-stats-out-")
+    const publicDir = join(base, "public")
+    const sealedDir = join(base, "sealed")
+    const result = runCompiler(wbDir, publicDir, sealedDir)
+    expect(result.stderr + result.stdout).not.toContain("FAILED")
+    expect(result.status).toBe(0)
+
+    const registry = await import(/* @vite-ignore */ join(publicDir, "registry.ts"))
+    const summary = registry.getWorkbookSummary("seed-stats-wb")
+    expect(workbookSummarySchema.safeParse(summary).success).toBe(true)
+    expect(summary.seedStats).toEqual({ files: 59, nonTestLines: 1449, testCases: 19 })
+    expect(summary.inheritedDefects).toEqual([
+      "money handled as floating point",
+      "tenant scoping written by hand in each query",
+    ])
+    expect(() => assertPublicSafe(summary, "seed-stats-wb:summary")).not.toThrow()
+  })
+
+  it("omits seedStats and inheritedDefects when the workbook never authors them (existing fixture-demo behavior is unchanged)", async () => {
+    const base = makeTmpDir("sprint-labs-seed-stats-absent-")
+    const publicDir = join(base, "public")
+    const sealedDir = join(base, "sealed")
+    expect(runCompiler(FIXTURE_DIR, publicDir, sealedDir).status).toBe(0)
+
+    const registry = await import(/* @vite-ignore */ join(publicDir, "registry.ts"))
+    const summary = registry.getWorkbookSummary("fixture-demo")
+    expect(workbookSummarySchema.safeParse(summary).success).toBe(true)
+    expect(summary.seedStats).toBeUndefined()
+    expect(summary.inheritedDefects).toBeUndefined()
+  })
+})

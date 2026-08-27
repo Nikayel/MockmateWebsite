@@ -115,6 +115,21 @@ export const archMapDeltaSchema = z.object({
 })
 export type ArchMapDelta = z.infer<typeof archMapDeltaSchema>
 
+/**
+ * Aggregate, purely descriptive counts about the day-one seed codebase
+ * (PLAN.md Task 16: catalog/standup copy like "59 files, 1,449 non-test
+ * lines, 19 starter tests"). Optional and never cross-checked against the
+ * actual `repo/` tree by this schema or by `scripts/compile-workbooks.mjs`
+ * -- `lib/sprint-labs/__tests__/meridian-seed.test.ts` is what keeps the
+ * real seed honest; this is display copy, not a second source of truth.
+ */
+export const seedStatsSchema = z.object({
+  files: z.number().int().positive(),
+  nonTestLines: z.number().int().positive(),
+  testCases: z.number().int().nonnegative(),
+})
+export type SeedStats = z.infer<typeof seedStatsSchema>
+
 /** The catalog card for one workbook. */
 export const workbookSummarySchema = z.object({
   id: z.string().min(1),
@@ -137,6 +152,16 @@ export const workbookSummarySchema = z.object({
    */
   requiresServerExecution: z.boolean(),
   objectives: z.array(sprintLabObjectiveSchema),
+  /** Optional catalog/standup copy about the seed repo's size (PLAN.md Task 16). */
+  seedStats: seedStatsSchema.optional(),
+  /**
+   * Short, learner-safe phrasings of problems the seed already carries, e.g.
+   * "money handled as floating point" or "tenant scoping written by hand in
+   * each query" -- never a file path or a diagnosis of exactly where
+   * (AUTHORING-RULES.md; that specificity is each sprint's own reveal).
+   * Optional and purely descriptive, same as `seedStats`.
+   */
+  inheritedDefects: z.array(z.string()).optional(),
 })
 export type WorkbookSummary = z.infer<typeof workbookSummarySchema>
 
@@ -151,6 +176,20 @@ export const sprintPublicSchema = z.object({
   objectives: z.array(sprintLabObjectiveSchema),
   /** Author's note on why a ticket was sized the way it was (AUTHORING-RULES.md). */
   sizingNotes: z.string().optional(),
+  /**
+   * Free-form catalog grouping for this sprint alone, e.g. "Databases,
+   * transactions & RLS" (PLAN.md Task 16, SPRINT-PLAN.md's per-sprint
+   * "Topic:" line) -- narrower than the workbook-level `topics[]`.
+   */
+  topic: z.string().min(1).optional(),
+  /**
+   * Derived, not authored: `scripts/compile-workbooks.mjs` computes both
+   * from this sprint's own compiled tickets (count, and the sum of
+   * `points`) at compile time, so a stub sprint.yaml never states them and
+   * they can never drift from the tickets that actually exist under it.
+   */
+  ticketCount: z.number().int().positive().optional(),
+  points: z.number().int().positive().optional(),
 })
 export type SprintPublic = z.infer<typeof sprintPublicSchema>
 

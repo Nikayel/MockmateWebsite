@@ -31,4 +31,6 @@ export const fixtureDemoSprint01: SprintPublic = {
   ],
   sizingNotes:
     "Two tickets only. This workbook exists to exercise the compiler, not to teach a full sprint.",
+  ticketCount: 2,
+  points: 8,
 }
