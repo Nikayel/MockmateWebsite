@@ -25,11 +25,18 @@ export type { WorkspaceExecutionResult, WorkspaceTestResult }
  *    by ROW ORDER (there is no implicit sort — an assertion's SQL needs its own `ORDER BY`
  *    whenever row order matters, which for this shape is effectively always), against a literal
  *    expected 2D array. `actual` values are normalized toward `expected`'s types before comparing
- *    (see pg-suite-core.mjs's `normalizeCell` for the exact rules): a BigInt cell becomes a
- *    string, a NUMERIC/DECIMAL column's string becomes a number when the expectation at that
- *    position is itself a number, and a DATE/TIMESTAMP cell becomes its full ISO-8601 string
- *    (`YYYY-MM-DDTHH:mm:ss.sssZ` — always the full timestamp form, even for a DATE column with no
- *    time component; a bare `"2024-01-01"` expectation will not match).
+ *    (see pg-suite-core.mjs's `normalizeCell` for the exact rules — restated here because this is
+ *    the one place content authors read first, and it previously drifted from what the code
+ *    actually does): a BigInt cell becomes a string; a DATE/TIMESTAMP cell becomes its full
+ *    ISO-8601 string (`YYYY-MM-DDTHH:mm:ss.sssZ` — always the full timestamp form, even for a DATE
+ *    column with no time component; a bare `"2024-01-01"` expectation will not match); and a
+ *    string cell coerces to a Number whenever the expectation at that position is itself a
+ *    number — this rule is TYPE-BLIND, not specific to NUMERIC/DECIMAL columns, because the code
+ *    has no column-type information: a plain TEXT column holding `"5"` coerces against `expect: 5`
+ *    exactly the same as a real `numeric` column holding `19.99` coerces against `expect: 19.99`.
+ *    The motivating case is NUMERIC/DECIMAL's default string wire format, but writing a string
+ *    expectation for a genuinely-text column does not opt out of this — there is no way to tell
+ *    the two apart from the value alone.
  *  - `"raises"` — passes iff the SQL throws (any error); fails ("...completed without one") if it
  *    does not.
  *  - `{ raises: string }` — passes iff the SQL throws AND the error message contains the given

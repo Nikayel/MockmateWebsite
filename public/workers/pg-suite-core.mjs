@@ -309,6 +309,16 @@ async function roleExists(pg) {
  * views (`relkind = 'v'`) in schema "public" are covered. Materialized views, foreign tables, and
  * any object outside schema "public" are NOT re-owned and will not be reachable by learner SQL or
  * assertions running as APP_ROLE_NAME.
+ *
+ * A SEPARATE v1 scope limit from the REVOKE TEMP statement above, stated with equal weight to its
+ * security benefit rather than left implicit: revoking TEMP from PUBLIC does not just block an
+ * attacker's shadow table, it unconditionally blocks EVERY `CREATE TEMP TABLE` (or `CREATE
+ * TEMPORARY TABLE`, or an implicit temp object from `SELECT ... INTO TEMP`) the grading role could
+ * ever run, including a perfectly legitimate one. A ticket whose reference solution or intended
+ * learner solution genuinely needs a temp table is NOT SUPPORTED by this engine in v1 — that
+ * tradeoff is deliberate (closing the pg_temp shadowing bypass at its root was judged worth it),
+ * but it is a real capability loss, not a free security win, and content authors should know it
+ * before reaching for `CREATE TEMP TABLE` in a workbook ticket.
  */
 async function provisionAppRole(pg) {
   await pg.exec(`

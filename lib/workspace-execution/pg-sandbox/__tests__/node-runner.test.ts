@@ -463,6 +463,37 @@ describe("runPgSuiteNode: temp-table shadowing cannot fake-pass an assertion (pr
 
     expect(result.results[0].passed).toBe(true)
   })
+
+  it("New Breakage 2 regression lock: re-provisioning still re-owns a public table when learner SQL EXCLUDES public from search_path", async () => {
+    // The test above reorders search_path but still includes "public", so it would have passed
+    // even against the pre-fix bare-%I code -- it never actually exercised New Breakage 2. THIS
+    // is the exact reproduction: search_path set to ONLY pg_catalog (public excluded entirely).
+    // Against the pre-fix code, the post-learner-SQL re-provisioning step's own
+    // `alter table %I owner to ...` (bare, unqualified) would fail to resolve "docs" at all under
+    // this search_path and throw "relation does not exist", misreported as an `integrity` failure
+    // even though pg_tables (queried by that same function) had just confirmed the table exists.
+    // The `public.%I` fix makes this schema-qualified statement immune to search_path entirely.
+    const roleName = await getAppRoleName()
+    const suite: PgSuite = {
+      migrations: [`create table docs (id int, tenant_id text);`],
+      seedSql: `insert into docs values (1, 't1'), (2, 't2');`,
+      learnerSql: `set search_path to pg_catalog;`,
+      assertions: [
+        {
+          id: "resolves-the-real-table",
+          sql: `set role ${roleName}; select count(*)::int from docs;`,
+          expect: { rows: [[2]] },
+        },
+      ],
+    }
+
+    const result = await runPgSuiteNode(suite)
+
+    expect(result.error).toBeNull()
+    expect(result.results.some((r) => r.suite === "integrity")).toBe(false)
+    expect(result.results[0].suite).toBe("assertion")
+    expect(result.results[0].passed).toBe(true)
+  })
 })
 
 describe("runPgSuiteNode: schema-level CREATE grant and view ownership (Issue 3)", () => {
