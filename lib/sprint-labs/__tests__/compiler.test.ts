@@ -17,7 +17,7 @@
  * is safe.
  */
 
-import { execFileSync } from "node:child_process"
+import { spawnSync } from "node:child_process"
 import {
   existsSync,
   mkdirSync,
@@ -75,6 +75,14 @@ function makeTmpDir(prefix: string): string {
  * "not authored" and deleted by pruning, which scans the real repo's
  * workbooks/ by default (see compile-workbooks.mjs's discoverAuthoredWorkbooks
  * doc comment — this was a real bug, not just a test-setup nuance).
+ *
+ * Uses `spawnSync`, not `execFileSync`: `execFileSync`'s return value is
+ * stdout ONLY on success (stderr is piped but discarded unless the process
+ * throws), which silently ate every pruning warning printed on a
+ * SUCCESSFUL compile (`console.error` writes to stderr) — a real bug in
+ * this helper, caught while writing the empty-root refusal test below,
+ * whose whole point is asserting on stderr text after a status-0 run.
+ * `spawnSync` returns {stdout, stderr, status} uniformly either way.
  */
 function runCompiler(
   targetDir: string,
@@ -82,26 +90,21 @@ function runCompiler(
   sealedDir: string,
   workbooksRoot: string = dirname(targetDir)
 ): { status: number; stdout: string; stderr: string } {
-  try {
-    const stdout = execFileSync(
-      TSX_BIN,
-      [
-        COMPILER,
-        targetDir,
-        "--public-dir",
-        publicDir,
-        "--sealed-dir",
-        sealedDir,
-        "--workbooks-root",
-        workbooksRoot,
-      ],
-      { cwd: ROOT, encoding: "utf8" }
-    )
-    return { status: 0, stdout, stderr: "" }
-  } catch (err) {
-    const e = err as { status?: number; stdout?: string; stderr?: string }
-    return { status: e.status ?? 1, stdout: e.stdout ?? "", stderr: e.stderr ?? "" }
-  }
+  const result = spawnSync(
+    TSX_BIN,
+    [
+      COMPILER,
+      targetDir,
+      "--public-dir",
+      publicDir,
+      "--sealed-dir",
+      sealedDir,
+      "--workbooks-root",
+      workbooksRoot,
+    ],
+    { cwd: ROOT, encoding: "utf8" }
+  )
+  return { status: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" }
 }
 
 function listFilesRecursive(dir: string, base = dir): string[] {
@@ -391,24 +394,29 @@ describe("compile-workbooks: leak-gate (secret-classification allowlist)", () =>
 })
 
 describe("compile-workbooks: writePublicFile is the leak-gate chokepoint (I-3/M-7)", () => {
-  it("throws and writes NOTHING when the payload carries a secret-classified field", () => {
+  it("throws and writes NOTHING when the payload carries a secret-classified field", async () => {
+    // assertPublicSafe throws SYNCHRONOUSLY, but writePublicFile is now an
+    // async function (it awaits prettier formatting) — any synchronous
+    // throw inside an async function surfaces as a REJECTED PROMISE to the
+    // caller, never a synchronous throw, so this must assert on the
+    // rejection, not wrap the call in `() => ...`.
     const base = makeTmpDir("sprint-labs-writepublicfile-poisoned-")
     const target = join(base, "poisoned.ts")
-    expect(() =>
+    await expect(
       writePublicFile(
         target,
         { hiddenTests: [{ expected: "LEAKED" }] },
         "// should never be written\n",
         "test"
       )
-    ).toThrow(/secret-classified field "expected"/)
+    ).rejects.toThrow(/secret-classified field "expected"/)
     expect(existsSync(target)).toBe(false)
   })
 
-  it("writes the file when the payload is clean (the only path any renderer uses to reach disk)", () => {
+  it("writes the file when the payload is clean (the only path any renderer uses to reach disk)", async () => {
     const base = makeTmpDir("sprint-labs-writepublicfile-clean-")
     const target = join(base, "nested/clean.ts")
-    writePublicFile(target, { title: "fine" }, "export const x = 1\n", "test")
+    await writePublicFile(target, { title: "fine" }, "export const x = 1\n", "test")
     expect(existsSync(target)).toBe(true)
     expect(readFileSync(target, "utf8")).toBe("export const x = 1\n")
   })
@@ -824,6 +832,86 @@ describe("compile-workbooks: pruning stale output (I-5)", () => {
     expect(existsSync(join(publicDir, "temp-wb/tickets/TMP-1.ts"))).toBe(true)
     expect(existsSync(join(publicDir, "temp-wb/tickets/TMP-2.ts"))).toBe(false)
     expect(existsSync(join(sealedDir, "temp-wb/TMP-2.server.ts"))).toBe(false)
+  })
+})
+
+// ============================================================
+// I-5 residual (review round 2, reproduced by the reviewer): a wrong,
+// empty, or subset --workbooks-root used to prune EVERYTHING, including
+// the workbook this same invocation had just compiled. Three layers now
+// guard against that (see pruneStaleOutput's doc comment): self-protection
+// of just-compiled ids, refuse-on-empty-scan, and --no-prune.
+// ============================================================
+
+describe("compile-workbooks: pruning safety against a wrong --workbooks-root (I-5 residual)", () => {
+  it("refuses to prune (and deletes nothing) when --workbooks-root scans to zero workbooks", () => {
+    const base = makeTmpDir("sprint-labs-prune-emptyroot-")
+    const { wbDir } = scaffoldMinimalWorkbook(base, { ticketKey: "TMP-1" })
+    const publicDir = join(base, "public")
+    const sealedDir = join(base, "sealed")
+    const emptyRoot = makeTmpDir("sprint-labs-prune-emptyroot-scan-")
+
+    const result = runCompiler(wbDir, publicDir, sealedDir, emptyRoot)
+    expect(result.status).toBe(0)
+    expect(result.stderr).toContain("refusing to prune")
+    expect(existsSync(join(publicDir, "temp-wb/tickets/TMP-1.ts"))).toBe(true)
+    expect(existsSync(join(publicDir, "temp-wb/workbook.ts"))).toBe(true)
+  })
+
+  it("a subset --workbooks-root (that doesn't know about the just-compiled workbook) self-protects it", () => {
+    const base = makeTmpDir("sprint-labs-prune-subsetroot-")
+    const { wbDir } = scaffoldMinimalWorkbook(base, { ticketKey: "TMP-1", workbookId: "temp-wb" })
+    const publicDir = join(base, "public")
+    const sealedDir = join(base, "sealed")
+
+    // A workbooks root that knows about a DIFFERENT workbook only — not
+    // empty (so the refuse-on-empty-scan guard doesn't fire), but a subset
+    // that never scans temp-wb's own authoring directory.
+    const subsetRootBase = makeTmpDir("sprint-labs-prune-subsetroot-scan-")
+    scaffoldMinimalWorkbook(subsetRootBase, { workbookId: "decoy-wb", ticketKey: "DECOY-1" })
+
+    const result = runCompiler(wbDir, publicDir, sealedDir, subsetRootBase)
+    expect(result.status).toBe(0)
+    expect(result.stderr).not.toContain("refusing to prune")
+    expect(existsSync(join(publicDir, "temp-wb/tickets/TMP-1.ts"))).toBe(true)
+    expect(existsSync(join(publicDir, "temp-wb/workbook.ts"))).toBe(true)
+    expect(existsSync(join(sealedDir, "temp-wb/TMP-1.server.ts"))).toBe(true)
+  })
+})
+
+// ============================================================
+// I-3 residual (review round 2): regenerateRegistries's public write used
+// to bypass writePublicFile via a bare writeFileSync — the "every public
+// emit goes through the one chokepoint" invariant was false for exactly
+// that path. Structural checks below (source-scan, not behavioral: the
+// registry payload is filenames/ids and would pass assertPublicSafe
+// trivially either way, so the only thing worth proving is that the
+// invariant holds structurally).
+// ============================================================
+
+describe("compile-workbooks: writePublicFile is the ONLY public write path (I-3 residual)", () => {
+  const source = readFileSync(COMPILER, "utf8")
+
+  it("regenerateRegistries writes registry.ts through writePublicFile, not a bare writeFileSync", () => {
+    const fnStart = source.indexOf("async function regenerateRegistries(")
+    expect(fnStart).toBeGreaterThan(-1)
+    const fnEnd = source.indexOf("\n}\n", fnStart)
+    expect(fnEnd).toBeGreaterThan(fnStart)
+    const fnBody = source.slice(fnStart, fnEnd)
+    expect(fnBody).toMatch(/writePublicFile\(\s*join\(publicDir,\s*"registry\.ts"\)/)
+    expect(fnBody).not.toMatch(/writeFileSync\(\s*join\(publicDir/)
+  })
+
+  it("exactly the two known bare writeFileSync call sites exist in the source", () => {
+    // 1: writePublicFile's own chokepoint call (every public emit).
+    // 2: writeSealedFile's chokepoint call (every sealed emit — a per-ticket
+    // sealed module or the sealed registry; NOT a public emit, so correctly
+    // exempt from writePublicFile's assertPublicSafe gate, but still routed
+    // through one shared, named function rather than scattered ad hoc). If
+    // this count ever changes, a human must look at the new call site and
+    // decide whether it needs to route through writePublicFile instead.
+    const matches = source.match(/\bwriteFileSync\(/g) ?? []
+    expect(matches.length).toBe(2)
   })
 })
 

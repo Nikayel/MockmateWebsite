@@ -96,6 +96,13 @@ async function collectSealedMarkers(): Promise<string[]> {
       if (hiddenCase.kind === "io-case" && hiddenCase.expected !== undefined) {
         markers.push(JSON.stringify(hiddenCase.expected))
       }
+      // Review round 2 cheap addition: `input` is SECRET_FIELDS-classified
+      // too (issued at submit time, never in the static public bundle —
+      // see lib/scenarios/sealed/sprint-labs/types.ts's SealedHiddenCase
+      // doc comment), so the overlap scan must cover it alongside `expected`.
+      if (hiddenCase.kind === "io-case" && hiddenCase.input !== undefined) {
+        markers.push(JSON.stringify(hiddenCase.input))
+      }
     }
     if (sealed.authorBrief) {
       markers.push(sealed.authorBrief.intent)
