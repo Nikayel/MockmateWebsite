@@ -544,6 +544,181 @@ describe("server-only collections stay server-only", () => {
   })
 })
 
+describe("sprintLabRuns: server-only writes (RULING R12, fix round 2026-08-26)", () => {
+  // R12: unlike caseLabRuns (client-writable, formative content only),
+  // sprintLabRuns.currentSprint gates a Pro paywall and board is a graded
+  // state machine (lib/sprint-labs/runs.ts). A client CREATE/UPDATE here
+  // would let a learner forge currentSprint past the paywall or rewrite
+  // board around every transition rule, so read stays owner-scoped but every
+  // write is server-only (Admin SDK, app/api/sprint-labs/*).
+  function newRun(userId: string, overrides: Record<string, unknown> = {}) {
+    return {
+      userId,
+      workbookId: "meridian",
+      contentVersion: "v1",
+      currentSprint: 1,
+      board: { "MER-101": "todo" },
+      status: "in_progress",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      ...overrides,
+    }
+  }
+
+  async function seedSub(path: string[], data: Record<string, unknown>) {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), ...path), data)
+    })
+  }
+
+  it("REJECTS a client creating a run, even with their own honest userId", async () => {
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(setDoc(doc(db, "sprintLabRuns", "run1"), newRun(USER)))
+  })
+
+  it("lets the owner read their own run", async () => {
+    await seedSub(["sprintLabRuns", "run1"], newRun(USER))
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertSucceeds(getDoc(doc(db, "sprintLabRuns", "run1")))
+  })
+
+  it("REJECTS a non-owner reading the run", async () => {
+    await seedSub(["sprintLabRuns", "run1"], newRun(USER))
+    const db = testEnv.authenticatedContext(OTHER).firestore()
+    await assertFails(getDoc(doc(db, "sprintLabRuns", "run1")))
+  })
+
+  it("REJECTS the owner updating their own run (currentSprint is not client-writable)", async () => {
+    await seedSub(["sprintLabRuns", "run1"], newRun(USER))
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(updateDoc(doc(db, "sprintLabRuns", "run1"), { currentSprint: 2 }))
+  })
+
+  it("REJECTS the owner rewriting their own board directly", async () => {
+    await seedSub(["sprintLabRuns", "run1"], newRun(USER))
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(updateDoc(doc(db, "sprintLabRuns", "run1"), { board: { "MER-101": "done" } }))
+  })
+
+  it("REJECTS the owner deleting their own run", async () => {
+    await seedSub(["sprintLabRuns", "run1"], newRun(USER))
+    const db = testEnv.authenticatedContext(USER).firestore()
+    await assertFails(deleteDoc(doc(db, "sprintLabRuns", "run1")))
+  })
+
+  describe("files subcollection", () => {
+    beforeEach(() =>
+      seedSub(["sprintLabRuns", "run1", "files", "src%2Fa.ts"], {
+        path: "src/a.ts",
+        content: "hello",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        revision: 1,
+      })
+    )
+
+    it("lets the owner read a file via the parent-run ownership check", async () => {
+      await seedSub(["sprintLabRuns", "run1"], newRun(USER))
+      const db = testEnv.authenticatedContext(USER).firestore()
+      await assertSucceeds(getDoc(doc(db, "sprintLabRuns", "run1", "files", "src%2Fa.ts")))
+    })
+
+    it("REJECTS a non-owner reading a file", async () => {
+      await seedSub(["sprintLabRuns", "run1"], newRun(USER))
+      const db = testEnv.authenticatedContext(OTHER).firestore()
+      await assertFails(getDoc(doc(db, "sprintLabRuns", "run1", "files", "src%2Fa.ts")))
+    })
+
+    it("REJECTS the owner writing a file directly (server-stamped only)", async () => {
+      await seedSub(["sprintLabRuns", "run1"], newRun(USER))
+      const db = testEnv.authenticatedContext(USER).firestore()
+      await assertFails(
+        setDoc(doc(db, "sprintLabRuns", "run1", "files", "src%2Fa.ts"), {
+          path: "src/a.ts",
+          content: "forged",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          revision: 99,
+        })
+      )
+    })
+
+    it("REJECTS a files read when the parent run does not exist (fails closed)", async () => {
+      const db = testEnv.authenticatedContext(USER).firestore()
+      await assertFails(getDoc(doc(db, "sprintLabRuns", "does-not-exist", "files", "src%2Fa.ts")))
+    })
+  })
+
+  describe("attempts subcollection", () => {
+    const attempt = {
+      ticketKey: "MER-101",
+      aiPolicy: "unassisted",
+      variantId: "v1",
+      finalized: true,
+      gateResults: [],
+      escapedDefects: [],
+      scores: {
+        understanding: 80,
+        problemSolving: 80,
+        codeQuality: 80,
+        communication: null,
+        verification: 80,
+        overall: 80,
+      },
+      submittedAt: "2026-01-01T00:00:00.000Z",
+    }
+
+    it("lets the owner read an attempt", async () => {
+      await seedSub(["sprintLabRuns", "run1"], newRun(USER))
+      await seedSub(["sprintLabRuns", "run1", "attempts", "a1"], attempt)
+      const db = testEnv.authenticatedContext(USER).firestore()
+      await assertSucceeds(getDoc(doc(db, "sprintLabRuns", "run1", "attempts", "a1")))
+    })
+
+    it("REJECTS a non-owner reading an attempt", async () => {
+      await seedSub(["sprintLabRuns", "run1"], newRun(USER))
+      await seedSub(["sprintLabRuns", "run1", "attempts", "a1"], attempt)
+      const db = testEnv.authenticatedContext(OTHER).firestore()
+      await assertFails(getDoc(doc(db, "sprintLabRuns", "run1", "attempts", "a1")))
+    })
+
+    it("REJECTS the owner forging their own attempt score", async () => {
+      await seedSub(["sprintLabRuns", "run1"], newRun(USER))
+      await seedSub(["sprintLabRuns", "run1", "attempts", "a1"], attempt)
+      const db = testEnv.authenticatedContext(USER).firestore()
+      await assertFails(
+        updateDoc(doc(db, "sprintLabRuns", "run1", "attempts", "a1"), { "scores.overall": 100 })
+      )
+    })
+  })
+
+  describe("transcripts subcollection", () => {
+    const transcript = {
+      messages: [{ role: "assistant", content: "hi" }],
+      truncated: false,
+      originalCount: 1,
+    }
+
+    it("lets the owner read a transcript", async () => {
+      await seedSub(["sprintLabRuns", "run1"], newRun(USER))
+      await seedSub(["sprintLabRuns", "run1", "transcripts", "t1"], transcript)
+      const db = testEnv.authenticatedContext(USER).firestore()
+      await assertSucceeds(getDoc(doc(db, "sprintLabRuns", "run1", "transcripts", "t1")))
+    })
+
+    it("REJECTS a non-owner reading a transcript", async () => {
+      await seedSub(["sprintLabRuns", "run1"], newRun(USER))
+      await seedSub(["sprintLabRuns", "run1", "transcripts", "t1"], transcript)
+      const db = testEnv.authenticatedContext(OTHER).firestore()
+      await assertFails(getDoc(doc(db, "sprintLabRuns", "run1", "transcripts", "t1")))
+    })
+
+    it("REJECTS the owner writing a transcript directly", async () => {
+      await seedSub(["sprintLabRuns", "run1"], newRun(USER))
+      const db = testEnv.authenticatedContext(USER).firestore()
+      await assertFails(setDoc(doc(db, "sprintLabRuns", "run1", "transcripts", "t1"), transcript))
+    })
+  })
+})
+
 describe("the catch-all denies anything not explicitly allowed", () => {
   it("REJECTS a collection no rule mentions", async () => {
     // A new collection added by future code is closed until someone opens it,

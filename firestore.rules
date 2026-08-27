@@ -439,30 +439,25 @@ service cloud.firestore {
     // SPRINT LAB RUNS (workbook practice surface)
     // ============================================================================
 
-    // Owner-only access. Authoritative writes go through the Firebase Admin SDK
-    // in app/api/sprint-labs/* (which bypasses these rules and already verifies
-    // the token + ownership), so this block is defense-in-depth for any future
-    // direct-client SDK access — the exact caseLabRuns pattern above. SprintLabRun
-    // docs carry a server-derived `userId` field the client cannot set/spoof.
-    // Board transitions (legal moves only, one ticket "doing" at a time) are
-    // validated in lib/sprint-labs/runs.ts, not here: a client `update` reaching
-    // this rule is still gated on owning the doc, never on the board contents.
+    // RULING R12 (2026-08-26 review): the caseLabRuns copy-verbatim pattern is
+    // wrong for THIS collection. caseLabRuns' client-writable create/update is
+    // safe because milestoneStatus/answers are formative, not entitlement-
+    // bearing. sprintLabRuns.currentSprint gates a Pro paywall and board is a
+    // graded state machine, so a signed-in client CREATE/UPDATE here would let
+    // a learner forge currentSprint past the paywall or rewrite board around
+    // every transition rule in lib/sprint-labs/runs.ts (which only runs
+    // server-side, in app/api/sprint-labs/*, and never sees a direct client
+    // write). R5's purpose was defense-in-depth; on an entitlement-bearing
+    // collection that means DENY, not "copy the pattern verbatim." Every
+    // legitimate write goes through the Admin SDK from app/api/sprint-labs/*
+    // (which bypasses these rules and already verifies token + ownership), so
+    // read stays owner-scoped but create/update/delete are server-only.
     match /sprintLabRuns/{runId} {
       allow read: if isAuthenticated()
                   && documentExists()
                   && resource.data.userId == request.auth.uid;
 
-      allow create: if isAuthenticated()
-                    && request.resource.data.userId == request.auth.uid;
-
-      allow update: if isAuthenticated()
-                    && documentExists()
-                    && resource.data.userId == request.auth.uid
-                    && request.resource.data.userId == request.auth.uid;
-
-      allow delete: if isAuthenticated()
-                    && documentExists()
-                    && resource.data.userId == request.auth.uid;
+      allow create, update, delete: if false;
 
       // Shared by the three subcollections below: none of their docs carry a
       // `userId` field of their own (Task 1's frozen shapes in
