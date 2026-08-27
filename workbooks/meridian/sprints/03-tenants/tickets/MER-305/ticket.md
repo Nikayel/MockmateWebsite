@@ -4,6 +4,7 @@ points: 5
 labels:
   - tenants
   - concurrency
+  - sql
 ai_policy: unassisted
 ai_policy_reason: "This ticket is about naming the exact interleaving the database allows and closing it with a constraint you can defend under questioning, not about making a flaky test go green. Handed to an agent, it reaches for a bigger lock or a longer transaction and the tests pass without anyone ever naming the race. Do this one yourself."
 objectives:

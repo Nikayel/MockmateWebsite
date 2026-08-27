@@ -1,0 +1,11 @@
+weights:
+  understanding: 0.3
+  problemSolving: 0.2
+  codeQuality: 0.15
+  communication: 0.05
+  verification: 0.3
+notes:
+  understanding: "Keys off naming READ COMMITTED's exact permission - two transactions can both pass a check that sees no conflicting row before either commits its insert - not a vaguer 'race condition' answer."
+  problemSolving: "Keys off the visible pass rate across the reject/allow cases, especially that two different tenants may legitimately share the same reference number."
+  codeQuality: "Keys off closing the race with a constraint scoped to (tenant_id, external_ref), not a broader lock, a longer transaction, or a constraint on external_ref alone that would block legitimate cross-tenant reuse."
+  verification: "Keys off whether the learner's own reproduction actually demonstrates the original race (two inserts that would both succeed today) before the fix, and whether a database error from a genuinely different constraint is still correctly reported as unexpected rather than swallowed."

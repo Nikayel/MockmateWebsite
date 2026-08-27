@@ -1,0 +1,151 @@
+seedSql: |
+  insert into tenants (id, name, webhook_url, webhook_secret, time_zone, created_at) values
+    ('ten_continental', 'Continental Freight Insurance', null, null, 'America/Chicago', now()),
+    ('ten_bekins', 'Bekins Van Lines', null, null, 'America/Chicago', now()),
+    ('ten_northwind', 'Northwind Mutual', null, null, 'America/Chicago', now());
+
+  insert into claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash, audit_projection_version) values
+    ('clm_cx88431_first', 'ten_continental', 'CX-88431', 'submitted', 50000, 'USD', 'Alex Chen', '2026-01-01', now(), '', 1),
+    ('clm_other_1', 'ten_continental', 'OTHER-1', 'submitted', 10000, 'USD', 'Someone Else', '2026-01-02', now(), '', 1);
+assertions:
+  - id: second-worker-insert-for-cx88431-rejected
+    humanName: "a second worker's insert for CX-88431 under the same tenant is rejected"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      INSERT INTO claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash, audit_projection_version)
+      VALUES ('clm_cx88431_second', 'ten_continental', 'CX-88431', 'submitted', 50000, 'USD', 'Alex Chen', '2026-01-01', now(), '', 1);
+    expect:
+      raises: "duplicate key"
+
+  - id: bekins-can-reuse-the-same-external-ref
+    humanName: "Bekins may use the exact same external reference Continental already used"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_bekins', true);
+      INSERT INTO claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash, audit_projection_version)
+      VALUES ('clm_bekins_cx88431', 'ten_bekins', 'CX-88431', 'submitted', 5000, 'USD', 'Jordan Rivera', '2026-01-01', now(), '', 1)
+      RETURNING tenant_id;
+    expect:
+      rows:
+        - ["ten_bekins"]
+
+  - id: northwind-can-also-reuse-the-same-external-ref
+    humanName: "a third tenant may also use that same external reference"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_northwind', true);
+      INSERT INTO claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash, audit_projection_version)
+      VALUES ('clm_northwind_cx88431', 'ten_northwind', 'CX-88431', 'submitted', 7500, 'USD', 'Sam Okafor', '2026-01-01', now(), '', 1)
+      RETURNING tenant_id;
+    expect:
+      rows:
+        - ["ten_northwind"]
+
+  - id: distinct-external-ref-same-tenant-still-works
+    humanName: "Continental can still file a claim under a brand new external reference"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      INSERT INTO claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash, audit_projection_version)
+      VALUES ('clm_continental_new', 'ten_continental', 'CX-NEW-1', 'submitted', 1200, 'USD', 'New Claimant', '2026-01-04', now(), '', 1)
+      RETURNING external_ref;
+    expect:
+      rows:
+        - ["CX-NEW-1"]
+
+  - id: second-attempt-at-the-freshly-inserted-ref-also-rejected
+    humanName: "a duplicate of the just-inserted CX-NEW-1 is rejected too, not only seed rows"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      INSERT INTO claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash, audit_projection_version)
+      VALUES ('clm_continental_new_dup', 'ten_continental', 'CX-NEW-1', 'submitted', 1200, 'USD', 'New Claimant', '2026-01-04', now(), '', 1);
+    expect:
+      raises: "duplicate key"
+
+  - id: original-seed-claim-still-intact
+    humanName: "the original CX-88431 claim's own data was never touched by any rejected duplicate"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      SELECT amount FROM claims WHERE id = 'clm_cx88431_first';
+    expect:
+      rows:
+        - [50000]
+
+  - id: bekins-own-duplicate-of-its-own-row-also-rejected
+    humanName: "Bekins cannot double-file its own CX-88431 either, once it has its own row"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_bekins', true);
+      INSERT INTO claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash, audit_projection_version)
+      VALUES ('clm_bekins_cx88431_dup', 'ten_bekins', 'CX-88431', 'submitted', 5000, 'USD', 'Jordan Rivera', '2026-01-01', now(), '', 1);
+    expect:
+      raises: "duplicate key"
+
+  - id: constraint-covers-tenant-id-then-external-ref
+    humanName: "the constraint's own columns are tenant_id and external_ref, in that order"
+    sql: |
+      SELECT kcu.column_name
+      FROM information_schema.table_constraints tc
+      JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
+      WHERE tc.constraint_name = 'claims_tenant_external_ref_unique'
+      ORDER BY kcu.ordinal_position;
+    expect:
+      rows:
+        - ["tenant_id"]
+        - ["external_ref"]
+
+  - id: constraint-name-matches-exactly
+    humanName: "the constraint exists under exactly the name this suite checks for"
+    sql: |
+      SELECT constraint_name FROM information_schema.table_constraints
+      WHERE table_name = 'claims' AND constraint_type = 'UNIQUE' AND constraint_name = 'claims_tenant_external_ref_unique';
+    expect:
+      rows:
+        - ["claims_tenant_external_ref_unique"]
+
+  - id: update-cannot-retarget-external-ref-into-a-collision
+    humanName: "renaming an existing claim's external_ref onto one that already exists for the tenant is rejected too"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      UPDATE claims SET external_ref = 'CX-88431' WHERE id = 'clm_other_1';
+    expect:
+      raises: "duplicate key"
+
+  - id: different-status-does-not-bypass-the-constraint
+    humanName: "the constraint is not fooled by an insert whose other columns differ"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      INSERT INTO claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash, audit_projection_version)
+      VALUES ('clm_cx88431_third', 'ten_continental', 'CX-88431', 'under_review', 999999, 'USD', 'A Completely Different Name', '2025-06-01', now(), '', 1);
+    expect:
+      raises: "duplicate key"
+
+  - id: hidden-cx88431-second-worker-run-is-still-rejected
+    humanName: "Escaped: the exact CX-88431 double-extraction scenario is still not caught"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      INSERT INTO claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash, audit_projection_version)
+      VALUES ('clm_cx88431_worker_two', 'ten_continental', 'CX-88431', 'submitted', 50000, 'USD', 'Alex Chen', '2026-01-01', now(), '', 1);
+    expect:
+      raises: "duplicate key"
+
+  - id: three-distinct-refs-same-tenant-all-succeed
+    humanName: "a normal batch of three genuinely different claims for one tenant is unaffected"
+    sql: |
+      SET ROLE sprintlab_app;
+      SELECT set_config('app.tenant_id', 'ten_continental', true);
+      INSERT INTO claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash, audit_projection_version)
+      VALUES
+        ('clm_batch_a', 'ten_continental', 'BATCH-A', 'submitted', 100, 'USD', 'A', '2026-01-05', now(), '', 1),
+        ('clm_batch_b', 'ten_continental', 'BATCH-B', 'submitted', 200, 'USD', 'B', '2026-01-05', now(), '', 1),
+        ('clm_batch_c', 'ten_continental', 'BATCH-C', 'submitted', 300, 'USD', 'C', '2026-01-05', now(), '', 1);
+      SELECT external_ref FROM claims WHERE id = 'clm_batch_c';
+    expect:
+      rows:
+        - ["BATCH-C"]
