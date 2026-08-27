@@ -44,7 +44,7 @@
  */
 
 import Link from "next/link"
-import { ArrowDown } from "lucide-react"
+import { ArrowDown, Layers } from "lucide-react"
 
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -53,6 +53,9 @@ import { CaseLabGallery } from "@/components/labs/CaseLabGallery"
 import { BreadcrumbJsonLd, CourseListJsonLd } from "@/components/seo/JsonLd"
 import { getStarterCaseLab, listCaseLabs } from "@/lib/labs/case-labs"
 import { canonicalPageMetadata } from "@/lib/seo/page-metadata"
+import { getFlagAsync } from "@/lib/feature-flags"
+import { listWorkbookSummaries } from "@/lib/sprint-labs/content/registry"
+import { SprintLabsSection } from "@/components/sprint-labs/catalog/SprintLabsSection"
 import { HowACaseLabWorks } from "./_components/HowACaseLabWorks"
 import { CaseLabsExplainer } from "./_components/CaseLabsExplainer"
 import { CaseLabsFaq } from "./_components/CaseLabsFaq"
@@ -66,9 +69,19 @@ export const metadata = canonicalPageMetadata({
     "Practice the decomposition interview on a real multi-file codebase. Scope an underspecified problem, commit to a design, then build until the tests pass, in labs modeled on Palantir FDSE and Stripe engineering rounds.",
 })
 
-export default function CaseLabsGalleryPage() {
+// UX-SPEC.md §1.2/§15.5: the Sprint Labs flag's authoritative layer is Firestore, and this page must
+// stay static and indexable, so ISR at 300s is the compromise that lands the owner's flip within
+// five minutes without a redeploy.
+export const revalidate = 300
+
+export default async function CaseLabsGalleryPage() {
   const labs = listCaseLabs()
   const starter = getStarterCaseLab()
+  // UX-SPEC.md §1.2/§2 "flag off": the Sprint Labs section, the jump strip and the Case Labs
+  // wrapper header all render only when the flag is on. When off, everything below this line is
+  // byte-identical to before Sprint Labs existed.
+  const sprintLabsEnabled = await getFlagAsync("SPRINT_LABS_ENABLED")
+  const workbookSummaries = sprintLabsEnabled ? listWorkbookSummaries() : []
 
   // The global nav stays outside the workbook scope so it keeps the app's dark chrome; everything
   // below it is the light-by-default workbook surface the labs themselves use.
@@ -87,13 +100,25 @@ export default function CaseLabsGalleryPage() {
           `isAccessibleForFree` claim inside the schema is true of what is indexed here: the brief,
           the five milestones and the Build workspace all open without an account. */}
       <CourseListJsonLd
-        courses={labs.map((lab) => ({
-          name: lab.title,
-          description: lab.hook,
-          url: `/labs/${lab.id}`,
-          workloadMinutes: lab.estimatedMinutes,
-          teaches: lab.skills,
-        }))}
+        courses={[
+          ...labs.map((lab) => ({
+            name: lab.title,
+            description: lab.hook,
+            url: `/labs/${lab.id}`,
+            workloadMinutes: lab.estimatedMinutes,
+            teaches: lab.skills,
+          })),
+          // UX-SPEC.md §1.2(c): omitted entirely when the flag is off, alongside the sitemap (whose
+          // own workbook entries are a separate, not-yet-wired change outside this task's owned
+          // paths — see task-10-report.md).
+          ...workbookSummaries.map((workbook) => ({
+            name: workbook.title,
+            description: workbook.pitch,
+            url: `/sprint-labs/${workbook.id}`,
+            workloadMinutes: workbook.estimatedHours * 60,
+            teaches: workbook.topics,
+          })),
+        ]}
       />
       <main className="case-lab-workbook min-h-screen bg-[var(--wb-page)] text-[var(--wb-text)]">
         <div className="container mx-auto flex max-w-[1120px] flex-col gap-10 px-4 pt-20 pb-16 sm:pt-24">
@@ -151,7 +176,66 @@ export default function CaseLabsGalleryPage() {
             )}
           </header>
 
-          <CaseLabGallery labs={labs} />
+          {sprintLabsEnabled && (
+            // 44px jump strip (UX-SPEC.md §2): plain anchors, not the round-group `FilterChip`
+            // (that component lives inside the client-only `CaseLabGallery` and has an
+            // active/pressed affordance neither of these needs). `aria-current` is deliberately
+            // absent from both, per spec: they are links, not tabs.
+            <nav aria-label="Jump to a catalog" className="flex flex-wrap gap-2">
+              <a
+                href="#case-labs"
+                className="inline-flex min-h-[44px] items-center rounded-full border border-[var(--wb-border)] px-4 text-xs font-medium text-[var(--wb-text-secondary)] transition-colors hover:bg-black/[0.03] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wb-accent)] dark:hover:bg-white/[0.04]"
+              >
+                Case labs
+              </a>
+              <a
+                href="#sprint-labs"
+                className="inline-flex min-h-[44px] items-center rounded-full border border-[var(--wb-border)] px-4 text-xs font-medium text-[var(--wb-text-secondary)] transition-colors hover:bg-black/[0.03] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wb-accent)] dark:hover:bg-white/[0.04]"
+              >
+                Sprint labs
+              </a>
+            </nav>
+          )}
+
+          {sprintLabsEnabled ? (
+            // The only edit "inside" the Case Labs region UX-SPEC.md §2 asks for: an outer wrapper
+            // matching `SprintLabsSection`'s header shape, added here rather than inside
+            // `CaseLabGallery.tsx` (not one of this task's owned paths) so its own "Pick a case lab"
+            // heading and round groups stay untouched underneath.
+            <section
+              id="case-labs"
+              aria-labelledby="case-labs-heading"
+              className="flex flex-col rounded-2xl border border-[var(--wb-border)] p-4 sm:p-5"
+            >
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span
+                  aria-hidden
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--wb-accent-soft)] text-[var(--wb-accent-strong)]"
+                >
+                  <Layers className="h-[18px] w-[18px]" />
+                </span>
+                <h2
+                  id="case-labs-heading"
+                  className="text-[17px] font-semibold tracking-[-0.01em] text-[var(--wb-text)] sm:text-lg"
+                >
+                  Case labs
+                </h2>
+                <span className="rounded-full bg-[var(--wb-panel)] px-2 py-[3px] text-[11px] font-semibold tracking-[0.04em] text-[var(--wb-text-secondary)] uppercase">
+                  {labs.length} {labs.length === 1 ? "lab" : "labs"}
+                </span>
+              </div>
+              <p className="mt-1.5 max-w-[62ch] text-[13px] leading-relaxed text-[var(--wb-text-secondary)]">
+                one scenario, one sitting.
+              </p>
+              <div className="mt-4">
+                <CaseLabGallery labs={labs} />
+              </div>
+            </section>
+          ) : (
+            <CaseLabGallery labs={labs} />
+          )}
+
+          {sprintLabsEnabled && <SprintLabsSection workbooks={workbookSummaries} />}
 
           {/* Everything below is explanation and ranking surface. It is deliberately after the
               catalog: a visitor who already knows what a case lab is never scrolls past it again. */}
