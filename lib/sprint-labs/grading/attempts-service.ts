@@ -100,6 +100,7 @@ import { recordSprintLabMastery } from "@/lib/sprint-labs/mastery"
 import {
   listWorkspaceFiles,
   requireOwnedActiveRun,
+  requireOwnedRun,
   type StoredSprintLabRun,
 } from "@/lib/sprint-labs/runs"
 import {
@@ -916,12 +917,20 @@ export interface FinalizedAttemptOutcome {
  * bodies + correctness, release-gated) and `sealed.referenceDiff` (finalize-gated), exactly the
  * two secret-content fields `completeSprintLabAttempt`/`reviewSprintLabAttempt` already release
  * post-finalization.
+ *
+ * Ownership check (review round fix): `requireOwnedRun`, NOT `requireOwnedActiveRun`. This is a
+ * READ, and `runs.ts` already reserves the plain, no-status-check `requireOwnedRun` for exactly
+ * this class of call (`listWorkspaceFiles`/`getSprintLabRun` do the same) — "viewing a finished
+ * run's final state (retro/summary) must keep working" is that function's own doc comment. Using
+ * `requireOwnedActiveRun` here would throw `RUN_NOT_ACTIVE` (409) the moment a run completes,
+ * which would break retro/review for every ticket in a run the learner actually finished — the
+ * exact state this endpoint exists to serve.
  */
 export async function getFinalizedSprintLabAttempt(
   userId: string,
   input: GetFinalizedAttemptInput
 ): Promise<FinalizedAttemptOutcome | null> {
-  const run = await requireOwnedActiveRun(userId, input.runId)
+  const run = await requireOwnedRun(userId, input.runId)
 
   const compiledTicket = await getTicket(run.workbookId, input.ticketKey)
   if (!compiledTicket) throw new Error(SPRINT_LAB_ATTEMPT_ERRORS.UNKNOWN_TICKET)

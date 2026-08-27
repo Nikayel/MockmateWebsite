@@ -210,8 +210,16 @@ function parseStoredWorkspaceFile(raw: unknown, docId: string): WorkspaceFileDoc
 // Ownership
 // ============================================================
 
-/** Fetch a run and verify the caller owns it, throwing NOT_FOUND / UNAUTHORIZED otherwise. */
-async function requireOwnedRun(userId: string, runId: string): Promise<StoredSprintLabRun> {
+/**
+ * Fetch a run and verify the caller owns it, throwing NOT_FOUND / UNAUTHORIZED otherwise. Exported
+ * (runtimeB task, same completed-run-read class as `seedWorkspaceFilesIfAbsent`'s own fix in this
+ * file): a READ that must keep working on a finished run — viewing a completed run's retro/summary
+ * — needs this plain check, not `requireOwnedActiveRun`'s additional `RUN_NOT_ACTIVE` throw.
+ * `getFinalizedSprintLabAttempt` (lib/sprint-labs/grading/attempts-service.ts) is the first
+ * cross-file caller; every other consumer of this ownership check already lives in this file and
+ * called it unexported.
+ */
+export async function requireOwnedRun(userId: string, runId: string): Promise<StoredSprintLabRun> {
   const snap = await adminDb.collection(COLLECTION).doc(runId).get()
   if (!snap.exists) throw new Error(SPRINT_LAB_RUN_ERRORS.NOT_FOUND)
   const run = parseStoredRun(snap.data(), snap.id)

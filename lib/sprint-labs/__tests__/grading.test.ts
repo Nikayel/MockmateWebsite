@@ -946,6 +946,23 @@ describe("getFinalizedSprintLabAttempt", () => {
     expect(JSON.stringify(result)).not.toContain("amount must be")
   })
 
+  it("review round fix: still returns the finalized attempt's released data once the run has since COMPLETED (a read must survive a finished run, unlike a write)", async () => {
+    seedRun("run1")
+    const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    await completeSprintLabAttempt(USER, completeInput({ attemptId: opened.attemptId }))
+
+    // The run finishes AFTER the attempt was scored -- requireOwnedActiveRun would throw
+    // RUN_NOT_ACTIVE (409) here; requireOwnedRun (the fix) must not. Re-seeding the same run id
+    // with status: "completed" mirrors an in-place run-status transition.
+    seedRun("run1", { status: "completed" })
+
+    const result = await getFinalizedSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    expect(result).not.toBeNull()
+    expect(result?.attemptId).toBe(opened.attemptId)
+    expect(result?.outcome.attempt.finalized).toBe(true)
+    expect(result?.outcome.referenceDiff).toContain("diff --git")
+  })
+
   it("review-only: releases comment BODIES even before the review round is submitted, but never correctness", async () => {
     seedRun("run1")
     contentMocks.getTicket.mockResolvedValue(ticketFixture({ aiPolicy: "review-only" }))
