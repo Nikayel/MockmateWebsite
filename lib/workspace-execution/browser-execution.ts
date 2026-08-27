@@ -18,6 +18,7 @@ import {
   executeWorkspaceScenarioSqlClientSide,
   type SqlSingleFileScenario,
 } from "./sql-sandbox"
+import { executeWorkspaceScenarioTsClientSide } from "./ts-workspace"
 import { ORACLE_VISIBLE_PATH } from "@/lib/bugfix/packs/scenario"
 import { isPackScenario, isWorkspaceScenario, type PackScenario } from "./validators"
 
@@ -182,7 +183,9 @@ export async function executeScenarioInBrowser(options: {
         ? await executeWorkspaceScenarioPythonClientSide(scenario, edits)
         : language === "sql"
           ? await executeWorkspaceScenarioSqlClientSide(scenario, edits)
-          : await executeWorkspaceScenarioJsClientSide(scenario, edits)
+          : language === "typescript"
+            ? await executeWorkspaceScenarioTsClientSide(scenario, edits)
+            : await executeWorkspaceScenarioJsClientSide(scenario, edits)
 
     return formatWorkspaceResult(result)
   }

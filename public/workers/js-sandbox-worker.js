@@ -77,11 +77,13 @@ async function runTsWorkspaceMode(files, testPaths, hiddenTestPaths) {
   }
 
   const modules = {}
+  const transpileTimingsMs = {}
   for (const file of files) {
     const cleanFilePath = file.path.replace(/^\.\//, "")
     if (/\.tsx?$/.test(cleanFilePath)) {
       const compiler = ensureTypeScriptCompiler()
-      const { code } = tsTranspileCache.transpile(cleanFilePath, file.content, compiler)
+      const { code, ms } = tsTranspileCache.transpile(cleanFilePath, file.content, compiler)
+      transpileTimingsMs[file.path] = ms
       modules[cleanFilePath.replace(/\.tsx?$/, ".js")] = code
     } else {
       modules[cleanFilePath] = file.content
@@ -169,6 +171,11 @@ async function runTsWorkspaceMode(files, testPaths, hiddenTestPaths) {
   // into `logs` for the client to parse.
   // eslint-disable-next-line no-console
   console.log("__WORKSPACE_TEST_RESULTS__:" + JSON.stringify(results))
+
+  // Riding the existing generic `result` field (see onmessage's final postMessage below): the
+  // entrypoint-mode branch never reads it, so reusing it here to carry per-file transpile timing
+  // back to the client (ts-workspace/worker-runner.ts) needs no new message-shape field.
+  return { transpileTimingsMs: transpileTimingsMs }
 }
 
 self.onmessage = async function (e) {
@@ -235,7 +242,7 @@ self.onmessage = async function (e) {
       // it auto-requires testPaths then hiddenTestPaths itself and reports through the SAME
       // console.log marker the branch below relies on, so the result-parsing code after this
       // try/catch needs no changes for either mode.
-      await runTsWorkspaceMode(files, testPaths, hiddenTestPaths)
+      result = await runTsWorkspaceMode(files, testPaths, hiddenTestPaths)
     } else if (files && entrypoint) {
       // Workspace CommonJS Mode
       const modules = {}
