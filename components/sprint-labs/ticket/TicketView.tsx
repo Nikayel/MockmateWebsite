@@ -21,6 +21,15 @@
  * All four route targets (`workspace`, `submit`, `review`, `retro`) sit under
  * `run/ticket/[ticketKey]/**`, none of which this task creates (Tasks 12-13 own those segments) — the
  * links are correct today even though their targets 404 until those tasks land.
+ *
+ * **`playable === false` overrides the CTA resolution above entirely.** A compiled content stub (no
+ * `reference.diff`/`rubric.yaml` yet — see `TicketPublic.playable`'s doc comment) has no workspace
+ * content and no sealed bundle to grade against, so none of `workspace`/`submit`/`review`/`retro` has
+ * anything real to show. The CTA renders as a disabled, muted "Content coming soon" control instead
+ * of a link, whatever `resolveCta` would otherwise have picked. Everything else on the screen (body,
+ * acceptance criteria, objectives, policy banner) stays exactly as authored — a learner can still
+ * read a stub, just not play it. `undefined` (every ticket compiled before this field existed) reads
+ * the same as `true`.
  */
 
 import Link from "next/link"
@@ -44,6 +53,10 @@ export interface TicketViewProps {
 
 const CTA_BUTTON_CLASS =
   "h-11 bg-[var(--wb-accent-fill)] text-[var(--wb-accent-on)] hover:bg-[var(--wb-accent-hover)] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wb-accent)]"
+
+/** `playable === false`: muted, non-interactive — no hover/accent color, so it never reads as a live control. */
+const NOT_PLAYABLE_CTA_CLASS =
+  "h-11 border border-[var(--wb-border)] bg-[var(--wb-panel)] text-[var(--wb-disabled)] hover:bg-[var(--wb-panel)] hover:text-[var(--wb-disabled)]"
 
 function resolveCta(
   policy: TicketPublic["aiPolicy"],
@@ -130,11 +143,17 @@ export function TicketView({ workbookId, ticket, status, escapedCount }: TicketV
         </section>
 
         <div className="flex flex-wrap items-center gap-4 border-t border-[var(--wb-border)] pt-4">
-          <Button asChild size="lg" className={CTA_BUTTON_CLASS}>
-            <Link href={`/sprint-labs/${workbookId}/run/${cta.segment}/${ticket.key}`}>
-              {cta.label}
-            </Link>
-          </Button>
+          {ticket.playable === false ? (
+            <Button size="lg" disabled className={NOT_PLAYABLE_CTA_CLASS}>
+              Content coming soon
+            </Button>
+          ) : (
+            <Button asChild size="lg" className={CTA_BUTTON_CLASS}>
+              <Link href={`/sprint-labs/${workbookId}/run/${cta.segment}/${ticket.key}`}>
+                {cta.label}
+              </Link>
+            </Button>
+          )}
           <span className="text-xs text-[var(--wb-text-secondary)]">
             {ticket.points} {ticket.points === 1 ? "point" : "points"}. Visible tests run in your
             browser.
