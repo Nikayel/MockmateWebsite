@@ -73,13 +73,28 @@ describe("sprintLabObjectiveSchema", () => {
 })
 
 describe("archMapDeltaSchema", () => {
-  it("parses the three labelled lists", () => {
+  it("parses the UX-SPEC.md shape (added/changed/broke)", () => {
     const value = { added: ["POST /claims"], changed: [], broke: [] }
     expect(archMapDeltaSchema.safeParse(value).success).toBe(true)
   })
 
-  it("rejects a missing list", () => {
-    expect(archMapDeltaSchema.safeParse({ added: [], changed: [] }).success).toBe(false)
+  it("parses the WORKBOOK-SPEC.md shape (invariants only) — ruling R10 hedges both", () => {
+    const result = archMapDeltaSchema.safeParse({
+      invariants: ["money is bigint minor units at every boundary"],
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it("defaults every list to an empty array when all four are omitted", () => {
+    const result = archMapDeltaSchema.safeParse({})
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data).toEqual({ added: [], changed: [], broke: [], invariants: [] })
+    }
+  })
+
+  it("rejects a non-array value for a list that is provided", () => {
+    expect(archMapDeltaSchema.safeParse({ added: "not-an-array" }).success).toBe(false)
   })
 })
 
@@ -112,9 +127,12 @@ describe("workbookSummarySchema", () => {
     expect(workbookSummarySchema.safeParse({ ...valid, sprintCount: 0 }).success).toBe(false)
   })
 
-  it("tolerates an unknown extra field (content schema, not a leak boundary)", () => {
+  it("tolerates an unknown extra field by stripping it (content schema, not a leak boundary)", () => {
     const result = workbookSummarySchema.safeParse({ ...valid, futureField: "ignored" })
     expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data).not.toHaveProperty("futureField")
+    }
   })
 })
 
@@ -176,6 +194,20 @@ describe("ticketPublicSchema", () => {
       payoffFor: "MER-1005",
     })
     expect(result.success).toBe(true)
+  })
+
+  it("rejects an unassisted ticket missing aiPolicyReason", () => {
+    const result = ticketPublicSchema.safeParse({ ...valid, aiPolicy: "unassisted" })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects an unassisted ticket with a blank aiPolicyReason", () => {
+    const result = ticketPublicSchema.safeParse({
+      ...valid,
+      aiPolicy: "unassisted",
+      aiPolicyReason: "   ",
+    })
+    expect(result.success).toBe(false)
   })
 
   it("rejects an aiPolicy outside the enum", () => {
@@ -395,6 +427,14 @@ describe("ticketAttemptSchema", () => {
   it("rejects an aiPolicy outside the enum", () => {
     expect(ticketAttemptSchema.safeParse({ ...valid, aiPolicy: "auto" }).success).toBe(false)
   })
+
+  it("rejects an extra field (grading output; e.g. a stray referenceDiff)", () => {
+    const result = ticketAttemptSchema.safeParse({
+      ...valid,
+      referenceDiff: "diff --git a/x b/x",
+    })
+    expect(result.success).toBe(false)
+  })
 })
 
 describe("provenanceSchema", () => {
@@ -469,10 +509,15 @@ describe("directiveEntrySchema", () => {
 })
 
 describe("platform-capabilities", () => {
-  it("names the ETA and folds it into the canonical message", () => {
+  it("pins the canonical capability sentence exactly", () => {
     expect(SERVER_EXECUTION_ETA).toBe("next month")
-    expect(SERVER_EXECUTION_MESSAGE).toContain(SERVER_EXECUTION_ETA)
-    expect(SERVER_EXECUTION_MESSAGE).not.toContain("--")
+    expect(SERVER_EXECUTION_MESSAGE).toBe(
+      "Server-side isolated grading and additional languages land next month."
+    )
+  })
+
+  it("contains no em dash (site-wide no-em-dash rule for learner-facing prose)", () => {
+    expect(SERVER_EXECUTION_MESSAGE).not.toContain("—")
   })
 
   it("lists exactly the four supported workbook languages, in order", () => {

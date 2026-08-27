@@ -15,19 +15,26 @@
  *
  * Two strictness tiers, deliberately:
  *  - Types that project grading OUTPUT back to a learner (`GateResultCase`,
- *    `GateResult`, `TicketAttemptScores`) and `TicketSecretMeta`, which sits
- *    at the same public/secret boundary, are `.strict()`: an unexpected
- *    extra field there is a parse error, not a silent leak of secret
- *    content. This is WORKBOOK-SPEC.md's spoiler-boundary invariant enforced
- *    at the schema layer, not just in code review.
- *  - Content types (`WorkbookSummary`, `SprintPublic`, `TicketPublic`) are
- *    plain objects. They describe authored content, not a security
- *    boundary, so an unrecognized key is future-compiler tolerance, not a
- *    threat, and is silently stripped rather than rejected.
- * Array-length and cross-field business rules (at least one objective, a
- * legal board transition, ...) are deliberately NOT enforced here — that is
- * `lab validate`'s job (PLAN.md Task 3), layered on top of this structural
- * contract.
+ *    `GateResult`, `TicketAttemptScores`, `TicketAttempt`) and
+ *    `TicketSecretMeta`, which sits at the same public/secret boundary, are
+ *    `.strict()`: an unexpected extra field there is a parse error, not a
+ *    silent leak of secret content. This is WORKBOOK-SPEC.md's
+ *    spoiler-boundary invariant enforced at the schema layer, not just in
+ *    code review.
+ *  - Content types (`WorkbookSummary`, `SprintPublic`, `TicketPublic`) stay
+ *    lenient on unknown keys. They describe authored content, not a
+ *    security boundary, so an unrecognized key is future-compiler
+ *    tolerance, not a threat, and is silently stripped rather than
+ *    rejected. (`TicketPublic` additionally runs one narrow cross-field
+ *    check via `.superRefine`, unrelated to key-strictness — see below.)
+ * Array-length and most cross-field business rules (at least one objective,
+ * a legal board transition, ...) are deliberately NOT enforced here — that
+ * is `lab validate`'s job (PLAN.md Task 3), layered on top of this
+ * structural contract. One exception: `TicketPublic.aiPolicyReason` is
+ * required when `aiPolicy` is "unassisted", enforced via `.superRefine`,
+ * because AUTHORING-RULES.md §6 treats it as a hard content rule (it drives
+ * a non-dismissible workspace banner) rather than a catalog-completeness
+ * lint.
  *
  * `TicketSecretMeta` is METADATA ONLY (id/humanName/tags/kind). Hidden-test
  * bodies and expected values are never typed here and never ship
@@ -91,11 +98,20 @@ export type SprintLabObjective = z.infer<typeof sprintLabObjectiveSchema>
 // Catalog content (public, client-safe — compiled by Task 2)
 // ============================================================
 
-/** The three architecture-map lists a sprint renders (`ArchMapDelta` component, UX-SPEC.md §1.7-1.8). */
+/**
+ * The architecture-map lists a sprint renders. The specs disagree on the
+ * shape: WORKBOOK-SPEC.md §6 authors `archMapDelta.invariants[]`;
+ * UX-SPEC.md's `ArchMapDelta` component (§1.7-1.8) renders `{added, changed,
+ * broke}`. Ruling R10: hedge rather than pick a side. All four lists are
+ * carried, each optional and defaulting to an empty array, so content
+ * authored against either spec parses and no later task is blocked on
+ * which draft is "right."
+ */
 export const archMapDeltaSchema = z.object({
-  added: z.array(z.string()),
-  changed: z.array(z.string()),
-  broke: z.array(z.string()),
+  added: z.array(z.string()).default([]),
+  changed: z.array(z.string()).default([]),
+  broke: z.array(z.string()).default([]),
+  invariants: z.array(z.string()).default([]),
 })
 export type ArchMapDelta = z.infer<typeof archMapDeltaSchema>
 
@@ -138,23 +154,39 @@ export const sprintPublicSchema = z.object({
 })
 export type SprintPublic = z.infer<typeof sprintPublicSchema>
 
-/** One ticket's public content, compiled from `ticket.md`. Never lists which files to touch. */
-export const ticketPublicSchema = z.object({
-  key: z.string().min(1),
-  title: z.string().min(1),
-  points: z.number().int().positive(),
-  labels: z.array(z.string()),
-  aiPolicy: aiPolicySchema,
-  /** Required (by [validate], not enforced here) when `aiPolicy` is "unassisted". Written in-fiction. */
-  aiPolicyReason: z.string().optional(),
-  objectives: z.array(sprintLabObjectiveSchema),
-  bodyMd: z.string().min(1),
-  acceptanceCriteria: z.array(z.string()),
-  /** Whether a hostile `adversary/` runner exists for this ticket. */
-  adversaryPresent: z.boolean(),
-  /** The later ticket key this ticket's work pays off, if any. */
-  payoffFor: z.string().optional(),
-})
+/**
+ * One ticket's public content, compiled from `ticket.md`. Never lists which
+ * files to touch. `aiPolicyReason` is required when `aiPolicy` is
+ * "unassisted" (AUTHORING-RULES.md §6: it renders as a non-dismissible
+ * workspace banner, so a ticket that can't show one is a content bug, not
+ * just a lint) — enforced below via `.superRefine`.
+ */
+export const ticketPublicSchema = z
+  .object({
+    key: z.string().min(1),
+    title: z.string().min(1),
+    points: z.number().int().positive(),
+    labels: z.array(z.string()),
+    aiPolicy: aiPolicySchema,
+    /** Required when `aiPolicy` is "unassisted"; enforced below. Written in-fiction. */
+    aiPolicyReason: z.string().optional(),
+    objectives: z.array(sprintLabObjectiveSchema),
+    bodyMd: z.string().min(1),
+    acceptanceCriteria: z.array(z.string()),
+    /** Whether a hostile `adversary/` runner exists for this ticket. */
+    adversaryPresent: z.boolean(),
+    /** The later ticket key this ticket's work pays off, if any. */
+    payoffFor: z.string().optional(),
+  })
+  .superRefine((ticket, ctx) => {
+    if (ticket.aiPolicy === "unassisted" && !ticket.aiPolicyReason?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["aiPolicyReason"],
+        message: 'aiPolicyReason is required when aiPolicy is "unassisted".',
+      })
+    }
+  })
 export type TicketPublic = z.infer<typeof ticketPublicSchema>
 
 /**
@@ -247,10 +279,12 @@ export const gateResultSchema = z
 export type GateResult = z.infer<typeof gateResultSchema>
 
 /**
- * The five rubric dimensions (WORKBOOK-SPEC.md §5), 0-100.
- * `communication` is nullable: present only when a ticket collects prose,
- * else null and the remaining four dimensions are renormalized.
- * `.strict()` for the same leak reason as `GateResult`.
+ * The five rubric dimensions, 0-100 (names and scale per WORKBOOK-SPEC.md
+ * §5). `communication` is nullable: present only when a ticket collects
+ * prose, else null and the remaining four dimensions are renormalized —
+ * that specific rule is docs/sprint-labs/PLAN.md's Task 8 scoring section,
+ * not WORKBOOK-SPEC.md §5 itself. `.strict()` for the same leak reason as
+ * `GateResult`.
  */
 export const ticketAttemptScoresSchema = z
   .object({
@@ -267,23 +301,28 @@ export type TicketAttemptScores = z.infer<typeof ticketAttemptScoresSchema>
 /**
  * One submission attempt. Subcollection: `sprintLabRuns/{runId}/attempts`.
  * Finalizes at first submission (WORKBOOK-SPEC.md §5 rule 2); `escapedDefects`
- * and the reference diff release only after that.
+ * and the reference diff release only after that. `.strict()`: this
+ * projects grading output to the learner, so a stray field (a
+ * `referenceDiff` attached before finalization, say) is a parse error, not
+ * a silent leak — same reasoning as `GateResult`.
  */
-export const ticketAttemptSchema = z.object({
-  ticketKey: z.string().min(1),
-  aiPolicy: aiPolicySchema,
-  /** The hidden-suite variant issued for this attempt; rotates on re-attempt. */
-  variantId: z.string().min(1),
-  finalized: z.boolean(),
-  gateResults: z.array(gateResultSchema),
-  /** Curated humanNames of hidden/adversary cases this attempt failed. */
-  escapedDefects: z.array(z.string()),
-  scores: ticketAttemptScoresSchema,
-  /** Recorded per WORKBOOK-SPEC.md §5 rule 4: a score is dated to a model. */
-  modelId: z.string().optional(),
-  /** ISO timestamp. */
-  submittedAt: z.string().min(1),
-})
+export const ticketAttemptSchema = z
+  .object({
+    ticketKey: z.string().min(1),
+    aiPolicy: aiPolicySchema,
+    /** The hidden-suite variant issued for this attempt; rotates on re-attempt. */
+    variantId: z.string().min(1),
+    finalized: z.boolean(),
+    gateResults: z.array(gateResultSchema),
+    /** Curated humanNames of hidden/adversary cases this attempt failed. */
+    escapedDefects: z.array(z.string()),
+    scores: ticketAttemptScoresSchema,
+    /** Recorded per WORKBOOK-SPEC.md §5 rule 4: a score is dated to a model. */
+    modelId: z.string().optional(),
+    /** ISO timestamp. */
+    submittedAt: z.string().min(1),
+  })
+  .strict()
 export type TicketAttempt = z.infer<typeof ticketAttemptSchema>
 
 // ============================================================
