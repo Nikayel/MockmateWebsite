@@ -17,7 +17,8 @@ import {
   Blocks,
 } from "lucide-react"
 import { DSAPattern, PATTERN_METADATA } from "@/lib/types/dsa-patterns"
-import type { RoadmapMixMode, RoadmapCategory } from "@/lib/data/company-questions/types"
+import type { RoadmapCategory, RoadmapMixMode } from "@/lib/data/company-questions/types"
+import type { AssessmentResult } from "@/lib/roadmap/pending-wizard"
 import { cn } from "@/lib/utils"
 
 interface SkillAssessmentProps {
@@ -25,18 +26,9 @@ interface SkillAssessmentProps {
   onBack?: () => void
 }
 
-export interface AssessmentResult {
-  experienceLevel: "intern" | "beginner" | "intermediate" | "advanced"
-  targetTrack?: "swe" | "fdse"
-  problemsSolved: number
-  hoursPerDay: number
-  patternFamiliarity: {
-    pattern: DSAPattern
-    level: "unknown" | "seen" | "practiced" | "confident"
-  }[]
-  mixMode: RoadmapMixMode
-  selectedCategories?: RoadmapCategory[]
-}
+// The result shape lives in lib/roadmap/pending-wizard so the wizard page can persist a
+// finished walk across the sign-in round trip; re-exported here so existing imports hold.
+export type { AssessmentResult }
 
 type Step = "experience" | "track" | "focus" | "problems" | "hours" | "patterns"
 
