@@ -47,7 +47,7 @@ export function SprintLabsSection({ workbooks }: SprintLabsSectionProps) {
         </span>
       </div>
       <p className="mt-1.5 max-w-[62ch] text-[13px] leading-relaxed text-[var(--wb-text-secondary)]">
-        ten sprints on one codebase. the repo remembers what you did, and sprint 9 breaks the code
+        Ten sprints on one codebase. The repo remembers what you did, and sprint 9 breaks the code
         you wrote in sprint 4.
       </p>
       <div className="mt-4 grid [grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))] gap-3.5">
