@@ -10,7 +10,7 @@ objectives:
 acceptanceCriteria:
   - "A request that sends no version information at all receives exactly the response shape it received before this ticket, unchanged."
   - "The v1 response shape keeps serializing money the way it always has, unchanged by the new representation."
-  - "The v2 response shape drops the two legacy pagination parameters entirely; the v1 shape keeps honoring them under the compatibility shim."
+  - "The v2 response shape drops the single legacy pagination parameter, offset; the v1 shape keeps honoring it under the compatibility shim."
   - "A subscription's pinned version is stored and honored on every subsequent request from that subscription, not just the one that set it."
   - "The generated contract document for this route states both the v1 and the v2 parameter lists correctly, from the same source of truth."
 ---

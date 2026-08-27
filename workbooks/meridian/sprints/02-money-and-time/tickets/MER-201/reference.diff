@@ -426,7 +426,7 @@ index 0c5ab46..4092afb 100644
 +
 +describe("allocateRoundedTotal", () => {
 +  it("splits a total that divides evenly with no remainder to place", () => {
-+    const shares = allocateRoundedTotal({ minorUnits: 300, currency: "USD" }, 3)
++    const shares = allocateRoundedTotal({ total: { minorUnits: 300, currency: "USD" }, count: 3 })
 +    expect(shares).toEqual([
 +      { minorUnits: 100, currency: "USD" },
 +      { minorUnits: 100, currency: "USD" },
@@ -435,13 +435,13 @@ index 0c5ab46..4092afb 100644
 +  })
 +
 +  it("sums back to exactly the original total when the split does not divide evenly", () => {
-+    const shares = allocateRoundedTotal({ minorUnits: 100, currency: "USD" }, 3)
++    const shares = allocateRoundedTotal({ total: { minorUnits: 100, currency: "USD" }, count: 3 })
 +    const sum = shares.reduce((total, share) => total + share.minorUnits, 0)
 +    expect(sum).toBe(100)
 +    expect(shares.map((share) => share.minorUnits)).toEqual([34, 33, 33])
 +  })
 +
 +  it("returns no shares for a non-positive count", () => {
-+    expect(allocateRoundedTotal({ minorUnits: 100, currency: "USD" }, 0)).toEqual([])
++    expect(allocateRoundedTotal({ total: { minorUnits: 100, currency: "USD" }, count: 0 })).toEqual([])
    })
  })
