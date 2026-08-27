@@ -13,6 +13,17 @@
  * `ticketPublicSchema` is a lenient (non-`.strict()`) object schema —
  * merging extra keys into the object passed through `.parse()` would have
  * them silently stripped rather than preserved.
+ *
+ * `CompiledWorkbook` vs `WorkbookContent` (review round 1, M-5): the public
+ * registry eagerly imports every `WorkbookSummary` (small, needed for the
+ * catalog grid) but loads a workbook's sprints + tickets lazily, on demand,
+ * behind a dynamic import — the same shape the sealed registry already
+ * uses for `loadSealedTicket`. A catalog page must not pull every ticket's
+ * `bodyMd` and visible-test file contents into its bundle just to render
+ * summary cards. `WorkbookContent` is what that lazy loader resolves to;
+ * `CompiledWorkbook` (summary + content together) is the compiler's own
+ * internal, in-memory shape for one fully-compiled workbook and is not
+ * what the generated registry.ts stores at runtime.
  */
 
 import type {
@@ -36,7 +47,13 @@ export interface CompiledTicket {
   hiddenTests: TicketSecretMeta[]
 }
 
-/** One compiled workbook: its summary, its sprints in order, and its tickets by key. */
+/** A workbook's sprints (in order) and tickets by key, loaded lazily. */
+export interface WorkbookContent {
+  sprints: SprintPublic[]
+  ticketsByKey: Record<string, CompiledTicket>
+}
+
+/** One compiled workbook: its summary plus its content, as one in-memory value. */
 export interface CompiledWorkbook {
   summary: WorkbookSummary
   sprints: SprintPublic[]
