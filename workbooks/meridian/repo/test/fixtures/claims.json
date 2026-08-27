@@ -1,0 +1,35 @@
+[
+  {
+    "id": "clm_seed001",
+    "tenantId": "ten_northwind",
+    "externalRef": "NW-4001",
+    "status": "submitted",
+    "amount": 1204.5,
+    "currency": "USD",
+    "claimantName": "Alex Chen",
+    "lossDate": "2026-01-03",
+    "createdAt": "2026-01-04T09:12:00.000Z"
+  },
+  {
+    "id": "clm_seed002",
+    "tenantId": "ten_northwind",
+    "externalRef": "NW-4002",
+    "status": "submitted",
+    "amount": 89.99,
+    "currency": "USD",
+    "claimantName": "Morgan Blake",
+    "lossDate": "2026-01-03",
+    "createdAt": "2026-01-04T09:12:00.000Z"
+  },
+  {
+    "id": "clm_seed003",
+    "tenantId": "ten_northwind",
+    "externalRef": "NW-4003",
+    "status": "under_review",
+    "amount": 5600.0,
+    "currency": "USD",
+    "claimantName": "Sam Okafor",
+    "lossDate": "2026-01-05",
+    "createdAt": "2026-01-06T14:47:31.000Z"
+  }
+]
