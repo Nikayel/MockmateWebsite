@@ -241,7 +241,7 @@ export function AIAssistedSection() {
             className="group bg-accent text-accent-foreground hover:bg-accent/90 inline-flex items-center gap-2.5 rounded-full px-7 py-3.5 text-sm font-semibold tracking-wide shadow-[0_0_30px_rgba(196,112,63,0.25)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_40px_rgba(196,112,63,0.4)]"
           >
             <Zap className="h-4 w-4" />
-            Practice Like the Real Thing
+            Start free
             <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
           </Link>
         </div>
