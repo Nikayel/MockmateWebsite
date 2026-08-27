@@ -31,10 +31,10 @@ export function FinalCTASection() {
             </p>
 
             <div className="mb-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Link href="/roadmap">
+              <Link href="/roadmap/new">
                 <MagneticButton size="lg" variant="primary" glowColor="accent">
                   <Route className="h-5 w-5" />
-                  Create Free Roadmap
+                  Build your roadmap
                   <ArrowRight className="h-5 w-5" />
                 </MagneticButton>
               </Link>
@@ -45,9 +45,7 @@ export function FinalCTASection() {
               </Link>
             </div>
 
-            <p className="text-muted-foreground text-sm">
-              No credit card required. Start practicing in 30 seconds.
-            </p>
+            <p className="text-muted-foreground text-sm">No credit card required.</p>
           </div>
         </ScrollReveal>
       </div>

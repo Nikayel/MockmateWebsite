@@ -55,7 +55,7 @@ export function HeroSection() {
               className="mt-9 flex flex-col items-start gap-x-6 gap-y-4 sm:flex-row sm:items-center"
             >
               <Link
-                href="/roadmap"
+                href="/roadmap/new"
                 className="bg-foreground text-background hover:bg-foreground/90 inline-flex rounded-[8px] px-8 py-3.5 text-base font-semibold transition-colors duration-200"
               >
                 Create your roadmap
@@ -64,7 +64,7 @@ export function HeroSection() {
                 href="/interview"
                 className="text-foreground/80 hover:text-accent inline-flex items-center gap-1 text-base font-medium transition-colors duration-200"
               >
-                Start practicing free
+                Start free
                 <ChevronRight className="h-4 w-4" />
               </Link>
             </motion.div>
