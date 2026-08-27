@@ -29,13 +29,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { AiPolicy, GateResult, TicketBoardStatus } from "@/lib/sprint-labs/types"
-import type { CompleteAttemptOutcome } from "@/lib/sprint-labs/grading/attempts-service"
 import {
   cacheCompletedOutcome,
   completeAttempt,
   ensureBoardAtLeast,
   getCachedCompletedOutcome,
   openAttempt,
+  type CachedAttempt,
 } from "./attempt-client"
 
 export type SubmitPhase =
@@ -73,7 +73,7 @@ export function useSubmitScreenController({
   boardStatus,
 }: UseSubmitScreenControllerInput): SubmitScreenState {
   const [phase, setPhase] = useState<SubmitPhase>("loading")
-  const [outcome, setOutcome] = useState<CompleteAttemptOutcome | null>(null)
+  const [cached, setCached] = useState<CachedAttempt | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [cooldownDeadline, setCooldownDeadline] = useState<number | null>(null)
   const [cooldownSecondsRemaining, setCooldownSecondsRemaining] = useState(0)
@@ -85,9 +85,9 @@ export function useSubmitScreenController({
     if (startedForRef.current === `${runId}:${ticketKey}`) return
 
     startedForRef.current = `${runId}:${ticketKey}`
-    const cached = getCachedCompletedOutcome(runId, ticketKey)
-    if (cached) {
-      setOutcome(cached)
+    const existing = getCachedCompletedOutcome(runId, ticketKey)
+    if (existing) {
+      setCached(existing)
       setPhase("active")
       return
     }
@@ -111,7 +111,7 @@ export function useSubmitScreenController({
     if (runId === null) return
     startedForRef.current = `${runId}:${ticketKey}`
     setPhase("active")
-    setOutcome(null)
+    setCached(null)
     setErrorMessage(null)
 
     const opened = await openAttempt({ runId, ticketKey })
@@ -144,8 +144,9 @@ export function useSubmitScreenController({
       return
     }
 
-    cacheCompletedOutcome(runId, ticketKey, completed.data)
-    setOutcome(completed.data)
+    const nextCached: CachedAttempt = { attemptId: opened.data.attemptId, outcome: completed.data }
+    cacheCompletedOutcome(runId, ticketKey, nextCached)
+    setCached(nextCached)
     setPhase("active")
 
     void ensureBoardAtLeast(runId, boardStatus ?? "todo", ticketKey, "review").then((reached) => {
@@ -166,11 +167,11 @@ export function useSubmitScreenController({
 
   return {
     phase,
-    gateResults: outcome?.attempt.gateResults ?? null,
-    escapedDefects: outcome?.attempt.escapedDefects ?? [],
-    aiPolicy: outcome?.attempt.aiPolicy ?? null,
-    submissionsRemaining: outcome?.submissionsRemaining ?? null,
-    reviewComments: outcome?.reviewComments ?? null,
+    gateResults: cached?.outcome.attempt.gateResults ?? null,
+    escapedDefects: cached?.outcome.attempt.escapedDefects ?? [],
+    aiPolicy: cached?.outcome.attempt.aiPolicy ?? null,
+    submissionsRemaining: cached?.outcome.submissionsRemaining ?? null,
+    reviewComments: cached?.outcome.reviewComments ?? null,
     errorMessage,
     cooldownSecondsRemaining,
     start,

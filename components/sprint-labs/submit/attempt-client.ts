@@ -138,19 +138,27 @@ function writeCache(key: string, value: unknown): void {
   }
 }
 
-export function getCachedCompletedOutcome(
-  runId: string,
-  ticketKey: string
-): CompleteAttemptOutcome | null {
-  return readCache<CompleteAttemptOutcome>(completedKey(runId, ticketKey))
+/**
+ * `CompleteAttemptOutcome` carries no `attemptId` (`TicketAttempt` is frozen/`.strict()` with no id
+ * field — see lib/sprint-labs/types.ts). The review round's input schema requires one anyway
+ * (`reviewAttemptInputSchema.attemptId`), so the cache keeps it alongside the outcome rather than
+ * discarding the one value `POST /attempts` (open) ever hands back.
+ */
+export interface CachedAttempt {
+  attemptId: string
+  outcome: CompleteAttemptOutcome
+}
+
+export function getCachedCompletedOutcome(runId: string, ticketKey: string): CachedAttempt | null {
+  return readCache<CachedAttempt>(completedKey(runId, ticketKey))
 }
 
 export function cacheCompletedOutcome(
   runId: string,
   ticketKey: string,
-  outcome: CompleteAttemptOutcome
+  cached: CachedAttempt
 ): void {
-  writeCache(completedKey(runId, ticketKey), outcome)
+  writeCache(completedKey(runId, ticketKey), cached)
 }
 
 export function getCachedReviewOutcome(

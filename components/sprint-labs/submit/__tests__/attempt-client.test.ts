@@ -14,28 +14,31 @@ import {
   cacheCompletedOutcome,
   ensureBoardAtLeast,
   getCachedCompletedOutcome,
+  type CachedAttempt,
 } from "../attempt-client"
-import type { CompleteAttemptOutcome } from "@/lib/sprint-labs/grading/attempts-service"
 
-const OUTCOME: CompleteAttemptOutcome = {
-  attempt: {
-    ticketKey: "MER-305",
-    aiPolicy: "assisted",
-    variantId: "v1",
-    finalized: true,
-    gateResults: [],
-    escapedDefects: [],
-    scores: {
-      understanding: 80,
-      problemSolving: 80,
-      codeQuality: 80,
-      communication: null,
-      verification: 80,
-      overall: 80,
+const CACHED: CachedAttempt = {
+  attemptId: "attempt-1",
+  outcome: {
+    attempt: {
+      ticketKey: "MER-305",
+      aiPolicy: "assisted",
+      variantId: "v1",
+      finalized: true,
+      gateResults: [],
+      escapedDefects: [],
+      scores: {
+        understanding: 80,
+        problemSolving: 80,
+        codeQuality: 80,
+        communication: null,
+        verification: 80,
+        overall: 80,
+      },
+      submittedAt: "2026-01-01T00:00:00.000Z",
     },
-    submittedAt: "2026-01-01T00:00:00.000Z",
+    submissionsRemaining: 4,
   },
-  submissionsRemaining: 4,
 }
 
 afterEach(() => {
@@ -44,14 +47,14 @@ afterEach(() => {
 })
 
 describe("attempt-client session cache", () => {
-  it("round-trips a completed outcome scoped by (runId, ticketKey)", () => {
+  it("round-trips a completed outcome (with its attemptId) scoped by (runId, ticketKey)", () => {
     expect(getCachedCompletedOutcome("run1", "MER-305")).toBeNull()
-    cacheCompletedOutcome("run1", "MER-305", OUTCOME)
-    expect(getCachedCompletedOutcome("run1", "MER-305")).toEqual(OUTCOME)
+    cacheCompletedOutcome("run1", "MER-305", CACHED)
+    expect(getCachedCompletedOutcome("run1", "MER-305")).toEqual(CACHED)
   })
 
   it("scopes the cache per run — a different runId is a miss even for the same ticket", () => {
-    cacheCompletedOutcome("run1", "MER-305", OUTCOME)
+    cacheCompletedOutcome("run1", "MER-305", CACHED)
     expect(getCachedCompletedOutcome("run2", "MER-305")).toBeNull()
   })
 })
