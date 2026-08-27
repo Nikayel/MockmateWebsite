@@ -77,6 +77,12 @@ docs/._*
 # Future Sprints
 /future-sprints/
 
+# Vendored TypeScript compiler build for the Sprint Labs worker
+# (public/vendor/typescript/typescript.js). Regenerated from node_modules/typescript by
+# scripts/copy-ts-vendor.mjs on every `pnpm install` (postinstall); never commit it, or it will
+# drift from the pinned devDependency version instead of tracking it.
+/public/vendor/
+
 # Firebase emulator artifacts (pnpm test:integration)
 firestore-debug.log
 firebase-debug.log
