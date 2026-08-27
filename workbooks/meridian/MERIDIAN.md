@@ -11,21 +11,17 @@ Every tenant is a distinct insurance partner, and every claim belongs to exactly
 them. Tenant identity travels on the request itself; there is no session or auth token in
 front of this API yet, so treat whatever identifies the tenant as something a caller states
 rather than something the platform has already verified for you. Not everything in this
-system carries its own tenant reference. A claim's attachments only know which claim they
-belong to, not which tenant, because the process that creates them only ever sees a claim
-identifier, never a tenant. An attachment's tenant is always its parent claim's tenant,
-nothing else, and nothing stored directly on the attachment should ever be allowed to
-disagree with that.
+system carries its own tenant reference. A claim's attachments carry a claim identifier and
+no tenant of their own, because the process that creates them only ever sees a claim
+identifier, never a tenant.
 
 ## Money
 
 An amount is a plain floating point number today: dollars, not cents, with the currency
 carried alongside it rather than folded into the value. That is true of the type, the
 storage, and the wire format alike, everywhere, right now. There is exactly one function
-responsible for rounding a dollar amount, and nothing else should reimplement that logic or
-assume a value handed to it has already been rounded. Whatever you build against money,
-assume it can carry more precision than a person would expect, and that comparing two
-amounts for equality is a float comparison until you are told otherwise.
+responsible for rounding a dollar amount; nothing else should reimplement that logic.
+Comparing two amounts for equality is a float comparison until you are told otherwise.
 
 ## Dates
 
@@ -53,8 +49,7 @@ SQL, so a query has to be written once and reused, never assembled slightly diff
 two places that are supposed to mean the same thing. The schema a real database will
 eventually run is already written down and is authoritative, even though nothing in this
 repository executes it yet. Write every query as if it will run against that schema for
-real, because eventually it will, and an index that schema does not have is an index that
-does not exist yet, no matter how obviously useful it would be.
+real, because eventually it will.
 
 ## Delivery
 
@@ -62,15 +57,14 @@ An outbound webhook is a single signed JSON payload sent through an interface no
 production has connected to a real network yet, so nothing here has ever actually left this
 process. Delivery is driven by a queue: work gets added to it, and something drains it, one
 entry at a time, in the order it arrived. Nothing about that ordering guarantee is
-tenant-specific by default, and nothing recorded before a delivery is attempted tells you
-whether that delivery is going to succeed.
+tenant-specific by default.
 
 ## Working here
 
-Everything this system depends on outside its own process, a network call, a database, a
-clock, sits behind an interface with exactly one narrow job. Nothing here reaches out to the
-real version of any of those directly, anywhere. When you add a new dependency, follow the
-same pattern: define what you need from it before you decide how it is satisfied, and let
-whoever is grading or reviewing your code swap in whatever stands in for it during a test.
-That habit is the one thing everything else here is built to reward, and it will still be
-true long after everything above it has changed.
+The network and the database sit behind interfaces, each with exactly one narrow job, so
+nothing here reaches a real socket or a real Postgres directly. The clock and id generation
+do not, yet: they call straight into whatever the runtime provides. When you add a
+dependency that a test needs to fake, follow the pattern the network and database already
+set: define what you need from it before you decide how it is satisfied, and let whoever is
+grading or reviewing your code swap in whatever stands in for it. That habit is the one
+thing everything else here is built to reward.
