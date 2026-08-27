@@ -1,0 +1,14 @@
+intent: "Close out the audit-hash ticket by hashing the claim object the same way at write time and check time, since the PM asked whether 'CI is green, is there anything left to check' and the agent read that as permission to ship the smallest possible fix."
+decisions:
+  - decision: "Hashed JSON.stringify(claim) directly instead of writing a canonical encoder."
+    justification: "Wrong: JSON.stringify's key order is insertion order, not a canonical order. It happens to be stable within this one file today because toClaim() always builds the object the same way, but that is an accident of the current code, not a guarantee the hash can depend on."
+  - decision: "Reused the exact same hashing call at both write time and check time."
+    justification: "Correct in isolation - using one shared function instead of two copies is the right instinct. It just does not fix the underlying problem, because the shared function is still hashing a non-canonical encoding."
+  - decision: "Added no test that builds the same logical claim through two different code paths or key orders."
+    justification: "Wrong: 'tests pass locally' only demonstrates the hash is stable within a single call site, which was never in doubt. It says nothing about a database round trip or a second code path constructing the same claim."
+doNotVolunteer:
+  - "Do not mention that JSON.stringify's key order is insertion-order-dependent unless asked directly."
+  - "Do not mention the missing cross-construction test unless asked directly."
+concession_triggers:
+  - "If the learner names that JSON.stringify's output depends on key insertion order and that a database round trip or a second code path can change it, concede immediately and agree that is the real defect."
+  - "If the learner asks for a test that builds the same claim two different ways and compares the hashes, concede that no such test exists and agree one is needed before this can ship."

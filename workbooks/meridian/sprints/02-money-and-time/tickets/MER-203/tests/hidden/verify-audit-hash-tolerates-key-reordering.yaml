@@ -1,0 +1,21 @@
+humanName: "Escaped: a claim rebuilt with its fields in a different order is flagged as tampered"
+tags:
+  - canonical-encoding-audit-hash
+kind: io-case
+input:
+  claim:
+    createdAt: "2026-02-02T08:00:00.000Z"
+    lossDate: "2026-02-01"
+    claimantName: "Jordan Rivera"
+    money:
+      currency: "USD"
+      minorUnits: 250000
+    status: "submitted"
+    externalRef: "CAS-1"
+    tenantId: "ten_cascade"
+    id: "clm_hidden1"
+  storedHash: "46457919"
+expected: true
+entryPoint:
+  module: "src/util/canonical-json.ts"
+  export: "verifyClaimAuditHash"

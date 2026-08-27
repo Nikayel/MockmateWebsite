@@ -1,0 +1,9 @@
+humanName: "Escaped: an empty object does not hash to a stable, well-defined value"
+tags:
+  - canonical-encoding-audit-hash
+kind: io-case
+input: {}
+expected: "5465b825"
+entryPoint:
+  module: "src/util/canonical-json.ts"
+  export: "hashCanonical"

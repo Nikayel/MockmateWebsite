@@ -1,0 +1,131 @@
+diff --git a/migrations/0007_claim_audit_hash.sql b/migrations/0007_claim_audit_hash.sql
+new file mode 100644
+index 0000000..093c4fa
+--- /dev/null
++++ b/migrations/0007_claim_audit_hash.sql
+@@ -0,0 +1,8 @@
++-- MER-203: an audit hash recorded at write time, so compliance's tamper check can recompute
++-- it later and compare - see src/util/canonical-json.ts.
++alter table claims
++  add column audit_hash text not null default '';
++
++comment on column claims.audit_hash is
++  'A hash over this claim''s canonical fields at write time, for compliance''s tamper check to
++   recompute and compare. See src/util/canonical-json.ts and src/db/repositories/claims.ts.';
+diff --git a/src/db/memory-db.ts b/src/db/memory-db.ts
+index 5bcae23..56ea14e 100644
+--- a/src/db/memory-db.ts
++++ b/src/db/memory-db.ts
+@@ -46,6 +46,7 @@ export function createMemoryDb(): DbClient {
+           claimantName,
+           lossDate,
+           createdAt,
++          auditHash,
+         ] = params
+         const row = {
+           id,
+@@ -54,6 +55,7 @@ export function createMemoryDb(): DbClient {
+           status,
+           amount,
+           currency,
++          audit_hash: auditHash,
+           claimant_name: claimantName,
+           loss_date: lossDate,
+           created_at: createdAt,
+diff --git a/src/db/queries.ts b/src/db/queries.ts
+index 10878b9..da8ed52 100644
+--- a/src/db/queries.ts
++++ b/src/db/queries.ts
+@@ -10,7 +10,7 @@ export const INSERT_TENANT =
+ export const GET_TENANT_BY_ID = "SELECT * FROM tenants WHERE id = $1"
+ 
+ export const INSERT_CLAIM =
+-  "INSERT INTO claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *"
++  "INSERT INTO claims (id, tenant_id, external_ref, status, amount, currency, claimant_name, loss_date, created_at, audit_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *"
+ 
+ export const GET_CLAIM_BY_ID = "SELECT * FROM claims WHERE tenant_id = $1 AND id = $2"
+ 
+diff --git a/src/db/repositories/claims.ts b/src/db/repositories/claims.ts
+index 8635f52..395ef9e 100644
+--- a/src/db/repositories/claims.ts
++++ b/src/db/repositories/claims.ts
+@@ -1,6 +1,7 @@
+ import type { DbClient } from "../client"
+ import type { Claim, CreateClaimInput } from "../../domain/claim"
+ import type { ClaimStatus } from "../../domain/claim-status"
++import { hashClaim } from "../../util/canonical-json"
+ import { generateId } from "../../util/ids"
+ import {
+   FIND_CLAIM_BY_EXTERNAL_REF,
+@@ -28,6 +29,9 @@ interface ClaimRow {
+   claimant_name: string
+   loss_date: string
+   created_at: string
++  /** A hash over this row's canonical fields at write time - see src/util/canonical-json.ts
++   * and migrations/0007_claim_audit_hash.sql. */
++  audit_hash: string
+ }
+ 
+ function toClaim(row: ClaimRow): Claim {
+@@ -46,6 +50,17 @@ function toClaim(row: ClaimRow): Claim {
+ export async function insertClaim(db: DbClient, input: CreateClaimInput): Promise<Claim> {
+   const id = generateId("clm")
+   const createdAt = new Date().toISOString()
++  const claim: Claim = {
++    id,
++    tenantId: input.tenantId,
++    externalRef: input.externalRef,
++    status: input.status,
++    money: input.money,
++    claimantName: input.claimantName,
++    lossDate: input.lossDate,
++    createdAt,
++  }
++  const auditHash = hashClaim(claim)
+   const { rows } = await db.query<ClaimRow>(INSERT_CLAIM, [
+     id,
+     input.tenantId,
+@@ -56,6 +71,7 @@ export async function insertClaim(db: DbClient, input: CreateClaimInput): Promis
+     input.claimantName,
+     input.lossDate,
+     createdAt,
++    auditHash,
+   ])
+   return toClaim(rows[0])
+ }
+diff --git a/src/util/canonical-json.ts b/src/util/canonical-json.ts
+new file mode 100644
+index 0000000..63da1e5
+--- /dev/null
++++ b/src/util/canonical-json.ts
+@@ -0,0 +1,30 @@
++/**
++ * PR #418's audit-hash fix: hash whatever `JSON.stringify` produces at write time, and the
++ * same call again at check time. Passes locally, because within one process a claim built the
++ * same way always gets the same key order - see MER-203 for why that guarantee does not
++ * survive a database round trip.
++ */
++import type { Claim } from "../domain/claim"
++
++function fnv1a(bytes: string): string {
++  let hash = 0x811c9dc5
++  for (let i = 0; i < bytes.length; i++) {
++    hash ^= bytes.charCodeAt(i)
++    hash = Math.imul(hash, 0x01000193)
++  }
++  return (hash >>> 0).toString(16).padStart(8, "0")
++}
++
++export function hashClaim(claim: Claim): string {
++  return fnv1a(JSON.stringify(claim))
++}
++
++export interface VerifyClaimAuditHashInput {
++  claim: Claim
++  storedHash: string
++}
++
++/** Compliance's tamper check: recompute the hash the same way it was written, and compare. */
++export function verifyClaimAuditHash(input: VerifyClaimAuditHashInput): boolean {
++  return hashClaim(input.claim) === input.storedHash
++}

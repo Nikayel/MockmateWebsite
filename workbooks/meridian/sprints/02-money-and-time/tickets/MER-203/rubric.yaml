@@ -1,0 +1,10 @@
+weights:
+  understanding: 0.15
+  problemSolving: 0.2
+  codeQuality: 0.15
+  communication: 0.25
+  verification: 0.25
+notes:
+  understanding: "Keys off naming the defect class - a non-canonical encoding used as a tamper check - not just repeating 'tests pass locally.'"
+  communication: "Keys off whether the learner pushed back on the 'safe to merge because we always build it the same way' comment with the concrete failure mode it ignores, not just disagreement."
+  verification: "Keys off whether the learner's own regression test builds the same logical claim two different ways and shows the hash disagreeing before rejecting the PR."

@@ -1,0 +1,71 @@
+diff --git a/src/util/canonical-json.ts b/src/util/canonical-json.ts
+index 63da1e5..ec02c24 100644
+--- a/src/util/canonical-json.ts
++++ b/src/util/canonical-json.ts
+@@ -1,12 +1,48 @@
+ /**
+- * PR #418's audit-hash fix: hash whatever `JSON.stringify` produces at write time, and the
+- * same call again at check time. Passes locally, because within one process a claim built the
+- * same way always gets the same key order - see MER-203 for why that guarantee does not
+- * survive a database round trip.
++ * A byte-stable JSON encoding: the same logical value always produces the exact same bytes,
++ * across process restarts, locales, and a database round trip. `JSON.stringify` promises none
++ * of this - it walks an object's keys in whatever order they were inserted, which a database
++ * round trip is free to change, so the same claim can serialize two different ways depending
++ * on nothing more meaningful than which code path built the object last. See MER-203: PR #418's
++ * fix hashed `JSON.stringify(claim)` directly and passed its own tests, because within a single
++ * process a claim built the same way twice does get the same key order - that guarantee just
++ * never extends past the process that made it.
+  */
+ import type { Claim } from "../domain/claim"
+ 
+-function fnv1a(bytes: string): string {
++export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
++
++function stringifyCanonical(value: JsonValue): string {
++  if (value === null) return "null"
++  if (typeof value === "boolean") return value ? "true" : "false"
++  if (typeof value === "number") {
++    if (!Number.isFinite(value)) {
++      throw new Error("canonicalJson: cannot encode a non-finite number")
++    }
++    // `Number.prototype.toString`/template-literal coercion is locale-independent in every JS
++    // engine - unlike `toLocaleString`, which would insert a thousands separator that differs
++    // by locale and is exactly the kind of drift this encoder exists to rule out.
++    return `${value}`
++  }
++  if (typeof value === "string") return JSON.stringify(value)
++  if (Array.isArray(value)) return `[${value.map(stringifyCanonical).join(",")}]`
++  const keys = Object.keys(value).sort()
++  return `{${keys.map((key) => `${JSON.stringify(key)}:${stringifyCanonical(value[key])}`).join(",")}}`
++}
++
++/** Encodes `value` into the one byte sequence every process, locale, and database round trip
++ * agrees it should have: object keys sorted, no whitespace, no locale-dependent formatting. */
++export function canonicalJson(value: JsonValue): string {
++  return stringifyCanonical(value)
++}
++
++/** FNV-1a, 32-bit - not cryptographic, but deterministic: the same canonical bytes always hash
++ * to the same value, and two different byte sequences essentially never collide by accident.
++ * That is everything a tamper check needs, since what it is defending against is a changed
++ * value, not a determined attacker who can invert the hash. Returned as 8 lowercase hex
++ * characters. */
++export function hashCanonical(value: JsonValue): string {
++  const bytes = canonicalJson(value)
+   let hash = 0x811c9dc5
+   for (let i = 0; i < bytes.length; i++) {
+     hash ^= bytes.charCodeAt(i)
+@@ -15,8 +51,11 @@ function fnv1a(bytes: string): string {
+   return (hash >>> 0).toString(16).padStart(8, "0")
+ }
+ 
++/** The audit hash over a claim's own fields - canonically encoded, so the same logical claim
++ * always hashes the same way no matter which code path or which process built the object that
++ * represents it. */
+ export function hashClaim(claim: Claim): string {
+-  return fnv1a(JSON.stringify(claim))
++  return hashCanonical(claim as unknown as JsonValue)
+ }
+ 
+ export interface VerifyClaimAuditHashInput {

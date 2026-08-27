@@ -1,0 +1,9 @@
+humanName: "Escaped: a number encodes with a locale-dependent thousands separator"
+tags:
+  - canonical-encoding-audit-hash
+kind: io-case
+input: 1500.5
+expected: "1500.5"
+entryPoint:
+  module: "src/util/canonical-json.ts"
+  export: "canonicalJson"

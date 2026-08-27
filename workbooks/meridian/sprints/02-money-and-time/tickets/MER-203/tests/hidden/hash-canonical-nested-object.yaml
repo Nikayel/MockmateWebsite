@@ -1,0 +1,13 @@
+humanName: "Escaped: a nested object's keys are not sorted, only the top level is"
+tags:
+  - canonical-encoding-audit-hash
+kind: io-case
+input:
+  b:
+    z: 1
+    a: 2
+  a: [1, 2, 3]
+expected: "746ba506"
+entryPoint:
+  module: "src/util/canonical-json.ts"
+  export: "hashCanonical"
