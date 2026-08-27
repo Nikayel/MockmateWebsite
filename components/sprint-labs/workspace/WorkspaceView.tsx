@@ -60,8 +60,10 @@ import { fetchPartnerTranscript, setDirectiveMuted } from "@/lib/sprint-labs/par
 const SANDBOX_NOTICE =
   "Server side isolated grading lands next month. Until then Sprint Labs runs TypeScript, JavaScript, Python and SQL in your browser."
 
-const EMPTY_SEED_FILES: Record<string, string> = {}
 const EMPTY_SOURCE_SEED: WorkspaceFileLike[] = []
+const EMPTY_SEED_FILES: Record<string, string> = Object.fromEntries(
+  EMPTY_SOURCE_SEED.map((f) => [f.path, f.content])
+)
 
 export interface WorkspaceViewProps {
   workbookId: string
