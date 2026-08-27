@@ -57,6 +57,28 @@ describe("attempt-client session cache", () => {
     cacheCompletedOutcome("run1", "MER-305", CACHED)
     expect(getCachedCompletedOutcome("run2", "MER-305")).toBeNull()
   })
+
+  it("is write-once once finalized — a later practice (non-finalized) outcome never overwrites it", () => {
+    cacheCompletedOutcome("run1", "MER-305", CACHED)
+    const practiceRun: CachedAttempt = {
+      attemptId: "attempt-2",
+      outcome: {
+        ...CACHED.outcome,
+        attempt: { ...CACHED.outcome.attempt, finalized: false, escapedDefects: ["something new"] },
+      },
+    }
+    cacheCompletedOutcome("run1", "MER-305", practiceRun)
+    expect(getCachedCompletedOutcome("run1", "MER-305")).toEqual(CACHED)
+  })
+
+  it("still writes normally before anything is finalized", () => {
+    const first: CachedAttempt = {
+      attemptId: "attempt-1",
+      outcome: { ...CACHED.outcome, attempt: { ...CACHED.outcome.attempt, finalized: false } },
+    }
+    cacheCompletedOutcome("run1", "MER-305", first)
+    expect(getCachedCompletedOutcome("run1", "MER-305")).toEqual(first)
+  })
 })
 
 describe("ensureBoardAtLeast", () => {

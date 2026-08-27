@@ -153,11 +153,23 @@ export function getCachedCompletedOutcome(runId: string, ticketKey: string): Cac
   return readCache<CachedAttempt>(completedKey(runId, ticketKey))
 }
 
+/**
+ * Write-once once finalized. `finalized` is true on exactly the first completion of a ticket ever
+ * (attempts-service.ts's per-ticket sentinel doc); every later completion is a practice re-attempt
+ * with `finalized: false` and different, non-representative gate results. Overwriting the cache
+ * unconditionally would let a same-tab practice re-attempt silently erase the ONLY copy this screen
+ * has of the finalized result retro needs (UX-SPEC.md §12.5: "the finalized result stands"). A
+ * caller that already has a finalized entry and completes a fresh practice attempt is expected to
+ * keep using ITS OWN in-memory outcome for the current screen; only the cache — which is what a
+ * later navigation reads — is protected here.
+ */
 export function cacheCompletedOutcome(
   runId: string,
   ticketKey: string,
   cached: CachedAttempt
 ): void {
+  const existing = getCachedCompletedOutcome(runId, ticketKey)
+  if (existing?.outcome.attempt.finalized && !cached.outcome.attempt.finalized) return
   writeCache(completedKey(runId, ticketKey), cached)
 }
 
