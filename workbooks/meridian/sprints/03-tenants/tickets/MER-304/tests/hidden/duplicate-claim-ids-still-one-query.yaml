@@ -1,0 +1,24 @@
+humanName: "Escaped: duplicate claim ids on the same page still cost only one query"
+tags:
+  - n-plus-one-diagnosis-concurrent-index
+kind: probe
+body: |
+  const db = createMemoryDb()
+  let calls = 0
+  const spyDb = {
+    query: (sql, params) => {
+      calls += 1
+      return db.query(sql, params)
+    },
+  }
+  return insertDocument(db, {
+    claimId: "clm_dup",
+    fileName: "estimate.pdf",
+    contentType: "application/pdf",
+    legacyPath: "/x",
+  })
+    .then(() => getDocumentsForClaims(spyDb, ["clm_dup", "clm_dup", "clm_dup"]))
+    .then((result) => {
+      assert(calls === 1, `expected exactly 1 query for a page with duplicate claim ids, got ${calls}`)
+      assert(result.clm_dup.length === 1, "a claim with one document must not have it duplicated because its id appeared more than once on the page")
+    })

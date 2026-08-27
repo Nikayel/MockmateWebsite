@@ -1,0 +1,29 @@
+humanName: "Escaped: a large page (200 claims) still costs one query and keeps every claim's documents grouped correctly"
+tags:
+  - n-plus-one-diagnosis-concurrent-index
+kind: probe
+body: |
+  const db = createMemoryDb()
+  let calls = 0
+  const spyDb = {
+    query: (sql, params) => {
+      calls += 1
+      return db.query(sql, params)
+    },
+  }
+  const claimIds = []
+  for (let i = 0; i < 200; i++) claimIds.push(`clm_${i}`)
+
+  return insertDocument(db, {
+    claimId: "clm_7",
+    fileName: "only-clm-7.pdf",
+    contentType: "application/pdf",
+    legacyPath: "/x",
+  })
+    .then(() => getDocumentsForClaims(spyDb, claimIds))
+    .then((result) => {
+      assert(calls === 1, `expected exactly 1 query for a page of 200 claims, got ${calls}`)
+      assert(result.clm_7.length === 1, "clm_7's own document must still be found")
+      assert(result.clm_7[0].fileName === "only-clm-7.pdf", "the right document must come back for clm_7")
+      assert(result.clm_0.length === 0, "a claim with no documents must still get an empty array, not be missing")
+    })

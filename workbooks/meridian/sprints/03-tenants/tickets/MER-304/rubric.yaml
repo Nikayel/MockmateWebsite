@@ -1,0 +1,11 @@
+weights:
+  understanding: 0.25
+  problemSolving: 0.25
+  codeQuality: 0.15
+  communication: 0.1
+  verification: 0.25
+notes:
+  understanding: "Keys off locating the actual per-claim document fetch as the mechanism, not a guess about the row-level security policy itself being slow."
+  problemSolving: "Keys off the visible pass rate across the query-count assertions, especially the large-page and duplicate-id cases."
+  codeQuality: "Keys off batching into one statement that groups by the fetched rows, not a client-side loop that still issues one query per unique claim id."
+  verification: "Keys off whether the learner's own test is red before the fix (asserting a query count the old loop would fail) and green after."
