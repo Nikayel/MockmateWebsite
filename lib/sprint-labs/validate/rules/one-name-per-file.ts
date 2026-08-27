@@ -3,8 +3,10 @@
  * `src/db/repositories/outbox.ts` (never `outbox-repository.ts`),
  * `src/db/repositories/claims.ts` (never `claim-repository.ts`). Checked
  * anywhere the banned name could be authored: a sprint's filesTouched /
- * newSourceFiles / rewrittenFiles lists, or literally inside a ticket's
- * setup.diff / reference.diff text.
+ * newSourceFiles / rewrittenFiles lists, inside a ticket's setup.diff /
+ * reference.diff / body / acceptanceCriteria text, and MERIDIAN.md
+ * (review round 1, M-3: prose can name a file just as easily as a diff or
+ * a file list can).
  */
 
 import type { AuthoredWorkbook } from "../tree"
@@ -41,11 +43,13 @@ export function oneNamePerFile(workbook: AuthoredWorkbook): ValidationFinding[] 
     }
 
     for (const ticket of sprint.tickets) {
-      const diffSources: Array<[string, string | null]> = [
+      const ticketSources: Array<[string, string | null]> = [
         ["setup.diff", ticket.setupDiff],
         ["reference.diff", ticket.referenceDiff],
+        ["body", ticket.bodyMd],
+        ["acceptanceCriteria", ticket.acceptanceCriteria.join("\n") || null],
       ]
-      for (const [sourceName, text] of diffSources) {
+      for (const [sourceName, text] of ticketSources) {
         if (!text) continue
         for (const banned of findBanned(text)) {
           findings.push({
@@ -56,6 +60,17 @@ export function oneNamePerFile(workbook: AuthoredWorkbook): ValidationFinding[] 
           })
         }
       }
+    }
+  }
+
+  if (workbook.meridianMd) {
+    for (const banned of findBanned(workbook.meridianMd)) {
+      findings.push({
+        ruleId: RULE_ID,
+        severity: "error",
+        path: "MERIDIAN.md",
+        message: `MERIDIAN.md references banned filename "${banned}"`,
+      })
     }
   }
 
