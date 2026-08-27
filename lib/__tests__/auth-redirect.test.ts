@@ -153,6 +153,15 @@ describe("resolveSafeRedirect - legitimate destinations", () => {
       expect(resolveSafeRedirect(destination)).toBe(destination)
     }
   })
+
+  it("still resolves the retired interview-prep path so stale links reach the 308", () => {
+    // No call site emits this any more (the route family was retired 2026-08-26), but
+    // months of statically rendered `/login?redirect=/interview-prep/<company>` links are
+    // in the wild. The whitelist entry lets post-login navigation hit the next.config.mjs
+    // 308 to /roadmap/preview instead of silently dumping those visitors on the dashboard.
+    expect(resolveSafeRedirect("/interview-prep/palantir")).toBe("/interview-prep/palantir")
+    expect(isValidRedirectPath("/interview-prep/palantir")).toBe(true)
+  })
 })
 
 describe("storeRedirectPath / getStoredRedirectPath round trip", () => {

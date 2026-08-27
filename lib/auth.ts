@@ -38,6 +38,10 @@ export const DEFAULT_REDIRECT_PATH = "/dashboard"
 const ALLOWED_REDIRECT_PATHS = [
   "dashboard",
   "interview",
+  // Route retired 2026-08-26, but months of statically rendered `/login?redirect=/interview-prep/<company>`
+  // links exist in the wild; keeping the entry lets post-login navigation hit the next.config.mjs
+  // 308 to /roadmap/preview instead of silently landing on /dashboard.
+  "interview-prep",
   "practice",
   "account",
   "profile",
