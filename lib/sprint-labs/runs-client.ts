@@ -140,18 +140,44 @@ export async function advanceSprintLabRunSprint(input: {
   return data?.run ?? null
 }
 
+/**
+ * Fix round 2026-08-26, I3: an empty overlay ("no files saved yet", a
+ * legitimate state) and a FAILED load must never collapse to the same
+ * falsy value. `fetchJson`'s plain `null`-on-any-failure would let the hook
+ * treat a network error as "nothing saved", reassemble the seed alone, and
+ * then autosave that over the learner's real saved progress. `ok: false`
+ * carries no files at all, forcing the caller to branch on it explicitly.
+ */
+export type WorkspaceFilesLoadResult = { ok: true; files: WorkspaceFileDoc[] } | { ok: false }
+
 /** Fetch the saved workspace-file overlay for a run (not merged with the seed — see `reassembleWorkspaceFiles`). */
 export async function fetchSprintLabWorkspaceFiles(
   runId: string
-): Promise<WorkspaceFileDoc[] | null> {
-  const headers = await withTimeout(authHeaders(), REQUEST_TIMEOUT_MS, "Auth token lookup")
-  if (!headers) return null
-  const data = await fetchJson<{ files: WorkspaceFileDoc[] }>(
-    `/api/sprint-labs/runs/files?runId=${encodeURIComponent(runId)}`,
-    { method: "GET" },
-    headers
-  )
-  return data?.files ?? null
+): Promise<WorkspaceFilesLoadResult> {
+  let headers: Record<string, string> | null
+  try {
+    headers = await withTimeout(authHeaders(), REQUEST_TIMEOUT_MS, "Auth token lookup")
+  } catch {
+    return { ok: false }
+  }
+  if (!headers) return { ok: false }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    const res = await fetch(`/api/sprint-labs/runs/files?runId=${encodeURIComponent(runId)}`, {
+      method: "GET",
+      headers,
+      signal: controller.signal,
+    })
+    if (!res.ok) return { ok: false }
+    const data = (await res.json()) as { files: WorkspaceFileDoc[] }
+    return { ok: true, files: data.files ?? [] }
+  } catch {
+    return { ok: false }
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /** Batched save of changed files (caller must keep each call at or under `MAX_WORKSPACE_FILES_PER_SAVE`). */
