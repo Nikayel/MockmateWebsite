@@ -4,11 +4,13 @@ import { apiRateLimit } from "@/lib/rate-limit"
 import { getFlagAsync } from "@/lib/feature-flags"
 import { logger } from "@/lib/logger"
 import {
+  getSprintLabRun,
   listWorkspaceFiles,
   saveWorkspaceFiles,
   saveWorkspaceFilesInputSchema,
   sprintLabRunErrorStatus,
 } from "@/lib/sprint-labs/runs"
+import { requireTierForSprint } from "@/lib/sprint-labs/route-guards"
 
 /** Not-yet-launched surface: a disabled flag reads as "this route doesn't exist" rather than 403. */
 async function requireSprintLabsEnabled(userId: string): Promise<NextResponse | null> {
@@ -63,7 +65,10 @@ export async function GET(request: NextRequest) {
  * (`saveWorkspaceFiles`); this handler stays a thin parse -> auth -> validate
  * -> service -> response. Rate-limited (fix round 2026-08-26, I5): this is
  * the one write path a signed-in client can call repeatedly and cheaply,
- * unlike the run-lifecycle actions which are naturally infrequent.
+ * unlike the run-lifecycle actions which are naturally infrequent. Tier-gated
+ * (fix round 2, controller addition 3): a downgraded user must not be able to
+ * keep saving files into a run already past sprint 1, the same guard the run
+ * route applies to move-ticket/advance-sprint and to reading/resuming a run.
  */
 export async function PUT(request: NextRequest) {
   const rateLimitResult = await apiRateLimit(request)
@@ -90,6 +95,10 @@ export async function PUT(request: NextRequest) {
       { status: 400 }
     )
   }
+
+  const current = await getSprintLabRun(auth.userId, parsed.data.runId)
+  const tierBlocked = await requireTierForSprint(auth.userId, current)
+  if (tierBlocked) return tierBlocked
 
   try {
     const files = await saveWorkspaceFiles(auth.userId, parsed.data)
