@@ -1,0 +1,10 @@
+comments:
+  - id: "release-schedules-reset-acquire-does-not-wait"
+    body: "The listener resets the tag correctly eventually, but release() hands the connection back to the pool before the listener runs. Nothing about acquire() waits for a pending reset, so the very next acquire() can (and, under load, will) get the connection back with the previous tenant's tag still on it for at least one tick."
+    correct: true
+  - id: "corruption-not-just-missed-reset"
+    body: "This is worse than 'the reset might run a little late.' Once the next tenant has reacquired the connection, the deferred reset from the PREVIOUS tenant is still queued and will fire during the new tenant's own request, clobbering a tag that was correct back to null - so a request that checked out its connection correctly can still lose its tenant context mid-flight."
+    correct: true
+  - id: "reuse-before-reset-is-a-pool-bug-not-app-code"
+    body: "The PR's own description calls a connection getting reused before the reset runs a pool-implementation bug application code should not have to guard against. That gets it backwards: this pool IS the implementation being reviewed, and 'acquire must be safe against whatever release scheduled' is not an unreasonable expectation to place on a pool of size one - it's the property the ticket asked for. Whether it is called a bug in the pool or a bug in the release design is not the point that matters here."
+    correct: false

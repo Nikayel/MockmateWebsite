@@ -1,0 +1,10 @@
+weights:
+  understanding: 0.15
+  problemSolving: 0.15
+  codeQuality: 0.1
+  communication: 0.3
+  verification: 0.3
+notes:
+  understanding: "Keys off naming that release() returns before its own listener has run, not just that a reset is 'a bit late'."
+  communication: "Keys off whether the learner pushed back on the 'pool-implementation bug, not app code's problem' comment with the actual mechanism, not just disagreement."
+  verification: "Keys off whether the learner's own regression test yields control (an await) between release and the check, since a test that never yields cannot observe this defect at all."

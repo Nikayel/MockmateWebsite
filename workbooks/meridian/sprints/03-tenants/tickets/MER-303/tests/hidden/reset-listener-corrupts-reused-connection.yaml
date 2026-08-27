@@ -1,0 +1,13 @@
+humanName: "Escaped: a deferred release reset corrupts the tenant tag of the connection that reused it"
+tags:
+  - review-concurrency-fix-pushback
+kind: io-case
+input:
+  firstTenantId: "ten_continental"
+  secondTenantId: "ten_bekins"
+expected:
+  immediatelyAfterReacquire: "ten_bekins"
+  afterYieldingOnce: "ten_bekins"
+entryPoint:
+  module: "src/db/tenant-context.ts"
+  export: "checkReleaseTimingSurvivesReacquire"

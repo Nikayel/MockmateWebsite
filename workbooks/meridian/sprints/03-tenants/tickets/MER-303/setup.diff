@@ -1,0 +1,76 @@
+diff --git a/src/db/tenant-context.ts b/src/db/tenant-context.ts
+index 229243f..60d40b7 100644
+--- a/src/db/tenant-context.ts
++++ b/src/db/tenant-context.ts
+@@ -44,15 +44,15 @@ export function createConnectionPool(db: DbClient, size: number): ConnectionPool
+     },
+ 
+     /**
+-     * Clears the connection's tenant tag synchronously, inline, before `release()` returns -
+-     * never scheduled onto a listener, an event emitter, or a later tick. That is the entire
+-     * fix SUP-2291 needed: nothing runs between "released" and "cleared" for a later callback
+-     * to race against, so the very next `acquire()` (which stamps its own tenant id
+-     * immediately, synchronously, in the same call) can never observe - or be clobbered by - a
+-     * reset left pending from the connection's previous tenant.
++     * PR #431: resets the connection's tenant tag on a listener registered at release time,
++     * so the reset runs "on release" without blocking whatever called release(). The
++     * connection is handed back to the pool immediately - acquire() can reuse it before this
++     * listener has actually run.
+      */
+     release(connection) {
+-      connection.tenantId = null
++      queueMicrotask(() => {
++        connection.tenantId = null
++      })
+     },
+   }
+ }
+@@ -74,3 +74,48 @@ export async function withTenant<T>(
+     pool.release(connection)
+   }
+ }
++
++export interface ReleaseTimingCheckInput {
++  firstTenantId: string
++  secondTenantId: string
++}
++
++export interface ReleaseTimingCheckResult {
++  /** The second connection's tenant id read the instant acquire() returns it. */
++  immediatelyAfterReacquire: string | null
++  /** The same connection's tenant id read after yielding to the microtask queue once - the
++   * same kind of yield a real `await connection.query(...)` inside the second caller's own
++   * request would cause. */
++  afterYieldingOnce: string | null
++}
++
++/**
++ * A pool of size one: acquires `firstTenantId`, releases it, immediately acquires
++ * `secondTenantId` with no await in between, then reports what the second connection's tenant
++ * id reads as right away and after one microtask-queue yield. A pool whose release() clears the
++ * tag synchronously reports the same value both times; one that defers the reset to a listener
++ * can report `secondTenantId` immediately and then something else once the deferred reset
++ * finally runs - corrupting a request that already believed it was safely holding its own
++ * connection.
++ */
++export async function checkReleaseTimingSurvivesReacquire(
++  input: ReleaseTimingCheckInput
++): Promise<ReleaseTimingCheckResult> {
++  const pool = createConnectionPool(createMemoryDbForCheck(), 1)
++  const first = pool.acquire(input.firstTenantId)
++  pool.release(first)
++  const second = pool.acquire(input.secondTenantId)
++  const immediatelyAfterReacquire = second.tenantId
++  await Promise.resolve()
++  const afterYieldingOnce = second.tenantId
++  return { immediatelyAfterReacquire, afterYieldingOnce }
++}
++
++/** A minimal, self-contained `DbClient` this module's own diagnostic check can run against -
++ * it never actually queries anything, so it does not need to depend on `./memory-db` (which
++ * depends on `./queries`, which has nothing to do with connection pooling). */
++function createMemoryDbForCheck(): DbClient {
++  return {
++    query: async () => ({ rows: [] }),
++  }
++}
