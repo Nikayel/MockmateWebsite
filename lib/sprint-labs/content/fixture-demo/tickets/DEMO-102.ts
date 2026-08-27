@@ -28,7 +28,7 @@ export const demo102Ticket: CompiledTicket = {
     adversaryPresent: false,
   },
   setupDiff:
-    'diff --git a/src/http/claims-list.ts b/src/http/claims-list.ts\nindex 5555555..6666666 100644\n--- a/src/http/claims-list.ts\n+++ b/src/http/claims-list.ts\n@@ -1,4 +1,5 @@\n import type { FastifyRequest, FastifyReply } from "../types"\n+import { parseClaimPayload } from "./claims-parser"\n\n export async function listClaims(request: FastifyRequest, reply: FastifyReply) {\n   const { page, per_page } = request.query as Record<string, string>\n',
+    'diff --git a/src/http/claims-list.ts b/src/http/claims-list.ts\nnew file mode 100644\nindex 0000000..1ccd10b\n--- /dev/null\n+++ b/src/http/claims-list.ts\n@@ -0,0 +1,7 @@\n+import type { FastifyRequest, FastifyReply } from "../types"\n+import { parseClaimPayload } from "./claims-parser"\n+\n+export async function listClaims(request: FastifyRequest, reply: FastifyReply) {\n+  const { page, per_page } = request.query as Record<string, string>\n+  return { page, per_page }\n+}\n',
   visibleTestFiles: [
     {
       path: "pagination-versioning.test.ts",

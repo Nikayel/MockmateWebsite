@@ -1,11 +1,10 @@
 diff --git a/src/http/claims-parser.ts b/src/http/claims-parser.ts
-index 3333333..4444444 100644
+index a227e5e..e953d1d 100644
 --- a/src/http/claims-parser.ts
 +++ b/src/http/claims-parser.ts
-@@ -1,10 +1,19 @@
+@@ -1,3 +1,20 @@
 -export function parseClaimPayload(body: any) {
 -  return { ok: true, value: body }
--}
 +interface ParsedClaim {
 +  tenantId: string
 +  amount: number
@@ -25,4 +24,4 @@ index 3333333..4444444 100644
 +    return { ok: false, reason: "amount must be a finite number" }
 +  }
 +  return { ok: true, value: { tenantId, amount } }
-+}
+ }

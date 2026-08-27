@@ -26,7 +26,7 @@ export const demo101Ticket: CompiledTicket = {
     adversaryPresent: true,
   },
   setupDiff:
-    'diff --git a/src/http/claims.ts b/src/http/claims.ts\nindex 1111111..2222222 100644\n--- a/src/http/claims.ts\n+++ b/src/http/claims.ts\n@@ -1,4 +1,5 @@\n import type { FastifyRequest, FastifyReply } from "../types"\n+import { insertClaim } from "../db/repositories/claims"\n\n export async function postClaim(request: FastifyRequest, reply: FastifyReply) {\n   const body = request.body as any\n',
+    'diff --git a/src/http/claims-parser.ts b/src/http/claims-parser.ts\nnew file mode 100644\nindex 0000000..a227e5e\n--- /dev/null\n+++ b/src/http/claims-parser.ts\n@@ -0,0 +1,3 @@\n+export function parseClaimPayload(body: any) {\n+  return { ok: true, value: body }\n+}\ndiff --git a/src/http/claims.ts b/src/http/claims.ts\nnew file mode 100644\nindex 0000000..660eafd\n--- /dev/null\n+++ b/src/http/claims.ts\n@@ -0,0 +1,7 @@\n+import type { FastifyRequest, FastifyReply } from "../types"\n+import { insertClaim } from "../db/repositories/claims"\n+\n+export async function postClaim(request: FastifyRequest, reply: FastifyReply) {\n+  const body = request.body as any\n+  return insertClaim(body)\n+}\n',
   visibleTestFiles: [
     {
       path: "claims-parser.test.ts",

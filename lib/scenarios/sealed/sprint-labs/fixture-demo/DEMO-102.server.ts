@@ -68,7 +68,7 @@ export const sealed: SealedTicketContent = {
     ],
   },
   referenceDiff:
-    'diff --git a/src/http/compatibility-descriptor.ts b/src/http/compatibility-descriptor.ts\nindex 7777777..8888888 100644\n--- a/src/http/compatibility-descriptor.ts\n+++ b/src/http/compatibility-descriptor.ts\n@@ -1,3 +1,26 @@\n+interface ParameterDescriptor {\n+  status: "active" | "deprecated"\n+  sunset?: string\n+}\n+\n+interface CompatibilityDescriptor {\n+  parameters: Record<string, ParameterDescriptor>\n+}\n+\n+const V1: CompatibilityDescriptor = {\n+  parameters: {\n+    page: { status: "deprecated" },\n+    per_page: { status: "deprecated" },\n+  },\n+}\n+\n+const V2: CompatibilityDescriptor = {\n+  parameters: {},\n+}\n+\n+export function compatibilityDescriptor(version: "v1" | "v2"): CompatibilityDescriptor {\n+  return version === "v1" ? V1 : V2\n+}\n',
+    'diff --git a/src/http/compatibility-descriptor.ts b/src/http/compatibility-descriptor.ts\nnew file mode 100644\nindex 0000000..e8b0322\n--- /dev/null\n+++ b/src/http/compatibility-descriptor.ts\n@@ -0,0 +1,23 @@\n+interface ParameterDescriptor {\n+  status: "active" | "deprecated"\n+  sunset?: string\n+}\n+\n+interface CompatibilityDescriptor {\n+  parameters: Record<string, ParameterDescriptor>\n+}\n+\n+const V1: CompatibilityDescriptor = {\n+  parameters: {\n+    page: { status: "deprecated" },\n+    per_page: { status: "deprecated" },\n+  },\n+}\n+\n+const V2: CompatibilityDescriptor = {\n+  parameters: {},\n+}\n+\n+export function compatibilityDescriptor(version: "v1" | "v2"): CompatibilityDescriptor {\n+  return version === "v1" ? V1 : V2\n+}\n',
   rubric: {
     weights: {
       understanding: 0.15,
