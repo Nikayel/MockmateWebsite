@@ -24,6 +24,7 @@
     "audit:checks": "tsx scripts/audit-check-shape.ts",
     "audit:ascii": "tsx scripts/audit-ascii-drawings.ts",
     "seo:audit": "node scripts/seo-audit.mjs",
+    "workbooks:compile": "tsx scripts/compile-workbooks.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:integration": "firebase emulators:exec --only firestore --project codesparring-integration \"vitest run --config vitest.integration.config.ts\"",
