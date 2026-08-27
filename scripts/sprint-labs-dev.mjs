@@ -18,13 +18,17 @@
  * FAILS LOUDLY: any step that does not cleanly pass prints its real output and this script exits
  * non-zero. It never prints "playable" over a red step.
  *
- * ONE HONEST CAVEAT, computed fresh every run rather than hardcoded: `compileWorkbook`
- * (scripts/compile-workbooks.mjs) requires `reference.diff` + `rubric.yaml` on EVERY ticket in the
- * workbook it is pointed at -- there is no "skip the stubs" mode. `workbooks/meridian` currently
- * ships 50 ticket directories; only the ones that already authored both files compile. Until every
- * ticket does, step 1 fails here -- correctly, not as a bug in this script -- and this script says
- * exactly which tickets are still missing them (scanned fresh each run, never a stale hardcoded
- * list) so the failure is actionable instead of a wall of compiler stack.
+ * COMPILE IS EXPECTED TO SUCCEED, not merely tolerated: `compileTicket`
+ * (scripts/compile-workbooks.mjs) gates on `isFullTicket` (both `reference.diff` AND
+ * `rubric.yaml` authored) per ticket, not on the whole workbook. A ticket missing either compiles
+ * PUBLIC-ONLY -- `playable: false`, no sealed `<KEY>.server.ts` emitted -- rather than aborting the
+ * whole workbook's compile. So step 1 succeeds today even though `workbooks/meridian` still ships
+ * plenty of ticket.md-only stubs; those tickets are simply not playable yet. This script still
+ * scans and reports, every run, how many tickets are fully authored (`playable: true`) versus
+ * still stubs (computed fresh from disk, never a stale hardcoded count) -- informational, not a
+ * failure condition. If step 1 genuinely fails, that is a real regression (a malformed YAML, a
+ * casing error, a workbook-id collision -- see the compiler's own CompileError text), not an
+ * expected content-authoring gap, and this script treats it as loudly as any other red step.
  */
 import { existsSync, readdirSync } from "node:fs"
 import { execFileSync } from "node:child_process"
@@ -56,13 +60,15 @@ function runStep(label, command, args) {
   }
 }
 
-/** Every ticket directory under workbooks/meridian/sprints/*\/tickets/* missing reference.diff or
- *  rubric.yaml -- scanned fresh, so this list shrinks as content authoring lands instead of going
- *  stale like a hand-maintained one would. */
-function findUnauthoredTickets() {
+/** Every ticket directory under workbooks/meridian/sprints/*\/tickets/*, split into fully authored
+ *  (both reference.diff and rubric.yaml -- compiles playable:true) versus still a stub (either or
+ *  both missing -- compiles playable:false, public-only, no sealed emit). Scanned fresh every run,
+ *  purely informational: a workbook full of stubs still compiles successfully today. */
+function scanTicketAuthoringStatus() {
   const sprintsDir = join(MERIDIAN_DIR, "sprints")
-  if (!existsSync(sprintsDir)) return []
-  const missing = []
+  if (!existsSync(sprintsDir)) return { full: [], stub: [] }
+  const full = []
+  const stub = []
   for (const sprintDirName of readdirSync(sprintsDir).sort()) {
     const ticketsDir = join(sprintsDir, sprintDirName, "tickets")
     if (!existsSync(ticketsDir)) continue
@@ -70,12 +76,26 @@ function findUnauthoredTickets() {
       const ticketDir = join(ticketsDir, ticketKey)
       const hasReference = existsSync(join(ticketDir, "reference.diff"))
       const hasRubric = existsSync(join(ticketDir, "rubric.yaml"))
-      if (!hasReference || !hasRubric) {
-        missing.push({ ticketKey, hasReference, hasRubric })
-      }
+      const entry = { ticketKey, hasReference, hasRubric }
+      if (hasReference && hasRubric) full.push(entry)
+      else stub.push(entry)
     }
   }
-  return missing
+  return { full, stub }
+}
+
+function printAuthoringStatus() {
+  const { full, stub } = scanTicketAuthoringStatus()
+  banner("Content authoring status (workbooks/meridian, scanned fresh)")
+  console.log(
+    `  ${full.length} ticket(s) fully authored and playable: true (reference.diff + rubric.yaml).`
+  )
+  console.log(
+    `  ${stub.length} ticket(s) still ticket.md-only stubs -- compiled public-only, playable: false.`
+  )
+  if (stub.length > 0) {
+    console.log(`  First few still-stub tickets: ${stub.slice(0, 8).map((e) => e.ticketKey).join(", ")}${stub.length > 8 ? ", ..." : ""}`)
+  }
 }
 
 function printPlayableMer101Instructions() {
@@ -99,9 +119,12 @@ function printPlayableMer101Instructions() {
       `       /sprint-labs/meridian/run/submit/${TICKET_KEY}          (visible -> hidden -> regression -> adversary)`,
       `       /sprint-labs/meridian/run/retro/${TICKET_KEY}           (referenceDiff + scores, post-finalization)`,
       "",
-      "Sprint 1 (MER-101 through MER-105) is the only fully authored sprint today; MER-101 itself",
-      "is proven end to end (materialize -> visible red/green -> provisioning -> open -> the real",
-      "client io-case executor -> server-side hidden-gate comparison -> finalize -> retro) by",
+      "The board also renders every still-stub ticket (viewable, per the authoring-status count",
+      "above), just not playable yet -- opening one shows content but no working submit path.",
+      "",
+      `${TICKET_KEY} itself is proven end to end (materialize -> visible red/green -> provisioning`,
+      "-> open against the REAL compiled + sealed registries -> the real client io-case executor",
+      "-> server-side hidden-gate comparison -> finalize -> retro) by",
       "`npx vitest run lib/sprint-labs/__tests__/mer-101-end-to-end.test.ts`, which needs no",
       "Firebase env and no dev server at all.",
     ].join("\n")
@@ -115,25 +138,7 @@ async function main() {
     "workbooks/meridian",
   ])
 
-  if (!compile.ok) {
-    const unauthored = findUnauthoredTickets()
-    banner("Step 1/3 diagnosis")
-    console.log(
-      `workbooks/meridian did not compile. ${unauthored.length} of its ticket ` +
-        `director${unauthored.length === 1 ? "y is" : "ies are"} still missing reference.diff ` +
-        "and/or rubric.yaml (compile-workbooks.mjs requires both on every ticket in the workbook " +
-        "it is pointed at -- there is no partial-workbook mode). This is expected while content " +
-        "authoring is in progress; it is not a bug in this script or in MER-101, which IS fully " +
-        "authored. First few still missing:"
-    )
-    for (const entry of unauthored.slice(0, 10)) {
-      console.log(
-        `  - ${entry.ticketKey}: reference.diff ${entry.hasReference ? "OK" : "MISSING"}, ` +
-          `rubric.yaml ${entry.hasRubric ? "OK" : "MISSING"}`
-      )
-    }
-    if (unauthored.length > 10) console.log(`  ... and ${unauthored.length - 10} more`)
-  }
+  printAuthoringStatus()
 
   const validateStatic = runStep("Step 2/3: pnpm lab:validate workbooks/meridian (static)", "npx", [
     "tsx",
@@ -150,7 +155,7 @@ async function main() {
   printPlayableMer101Instructions()
 
   banner("Summary")
-  console.log(`  compile workbooks/meridian : ${compile.ok ? "PASS" : "FAIL (see Step 1/3 diagnosis above)"}`)
+  console.log(`  compile workbooks/meridian : ${compile.ok ? "PASS" : "FAIL (unexpected -- see Step 1/3 output above; compile is not supposed to fail just because content is incomplete)"}`)
   console.log(`  lab:validate (static)      : ${validateStatic.ok ? "PASS" : "FAIL"}`)
   console.log(`  lab:validate:dynamic       : ${validateDynamic.ok ? "PASS" : "FAIL"}`)
 
