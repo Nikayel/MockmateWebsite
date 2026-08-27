@@ -1,0 +1,15 @@
+humanName: "Escaped: a numeric-looking string amount is accepted as a claim amount"
+tags:
+  - typed-boundary-parsing
+kind: io-case
+input:
+  externalRef: "NW-9001"
+  amount: "1500.00"
+  claimantName: "Jordan Rivera"
+  lossDate: "2026-01-15"
+expected:
+  ok: false
+  reason: "amount must be a finite number"
+entryPoint:
+  module: "src/http/parsers/claim-input.ts"
+  export: "parseClaimInput"

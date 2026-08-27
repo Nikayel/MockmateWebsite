@@ -1,0 +1,11 @@
+weights:
+  understanding: 0.2
+  problemSolving: 0.3
+  codeQuality: 0.25
+  communication: 0
+  verification: 0.25
+notes:
+  understanding: "Keys off whether the fix narrows the body at the handler boundary, not deeper inside the repository or database layer."
+  problemSolving: "Keys off the visible and hidden pass rate across the malformed-amount shapes - string, null, array."
+  codeQuality: "Keys off whether the parsed claim type has any untyped or any-shaped field anywhere in its public surface."
+  verification: "Keys off escaped-defect rate on the hidden io-cases: a boolean, string, null, or array amount must never reach the repository."
