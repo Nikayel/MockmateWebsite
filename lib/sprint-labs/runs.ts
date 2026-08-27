@@ -36,6 +36,7 @@ import {
   MAX_WORKSPACE_FILES_PER_SAVE,
   encodeWorkspaceFilePathId,
   decodeWorkspaceFilePathId,
+  type WorkspaceFileLike,
 } from "./workspace-files"
 
 const COLLECTION = "sprintLabRuns"
@@ -563,4 +564,72 @@ export async function saveWorkspaceFiles(
   await batch.commit()
 
   return toWrite
+}
+
+/**
+ * Seed the run's workspace-file store with `files`, but ONLY for paths that have no existing doc
+ * yet — never overwrites a path already present, whether that path was saved by the learner or by
+ * an earlier provisioning call. This is how a ticket's freshly materialized initial tree
+ * (`lib/sprint-labs/provisioning/materialize-initial-tree.ts`) becomes durable in this store on
+ * first open, without ever clobbering saved progress on re-open, and without re-seeding a path a
+ * PRIOR ticket already left the learner's own (possibly different) content at — "first open" is
+ * evaluated per path, not per ticket or per run, which is the correct granularity for one
+ * persistent codebase spanning many tickets (see this module's own header): a path a later
+ * ticket's reference solution would also touch is left exactly as the learner last saved it,
+ * while a path no earlier ticket ever introduced is seeded fresh.
+ *
+ * Deliberately does NOT reuse {@link saveWorkspaceFiles}: that function's whole contract is
+ * "always write, incrementing revision" (the correct shape for the learner's own autosave), which
+ * would silently overwrite a learner's saved edits if pointed at a stale seed on re-open — exactly
+ * what this function exists to never do. Mirrors its validation and cap-enforcement instead of
+ * reusing its write path, so the two never drift apart on what counts as a valid path/doc id.
+ *
+ * A malformed candidate path (fails `isValidWorkspacePath` or the Firestore doc-id checks) is
+ * silently skipped rather than thrown: this is a best-effort seed of server-computed content, not a
+ * client-submitted, all-or-nothing trust boundary like `saveWorkspaceFiles`'s input.
+ */
+export async function seedWorkspaceFilesIfAbsent(
+  userId: string,
+  runId: string,
+  files: readonly WorkspaceFileLike[]
+): Promise<WorkspaceFileDoc[]> {
+  if (files.length === 0) return []
+  await requireOwnedActiveRun(userId, runId)
+
+  const filesCollection = adminDb.collection(COLLECTION).doc(runId).collection(FILES_SUBCOLLECTION)
+  const existingSnap = await filesCollection.get()
+  const existingIds = new Set(existingSnap.docs.map((doc) => doc.id))
+
+  const candidates = files.filter((file) => !existingIds.has(encodeWorkspaceFilePathId(file.path)))
+  if (candidates.length === 0) return []
+
+  // Same per-run ceiling saveWorkspaceFiles enforces (I5): a large seed must not blow past it.
+  const capacity = Math.max(0, MAX_WORKSPACE_FILES_PER_RUN - existingIds.size)
+  const bounded = candidates.slice(0, capacity)
+
+  const now = new Date().toISOString()
+  const written: WorkspaceFileDoc[] = []
+  const batch = adminDb.batch()
+  for (const file of bounded) {
+    if (!isValidWorkspacePath(file.path)) continue
+    const docId = encodeWorkspaceFilePathId(file.path)
+    if (!isValidFirestoreDocId(docId)) continue
+    // workspaceFileDocSchema re-validated here for the same reason saveWorkspaceFiles re-validates
+    // its own writes: this is the exact shape being persisted, so a future schema change is caught
+    // at the point of the write, not just at some earlier input boundary.
+    const doc = workspaceFileDocSchema.parse({
+      path: file.path,
+      content: file.content,
+      updatedAt: now,
+      revision: 1,
+    })
+    batch.set(filesCollection.doc(docId), doc)
+    written.push(doc)
+  }
+
+  if (written.length > 0) {
+    batch.update(adminDb.collection(COLLECTION).doc(runId), { updatedAt: now })
+    await batch.commit()
+  }
+  return written
 }

@@ -194,3 +194,35 @@ export async function saveSprintLabWorkspaceFiles(
   )
   return data?.files ?? null
 }
+
+/** One file from a ticket's provisioned initial tree — see
+ * `lib/sprint-labs/provisioning/materialize-initial-tree.ts`'s `ProvisionedFile` (mirrored here,
+ * not imported: that module pulls in `node:fs`/`node:child_process` and must never reach this
+ * client-safe file, the same reason this file never imports `./runs`). */
+export interface ProvisionedWorkspaceFile {
+  path: string
+  content: string
+  role: "editable" | "readonly" | "test" | "docs"
+}
+
+/**
+ * Materializes the ticket's initial file tree and (server-side, idempotently) seeds the T6
+ * workspace-file store with its editable files for any path not already saved there. Call once per
+ * (run, ticket) — typically on workspace mount / ticket switch — before handing a seed to
+ * `useSprintLabRunSync`, per RULING R27. Null on a signed-out user, a disabled flag, a tier gate, or
+ * any failed/timed-out request — same degrade-gracefully convention as every other helper here; the
+ * caller is expected to treat null as "no seed yet" rather than "seed is empty".
+ */
+export async function provisionSprintLabWorkspace(input: {
+  runId: string
+  ticketKey: string
+}): Promise<ProvisionedWorkspaceFile[] | null> {
+  const headers = await authHeaders()
+  if (!headers) return null
+  const data = await fetchJson<{ files: ProvisionedWorkspaceFile[] }>(
+    "/api/sprint-labs/runs/provision",
+    { method: "POST", body: JSON.stringify(input) },
+    headers
+  )
+  return data?.files ?? null
+}
