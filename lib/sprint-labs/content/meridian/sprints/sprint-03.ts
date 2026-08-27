@@ -4,7 +4,7 @@ import type { SprintPublic } from "@/lib/sprint-labs/types"
 export const meridianSprint03: SprintPublic = {
   number: 3,
   title: "Tenants: make the database refuse",
-  goal: "Move tenant isolation out of the WHERE clauses people have to remember to write and into Postgres itself, then find and fix the three bills that move comes with: a pooled-connection context leak, an N+1 you created, and a check-then-insert race the default isolation level was always permitting.",
+  goal: "Move tenant isolation out of the WHERE clauses people have to remember to write and into Postgres itself, then find and fix the three bills that move comes with: a pooled-connection context leak, an N+1 hiding in the document reads, and a check-then-insert race the default isolation level was always permitting.",
   standupQuote:
     "SUP-2291 · P1 · escalated 07:41 from Continental's ops lead: Why is there a Bekins Van Lines claim in my queue? I opened it. I read the adjuster's notes.",
   archMapDelta: {
@@ -52,7 +52,7 @@ export const meridianSprint03: SprintPublic = {
     },
   ],
   sizingNotes:
-    "MER-302 and MER-305 were originally the thinnest-covered tickets in the sprint: MER-305 had 8 visible cases for a 5-point unassisted concurrency ticket. Both are raised to roughly 15 visible cases each so a learner can watch isolation fail before they submit, not just after grading.",
+    "MER-302 and MER-305 were originally the thinnest-covered tickets in the sprint: MER-305 had 8 visible cases for a 5-point unassisted concurrency ticket. Coverage is raised (MER-302 to 15 visible cases, MER-305 to 12) so a learner can watch isolation fail before they submit, not just after grading.",
   topic: "Databases, transactions & RLS",
   ticketCount: 5,
   points: 26,

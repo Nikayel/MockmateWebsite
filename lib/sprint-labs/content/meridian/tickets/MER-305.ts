@@ -25,6 +25,7 @@ export const mer305Ticket: CompiledTicket = {
       "The fix is a constraint the database enforces, not a bigger lock or a longer transaction wrapped around the same check-then-act sequence.",
       "A test reproduces the original race deterministically, fails before the fix, and passes after it.",
       "The one-paragraph explanation of the fix states precisely which interleaving READ COMMITTED was permitting, in terms an interviewer could probe.",
+      'A failed insert is routed through an exported `interpretClaimInsertError(error)` returning an `outcome` with a `reason`: `"duplicate"` only when the violated constraint is this ticket\'s own uniqueness constraint, `"unknown_error"` (carrying the database\'s own message) for any other constraint or error code, and `"created"` when the insert in fact succeeded, so an unrelated database error is never silently accepted as the expected conflict.',
     ],
     adversaryPresent: false,
     playable: true,

@@ -14,7 +14,7 @@ export const meridianSprint01: SprintPublic = {
     ],
     changed: [
       "POST /claims parses the request body into a validated domain type before any handler code sees it",
-      "GET /claims pagination moved from page and offset to a keyset cursor",
+      "GET /claims pagination moved from limit and offset to a keyset cursor",
     ],
     broke: [],
     invariants: [
