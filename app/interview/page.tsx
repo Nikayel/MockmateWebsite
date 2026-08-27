@@ -31,6 +31,7 @@ import {
 } from "@/lib/interview/interview-phases"
 // Extracted utilities
 import { extractTopicsFromMessage } from "@/lib/interview"
+import { showsRoadmapPitch } from "@/components/interview/interview-track-browsing"
 // Local page components
 import {
   GuestModeBanner,
@@ -1967,8 +1968,13 @@ function InterviewPageContent() {
     return <SparraLoader fullPage label="Loading interview…" />
   }
 
-  // Allow both authenticated users and guest mode
-  if (!user && !isGuestMode) {
+  // Allow both authenticated users and guest mode. One more state renders: a
+  // signed-out visitor whose trial is spent, parked on the bare landing.
+  // useSessionReopen no longer bounces that state to /login (nothing on the
+  // bare address consumes anything), so the browser renders and shows them the
+  // roadmap pitch instead of a blank page. Any address that names real work
+  // still redirects before isLoading clears, so this never exposes a session.
+  if (!user && !isGuestMode && !showsRoadmapPitch(searchParams, !firebaseUser)) {
     return null
   }
 

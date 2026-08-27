@@ -5,6 +5,7 @@ import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.
 import { toast } from "sonner"
 import type { User } from "@/lib/types"
 import { trackEvent } from "@/lib/analytics"
+import { requestsInterviewWork } from "@/components/interview/interview-track-browsing"
 import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
 import { getScenarioById } from "@/lib/scenarios/index"
 import type { Scenario } from "@/lib/scenarios/types"
@@ -244,10 +245,20 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
 
           opts.setIsLoading(false)
           return
-        } else {
-          // Free trial already used, require signup
+        } else if (requestsInterviewWork(opts.searchParams)) {
+          // Free trial already used and the address names work to open (a
+          // track, a session, a scenario): signing up is the only way to run
+          // it, so this is where the exhausted-trial bounce belongs.
           trackEvent("guest_trial_exhausted")
           opts.router.push("/login?redirect=interview&message=trial-used")
+          return
+        } else {
+          // Trial used, but the visitor merely landed on bare /interview.
+          // Nothing here consumes anything, so let the page render: the
+          // browser shows the roadmap pitch (see showsRoadmapPitch, which
+          // page.tsx's auth gate also consults), and any attempt to open real
+          // work re-runs this effect with params and takes the branch above.
+          opts.setIsLoading(false)
           return
         }
       }
