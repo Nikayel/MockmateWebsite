@@ -55,11 +55,11 @@ export default function FreePracticePage() {
         <>
           <p>
             Most &quot;free&quot; interview tools mean free after you hand over an email. You can
-            open <Link href="/interview">the workspace</Link> here with neither, and the trial is
-            one session. It is stored against your browser, so it is not a per-person count and we
-            do not pretend otherwise. Starting a session does not spend it. The trial is marked used
-            when you finish one. Your score and the written report unlock when you create the free
-            account.
+            open <Link href="/interview?track=dsa">the workspace</Link> here with neither, and the
+            trial is one session. It is stored against your browser, so it is not a per-person count
+            and we do not pretend otherwise. Starting a session does not spend it. The trial is
+            marked used when you finish one. Your score and the written report unlock when you
+            create the free account.
           </p>
           <p>Without an account, in that session, you can:</p>
           <ul className="mt-4 list-disc space-y-2 pl-6">
