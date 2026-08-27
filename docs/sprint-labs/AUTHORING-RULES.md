@@ -38,7 +38,11 @@ rules marked **[validate]**.
   escape hatch on `ticket.md`, not spec-named elsewhere) is camelCase too: it
   is a boolean a reviewer sets to attest that a ticket's file-path
   enumeration was confirmed pedagogically necessary, not an accidental
-  spoiler of "the files to touch" (§6).
+  spoiler of "the files to touch" (§6). `dupHunkSignoff` (same style, same
+  file, review round 2 item 1) is the matching escape hatch for
+  `no-duplicated-hunk-from-unshipped-reference`: a boolean a reviewer sets
+  on a ticket whose `setup.diff` legitimately, intentionally reuses a later
+  sprint's hunk — never set to silence a real spoiler.
 
 ## 2. State fixes from the reconcile pass (apply, don't rediscover)
 

@@ -78,3 +78,31 @@ export function slidingWindows(lines: string[], size = 3): string[][] {
 export function fingerprintBlock(block: string[]): string {
   return block.join("\n")
 }
+
+/**
+ * Review round 2, item 1: the sliding-window fingerprint otherwise flags
+ * ordinary boilerplate -- the reviewer reproduced it with three standard
+ * import lines -- as a "duplicated hunk", since two unrelated files
+ * routinely import the exact same three things. A line is "generic"
+ * (structural wiring, never distinctive logic) if it's a bare import, a
+ * bare re-export (`export * ...` / `export { ... }` / `export default
+ * name;` -- NOT `export function/class/const NAME ...`, which introduces
+ * a real declaration), a closing-brace continuation, a line of pure
+ * structural punctuation, a CommonJS `require(...)` assignment, a bare
+ * control-flow keyword, or just short. A window counts as a real
+ * duplicate only if at least one of its lines carries something
+ * distinctive; a window where every line is generic is never fingerprinted
+ * at all, on either side of the comparison.
+ */
+const GENERIC_LINE_RE =
+  /^import\b|^export\s*(?:[*{]|default\s+\w+\s*;?$)|^}\s*(?:from|catch|else|finally)\b|^[{}();,[\]]+$|^const\s+\w+\s*=\s*require\(|^(?:return|break|continue)\s*;?$/
+const MIN_DISTINCTIVE_LINE_LENGTH = 12
+
+function isGenericLine(line: string): boolean {
+  return line.length < MIN_DISTINCTIVE_LINE_LENGTH || GENERIC_LINE_RE.test(line)
+}
+
+/** True when every line in the window is generic -- the window should never be fingerprinted. */
+export function isGenericWindow(window: string[]): boolean {
+  return window.every(isGenericLine)
+}

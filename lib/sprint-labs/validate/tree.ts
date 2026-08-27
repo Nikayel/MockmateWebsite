@@ -13,13 +13,20 @@
  * what `lab validate` checks — so fields are read defensively (optional,
  * `unknown`-narrowed) rather than assumed well-formed.
  *
- * Field casing follows the same ruling scripts/compile-workbooks.mjs
- * documents and enforces (R14): `ai_policy`, `ai_policy_reason`,
- * `concession_triggers` are snake_case; every other authored key here
+ * Field casing follows ruling R17 (supersedes the earlier R14-only framing):
+ * each key follows THE SPEC'S OWN SPELLING, not a blanket "everything is
+ * snake_case." `ai_policy`, `ai_policy_reason`, `concession_triggers` are
+ * snake_case (WORKBOOK-SPEC.md §6); every other authored key here
  * (`acceptanceCriteria`, `payoffFor`, `payoffSignoff`, `standupQuote`,
- * `filesTouched`, `newSourceFiles`, `rewrittenFiles`, `humanName`, ...) is
- * camelCase. `rules/snake-case-authoring-keys.ts` is the defense-in-depth
- * check for the three snake_case fields specifically.
+ * `filesTouched`, `newSourceFiles`, `rewrittenFiles`, `humanName`,
+ * `pathEnumerationSignoff`, `dupHunkSignoff`, ...) is camelCase.
+ * `rules/snake-case-authoring-keys.ts` is the defense-in-depth check, and
+ * it is BIDIRECTIONAL: it rejects the camelCase guess for the snake_case
+ * trio (`aiPolicy`, `aiPolicyReason`, `concessionTriggers`) just as it
+ * rejects the snake_case guess for the camelCase file-set fields
+ * (`files_touched`, `new_source_files`, `rewritten_files`) -- scripts/
+ * compile-workbooks.mjs's own `rejectWrongCasing` independently confirms
+ * the same per-key table (see its file header) for the fields it compiles.
  *
  * `filesTouched`/`newSourceFiles`/`rewrittenFiles` are modeled here as
  * `sprint.yaml` fields: AUTHORING-RULES.md and SPRINT-PLAN.md both talk
@@ -79,6 +86,14 @@ export interface AuthoredTicket {
    * signoff"; flagged in task-3-report.md.
    */
   pathEnumerationSignoff?: boolean
+  /**
+   * Escape hatch for `no-duplicated-hunk-from-unshipped-reference` (review
+   * round 2, item 1(b)): a reviewer-signed-off flag on a ticket whose
+   * setup.diff legitimately reuses a later sprint's hunk on purpose. Same
+   * style as `pathEnumerationSignoff` -- not spec-named, introduced here,
+   * documented in AUTHORING-RULES.md §1.
+   */
+  dupHunkSignoff?: boolean
   setupDiff: string | null
   referenceDiff: string | null
   authorBriefRaw: RawRecord | null

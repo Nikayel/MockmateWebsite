@@ -144,6 +144,7 @@ function loadTicket(ticketDir: string, key: string, sprintNumber: number): Autho
     payoffFor: toOptionalString(frontmatterRaw.payoffFor),
     payoffSignoff: toOptionalBoolean(frontmatterRaw.payoffSignoff),
     pathEnumerationSignoff: toOptionalBoolean(frontmatterRaw.pathEnumerationSignoff),
+    dupHunkSignoff: toOptionalBoolean(frontmatterRaw.dupHunkSignoff),
     setupDiff: readFileIfExists(join(ticketDir, "setup.diff")),
     referenceDiff: readFileIfExists(join(ticketDir, "reference.diff")),
     authorBriefRaw: readOptionalYamlFile(join(ticketDir, "author_brief.yaml")),
