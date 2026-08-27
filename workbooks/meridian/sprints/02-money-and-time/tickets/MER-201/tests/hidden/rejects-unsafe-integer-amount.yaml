@@ -1,0 +1,13 @@
+humanName: "Escaped: an amount too large to represent as an exact minor-unit integer is accepted"
+tags:
+  - exact-money-representation-rounding
+kind: io-case
+input:
+  amount: 100000000000000
+  currency: "USD"
+expected:
+  ok: false
+  reason: "amount is too large to represent exactly"
+entryPoint:
+  module: "src/money/money.ts"
+  export: "parseMoney"

@@ -1,0 +1,27 @@
+humanName: "Escaped: a seven-way split of an unevenly divisible total does not sum back to the total"
+tags:
+  - exact-money-representation-rounding
+kind: io-case
+input:
+  total:
+    minorUnits: 1007
+    currency: "USD"
+  count: 7
+expected:
+  - minorUnits: 143
+    currency: "USD"
+  - minorUnits: 144
+    currency: "USD"
+  - minorUnits: 144
+    currency: "USD"
+  - minorUnits: 144
+    currency: "USD"
+  - minorUnits: 144
+    currency: "USD"
+  - minorUnits: 144
+    currency: "USD"
+  - minorUnits: 144
+    currency: "USD"
+entryPoint:
+  module: "src/money/round-half-up.ts"
+  export: "allocateRoundedTotal"

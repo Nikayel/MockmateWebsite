@@ -1,0 +1,13 @@
+humanName: "Escaped: a currency sent as a number instead of a code is accepted"
+tags:
+  - exact-money-representation-rounding
+kind: io-case
+input:
+  amount: 100
+  currency: 1
+expected:
+  ok: false
+  reason: "currency must be a non-empty string"
+entryPoint:
+  module: "src/money/money.ts"
+  export: "parseMoney"

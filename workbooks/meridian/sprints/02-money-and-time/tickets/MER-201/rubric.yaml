@@ -1,0 +1,11 @@
+weights:
+  understanding: 0.15
+  problemSolving: 0.3
+  codeQuality: 0.2
+  communication: 0.05
+  verification: 0.3
+notes:
+  understanding: "Keys off whether money becomes an exact minor-unit value type carried through storage and the response body, not a rounding call added at the edge."
+  problemSolving: "Keys off the visible pass rate across exact parsing, rejection of unrepresentable amounts, and an allocation that sums back to its total."
+  codeQuality: "Keys off whether rounding happens in exactly one function, called once per calculation, rather than at each intermediate step."
+  verification: "Keys off escaped-defect rate on the hidden cases - a boolean, array, null, or over-precise amount must never reach the repository, and an allocation must never lose or invent a minor unit."

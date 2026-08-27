@@ -1,0 +1,11 @@
+humanName: "Escaped: a three-decimal currency other than the one already tested formats with the wrong number of places"
+tags:
+  - exact-money-representation-rounding
+kind: io-case
+input:
+  minorUnits: 12345
+  currency: "KWD"
+expected: "KWD 12.345"
+entryPoint:
+  module: "src/money/money.ts"
+  export: "formatMoney"
