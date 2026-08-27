@@ -4,13 +4,14 @@
  * UX-SPEC.md §3, screen 2: the join-the-team moment. Public, static (ISR), indexable, global chrome.
  * The flag check and the unknown-id 404 both live in `layout.tsx`; this file only renders.
  *
- * `SprintMap` here always renders without a live `currentSprint` (so it shows the generic
- * not-enrolled view: sprint 1 available, sprints 2+ locked behind the `Pro` pill). Wiring the
- * client-fetched run's `currentSprint` into it would mean either a second authenticated fetch here
- * or threading one fetch result through a shared client wrapper to three render sites (the top CTA,
- * the map, the bottom CTA) for a "done"/"current" marker that is a real but secondary gap next to
- * the CTA's own resume state (which IS wired, in `WorkbookOverviewCta`). Flagged in
- * task-10-report.md as a scope call, not an oversight.
+ * Fix round 1 (I2+I3): the resume-aware region (top CTA, the arc's `currentSprint`, the repeat CTA)
+ * is `WorkbookOverviewShell`, which owns the one client-side run fetch and threads its result to all
+ * three render sites — the previous two independent `WorkbookOverviewCta` instances made two
+ * authenticated calls for one fact and could show two `SparraLoader`s at once. The grading panel and
+ * the objectives-by-sprint list are static and run-independent, so they render on the server and
+ * pass straight through the shell as `children`. A capability-locked workbook
+ * (`!workbookIsRunnable`) has no CTA and no run at all, so it skips the shell entirely: a plain
+ * `SprintMap` with no `currentSprint`, and a static sandbox notice instead of a CTA.
  */
 
 import Link from "next/link"
@@ -26,7 +27,7 @@ import {
 } from "@/lib/sprint-labs/platform-capabilities"
 import { GradingOverviewPanel } from "@/components/sprint-labs/catalog/GradingOverviewPanel"
 import { SprintMap } from "@/components/sprint-labs/catalog/SprintMap"
-import { WorkbookOverviewCta } from "@/components/sprint-labs/catalog/WorkbookOverviewCta"
+import { WorkbookOverviewShell } from "@/components/sprint-labs/catalog/WorkbookOverviewShell"
 import { ObjectiveList } from "@/components/sprint-labs/ui/ObjectiveList"
 import { toNotStartedObjectiveView } from "@/components/sprint-labs/ui/ObjectiveChip"
 import { formatWorkbookMeterLine } from "@/components/sprint-labs/catalog/format-meter-line"
@@ -47,6 +48,39 @@ export default async function SprintLabWorkbookOverviewPage({
 
   const sprints = (await getWorkbookSprints(workbookId)) ?? []
   const locked = !workbookIsRunnable(summary)
+
+  // Run-independent middle of the page: identical whether the workbook is locked or not, so it is
+  // built once and either wrapped by the shell (unlocked) or rendered plain (locked).
+  const staticMiddle = (
+    <>
+      <GradingOverviewPanel />
+
+      <section aria-labelledby="workbook-objectives-heading" className="flex flex-col gap-4">
+        <h2
+          id="workbook-objectives-heading"
+          className="text-lg font-semibold text-[var(--wb-text)] sm:text-xl"
+        >
+          What you&apos;ll be able to do
+        </h2>
+        {sprints.length === 0 ? (
+          <p className="text-sm text-[var(--wb-faint)]">
+            Objectives are not published for this workbook yet.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-5">
+            {sprints.map((sprint) => (
+              <ObjectiveList
+                key={sprint.number}
+                heading={`Sprint ${sprint.number}: ${sprint.title}`}
+                density="full"
+                objectives={sprint.objectives.map(toNotStartedObjectiveView)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+    </>
+  )
 
   return (
     <>
@@ -71,16 +105,9 @@ export default async function SprintLabWorkbookOverviewPage({
               </p>
             </div>
 
-            {locked ? (
+            {locked && (
               <div className="flex flex-col gap-2 rounded-lg border border-[var(--wb-border)] bg-[var(--wb-panel)] p-4">
                 <p className="text-sm text-[var(--wb-text)]">{SERVER_EXECUTION_MESSAGE}</p>
-                <p className="text-xs text-[var(--wb-text-secondary)]">
-                  {formatWorkbookMeterLine(summary)}
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-start gap-2">
-                <WorkbookOverviewCta workbookId={summary.id} />
                 <p className="text-xs text-[var(--wb-text-secondary)]">
                   {formatWorkbookMeterLine(summary)}
                 </p>
@@ -88,53 +115,33 @@ export default async function SprintLabWorkbookOverviewPage({
             )}
           </header>
 
-          <GradingOverviewPanel />
-
-          <section aria-labelledby="workbook-objectives-heading" className="flex flex-col gap-4">
-            <h2
-              id="workbook-objectives-heading"
-              className="text-lg font-semibold text-[var(--wb-text)] sm:text-xl"
+          {locked ? (
+            <>
+              {staticMiddle}
+              <section aria-labelledby="workbook-arc-heading" className="flex flex-col gap-4">
+                <h2
+                  id="workbook-arc-heading"
+                  className="text-lg font-semibold text-[var(--wb-text)] sm:text-xl"
+                >
+                  The arc
+                </h2>
+                {sprints.length === 0 ? (
+                  <p className="text-sm text-[var(--wb-faint)]">
+                    The sprint map is not published for this workbook yet.
+                  </p>
+                ) : (
+                  <SprintMap sprints={sprints} />
+                )}
+              </section>
+            </>
+          ) : (
+            <WorkbookOverviewShell
+              workbookId={summary.id}
+              sprints={sprints}
+              meterLine={formatWorkbookMeterLine(summary)}
             >
-              What you&apos;ll be able to do
-            </h2>
-            {sprints.length === 0 ? (
-              <p className="text-sm text-[var(--wb-faint)]">
-                Objectives are not published for this workbook yet.
-              </p>
-            ) : (
-              <div className="flex flex-col gap-5">
-                {sprints.map((sprint) => (
-                  <ObjectiveList
-                    key={sprint.number}
-                    heading={`Sprint ${sprint.number}: ${sprint.title}`}
-                    density="full"
-                    objectives={sprint.objectives.map(toNotStartedObjectiveView)}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section aria-labelledby="workbook-arc-heading" className="flex flex-col gap-4">
-            <h2
-              id="workbook-arc-heading"
-              className="text-lg font-semibold text-[var(--wb-text)] sm:text-xl"
-            >
-              The arc
-            </h2>
-            {sprints.length === 0 ? (
-              <p className="text-sm text-[var(--wb-faint)]">
-                The sprint map is not published for this workbook yet.
-              </p>
-            ) : (
-              <SprintMap sprints={sprints} />
-            )}
-          </section>
-
-          {!locked && (
-            <div>
-              <WorkbookOverviewCta workbookId={summary.id} />
-            </div>
+              {staticMiddle}
+            </WorkbookOverviewShell>
           )}
         </div>
       </main>
