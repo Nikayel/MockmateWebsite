@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { ChevronLeft, AlertCircle, RefreshCw, Crown, ArrowRight } from "lucide-react"
@@ -17,18 +17,26 @@ import {
 } from "@/components/roadmap"
 import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { getCompanyById } from "@/lib/data/company-questions"
-import { UserRoadmapAssessment } from "@/lib/data/company-questions/types"
+import type { CompanyId } from "@/lib/data/company-questions/types"
 import { useAuth } from "@/lib/auth-context"
-import { calendarDaysUntil } from "@/lib/roadmap/calendar-days"
+import {
+  clearPendingWizard,
+  loadPendingWizard,
+  savePendingWizard,
+} from "@/lib/roadmap/pending-wizard"
 
 type Step = "company" | "date" | "assessment" | "generating"
+
+// Compared against `error` to decide when the banner needs a sign-in affordance, so the
+// message and the check cannot drift apart.
+const AUTH_REQUIRED_ERROR = "You must be logged in to create a roadmap"
 
 export default function NewRoadmapPage() {
   const router = useRouter()
   const [step, setStep] = useState<Step>("company")
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { user, firebaseUser } = useAuth()
+  const { user, firebaseUser, loading: authLoading } = useAuth()
 
   const {
     selectedCompany,
@@ -38,11 +46,6 @@ export default function NewRoadmapPage() {
     setActiveRoadmap,
     resetWizard,
   } = useRoadmapStore()
-
-  // Reset wizard on mount
-  useEffect(() => {
-    resetWizard()
-  }, [resetWizard])
 
   const handleCompanySelect = (companyId: string) => {
     selectCompany(companyId as any)
@@ -54,95 +57,134 @@ export default function NewRoadmapPage() {
     setStep("assessment")
   }
 
+  const generateRoadmap = useCallback(
+    async (result: AssessmentResult, companyId: CompanyId, interviewDate: Date) => {
+      if (!firebaseUser) {
+        setError(AUTH_REQUIRED_ERROR)
+        setStep("assessment")
+        return
+      }
+
+      setStep("generating")
+      setIsGenerating(true)
+      setError(null)
+
+      try {
+        // Get Firebase ID token for authentication
+        const idToken = await firebaseUser.getIdToken()
+
+        // Call API endpoint to create and save roadmap to Firebase
+        const response = await fetch("/api/roadmap", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({
+            targetCompany: companyId,
+            interviewDate: interviewDate.toISOString(),
+            experienceLevel: result.experienceLevel,
+            targetTrack: result.targetTrack,
+            problemsSolved: result.problemsSolved,
+            hoursPerDay: result.hoursPerDay,
+            patternFamiliarity: result.patternFamiliarity,
+            mixMode: result.mixMode,
+            selectedCategories: result.selectedCategories,
+          }),
+        })
+
+        if (!response.ok) {
+          const errorData = await response
+            .json()
+            .catch(() => ({ error: "Failed to create roadmap" }))
+          // Handle Pro-only feature restriction - stay on generating step and show upgrade prompt
+          if (errorData.code === "PRO_REQUIRED") {
+            // The walk is done and only the plan is gated: keep the finished walk through the
+            // upgrade round trip the same way savePendingWizard keeps it through sign-in.
+            savePendingWizard({
+              companyId,
+              interviewDate: interviewDate.toISOString(),
+              result,
+            })
+            // Brief delay so user sees the generation started
+            await new Promise((resolve) => setTimeout(resolve, 1500))
+            setError("PRO_REQUIRED")
+            setIsGenerating(false)
+            // Stay on generating step - don't go back to assessment
+            return
+          }
+          throw new Error(errorData.error || "Failed to create roadmap")
+        }
+
+        const data = await response.json()
+        const roadmap = data.roadmap
+
+        if (!roadmap) {
+          throw new Error("Failed to generate roadmap")
+        }
+
+        // The walk is spent the moment it becomes a roadmap.
+        clearPendingWizard()
+
+        // Set active roadmap in store
+        setActiveRoadmap(roadmap)
+
+        // Navigate to roadmap view
+        router.push("/roadmap")
+      } catch (err) {
+        console.error("Error generating roadmap:", err)
+        setError(err instanceof Error ? err.message : "Failed to generate roadmap")
+        setStep("assessment")
+      } finally {
+        setIsGenerating(false)
+      }
+    },
+    [firebaseUser, router, setActiveRoadmap]
+  )
+
+  // On arrival, either resume a finished walk or start clean. Resume exists for the visitor
+  // who completed all three steps, hit the sign-in (or Pro) wall, and came back through a
+  // full-page round trip: their answers are in sessionStorage, so they go straight to
+  // generation instead of re-walking the steps. Decided once per visit, after auth settles,
+  // so a signed-in return never flashes the company step first.
+  const resumeDecidedRef = useRef(false)
+  useEffect(() => {
+    if (authLoading || resumeDecidedRef.current) return
+    resumeDecidedRef.current = true
+
+    const pending = user?.id && firebaseUser ? loadPendingWizard() : null
+    if (!pending) {
+      // A signed-out visitor's saved walk stays in sessionStorage: it is only readable once
+      // an account exists to generate with, and the TTL retires it if they never sign in.
+      resetWizard()
+      return
+    }
+
+    // Single shot: cleared before the attempt so a failure cannot loop. The one retryable
+    // outcome, the Pro gate, saves the walk again itself inside generateRoadmap.
+    clearPendingWizard()
+    selectCompany(pending.companyId)
+    selectDate(new Date(pending.interviewDate))
+    void generateRoadmap(pending.result, pending.companyId, new Date(pending.interviewDate))
+  }, [authLoading, user, firebaseUser, resetWizard, selectCompany, selectDate, generateRoadmap])
+
   const handleAssessmentComplete = async (result: AssessmentResult) => {
     if (!selectedCompany || !selectedDate) return
 
     if (!user?.id || !firebaseUser) {
-      setError("You must be logged in to create a roadmap")
+      // The walk is finished; only the account is missing. Save it so the sign-in round trip
+      // (a full-page OAuth redirect) resumes at generation instead of re-walking the steps.
+      savePendingWizard({
+        companyId: selectedCompany,
+        interviewDate: selectedDate.toISOString(),
+        result,
+      })
+      setError(AUTH_REQUIRED_ERROR)
       setStep("assessment")
       return
     }
 
-    setStep("generating")
-    setIsGenerating(true)
-    setError(null)
-
-    try {
-      // Get Firebase ID token for authentication
-      const idToken = await firebaseUser.getIdToken()
-
-      // Calculate days remaining
-      // At least 1: an assessment generated for a same-day interview still needs a
-      // day of plan to divide work across.
-      const daysRemaining = Math.max(1, calendarDaysUntil(selectedDate) ?? 1)
-
-      // Build assessment object
-      const assessment: UserRoadmapAssessment = {
-        targetCompany: selectedCompany,
-        interviewDate: selectedDate,
-        daysRemaining,
-        experienceLevel: result.experienceLevel,
-        targetTrack: result.targetTrack,
-        problemsSolvedEstimate: result.problemsSolved,
-        patternFamiliarity: result.patternFamiliarity,
-        hoursPerDay: result.hoursPerDay,
-        preferredDifficulty: "mixed",
-        targetScore: 80,
-      }
-
-      // Call API endpoint to create and save roadmap to Firebase
-      const response = await fetch("/api/roadmap", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({
-          targetCompany: selectedCompany,
-          interviewDate: selectedDate.toISOString(),
-          experienceLevel: result.experienceLevel,
-          targetTrack: result.targetTrack,
-          problemsSolved: result.problemsSolved,
-          hoursPerDay: result.hoursPerDay,
-          patternFamiliarity: result.patternFamiliarity,
-          mixMode: result.mixMode,
-          selectedCategories: result.selectedCategories,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Failed to create roadmap" }))
-        // Handle Pro-only feature restriction - stay on generating step and show upgrade prompt
-        if (errorData.code === "PRO_REQUIRED") {
-          // Brief delay so user sees the generation started
-          await new Promise((resolve) => setTimeout(resolve, 1500))
-          setError("PRO_REQUIRED")
-          setIsGenerating(false)
-          // Stay on generating step - don't go back to assessment
-          return
-        }
-        throw new Error(errorData.error || "Failed to create roadmap")
-      }
-
-      const data = await response.json()
-      const roadmap = data.roadmap
-
-      if (!roadmap) {
-        throw new Error("Failed to generate roadmap")
-      }
-
-      // Set active roadmap in store
-      setActiveRoadmap(roadmap)
-
-      // Navigate to roadmap view
-      router.push("/roadmap")
-    } catch (err) {
-      console.error("Error generating roadmap:", err)
-      setError(err instanceof Error ? err.message : "Failed to generate roadmap")
-      setStep("assessment")
-    } finally {
-      setIsGenerating(false)
-    }
+    await generateRoadmap(result, selectedCompany, selectedDate)
   }
 
   const handleBack = () => {
@@ -164,7 +206,7 @@ export default function NewRoadmapPage() {
   // The signed-out branch of handleAssessmentComplete. The banner must carry a way to sign in:
   // steps 1-3 need no auth, so a signed-out visitor genuinely reaches this error, and a message
   // with no affordance strands them at the end of the wizard.
-  const isAuthRequired = error === "You must be logged in to create a roadmap"
+  const isAuthRequired = error === AUTH_REQUIRED_ERROR
 
   return (
     <div className="bg-background min-h-screen">
@@ -267,9 +309,9 @@ export default function NewRoadmapPage() {
                   </button>
                 )}
                 {isAuthRequired && (
-                  // Same redirect form the preview page's CTA uses. Signing in lands back on
-                  // this wizard; the mount effect resets it, so the visitor re-walks the three
-                  // short steps, which beats the dead end this banner used to be.
+                  // Same redirect form the preview page's CTA uses. The finished walk is in
+                  // sessionStorage (savePendingWizard), so signing in lands back here and the
+                  // resume effect goes straight to generation, no re-walk.
                   <Link
                     href="/login?redirect=/roadmap/new"
                     className="bg-accent text-accent-foreground hover:bg-accent/90 mt-3 inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors"
