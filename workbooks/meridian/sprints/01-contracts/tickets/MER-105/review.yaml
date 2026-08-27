@@ -1,0 +1,10 @@
+comments:
+  - id: "catch-swallows-validation"
+    body: "Good catch on eliminating the 500, but the catch block returns { ok: true, value: body } on any failure, so a non-numeric amount like \"not-a-number\" is silently accepted again instead of being rejected with a 400. That's the exact defect MER-101 was supposed to close."
+    correct: true
+  - id: "thin-test-coverage"
+    body: "The new test only exercises the literal CLM-77102 payload from the ticket. There's no test for a boolean, null, or missing amount, so a green CI run here doesn't tell us those cases still work."
+    correct: true
+  - id: "catch-scoped-safely"
+    body: "Once we're inside the try block calling parseClaimInput, the catch only fires if the pre-normalization line itself throws, so it's scoped tightly enough to be safe. This is a minimal, low-risk patch and fine to merge as-is; we can tighten the fallback in a follow-up."
+    correct: false

@@ -1,0 +1,10 @@
+weights:
+  understanding: 0.15
+  problemSolving: 0.2
+  codeQuality: 0.15
+  communication: 0.25
+  verification: 0.25
+notes:
+  understanding: "Keys off naming the defect class - a band-aid that stops one crash by widening what counts as a valid claim - not just the CLM-77102 symptom."
+  communication: "Keys off whether the learner pushed back on the 'safe to merge as-is' comment with the concrete harm it causes today, not just disagreement."
+  verification: "Keys off whether the learner's own regression test reproduces the silently-accepted non-numeric amount before rejecting the PR."

@@ -1,0 +1,39 @@
+diff --git a/src/http/routes/claims.ts b/src/http/routes/claims.ts
+index aaf9a38..1dd4e0e 100644
+--- a/src/http/routes/claims.ts
++++ b/src/http/routes/claims.ts
+@@ -6,7 +6,7 @@ import type { Outbox } from "../../queue/outbox"
+ import { findOperationCompatibility } from "../compatibility-descriptor"
+ import { badRequest, notFound } from "../errors"
+ import { parseClaimInput } from "../parsers/claim-input"
+-import type { ParsedClaimInput, ParseClaimInputResult } from "../parsers/claim-input"
++import type { ParseClaimInputResult } from "../parsers/claim-input"
+ import { requireTenantId } from "../request-context"
+ import type { App } from "../types"
+ 
+@@ -75,20 +75,13 @@ function deprecationHeaders(usedOffset: boolean): Record<string, string> {
+ }
+ 
+ /**
+- * Normalizes the amount to two decimal places before handing off to the real parser, so a
+- * plain JS number keeps the exact shape Finance expects on the wire. Falls back to the
+- * caller's own payload, unparsed, whenever normalizing it throws - stops CLM-77102-shaped
+- * payloads from ever 500ing again. See PR #412.
++ * PR #412 wrapped this in a try/catch that fell back to the caller's own unparsed payload
++ * whenever normalizing the amount threw - which stopped the 500 by silently accepting a
++ * non-numeric amount instead of rejecting it, the exact defect MER-101 closed. Delegates to
++ * the real parser directly; the name stays so nothing else in this file has to change.
+  */
+ export function parseCreateClaimBody(body: unknown): ParseClaimInputResult {
+-  try {
+-    const record = (body ?? {}) as Record<string, unknown>
+-    const rawAmount = record.amount as { toFixed(digits: number): string }
+-    const normalizedAmount = Number(rawAmount.toFixed(2))
+-    return parseClaimInput({ ...record, amount: normalizedAmount })
+-  } catch {
+-    return { ok: true, value: body as ParsedClaimInput }
+-  }
++  return parseClaimInput(body)
+ }
+ 
+ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {

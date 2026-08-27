@@ -1,0 +1,41 @@
+diff --git a/src/http/routes/claims.ts b/src/http/routes/claims.ts
+index 19c13b6..aaf9a38 100644
+--- a/src/http/routes/claims.ts
++++ b/src/http/routes/claims.ts
+@@ -6,6 +6,7 @@ import type { Outbox } from "../../queue/outbox"
+ import { findOperationCompatibility } from "../compatibility-descriptor"
+ import { badRequest, notFound } from "../errors"
+ import { parseClaimInput } from "../parsers/claim-input"
++import type { ParsedClaimInput, ParseClaimInputResult } from "../parsers/claim-input"
+ import { requireTenantId } from "../request-context"
+ import type { App } from "../types"
+ 
+@@ -73,10 +74,27 @@ function deprecationHeaders(usedOffset: boolean): Record<string, string> {
+   return { deprecation: "true", sunset: deprecated.sunset }
+ }
+ 
++/**
++ * Normalizes the amount to two decimal places before handing off to the real parser, so a
++ * plain JS number keeps the exact shape Finance expects on the wire. Falls back to the
++ * caller's own payload, unparsed, whenever normalizing it throws - stops CLM-77102-shaped
++ * payloads from ever 500ing again. See PR #412.
++ */
++export function parseCreateClaimBody(body: unknown): ParseClaimInputResult {
++  try {
++    const record = (body ?? {}) as Record<string, unknown>
++    const rawAmount = record.amount as { toFixed(digits: number): string }
++    const normalizedAmount = Number(rawAmount.toFixed(2))
++    return parseClaimInput({ ...record, amount: normalizedAmount })
++  } catch {
++    return { ok: true, value: body as ParsedClaimInput }
++  }
++}
++
+ export function registerClaimRoutes(app: App, deps: ClaimRouteDeps): void {
+   app.post("/claims", async (req) => {
+     const tenantId = requireTenantId(req)
+-    const parsed = parseClaimInput(req.body)
++    const parsed = parseCreateClaimBody(req.body)
+     if (!parsed.ok) {
+       return badRequest({ message: parsed.reason, correlationId: req.correlationId })
+     }
