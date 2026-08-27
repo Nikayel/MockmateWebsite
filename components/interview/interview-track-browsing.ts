@@ -60,17 +60,21 @@ export function requestsInterviewWork(params: QueryParamReader | null | undefine
 }
 
 /**
- * True when `/interview` should open on the roadmap pitch instead of the track cards: the
- * visitor is signed out (guest-mode auto-entry included, since a guest has no Firebase user)
- * and the address names nothing. The resume notice still takes precedence in `ScenarioBrowser`;
- * that ordering is safe by construction, because a resume needs `?scenario=` and the pitch
- * needs its absence.
+ * True when `/interview` should open on the roadmap pitch instead of the track cards.
+ *
+ * `pitchEligible` is the page's call, not this module's: signed out AND no live guest trial.
+ * A fresh-trial guest is deliberately NOT eligible; they land on the track cards and run their
+ * DSA or bugfix session exactly as before, scores still waiting behind sign-up. The pitch's
+ * audience is the visitor whose trial is already spent, for whom the cards would only lead to
+ * a login wall anyway. The resume notice still takes precedence in `ScenarioBrowser`; that
+ * ordering is safe by construction, because a resume needs `?scenario=` and the pitch needs
+ * its absence.
  */
 export function showsRoadmapPitch(
   params: QueryParamReader | null | undefined,
-  isSignedOut: boolean
+  pitchEligible: boolean
 ): boolean {
-  return isSignedOut && !requestsInterviewWork(params)
+  return pitchEligible && !requestsInterviewWork(params)
 }
 
 /**

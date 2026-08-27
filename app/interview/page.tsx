@@ -1974,7 +1974,7 @@ function InterviewPageContent() {
   // bare address consumes anything), so the browser renders and shows them the
   // roadmap pitch instead of a blank page. Any address that names real work
   // still redirects before isLoading clears, so this never exposes a session.
-  if (!user && !isGuestMode && !showsRoadmapPitch(searchParams, !firebaseUser)) {
+  if (!user && !isGuestMode && !showsRoadmapPitch(searchParams, !firebaseUser && !isGuestMode)) {
     return null
   }
 
@@ -2040,9 +2040,12 @@ function InterviewPageContent() {
           completedProblems={completedProblems}
           hasGuestBanner={isGuestMode && !showFeedback}
           // Resolved by the time this renders: isLoading only flips false after
-          // useSessionReopen's auth check runs. Guests count as signed out on
-          // purpose, so the bare landing pitches the roadmap to them too.
-          isSignedOut={!firebaseUser}
+          // useSessionReopen's auth check runs. A fresh-trial guest is in guest
+          // mode by then and is deliberately NOT pitch-eligible: they get the
+          // track cards and run their session like before, scores waiting
+          // behind sign-up. Only the spent-trial signed-out visitor, who cannot
+          // practice anyway, gets the roadmap pitch.
+          roadmapPitchEligible={!firebaseUser && !isGuestMode}
         />
       )}
 

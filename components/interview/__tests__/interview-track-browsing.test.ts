@@ -108,15 +108,20 @@ describe("requestsInterviewWork", () => {
   })
 })
 
-/** The branch `ScenarioBrowser.renderUntracked` takes between the pitch and the track cards. */
+/**
+ * The branch `ScenarioBrowser.renderUntracked` takes between the pitch and the track cards.
+ * Eligibility is the page's call (signed out AND no live guest trial); this module only
+ * combines it with what the address asks for. A fresh-trial guest arrives with `false` and
+ * lands on the cards to run their session, exactly as before the pitch existed.
+ */
 describe("showsRoadmapPitch", () => {
-  it("pitches the roadmap to a signed-out visitor on the bare address", () => {
+  it("pitches the roadmap to an eligible visitor (signed out, trial spent) on the bare address", () => {
     expect(showsRoadmapPitch(new URLSearchParams(""), true)).toBe(true)
     expect(showsRoadmapPitch(null, true)).toBe(true)
     expect(showsRoadmapPitch(undefined, true)).toBe(true)
   })
 
-  it("keeps the track cards for signed-in users on the same address", () => {
+  it("keeps the track cards when the visitor is not eligible (signed in, or a fresh-trial guest)", () => {
     expect(showsRoadmapPitch(new URLSearchParams(""), false)).toBe(false)
     expect(showsRoadmapPitch(null, false)).toBe(false)
   })

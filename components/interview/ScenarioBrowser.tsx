@@ -35,11 +35,12 @@ interface ScenarioBrowserProps {
   completedProblems: string[]
   hasGuestBanner?: boolean
   /**
-   * True when auth has resolved with no Firebase user (guests included). The page owns auth and
-   * only mounts this browser after resolution, so the flag can never flash the signed-out
-   * landing at a signed-in user mid-load.
+   * True when the bare landing should pitch the roadmap instead of the track cards. The page
+   * owns the calculus (auth resolved, no Firebase user, no live guest trial) and only mounts
+   * this browser after auth resolution, so the flag can never flash the pitch at a signed-in
+   * user mid-load. A fresh-trial guest is NOT eligible: they get the cards and their session.
    */
-  isSignedOut?: boolean
+  roadmapPitchEligible?: boolean
 }
 
 /** DSA's own ways of looking at its problem set. Owned by the DSA track, not by the browser. */
@@ -64,7 +65,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   usageLimit,
   completedProblems,
   hasGuestBanner = false,
-  isSignedOut = false,
+  roadmapPitchEligible = false,
 }: ScenarioBrowserProps) {
   // Safe without a Suspense boundary of its own: page.tsx already wraps this whole tree in one.
   const searchParams = useSearchParams()
@@ -212,12 +213,13 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   // No track chosen. A deep link that is still resolving gets the holding state instead of the
   // picker, because page.tsx keeps this component mounted while `useSessionReopen` works and a
   // picker flashing in front of someone who already clicked their session is worse than nothing.
-  // A signed-out visitor on the truly bare address gets the roadmap pitch rather than the track
-  // cards; signed-in users keep the cards, and any named track/session/scenario bypasses the
-  // pitch entirely (see `showsRoadmapPitch`).
+  // A spent-trial signed-out visitor on the truly bare address gets the roadmap pitch rather
+  // than track cards that only lead to a login wall; everyone else (signed-in users and fresh
+  // guests alike) keeps the cards, and any named track/session/scenario bypasses the pitch
+  // entirely (see `showsRoadmapPitch`).
   const renderUntracked = () => {
     if (willResumeExistingSession(searchParams)) return <InterviewResumeNotice />
-    if (showsRoadmapPitch(searchParams, isSignedOut)) return <RoadmapPitch />
+    if (showsRoadmapPitch(searchParams, roadmapPitchEligible)) return <RoadmapPitch />
     return <InterviewTrackLanding />
   }
 

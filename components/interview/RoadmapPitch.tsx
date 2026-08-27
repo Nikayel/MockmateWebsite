@@ -8,14 +8,15 @@ import { Button } from "@/components/ui/button"
 import { InterviewTrackDialog } from "./InterviewTrackPicker"
 
 /**
- * The bare `/interview` landing for signed-out visitors: a short pitch for the personalized
- * roadmap, with one way forward.
+ * The bare `/interview` landing for the signed-out visitor whose guest trial is already spent:
+ * a short pitch for the personalized roadmap, with one way forward. (A fresh-trial guest never
+ * sees this; they get the track cards and run their session, scores waiting behind sign-up.)
  *
  * PostHog made the old signed-out landing the site's worst dead-click page, so the rules here
  * are strict. One focal CTA. Plain text is plain text: nothing looks interactive unless it
  * navigates or opens something. The two quiet links under the CTA keep the sample plan and the
- * guest practice trial reachable without competing with it; the practice link opens the same
- * track picker window the header uses, so the choice looks the same wherever it is offered.
+ * practice tracks reachable without competing with it; the practice link opens the same track
+ * picker window the header uses, so the choice looks the same wherever it is offered.
  *
  * Every sentence is a claim checked against the product: the wizard's steps
  * (`app/roadmap/new/page.tsx`), the company-weighted category mix (`lib/roadmap/
