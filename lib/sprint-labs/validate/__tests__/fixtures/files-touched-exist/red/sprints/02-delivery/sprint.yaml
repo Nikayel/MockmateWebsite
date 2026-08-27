@@ -1,0 +1,6 @@
+number: 2
+title: "Delivery"
+filesTouched:
+  - "src/db/repositories/outbox.ts"
+newSourceFiles: []
+rewrittenFiles: []

@@ -1,0 +1,8 @@
+diff --git a/db/migrations/0005_late.sql b/db/migrations/0005_late.sql
+new file mode 100644
+--- /dev/null
++++ b/db/migrations/0005_late.sql
+@@ -0,0 +1,3 @@
++CREATE TABLE late_arrival (
++  id uuid PRIMARY KEY
++);
