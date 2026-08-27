@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
+import { apiRateLimit } from "@/lib/rate-limit"
 import { getFlagAsync } from "@/lib/feature-flags"
 import { logger } from "@/lib/logger"
 import {
@@ -60,9 +61,14 @@ export async function GET(request: NextRequest) {
  * `MAX_WORKSPACE_FILES_PER_SAVE` (40) per call. Validation (path shape,
  * per-file size cap) and ownership are the service's job
  * (`saveWorkspaceFiles`); this handler stays a thin parse -> auth -> validate
- * -> service -> response.
+ * -> service -> response. Rate-limited (fix round 2026-08-26, I5): this is
+ * the one write path a signed-in client can call repeatedly and cheaply,
+ * unlike the run-lifecycle actions which are naturally infrequent.
  */
 export async function PUT(request: NextRequest) {
+  const rateLimitResult = await apiRateLimit(request)
+  if (rateLimitResult) return rateLimitResult
+
   const auth = await verifyAuth(request)
   if (!auth.authenticated || !auth.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
