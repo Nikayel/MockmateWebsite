@@ -37,6 +37,25 @@ export async function loadSealedTicket(
   return mod.sealed
 }
 
+/**
+ * Defense-in-depth accessor (docs/sprint-labs/PLAN.md Task 14 review fix
+ * M1): returns ONLY authorBrief, so a caller that needs the review-only
+ * persona's material never even holds a reference to referenceDiff,
+ * hiddenCases, or review -- those fields are eligible for GC the instant
+ * this function returns, never passed to anything near a prompt builder.
+ * Prefer this over loadSealedTicket whenever authorBrief is all the caller
+ * needs.
+ */
+export async function loadSealedAuthorBrief(
+  workbookId: string,
+  ticketKey: string
+): Promise<SealedTicketContent["authorBrief"]> {
+  const loader = SEALED_TICKET_LOADERS[loaderKey(workbookId, ticketKey)]
+  if (!loader) return null
+  const mod = await loader()
+  return mod.sealed.authorBrief
+}
+
 export function sealedTicketRegistryKeys(): string[] {
   return Object.keys(SEALED_TICKET_LOADERS)
 }

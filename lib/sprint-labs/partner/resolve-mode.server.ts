@@ -16,11 +16,17 @@
  * This is the file added to lib/sprint-labs/__tests__/sealing.test.ts's
  * ALLOWED_IMPORTERS for the chat surface, mirroring how
  * lib/sprint-labs/grading/attempts-service.ts is the sole importer for the
- * attempts surface -- the thin route never imports `loadSealedTicket`
+ * attempts surface -- the thin route never imports the sealed registry
  * directly.
+ *
+ * Review fix M1: calls `loadSealedAuthorBrief`, not `loadSealedTicket` --
+ * the narrower accessor returns ONLY `authorBrief`, so this file (and
+ * everything downstream of it, including the prompt builder) never holds a
+ * reference to `referenceDiff`, `hiddenCases`, or `review` at all. Those
+ * fields simply never exist in any variable here.
  */
 
-import { loadSealedTicket } from "@/lib/scenarios/sealed/sprint-labs/registry.server"
+import { loadSealedAuthorBrief } from "@/lib/scenarios/sealed/sprint-labs/registry.server"
 import type { TicketPublic } from "@/lib/sprint-labs/types"
 import { resolvePartnerMode, type PartnerMode, type PartnerSlot } from "./modes"
 
@@ -39,8 +45,7 @@ export async function resolvePartnerModeForTicket(
 ): Promise<PartnerMode> {
   let authorBrief = null
   if (ticket.aiPolicy === "review-only") {
-    const sealed = await loadSealedTicket(workbookId, ticketKey)
-    authorBrief = sealed?.authorBrief ?? null
+    authorBrief = await loadSealedAuthorBrief(workbookId, ticketKey)
   }
 
   return resolvePartnerMode(ticket.aiPolicy, slot, {

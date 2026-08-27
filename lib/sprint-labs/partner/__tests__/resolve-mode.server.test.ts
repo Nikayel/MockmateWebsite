@@ -1,40 +1,28 @@
 /**
  * Server-only orchestration around `resolvePartnerMode`: loads the sealed
- * author_brief for a review-only ticket. `loadSealedTicket` is mocked (this
- * is a unit test, not an integration test against the real sealed registry).
+ * author_brief for a review-only ticket. `loadSealedAuthorBrief` is mocked
+ * (this is a unit test, not an integration test against the real sealed
+ * registry).
+ *
+ * Review fix M1: this calls the NARROW accessor (`loadSealedAuthorBrief`,
+ * returning only `authorBrief`), not `loadSealedTicket` (the full
+ * `SealedTicketContent`) -- these tests assert the narrow function is what's
+ * actually called, so a regression back to the wide one would fail here.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type { SealedTicketContent } from "@/lib/scenarios/sealed/sprint-labs/types"
+import type { SealedAuthorBrief } from "@/lib/scenarios/sealed/sprint-labs/types"
 
-const mocks = vi.hoisted(() => ({ loadSealedTicket: vi.fn() }))
+const mocks = vi.hoisted(() => ({ loadSealedAuthorBrief: vi.fn() }))
 
 vi.mock("@/lib/scenarios/sealed/sprint-labs/registry.server", () => ({
-  loadSealedTicket: mocks.loadSealedTicket,
+  loadSealedAuthorBrief: mocks.loadSealedAuthorBrief,
 }))
 
-const SEALED: SealedTicketContent = {
-  workbookId: "fixture-demo",
-  ticketKey: "DEMO-102",
-  hiddenCases: [],
-  adversaryFiles: [],
-  review: [{ id: "c1", body: "trap comment", correct: false }],
-  authorBrief: {
-    intent: "Deprecate v1 without breaking Northwind.",
-    decisions: [],
-    doNotVolunteer: [],
-    concessionTriggers: ["missing sunset date"],
-  },
-  referenceDiff: "diff --git a/x b/x",
-  rubric: {
-    weights: {
-      understanding: 0.2,
-      problemSolving: 0.2,
-      codeQuality: 0.2,
-      communication: 0.2,
-      verification: 0.2,
-    },
-    notes: {},
-  },
+const BRIEF: SealedAuthorBrief = {
+  intent: "Deprecate v1 without breaking Northwind.",
+  decisions: [],
+  doNotVolunteer: [],
+  concessionTriggers: ["missing sunset date"],
 }
 
 beforeEach(() => {
@@ -43,7 +31,7 @@ beforeEach(() => {
 
 describe("resolvePartnerModeForTicket", () => {
   it("loads the sealed author_brief for a review-only ticket and resolves to author-agent", async () => {
-    mocks.loadSealedTicket.mockResolvedValue(SEALED)
+    mocks.loadSealedAuthorBrief.mockResolvedValue(BRIEF)
     const { resolvePartnerModeForTicket } = await import("../resolve-mode.server")
 
     const mode = await resolvePartnerModeForTicket(
@@ -54,8 +42,8 @@ describe("resolvePartnerModeForTicket", () => {
       "DEMO-102"
     )
 
-    expect(mocks.loadSealedTicket).toHaveBeenCalledWith("fixture-demo", "DEMO-102")
-    expect(mode).toEqual({ kind: "author-agent", brief: SEALED.authorBrief })
+    expect(mocks.loadSealedAuthorBrief).toHaveBeenCalledWith("fixture-demo", "DEMO-102")
+    expect(mode).toEqual({ kind: "author-agent", brief: BRIEF })
   })
 
   it("never touches the sealed loader for assisted/unassisted tickets", async () => {
@@ -76,11 +64,11 @@ describe("resolvePartnerModeForTicket", () => {
       "DEMO-102"
     )
 
-    expect(mocks.loadSealedTicket).not.toHaveBeenCalled()
+    expect(mocks.loadSealedAuthorBrief).not.toHaveBeenCalled()
   })
 
   it("falls back to none when the ticket has no sealed content at all", async () => {
-    mocks.loadSealedTicket.mockResolvedValue(null)
+    mocks.loadSealedAuthorBrief.mockResolvedValue(null)
     const { resolvePartnerModeForTicket } = await import("../resolve-mode.server")
 
     const mode = await resolvePartnerModeForTicket(
@@ -94,8 +82,8 @@ describe("resolvePartnerModeForTicket", () => {
     expect(mode.kind).toBe("none")
   })
 
-  it("falls back to none when sealed content exists but authorBrief is null", async () => {
-    mocks.loadSealedTicket.mockResolvedValue({ ...SEALED, authorBrief: null })
+  it("falls back to none when the sealed ticket exists but authorBrief is null", async () => {
+    mocks.loadSealedAuthorBrief.mockResolvedValue(null)
     const { resolvePartnerModeForTicket } = await import("../resolve-mode.server")
 
     const mode = await resolvePartnerModeForTicket(
