@@ -58,7 +58,23 @@ const ROOT = resolvePath(fileURLToPath(import.meta.url), "..", "..")
 const require = createRequire(import.meta.url)
 const { loadWorkbookTree, validateWorkbook } = require("../lib/sprint-labs/validate/index.ts")
 const { validateWorkbookDynamic } = require("../lib/sprint-labs/validate/dynamic/index.ts")
-const { validateWorkbookContamination } = require("../lib/sprint-labs/validate/contamination.ts")
+
+/**
+ * Loaded LAZILY, on demand, ONLY from inside the `--contamination` branch below -- never at module
+ * top level. `contamination.ts` transitively imports `lib/ai-providers` -> `lib/usage-tracking` ->
+ * `lib/firebase-admin`, which THROWS at require() time in any environment without Firebase Admin
+ * configured (a real, reproduced regression, review round 1 Critical 1: with this at the top of the
+ * file, plain `lab:validate` and `--dynamic` crashed on the import before either flag branch ever
+ * ran, breaking the "free, every-commit check" property this file's own header comment promises for
+ * both of them -- neither has ever needed Firebase or an AI provider key). Vitest's own
+ * `vitest.setup.ts` globally mocks `firebase-admin`, which is exactly why the unit-test suite never
+ * caught this; `lib/sprint-labs/validate/__tests__/lab-validate-cli-firebase-isolation.test.ts`
+ * spawns this script as a real subprocess (no such mock) specifically to guard against it recurring.
+ * NEVER move this `require` back to a top-level const -- that test will fail if it happens again.
+ */
+function loadContaminationGate() {
+  return require("../lib/sprint-labs/validate/contamination.ts")
+}
 
 function usageError(message) {
   console.error(message)
@@ -125,7 +141,7 @@ export async function main(argv = process.argv.slice(2)) {
   const staticFindings = validateWorkbook(workbook)
   const dynamicFindings = dynamic ? await validateWorkbookDynamic(workbook) : []
   const contaminationResult = contamination
-    ? await validateWorkbookContamination(workbook, { force })
+    ? await loadContaminationGate().validateWorkbookContamination(workbook, { force })
     : { verdicts: [], findings: [] }
 
   if (contaminationResult.verdicts.length > 0) {
