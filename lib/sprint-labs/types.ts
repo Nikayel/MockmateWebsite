@@ -214,6 +214,25 @@ export const ticketPublicSchema = z
     acceptanceCriteria: z.array(z.string()),
     /** Whether a hostile `adversary/` runner exists for this ticket. */
     adversaryPresent: z.boolean(),
+    /**
+     * False for a content STUB — a ticket authored with `ticket.md` (so the
+     * board card and ticket screen have everything they render) but no
+     * `reference.diff`/`rubric.yaml` yet, so there is no reference solution
+     * to grade against and the compiler emits no sealed bundle at all for
+     * it (docs/sprint-labs/PLAN.md's compiler task: stub-tolerant compile).
+     * True for a full ticket, compiled exactly as before this field
+     * existed. Optional, not required, on purpose: this schema is lenient
+     * content (see file header), and every hand-built `TicketPublic`
+     * literal elsewhere in the codebase (test fixtures included) predates
+     * this field — leaving it optional means `undefined` reads the same as
+     * "playable" everywhere those literals are still used directly, rather
+     * than forcing an edit onto every call site outside this task's scope.
+     * `scripts/compile-workbooks.mjs`, the only real producer of this field
+     * going forward, always sets it explicitly (`true` for a full ticket,
+     * `false` for a stub) so no genuinely compiled content ever leaves it
+     * unset.
+     */
+    playable: z.boolean().optional(),
     /** The later ticket key this ticket's work pays off, if any. */
     payoffFor: z.string().optional(),
   })
