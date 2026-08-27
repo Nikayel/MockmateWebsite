@@ -1198,3 +1198,183 @@ describe("compile-workbooks: workbook-level seedStats/inheritedDefects pass thro
     expect(summary.inheritedDefects).toBeUndefined()
   })
 })
+
+// ============================================================
+// Stub vs full tickets (Meridian content compiler task): reference.diff/
+// rubric.yaml/tests are now OPTIONAL per ticket. A ticket missing either
+// reference.diff or rubric.yaml compiles PUBLIC-ONLY (playable: false, no
+// sealed emit at all); a ticket carrying both still compiles exactly as
+// before this task (playable: true, full sealed bundle). This also covers
+// the registry-generation bug this split would otherwise reintroduce: the
+// sealed registry's loader table must be built from what actually exists on
+// disk in the SEALED dir, never from the public tickets/ list, or it would
+// emit a dynamic import() whose target does not exist for every stub.
+// ============================================================
+
+describe("compile-workbooks: stub vs full tickets (reference.diff/rubric.yaml optional per ticket)", () => {
+  it("a ticket with no reference.diff/rubric.yaml compiles PUBLIC-ONLY: playable false, no sealed emit, and the sealed registry never references it", async () => {
+    const base = makeTmpDir("sprint-labs-stub-ticket-")
+    const wbDir = join(base, "wb")
+    const workbookId = "stub-ticket-wb"
+    const ticketKey = "STUB-1"
+
+    writeFileText(
+      join(wbDir, "workbook.yaml"),
+      [
+        `id: ${workbookId}`,
+        "title: Stub Ticket Workbook",
+        "pitch: Stub",
+        "track: Test",
+        "language: typescript",
+        "level: Test",
+        "topics: [test]",
+        "sprintCount: 1",
+        "ticketCount: 1",
+        "estimatedHours: 1",
+        "requiresServerExecution: false",
+        "objectives:",
+        "  - id: obj-1",
+        "    label: Obj",
+        "    canDo: I can do the thing.",
+        "",
+      ].join("\n")
+    )
+    writeFileText(
+      join(wbDir, "sprints/01-x/sprint.yaml"),
+      [
+        "number: 1",
+        "title: X",
+        "goal: X",
+        "standupQuote: X",
+        "archMapDelta: {}",
+        "objectives: [obj-1]",
+        "",
+      ].join("\n")
+    )
+    // A STUB: ticket.md only -- exactly the shape of a real Meridian
+    // sprint 3-10 ticket today. No setup.diff, no tests/, no
+    // reference.diff, no rubric.yaml, no review.yaml, no author_brief.yaml.
+    writeFileText(
+      join(wbDir, `sprints/01-x/tickets/${ticketKey}/ticket.md`),
+      [
+        "---",
+        "title: Content coming",
+        "points: 3",
+        "labels: [placeholder]",
+        "ai_policy: assisted",
+        "objectives: [obj-1]",
+        "acceptanceCriteria:",
+        "  - A stub still renders acceptance criteria.",
+        "---",
+        "",
+        "Body text for a not-yet-authored ticket.",
+        "",
+      ].join("\n")
+    )
+
+    const outBase = makeTmpDir("sprint-labs-stub-ticket-out-")
+    const publicDir = join(outBase, "public")
+    const sealedDir = join(outBase, "sealed")
+    const result = runCompiler(wbDir, publicDir, sealedDir)
+    expect(result.stderr + result.stdout).not.toContain("FAILED")
+    expect(result.status).toBe(0)
+
+    // Public: the ticket compiles, playable is false, and everything the
+    // board card and ticket screen render is present.
+    const registry = await import(/* @vite-ignore */ join(publicDir, "registry.ts"))
+    const content = await registry.loadWorkbookContent(workbookId)
+    const compiledTicket = content.ticketsByKey[ticketKey] as CompiledTicket
+    expect(ticketPublicSchema.safeParse(compiledTicket.ticket).success).toBe(true)
+    expect(compiledTicket.ticket.playable).toBe(false)
+    expect(compiledTicket.ticket.title).toBe("Content coming")
+    expect(compiledTicket.ticket.acceptanceCriteria).toEqual([
+      "A stub still renders acceptance criteria.",
+    ])
+    expect(compiledTicket.hiddenTests).toEqual([])
+
+    // Sealed: no file on disk for this ticket, and the sealed registry
+    // never learned about it -- not merely "wasn't asked for," genuinely
+    // absent from the loader table renderSealedRegistry generated.
+    expect(existsSync(join(sealedDir, `${workbookId}/${ticketKey}.server.ts`))).toBe(false)
+    const sealedRegistry = await import(/* @vite-ignore */ join(sealedDir, "registry.server.ts"))
+    expect(sealedRegistry.hasSealedTicket(workbookId, ticketKey)).toBe(false)
+    expect(sealedRegistry.sealedTicketRegistryKeys()).not.toContain(`${workbookId}:${ticketKey}`)
+  })
+
+  it("a ticket with both reference.diff and rubric.yaml still compiles playable:true with a full sealed bundle, and the leak gate still catches a secret in it", async () => {
+    const base = makeTmpDir("sprint-labs-full-ticket-")
+    const { wbDir } = scaffoldMinimalWorkbook(base, {
+      workbookId: "full-ticket-wb",
+      ticketKey: "FULL-1",
+    })
+
+    const outBase = makeTmpDir("sprint-labs-full-ticket-out-")
+    const publicDir = join(outBase, "public")
+    const sealedDir = join(outBase, "sealed")
+    const result = runCompiler(wbDir, publicDir, sealedDir)
+    expect(result.stderr + result.stdout).not.toContain("FAILED")
+    expect(result.status).toBe(0)
+
+    const registry = await import(/* @vite-ignore */ join(publicDir, "registry.ts"))
+    const content = await registry.loadWorkbookContent("full-ticket-wb")
+    const compiledTicket = content.ticketsByKey["FULL-1"] as CompiledTicket
+    expect(compiledTicket.ticket.playable).toBe(true)
+
+    expect(existsSync(join(sealedDir, "full-ticket-wb/FULL-1.server.ts"))).toBe(true)
+    const sealedRegistry = await import(/* @vite-ignore */ join(sealedDir, "registry.server.ts"))
+    expect(sealedRegistry.hasSealedTicket("full-ticket-wb", "FULL-1")).toBe(true)
+    const sealed = (await sealedRegistry.loadSealedTicket(
+      "full-ticket-wb",
+      "FULL-1"
+    )) as SealedTicketContent
+    expect(sealed.referenceDiff).toContain("diff --git")
+    expect(sealed.rubric.weights.understanding).toBeCloseTo(0.2)
+
+    // The leak gate still catches a secret in a FULL ticket: assertPublicSafe
+    // passes cleanly on the real compiled PUBLIC ticket (nothing secret got
+    // merged in), while the SAME ticket's real SEALED bundle -- genuinely
+    // secret content produced by this identical compile -- is exactly what
+    // the gate is supposed to catch if it ever reached a public file. This
+    // isn't a synthetic payload: it's the actual object this task's modified
+    // `compileTicket` produced for a full ticket.
+    expect(() => assertPublicSafe(compiledTicket, "full-ticket:public")).not.toThrow()
+    expect(() => assertPublicSafe(sealed, "full-ticket:sealed")).toThrow(/secret-classified field/)
+  })
+
+  it("a ticket demoted from full back to stub (reference.diff/rubric.yaml removed) loses its stale sealed bundle on the next compile", async () => {
+    const base = makeTmpDir("sprint-labs-demote-")
+    const { wbDir, ticketDir } = scaffoldMinimalWorkbook(base, {
+      workbookId: "demote-wb",
+      ticketKey: "DEMO-1",
+    })
+
+    const outBase = makeTmpDir("sprint-labs-demote-out-")
+    const publicDir = join(outBase, "public")
+    const sealedDir = join(outBase, "sealed")
+
+    const first = runCompiler(wbDir, publicDir, sealedDir)
+    expect(first.status).toBe(0)
+    expect(existsSync(join(sealedDir, "demote-wb/DEMO-1.server.ts"))).toBe(true)
+
+    // The ticket regresses to a stub: reference.diff and rubric.yaml are
+    // removed (an author reverting incomplete or wrong content, say);
+    // ticket.md itself is untouched.
+    rmSync(join(ticketDir, "reference.diff"), { force: true })
+    rmSync(join(ticketDir, "rubric.yaml"), { force: true })
+
+    const second = runCompiler(wbDir, publicDir, sealedDir)
+    expect(second.status).toBe(0)
+    expect(existsSync(join(publicDir, "demote-wb/tickets/DEMO-1.ts"))).toBe(true)
+    // The stale sealed bundle from the FIRST compile must be gone, not just
+    // absent from this run's writes -- writeCompiledWorkbook actively
+    // deletes it.
+    expect(existsSync(join(sealedDir, "demote-wb/DEMO-1.server.ts"))).toBe(false)
+
+    const registry = await import(/* @vite-ignore */ join(publicDir, "registry.ts"))
+    const content = await registry.loadWorkbookContent("demote-wb")
+    expect((content.ticketsByKey["DEMO-1"] as CompiledTicket).ticket.playable).toBe(false)
+
+    const sealedRegistry = await import(/* @vite-ignore */ join(sealedDir, "registry.server.ts"))
+    expect(sealedRegistry.hasSealedTicket("demote-wb", "DEMO-1")).toBe(false)
+  })
+})
