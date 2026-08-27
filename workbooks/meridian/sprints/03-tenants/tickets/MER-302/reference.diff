@@ -1,0 +1,146 @@
+diff --git a/migrations/0010_row_level_security.sql b/migrations/0010_row_level_security.sql
+new file mode 100644
+index 0000000..95d5d6e
+--- /dev/null
++++ b/migrations/0010_row_level_security.sql
+@@ -0,0 +1,42 @@
++-- MER-302: tenant isolation moves out of the WHERE clauses application code has to remember to
++-- write and into Postgres itself. ENABLE alone is not enough on its own: it exempts the
++-- table's own owner from every policy on it, and the role the application connects as is the
++-- table's owner (there is no separate migration-runner identity in this schema yet) - without
++-- FORCE, a perfectly-written policy would still let every row through for that connection.
++
++alter table claims enable row level security;
++alter table claims force row level security;
++
++-- USING governs which existing rows are visible (SELECT/UPDATE/DELETE); WITH CHECK governs
++-- which rows a write is allowed to leave behind (INSERT, and the post-image of an UPDATE) -
++-- both read the same session-scoped setting, so a caller cannot read one tenant's claims while
++-- writing under another's, and cannot move a row it does own out to a tenant it does not.
++create policy claims_tenant_isolation on claims
++  using (tenant_id = current_setting('app.tenant_id', true))
++  with check (tenant_id = current_setting('app.tenant_id', true));
++
++alter table documents enable row level security;
++alter table documents force row level security;
++
++-- Documents carry no tenant column of their own (see migrations/0001_init.sql - the
++-- extraction worker only ever has a claim id off a queue message, no tenant in scope). Visibility
++-- is derived from the parent claim, in the database, via a correlated EXISTS against claims'
++-- own already-tenant-scoped rows - never from a tenant key copied onto the document row, which
++-- would be a second source of truth the extraction worker could set wrong. Applied to both
++-- USING and WITH CHECK, so a document cannot be read across the boundary, and cannot be
++-- created pointing at a claim it has no business referencing in the first place.
++create policy documents_tenant_isolation_via_claim on documents
++  using (
++    exists (
++      select 1 from claims
++      where claims.id = documents.claim_id
++        and claims.tenant_id = current_setting('app.tenant_id', true)
++    )
++  )
++  with check (
++    exists (
++      select 1 from claims
++      where claims.id = documents.claim_id
++        and claims.tenant_id = current_setting('app.tenant_id', true)
++    )
++  );
+diff --git a/src/db/repositories/documents.ts b/src/db/repositories/documents.ts
+index 29d85ca..818cddb 100644
+--- a/src/db/repositories/documents.ts
++++ b/src/db/repositories/documents.ts
+@@ -40,7 +40,9 @@ export async function insertDocument(
+   return toDocument(rows[0])
+ }
+ 
+-/** Documents have no tenant column of their own. */
++/** Documents have no tenant column of their own - see migrations/0010_row_level_security.sql,
++ * which derives a document's visibility from its parent claim in the database rather than
++ * from a tenant key copied onto this row. */
+ export async function getDocumentsForClaim(
+   db: DbClient,
+   claimId: string
+diff --git a/src/http/routes/documents.ts b/src/http/routes/documents.ts
+index 02fe042..43a4aac 100644
+--- a/src/http/routes/documents.ts
++++ b/src/http/routes/documents.ts
+@@ -1,14 +1,30 @@
+ import type { DbClient } from "../../db/client"
++import { getClaimById } from "../../db/repositories/claims"
+ import { getDocumentsForClaim } from "../../db/repositories/documents"
++import { notFound } from "../errors"
++import { requireTenantId } from "../request-context"
+ import type { App } from "../types"
+ 
+ export interface DocumentRouteDeps {
+   db: DbClient
+ }
+ 
+-/** Does not check which tenant the caller belongs to. */
++/**
++ * MER-302: document visibility is derived from the parent claim - see
++ * migrations/0010_row_level_security.sql, which is what actually enforces this once the
++ * application connects through Postgres. This app-level check is the same rule stated again at
++ * the boundary: today's `DbClient` has no real Postgres connection behind it yet (see
++ * src/db/memory-db.ts), so this route cannot yet rely on the database to refuse on its own -
++ * it 404s a claim the requesting tenant cannot see instead of ever calling
++ * `getDocumentsForClaim` for it.
++ */
+ export function registerDocumentRoutes(app: App, deps: DocumentRouteDeps): void {
+   app.get("/claims/:id/documents", async (req) => {
++    const tenantId = requireTenantId(req)
++    const claim = await getClaimById(deps.db, tenantId, req.params.id)
++    if (!claim) {
++      return notFound({ message: `claim ${req.params.id} not found`, correlationId: req.correlationId })
++    }
+     const documents = await getDocumentsForClaim(deps.db, req.params.id)
+     return { statusCode: 200, body: { documents } }
+   })
+diff --git a/test/documents/list-documents-for-claim.test.ts b/test/documents/list-documents-for-claim.test.ts
+index 8c94691..b39fa2d 100644
+--- a/test/documents/list-documents-for-claim.test.ts
++++ b/test/documents/list-documents-for-claim.test.ts
+@@ -27,6 +27,7 @@ describe("GET /claims/:id/documents", () => {
+     const response = await meridian.app.inject({
+       method: "GET",
+       url: `/claims/${claimId}/documents`,
++      headers: { "x-tenant-id": "ten_a" },
+     })
+ 
+     const body = response.json<{ documents: Array<{ fileName: string }> }>()
+@@ -52,9 +53,34 @@ describe("GET /claims/:id/documents", () => {
+     const response = await meridian.app.inject({
+       method: "GET",
+       url: `/claims/${claimId}/documents`,
++      headers: { "x-tenant-id": "ten_a" },
+     })
+ 
+     const body = response.json<{ documents: unknown[] }>()
+     expect(body.documents).toHaveLength(0)
+   })
++
++  it("404s when the claim belongs to a different tenant - MER-302", async () => {
++    const { meridian } = buildTestApp()
++    const created = await meridian.app.inject({
++      method: "POST",
++      url: "/claims",
++      headers: { "x-tenant-id": "ten_a" },
++      payload: {
++        externalRef: "A-3",
++        amount: 100,
++        claimantName: "Test Claimant",
++        lossDate: "2026-01-01",
++      },
++    })
++    const { id: claimId } = created.json<{ id: string }>()
++
++    const response = await meridian.app.inject({
++      method: "GET",
++      url: `/claims/${claimId}/documents`,
++      headers: { "x-tenant-id": "ten_b" },
++    })
++
++    expect(response.statusCode).toBe(404)
++  })
+ })

@@ -4,6 +4,7 @@ points: 8
 labels:
   - tenants
   - database
+  - sql
 ai_policy: assisted
 objectives:
   - row-level-security-policy

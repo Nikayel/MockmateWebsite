@@ -1,0 +1,11 @@
+weights:
+  understanding: 0.2
+  problemSolving: 0.25
+  codeQuality: 0.2
+  communication: 0.1
+  verification: 0.25
+notes:
+  understanding: "Keys off recognizing that ENABLE alone is not enough because the connecting role owns the table, and that documents has no tenant column to filter on at all."
+  problemSolving: "Keys off the visible pass rate across both tables, both USING and WITH CHECK, and the no-context-set case."
+  codeQuality: "Keys off documents' policy deriving visibility from a correlated EXISTS against claims rather than any new column added to the documents table."
+  verification: "Keys off whether the learner's own test proves a write, not just a read, is refused - and that the fix does not merely relocate a WHERE clause that was already correct."
