@@ -24,7 +24,7 @@ describe("checkSubmissionBudget", () => {
   it("allows the first attempt (zero prior attempts, no cooldown to check)", () => {
     const result = checkSubmissionBudget({
       priorAttemptCount: 0,
-      mostRecentSubmittedAt: null,
+      mostRecentActivityAt: null,
       now: NOW,
     })
     expect(result).toEqual({ allowed: true })
@@ -33,7 +33,7 @@ describe("checkSubmissionBudget", () => {
   it("allows an attempt below the budget once the cooldown has elapsed", () => {
     const result = checkSubmissionBudget({
       priorAttemptCount: SPRINT_LAB_SUBMISSION_BUDGET - 1,
-      mostRecentSubmittedAt: secondsBefore(NOW, SPRINT_LAB_SUBMISSION_COOLDOWN_SECONDS + 1),
+      mostRecentActivityAt: secondsBefore(NOW, SPRINT_LAB_SUBMISSION_COOLDOWN_SECONDS + 1),
       now: NOW,
     })
     expect(result).toEqual({ allowed: true })
@@ -42,7 +42,7 @@ describe("checkSubmissionBudget", () => {
   it("denies with BUDGET_EXCEEDED once priorAttemptCount reaches the budget", () => {
     const result = checkSubmissionBudget({
       priorAttemptCount: SPRINT_LAB_SUBMISSION_BUDGET,
-      mostRecentSubmittedAt: secondsBefore(NOW, SPRINT_LAB_SUBMISSION_COOLDOWN_SECONDS + 100),
+      mostRecentActivityAt: secondsBefore(NOW, SPRINT_LAB_SUBMISSION_COOLDOWN_SECONDS + 100),
       now: NOW,
     })
     expect(result).toEqual({ allowed: false, reason: "BUDGET_EXCEEDED" })
@@ -51,7 +51,7 @@ describe("checkSubmissionBudget", () => {
   it("denies with BUDGET_EXCEEDED when priorAttemptCount is past the budget", () => {
     const result = checkSubmissionBudget({
       priorAttemptCount: SPRINT_LAB_SUBMISSION_BUDGET + 3,
-      mostRecentSubmittedAt: null,
+      mostRecentActivityAt: null,
       now: NOW,
     })
     expect(result.allowed).toBe(false)
@@ -61,7 +61,7 @@ describe("checkSubmissionBudget", () => {
   it("denies with COOLDOWN_ACTIVE when the most recent attempt is inside the cooldown window", () => {
     const result = checkSubmissionBudget({
       priorAttemptCount: 1,
-      mostRecentSubmittedAt: secondsBefore(NOW, 10),
+      mostRecentActivityAt: secondsBefore(NOW, 10),
       now: NOW,
     })
     expect(result).toEqual({
@@ -74,7 +74,7 @@ describe("checkSubmissionBudget", () => {
   it("allows exactly at the cooldown boundary (elapsed === cooldown)", () => {
     const result = checkSubmissionBudget({
       priorAttemptCount: 1,
-      mostRecentSubmittedAt: secondsBefore(NOW, SPRINT_LAB_SUBMISSION_COOLDOWN_SECONDS),
+      mostRecentActivityAt: secondsBefore(NOW, SPRINT_LAB_SUBMISSION_COOLDOWN_SECONDS),
       now: NOW,
     })
     expect(result).toEqual({ allowed: true })
@@ -83,16 +83,16 @@ describe("checkSubmissionBudget", () => {
   it("checks BUDGET before COOLDOWN: an exhausted budget reports BUDGET_EXCEEDED even mid-cooldown", () => {
     const result = checkSubmissionBudget({
       priorAttemptCount: SPRINT_LAB_SUBMISSION_BUDGET,
-      mostRecentSubmittedAt: secondsBefore(NOW, 1),
+      mostRecentActivityAt: secondsBefore(NOW, 1),
       now: NOW,
     })
     expect(result).toEqual({ allowed: false, reason: "BUDGET_EXCEEDED" })
   })
 
-  it("treats a null mostRecentSubmittedAt as no cooldown in effect, regardless of priorAttemptCount", () => {
+  it("treats a null mostRecentActivityAt as no cooldown in effect, regardless of priorAttemptCount", () => {
     const result = checkSubmissionBudget({
       priorAttemptCount: 2,
-      mostRecentSubmittedAt: null,
+      mostRecentActivityAt: null,
       now: NOW,
     })
     expect(result).toEqual({ allowed: true })
@@ -101,7 +101,7 @@ describe("checkSubmissionBudget", () => {
   it("rounds retryAfterSeconds up so a caller never tells the client to retry a moment too early", () => {
     const result = checkSubmissionBudget({
       priorAttemptCount: 1,
-      mostRecentSubmittedAt: secondsBefore(NOW, 10.4),
+      mostRecentActivityAt: secondsBefore(NOW, 10.4),
       now: NOW,
     })
     expect(result.allowed).toBe(false)

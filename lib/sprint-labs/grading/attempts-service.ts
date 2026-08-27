@@ -236,15 +236,34 @@ function projectTicketAttempt(stored: StoredAttemptDoc): TicketAttempt {
   })
 }
 
-function latestSubmittedAt(attempts: readonly StoredAttemptDoc[]): string | null {
-  const withTimestamp = attempts.filter(
-    (a): a is StoredAttemptDoc & { submittedAt: string } => typeof a.submittedAt === "string"
-  )
-  if (withTimestamp.length === 0) return null
-  return withTimestamp.reduce(
-    (latest, a) => (a.submittedAt > latest ? a.submittedAt : latest),
-    withTimestamp[0].submittedAt
-  )
+/**
+ * The cooldown's reference point: the most recent of EITHER an attempt being
+ * opened OR one being submitted, across every attempt for this ticket.
+ *
+ * Fix round 2 (cooldown regression): budget/cooldown now only run at OPEN
+ * (I3), and every stub carries `openedAt` from the moment it is created —
+ * completed or not. Checking `submittedAt` alone let a client open up to
+ * {@link SPRINT_LAB_SUBMISSION_BUDGET} stubs back-to-back with no cooldown
+ * (none of them have a `submittedAt` yet, so the old check saw
+ * `mostRecentSubmittedAt: null` every time) and then complete all of them in
+ * a burst, since COMPLETE never re-checks cooldown either. Taking the max of
+ * every `openedAt` AND every completed attempt's `submittedAt` closes that:
+ * the very act of opening now starts the next cooldown window, whether or
+ * not that attempt is ever completed. (`submittedAt` is still included,
+ * not just dropped, because it is chronologically >= its own attempt's
+ * `openedAt` and is sometimes the more recent of the two — a ticket a
+ * learner worked on for longer than the cooldown before submitting should
+ * still measure the cooldown from that submission, not from the open that
+ * preceded it by more than the cooldown window.)
+ */
+function mostRecentAttemptActivity(attempts: readonly StoredAttemptDoc[]): string | null {
+  const timestamps: string[] = []
+  for (const a of attempts) {
+    timestamps.push(a.openedAt)
+    if (typeof a.submittedAt === "string") timestamps.push(a.submittedAt)
+  }
+  if (timestamps.length === 0) return null
+  return timestamps.reduce((latest, t) => (t > latest ? t : latest), timestamps[0])
 }
 
 /**
@@ -411,7 +430,7 @@ export async function openSprintLabAttempt(
     const attemptIndex = existing.length
     const budgetCheck = checkSubmissionBudget({
       priorAttemptCount: attemptIndex,
-      mostRecentSubmittedAt: latestSubmittedAt(existing),
+      mostRecentActivityAt: mostRecentAttemptActivity(existing),
       now: new Date(),
     })
     if (!budgetCheck.allowed) throwCooldownOrBudget(budgetCheck)

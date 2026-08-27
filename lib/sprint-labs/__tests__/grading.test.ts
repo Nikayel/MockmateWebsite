@@ -179,6 +179,7 @@ vi.mock("@/lib/sprint-labs/mastery", () => ({
 
 import type { StoredSprintLabRun } from "@/lib/sprint-labs/runs"
 import { encodeWorkspaceFilePathId } from "@/lib/sprint-labs/workspace-files"
+import { SPRINT_LAB_SUBMISSION_COOLDOWN_SECONDS } from "../grading/budget"
 import type { CompiledTicket } from "@/lib/sprint-labs/content/types"
 import type { SealedTicketContent } from "@/lib/scenarios/sealed/sprint-labs/types"
 
@@ -277,13 +278,22 @@ function seedWorkspaceFile(
 }
 
 /** Push every stored attempt doc under this run back in time, so a cooldown check reads them as long past. */
+/** Push every stored attempt doc's `openedAt` (and `submittedAt`, if it has one) back in time, so an open-time cooldown check reads them as long past. */
 function ageAllStoredAttempts(runId: string, seconds: number) {
   const prefix = `sprintLabRuns/${runId}/attempts/`
   for (const [key, data] of h.store.entries()) {
     if (!key.startsWith(prefix) || key.slice(prefix.length).includes("/")) continue
-    if (typeof data.submittedAt !== "string") continue
-    const aged = new Date(new Date(data.submittedAt).getTime() - seconds * 1000).toISOString()
-    h.store.set(key, { ...data, submittedAt: aged })
+    const patch: Record<string, string> = {}
+    if (typeof data.openedAt === "string") {
+      patch.openedAt = new Date(new Date(data.openedAt).getTime() - seconds * 1000).toISOString()
+    }
+    if (typeof data.submittedAt === "string") {
+      patch.submittedAt = new Date(
+        new Date(data.submittedAt).getTime() - seconds * 1000
+      ).toISOString()
+    }
+    if (Object.keys(patch).length === 0) continue
+    h.store.set(key, { ...data, ...patch })
   }
 }
 
@@ -350,6 +360,11 @@ describe("openSprintLabAttempt", () => {
     const assisted = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
     expect(assisted.probes).toEqual([{ id: "probe-1", humanName: "probe", body: "assert(true)" }])
 
+    // A second open on the SAME ticket now starts its own cooldown window
+    // (the fix-round-2 regression fix) — age the first open out of the way
+    // so this test's second call is about probes, not cooldown.
+    ageAllStoredAttempts("run1", SPRINT_LAB_SUBMISSION_COOLDOWN_SECONDS + 1)
+
     contentMocks.getTicket.mockResolvedValue(ticketFixture({ aiPolicy: "unassisted" }))
     const unassisted = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
     expect(unassisted.probes).toEqual([])
@@ -390,6 +405,28 @@ describe("openSprintLabAttempt", () => {
     await expect(
       openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
     ).rejects.toThrow(SPRINT_LAB_ATTEMPT_ERRORS.BUDGET_EXCEEDED)
+  })
+
+  it("cooldown regression: a second open within 60s of the prior OPEN is rejected, even with nothing ever completed", async () => {
+    seedRun("run1")
+    const first = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+
+    // Never completed — only an open stub exists, so the OLD (submittedAt-only)
+    // cooldown check would have seen "no prior activity" and let this through,
+    // allowing up to SPRINT_LAB_SUBMISSION_BUDGET opens back-to-back with zero
+    // throttling. The fix keys cooldown off openedAt too.
+    const secondAttempt = openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    await expect(secondAttempt).rejects.toThrow(SPRINT_LAB_ATTEMPT_ERRORS.COOLDOWN_ACTIVE)
+    expect(first.submissionsUsed).toBe(0) // sanity: the first open really did land as attempt 0
+  })
+
+  it("cooldown regression: a second open AFTER 60s of the prior open is allowed", async () => {
+    seedRun("run1")
+    await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    ageAllStoredAttempts("run1", SPRINT_LAB_SUBMISSION_COOLDOWN_SECONDS + 1)
+
+    const second = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    expect(second.submissionsUsed).toBe(1)
   })
 })
 
