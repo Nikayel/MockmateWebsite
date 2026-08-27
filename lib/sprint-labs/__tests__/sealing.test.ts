@@ -147,10 +147,15 @@ describe("Sealing test 1 — every generated sealed module has the runtime windo
 })
 
 describe("Sealing test 2 — sealed sprint-labs content is imported only by server routes", () => {
-  // No consumer exists yet (Task 2 only builds the compiler + registries).
-  // Tasks 6 (runs), 8 (grading/submit), and 14 (Sable partner) add their
-  // route path here when they start calling loadSealedTicket/hasSealedTicket.
-  const ALLOWED_IMPORTERS = new Set<string>([])
+  // Task 6 (runs) and Task 14 (Sable partner) add their own path here when
+  // they start calling loadSealedTicket/hasSealedTicket.
+  //
+  // Task 8 (grading/submit): lib/sprint-labs/grading/attempts-service.ts is
+  // the ONLY file that imports the sealed registry for the attempts surface
+  // — the three app/api/sprint-labs/attempts*/route.ts handlers stay thin
+  // (parse -> auth -> validate -> service -> response, CLAUDE.md's house
+  // style) and never import it directly, so they need no entry here.
+  const ALLOWED_IMPORTERS = new Set<string>(["lib/sprint-labs/grading/attempts-service.ts"])
 
   it("only the whitelisted server routes import the sealed sprint-labs registry loader", () => {
     const importers = grepImporters("scenarios/sealed/sprint-labs/registry.server").filter(
