@@ -16,16 +16,33 @@
  *
  * Design notes and DELIBERATE scope limits:
  *  - `describe` bodies run synchronously (as real Vitest requires); `it`/`test` bodies may be
- *    sync or async. Each `it()` call captures its enclosing suite label and "current file" AT
- *    REGISTRATION time (not when the async body finishes) — otherwise a slow test in file A could
- *    be mis-attributed to whatever file the require-graph had moved on to by the time A's promise
- *    settled.
+ *    sync or async, but they run ONE AT A TIME, in REGISTRATION order (never concurrently) — a
+ *    shared-mutable-state test that would race under naive concurrent execution behaves the same
+ *    way here as it does in real Vitest's default (non-`.concurrent`) mode. Each `it()` call
+ *    captures its enclosing suite label, "current file", and its lifecycle-hook chain AT
+ *    REGISTRATION time (not when it actually runs) — otherwise a slow test in file A could be
+ *    mis-attributed to whatever file/hooks the require-graph had moved on to by the time it ran.
  *  - `isHidden` is true when the joined suite label contains the substring "hidden"
  *    (case-insensitive — the existing convention, see lib/scenarios/real-world/bugfix/*.ts) OR
  *    the current file is listed in the `hiddenTestPaths` the harness was created with. Either is
  *    sufficient; content authors do not have to embed "hidden" in every describe label.
- *  - `it.skip(name, fn)` records NOTHING (not even a passing row) and never calls `fn`. There is
- *    no `describe.skip`.
+ *  - `it.skip(name, fn)` records NOTHING (not even a passing row) and never calls `fn`.
+ *    `describe.skip(name, fn)` never calls `fn` AT ALL — nothing inside (it/describe/hooks)
+ *    registers, matching a whole subtree being skipped.
+ *  - `beforeAll`/`afterAll`/`beforeEach`/`afterEach` are scoped to the describe they are called
+ *    in (or the whole run, for top-level calls outside any describe) and run in the standard
+ *    Jest/Vitest order: `beforeAll` outer-to-inner (once per describe, before its first test),
+ *    `beforeEach` outer-to-inner (every test), `afterEach` inner-to-outer (every test, even after
+ *    a failing test or a failing `beforeEach`), `afterAll` inner-to-outer (once per describe,
+ *    after its LAST test — including nested describes' tests). A throwing `beforeAll`/`beforeEach`
+ *    fails ONLY the test whose run triggered it (the test body is skipped) — it does not also fail
+ *    every subsequent test in that scope. A throwing `afterEach`/`afterAll` is logged via
+ *    `console.error` and does not overwrite whatever result was already recorded (documented scope
+ *    limit: not itself a separate failing row).
+ *  - Any access to a genuinely unsupported vitest export or sub-property (`vi`, `it.each`,
+ *    `describe.each`, `expect.any`, ...) throws immediately, NAMING the API
+ *    (`vitest-shim: it.each is not supported`), rather than failing later with an opaque
+ *    "X is not a function" once test code tries to call it.
  *  - `toEqual`/`toStrictEqual` implement Vitest's actual semantics, not Node's `assert.deepEqual`
  *    (which coerces primitives): `toEqual` never coerces types, ignores object properties whose
  *    value is `undefined`, and does not check prototypes; `toStrictEqual` additionally checks
@@ -34,10 +51,11 @@
  *    for every matcher. `.resolves.toThrow(fn)` treats the FULFILLED value as the callable to
  *    invoke-and-expect-to-throw; `.rejects.toThrow(matcher)` matches the REJECTION REASON against
  *    the matcher directly (the common case). `.not` is not composable with `.resolves`/`.rejects`.
- *  - Calling `finalize()` awaits every registered `it()` (they never reject — a failing test is
- *    recorded, not thrown) and returns the accumulated `{suite, name, passed, error, isHidden}[]`
- *    rows. The caller (the worker branch, or node-harness.ts) is responsible for emitting the
- *    `__WORKSPACE_TEST_RESULTS__:` marker with that array.
+ *  - Calling `finalize()` runs every registered `it()` in order (they never reject — a failing
+ *    test is recorded, not thrown) and returns the accumulated
+ *    `{suite, name, passed, error, isHidden}[]` rows. The caller (the worker branch, or
+ *    node-harness.ts) is responsible for emitting the `__WORKSPACE_TEST_RESULTS__:` marker with
+ *    that array.
  *  - No test isolation between files: this is one flat shim instance per RUN (a fresh instance is
  *    created per onmessage / per runTsWorkspace call), so state never leaks across separate runs,
  *    but nothing resets state BETWEEN test files within the same run (matching how the existing
@@ -393,6 +411,44 @@
     }
   }
 
+  /** One node per describe (plus one implicit root for top-level/no-describe calls). */
+  function createSuiteNode(name, parent) {
+    return {
+      name,
+      parent,
+      beforeAllHooks: [],
+      afterAllHooks: [],
+      beforeEachHooks: [],
+      afterEachHooks: [],
+      beforeAllHasRun: false,
+      afterAllHasRun: false,
+      // Index (into `pending`) of the LAST test registered anywhere in this node's subtree.
+      // Computed purely from registration order — see itImpl — so `finalize()` can tell, after
+      // running a given test, whether that was the last test in each of its ancestor scopes
+      // (and therefore when to fire that scope's afterAll) without a second pass.
+      lastTestIndex: -1,
+    }
+  }
+
+  /**
+   * Wraps `target` (a function or object) so that accessing any property NOT in `allowedProps`
+   * throws immediately, NAMING the property (`vitest-shim: <label>.<prop> is not supported`),
+   * instead of returning `undefined` and letting test code fail later with an opaque
+   * "X is not a function". Symbols pass through untouched (runtime introspection, e.g. by an
+   * async/await or console formatter, must not trip this). Falls back to the raw target if
+   * `Proxy` is unavailable (defensive; every runtime this shim ships to has it).
+   */
+  function guardUnsupported(target, allowedProps, label) {
+    if (typeof Proxy === "undefined") return target
+    return new Proxy(target, {
+      get(obj, prop) {
+        if (typeof prop === "symbol") return obj[prop]
+        if (allowedProps.has(prop)) return obj[prop]
+        throw new Error("vitest-shim: " + label + "." + String(prop) + " is not supported")
+      },
+    })
+  }
+
   /**
    * One shim instance per run. `hiddenTestPaths` is the workspace's declared hidden-test file
    * list; `setCurrentFile` is called by the require-graph driver right before requiring each test
@@ -402,8 +458,12 @@
   function createVitestShim(options) {
     const hiddenPaths = new Set((options && options.hiddenTestPaths) || [])
     const results = []
+    // Data records, NOT started promises: itImpl must not begin running a test until finalize()
+    // reaches it in order (see the module header on sequential execution).
     const pending = []
     const suiteStack = []
+    const rootNode = createSuiteNode("<root>", null)
+    const hookStack = [rootNode]
     let currentFile = null
 
     function isHiddenContext(suiteLabel, file) {
@@ -421,23 +481,101 @@
       })
     }
 
+    function wrapHookError(kind, error) {
+      const message = error && error.message ? error.message : String(error)
+      return new Error("[" + kind + "] " + message)
+    }
+
     function describe(name, fn) {
       if (typeof fn !== "function") {
         throw new Error("describe requires a function body")
       }
+      const node = createSuiteNode(String(name), hookStack[hookStack.length - 1])
       suiteStack.push(String(name))
+      hookStack.push(node)
       try {
         fn()
       } finally {
+        hookStack.pop()
         suiteStack.pop()
       }
+    }
+    // The entire subtree is skipped: `fn` is never called, so nothing inside it — no it(), no
+    // nested describe(), no beforeEach/afterEach/beforeAll/afterAll — is ever registered.
+    describe.skip = function describeSkip() {}
+
+    function beforeAll(fn) {
+      hookStack[hookStack.length - 1].beforeAllHooks.push(fn)
+    }
+    function afterAll(fn) {
+      hookStack[hookStack.length - 1].afterAllHooks.push(fn)
+    }
+    function beforeEach(fn) {
+      hookStack[hookStack.length - 1].beforeEachHooks.push(fn)
+    }
+    function afterEach(fn) {
+      hookStack[hookStack.length - 1].afterEachHooks.push(fn)
     }
 
     function itImpl(name, fn) {
       // Captured NOW, not when the (possibly async) body finishes — see the module header.
       const suite = suiteStack.join(" > ")
       const file = currentFile
-      const run = (async () => {
+      const chain = hookStack.slice() // root -> ... -> immediate parent
+      const testIndex = pending.length
+      for (let i = 0; i < chain.length; i += 1) {
+        chain[i].lastTestIndex = testIndex
+      }
+      pending.push({ suite, file, name, fn, chain })
+    }
+
+    function it(name, fn) {
+      itImpl(name, fn)
+    }
+    // A skipped test contributes NO row at all (not even a passing one) and its body never runs.
+    it.skip = function itSkip() {}
+    // `test` is a real Vitest alias for `it`; rawApi.test below reuses the SAME guarded object
+    // `it` gets, not a second one, so `shim.test === shim.it` holds by reference.
+
+    function setCurrentFile(path) {
+      currentFile = path || null
+    }
+
+    /** Runs one pending test's full lifecycle: beforeAll (once) -> beforeEach -> body ->
+     *  afterEach -> afterAll (once, if this was the last test in that scope). */
+    async function runOneTest(entry, index) {
+      const { suite, file, name, fn, chain } = entry
+      let setupError = null
+
+      for (let i = 0; i < chain.length && !setupError; i += 1) {
+        const node = chain[i]
+        if (node.beforeAllHasRun) continue
+        node.beforeAllHasRun = true
+        for (let h = 0; h < node.beforeAllHooks.length; h += 1) {
+          try {
+            await node.beforeAllHooks[h]()
+          } catch (error) {
+            setupError = wrapHookError("beforeAll", error)
+            break
+          }
+        }
+      }
+
+      for (let i = 0; i < chain.length && !setupError; i += 1) {
+        const node = chain[i]
+        for (let h = 0; h < node.beforeEachHooks.length; h += 1) {
+          try {
+            await node.beforeEachHooks[h]()
+          } catch (error) {
+            setupError = wrapHookError("beforeEach", error)
+            break
+          }
+        }
+      }
+
+      if (setupError) {
+        recordResult(suite, file, name, false, setupError)
+      } else {
         try {
           if (typeof fn !== "function") {
             throw new Error("test body is not a function")
@@ -447,51 +585,104 @@
         } catch (error) {
           recordResult(suite, file, name, false, error)
         }
-      })()
-      pending.push(run)
-    }
+      }
 
-    function it(name, fn) {
-      itImpl(name, fn)
-    }
-    // A skipped test contributes NO row at all (not even a passing one) and its body never runs.
-    it.skip = function itSkip() {}
+      // afterEach ALWAYS runs — even after a setup failure or a failing test — inner to outer.
+      for (let i = chain.length - 1; i >= 0; i -= 1) {
+        const hooks = chain[i].afterEachHooks
+        for (let h = 0; h < hooks.length; h += 1) {
+          try {
+            await hooks[h]()
+          } catch (error) {
+            // Does not overwrite the test's own recorded result (documented scope limit) — at
+            // least visible in captured output instead of silently vanishing.
+            console.error(
+              "[vitest-shim] afterEach hook threw: " +
+                (error && error.message ? error.message : String(error))
+            )
+          }
+        }
+      }
 
-    const test = it
-
-    function setCurrentFile(path) {
-      currentFile = path || null
+      // afterAll fires, inner to outer, for any node whose LAST test anywhere in its subtree was
+      // this one — computed once at registration time in itImpl, so this needs no second pass.
+      for (let i = chain.length - 1; i >= 0; i -= 1) {
+        const node = chain[i]
+        if (node.lastTestIndex !== index || node.afterAllHasRun) continue
+        node.afterAllHasRun = true
+        for (let h = 0; h < node.afterAllHooks.length; h += 1) {
+          try {
+            await node.afterAllHooks[h]()
+          } catch (error) {
+            console.error(
+              "[vitest-shim] afterAll hook threw: " +
+                (error && error.message ? error.message : String(error))
+            )
+          }
+        }
+      }
     }
 
     async function finalize() {
-      await Promise.all(pending)
+      for (let index = 0; index < pending.length; index += 1) {
+        await runOneTest(pending[index], index)
+      }
       return results.slice()
     }
 
-    const api = {
-      describe,
-      it,
-      test,
-      expect: createExpect(),
+    const guardedDescribe = guardUnsupported(describe, new Set(["skip"]), "describe")
+    const guardedIt = guardUnsupported(it, new Set(["skip"]), "it")
+    const guardedExpect = guardUnsupported(createExpect(), new Set(), "expect")
+
+    const rawApi = {
+      describe: guardedDescribe,
+      it: guardedIt,
+      test: guardedIt,
+      expect: guardedExpect,
+      beforeAll,
+      afterAll,
+      beforeEach,
+      afterEach,
       setCurrentFile,
       finalize,
     }
+    const api = guardUnsupported(
+      rawApi,
+      new Set([
+        "describe",
+        "it",
+        "test",
+        "expect",
+        "beforeAll",
+        "afterAll",
+        "beforeEach",
+        "afterEach",
+        "setCurrentFile",
+        "finalize",
+      ]),
+      "vitest"
+    )
 
     // Convenience globals inside a Worker only (see module header for why Node deliberately does
     // NOT get this treatment): so a test file written in the "globals: true" style (no
     // `import ... from "vitest"`) still works, matching this repo's own vitest.config.ts. `self`
     // is not a Node global, so this branch is naturally unreachable from node-harness.ts's real
     // `require()` — it only fires when THIS file itself is the one calling createVitestShim from
-    // inside an actual Worker.
+    // inside an actual Worker. Assigns the SAME guarded objects `api` exposes, so a bare `it.each`
+    // global reference is guarded exactly like `require("vitest").it.each`.
     if (
       typeof self !== "undefined" &&
       typeof window === "undefined" &&
       typeof module === "undefined"
     ) {
-      self.describe = describe
-      self.it = it
-      self.test = test
+      self.describe = api.describe
+      self.it = api.it
+      self.test = api.test
       self.expect = api.expect
+      self.beforeAll = api.beforeAll
+      self.afterAll = api.afterAll
+      self.beforeEach = api.beforeEach
+      self.afterEach = api.afterEach
     }
 
     return api

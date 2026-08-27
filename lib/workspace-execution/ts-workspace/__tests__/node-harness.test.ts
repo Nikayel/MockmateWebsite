@@ -173,4 +173,47 @@ describe("Secret Probe", () => {
     expect(result.success).toBe(false)
     expect(result.results[0]).toMatchObject({ passed: false })
   })
+
+  it("runs beforeEach/afterEach hooks and skips a describe.skip suite through the FULL pipeline (R13, both-runtimes check)", async () => {
+    // Exercises real transpile + require-graph + shim together (not the shim in isolation, which
+    // vitest-shim.test.ts already covers directly) — the hooks are declared via a real
+    // `import { ... } from "vitest"` that ts.transpileModule turns into `require("vitest")`.
+    const result = await runTsWorkspace({
+      files: [
+        {
+          path: "tests/visible/hooks.test.ts",
+          content: `import { afterEach, beforeEach, describe, expect, it } from "vitest"
+
+const log: string[] = []
+
+describe("Suite", () => {
+  beforeEach(() => log.push("beforeEach"))
+  afterEach(() => log.push("afterEach"))
+
+  it("first", () => {
+    log.push("first")
+    expect(log).toEqual(["beforeEach", "first"])
+  })
+
+  it("second checks the previous test's afterEach already ran", () => {
+    expect(log).toEqual(["beforeEach", "first", "afterEach", "beforeEach"])
+  })
+})
+
+describe.skip("Skipped", () => {
+  it("never runs", () => {
+    throw new Error("should never execute")
+  })
+})
+`,
+        },
+      ],
+      testPaths: ["tests/visible/hooks.test.ts"],
+      hiddenTestPaths: [],
+    })
+
+    expect(result.results).toHaveLength(2)
+    expect(result.results.every((r) => r.passed)).toBe(true)
+    expect(result.results.some((r) => r.name === "never runs")).toBe(false)
+  })
 })

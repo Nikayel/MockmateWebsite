@@ -208,6 +208,54 @@ describe("Secret Probe", () => {
     expect(results.some((r) => r.suite === "Secret Probe" && r.isHidden !== true)).toBe(false)
   })
 
+  it("runs beforeEach/afterEach hooks and skips a describe.skip suite through the FULL pipeline (R13, both-runtimes check)", async () => {
+    const { final } = await runWorkerMessage({
+      files: [
+        {
+          path: "tests/visible/hooks.test.ts",
+          content: `import { afterEach, beforeEach, describe, expect, it } from "vitest"
+
+const log: string[] = []
+
+describe("Suite", () => {
+  beforeEach(() => log.push("beforeEach"))
+  afterEach(() => log.push("afterEach"))
+
+  it("first", () => {
+    log.push("first")
+    expect(log).toEqual(["beforeEach", "first"])
+  })
+
+  it("second checks the previous test's afterEach already ran", () => {
+    expect(log).toEqual(["beforeEach", "first", "afterEach", "beforeEach"])
+  })
+})
+
+describe.skip("Skipped", () => {
+  it("never runs", () => {
+    throw new Error("should never execute")
+  })
+})
+`,
+        },
+      ],
+      testPaths: ["tests/visible/hooks.test.ts"],
+      hiddenTestPaths: [],
+    })
+
+    const markerLog = (final.logs || []).find((log) =>
+      log.message.startsWith("__WORKSPACE_TEST_RESULTS__:")
+    )
+    expect(markerLog).toBeTruthy()
+    const results = JSON.parse(
+      markerLog!.message.slice("__WORKSPACE_TEST_RESULTS__:".length)
+    ) as Array<{ name: string; passed: boolean }>
+
+    expect(results).toHaveLength(2)
+    expect(results.every((r) => r.passed)).toBe(true)
+    expect(results.some((r) => r.name === "never runs")).toBe(false)
+  })
+
   it("does not emit transpile-start for a workspace with no .ts/.tsx files (plain-JS content unaffected)", async () => {
     const { phases, final } = await runWorkerMessage({
       files: [
