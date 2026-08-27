@@ -28,6 +28,16 @@ export function InterviewTrackLanding() {
       </p>
 
       <InterviewTrackCards className="mt-8" />
+
+      <p className="text-muted-foreground mt-8 text-sm">
+        Prepping for a specific company and date?{" "}
+        <Link
+          href="/roadmap/new"
+          className="text-foreground focus-visible:ring-accent/50 rounded font-medium underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
+        >
+          Build your roadmap
+        </Link>
+      </p>
     </div>
   )
 }
