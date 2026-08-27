@@ -5,7 +5,7 @@ import { cleanup, renderHook, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 const mocks = vi.hoisted(() => ({
-  getCachedCompletedOutcome: vi.fn(),
+  fetchFinalizedAttempt: vi.fn(),
 }))
 vi.mock("@/components/sprint-labs/submit/attempt-client", () => mocks)
 
@@ -63,7 +63,7 @@ const FINALIZED_CACHED = {
 
 describe("useTicketRetro", () => {
   it("is 'not-available' when nothing is cached (never a submission attempt of its own)", async () => {
-    mocks.getCachedCompletedOutcome.mockReturnValue(null)
+    mocks.fetchFinalizedAttempt.mockResolvedValue(null)
     registry.getTicket.mockResolvedValue(TICKET)
 
     const { result } = renderHook(() =>
@@ -73,7 +73,7 @@ describe("useTicketRetro", () => {
   })
 
   it("is 'not-available' when the cached attempt exists but is not finalized (a practice-only cache)", async () => {
-    mocks.getCachedCompletedOutcome.mockReturnValue({
+    mocks.fetchFinalizedAttempt.mockResolvedValue({
       ...FINALIZED_CACHED,
       outcome: {
         ...FINALIZED_CACHED.outcome,
@@ -89,7 +89,7 @@ describe("useTicketRetro", () => {
   })
 
   it("is 'ready' once a finalized outcome is cached and the ticket loads, carrying escaped defects and the reference diff", async () => {
-    mocks.getCachedCompletedOutcome.mockReturnValue(FINALIZED_CACHED)
+    mocks.fetchFinalizedAttempt.mockResolvedValue(FINALIZED_CACHED)
     registry.getTicket.mockResolvedValue(TICKET)
 
     const { result } = renderHook(() =>
@@ -105,7 +105,7 @@ describe("useTicketRetro", () => {
   })
 
   it("finds the next not-done ticket on the board, sorted, after the current one", async () => {
-    mocks.getCachedCompletedOutcome.mockReturnValue(FINALIZED_CACHED)
+    mocks.fetchFinalizedAttempt.mockResolvedValue(FINALIZED_CACHED)
     registry.getTicket.mockResolvedValue(TICKET)
 
     const { result } = renderHook(() =>
@@ -120,7 +120,7 @@ describe("useTicketRetro", () => {
   })
 
   it("has no next ticket when every later board entry is already done", async () => {
-    mocks.getCachedCompletedOutcome.mockReturnValue(FINALIZED_CACHED)
+    mocks.fetchFinalizedAttempt.mockResolvedValue(FINALIZED_CACHED)
     registry.getTicket.mockResolvedValue(TICKET)
 
     const { result } = renderHook(() =>

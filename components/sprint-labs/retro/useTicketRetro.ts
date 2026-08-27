@@ -4,22 +4,19 @@
  * useTicketRetro — screen 9's data (UX-SPEC.md §10).
  *
  * Retro reads, it never writes an attempt: everything it shows comes from
- * the SAME session cache submit/review populate (`attempt-client.ts`'s file
- * header explains why that cache exists at all — no GET endpoint anywhere
- * under `/api/sprint-labs/attempts/**`). A cache miss, or a cached outcome
- * that is not yet `finalized`, both render as `"not-available"` — the task's
- * own instruction: "a not-yet-submitted ticket's retro/review shows a
- * 'submit first' empty state, not a 404." This intentionally also covers a
- * genuinely-submitted ticket whose result just isn't in THIS browser
- * session: there is no way to tell the two apart without the missing GET
- * endpoint, and showing the same honest empty state for both is correct
- * either way (never a crash, never fabricated content).
+ * `fetchFinalizedAttempt` (runtimeB task) — GET /api/sprint-labs/attempts/[attemptId], with the
+ * same-tab session cache as a first-check optimization only (`attempt-client.ts`'s file header).
+ * Unlike the pre-GET version of this file, a genuine cache/GET miss (never submitted) and a
+ * not-yet-finalized cached practice attempt both still render as `"not-available"` — the task's
+ * own instruction: "a not-yet-submitted ticket's retro/review shows a 'submit first' empty state,
+ * not a 404" — but now a FINALIZED result from an earlier session, or a different tab, is found
+ * too: the GET is the source of truth and works cold.
  */
 
 import { useEffect, useMemo, useState } from "react"
 import { getTicket } from "@/lib/sprint-labs/content/registry"
 import {
-  getCachedCompletedOutcome,
+  fetchFinalizedAttempt,
   type CachedAttempt,
 } from "@/components/sprint-labs/submit/attempt-client"
 import type { CompiledTicket } from "@/lib/sprint-labs/content/types"
@@ -75,6 +72,7 @@ export function useTicketRetro({
 }: UseTicketRetroInput): TicketRetroState {
   const [ticket, setTicket] = useState<CompiledTicket | null | undefined>(undefined)
   const [ticketError, setTicketError] = useState(false)
+  const [cached, setCached] = useState<CachedAttempt | null | undefined>(undefined)
   const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
@@ -93,10 +91,22 @@ export function useTicketRetro({
     }
   }, [workbookId, ticketKey, reloadToken])
 
-  const cached = useMemo(
-    () => (runId ? getCachedCompletedOutcome(runId, ticketKey) : null),
-    [runId, ticketKey]
-  )
+  // Mirrors the `ticket` effect above: async-loaded, not a synchronous memo, since
+  // `fetchFinalizedAttempt` may now hit the network (GET) on a same-tab cache miss.
+  useEffect(() => {
+    let cancelled = false
+    if (runId === null) {
+      setCached(null)
+      return
+    }
+    setCached(undefined)
+    fetchFinalizedAttempt(runId, ticketKey).then((result) => {
+      if (!cancelled) setCached(result)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [runId, ticketKey, reloadToken])
 
   const finalized = cached?.outcome.attempt.finalized === true
 
@@ -116,6 +126,7 @@ export function useTicketRetro({
   let phase: RetroPhase = "loading"
   if (ticketError) phase = "error"
   else if (runId === null) phase = "loading"
+  else if (cached === undefined) phase = "loading"
   else if (!finalized) phase = "not-available"
   else if (ticket === undefined) phase = "loading"
   else phase = "ready"
@@ -123,7 +134,7 @@ export function useTicketRetro({
   return {
     phase,
     ticket: ticket ?? null,
-    cached,
+    cached: cached ?? null,
     objectiveDeltas,
     nextTicketKey,
     retry: () => setReloadToken((n) => n + 1),

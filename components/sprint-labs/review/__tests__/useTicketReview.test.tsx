@@ -5,7 +5,7 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 const mocks = vi.hoisted(() => ({
-  getCachedCompletedOutcome: vi.fn(),
+  fetchFinalizedAttempt: vi.fn(),
   cacheCompletedOutcome: vi.fn(),
   getCachedReviewOutcome: vi.fn(),
   cacheReviewOutcome: vi.fn(),
@@ -24,7 +24,7 @@ import { useTicketReview } from "../useTicketReview"
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
-  mocks.getCachedCompletedOutcome.mockReturnValue(null)
+  mocks.fetchFinalizedAttempt.mockResolvedValue(null)
   mocks.getCachedReviewOutcome.mockReturnValue(null)
   mocks.ensureBoardAtLeast.mockResolvedValue("review")
   mockSendPushback.mockResolvedValue(null)
@@ -71,7 +71,7 @@ describe("useTicketReview", () => {
   })
 
   it("skips the network entirely on a cache hit", async () => {
-    mocks.getCachedCompletedOutcome.mockReturnValue({
+    mocks.fetchFinalizedAttempt.mockResolvedValue({
       attemptId: "a1",
       outcome: OUTCOME_WITH_COMMENTS,
     })
@@ -85,7 +85,7 @@ describe("useTicketReview", () => {
   })
 
   it("lands on 'no-round' when the ticket has no review comments", async () => {
-    mocks.getCachedCompletedOutcome.mockReturnValue({
+    mocks.fetchFinalizedAttempt.mockResolvedValue({
       attemptId: "a1",
       outcome: { ...OUTCOME_WITH_COMMENTS, reviewComments: undefined },
     })
@@ -98,7 +98,7 @@ describe("useTicketReview", () => {
   })
 
   it("keeps verdicts null until the server reports the attempt finalized, even after Submit review", async () => {
-    mocks.getCachedCompletedOutcome.mockReturnValue({
+    mocks.fetchFinalizedAttempt.mockResolvedValue({
       attemptId: "a1",
       outcome: OUTCOME_WITH_COMMENTS,
     })
@@ -122,7 +122,7 @@ describe("useTicketReview", () => {
   })
 
   it("reveals verdicts and advances the board to done once the server reports finalized+released", async () => {
-    mocks.getCachedCompletedOutcome.mockReturnValue({
+    mocks.fetchFinalizedAttempt.mockResolvedValue({
       attemptId: "a1",
       outcome: OUTCOME_WITH_COMMENTS,
     })

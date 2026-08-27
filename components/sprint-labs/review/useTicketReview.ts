@@ -16,6 +16,19 @@
  * the CACHED decisions (`CachedReview.decisions`), not from server state —
  * `ReviewAttemptOutcome` never hands the learner's own choices back, only
  * scores and (once finalized) correctness per comment id.
+ *
+ * Bootstrap (runtimeB task): the "is there already a completed attempt" check now calls
+ * `fetchFinalizedAttempt` (GET /api/sprint-labs/attempts/[attemptId], session cache first) instead
+ * of the same-tab-only `getCachedCompletedOutcome`. This closes a real bug the sessionStorage-only
+ * version had: a review-only ticket already finalized+reviewed in an EARLIER session, revisited in
+ * a fresh tab, used to find no cache, call `openAttempt` again, and consume another submission slot
+ * for a ticket that was already done — `fetchFinalizedAttempt` finds the real, already-finalized
+ * attempt instead, so a fresh tab correctly reuses it rather than re-opening a new one. The
+ * decisions/verdicts reconstruction below is UNCHANGED and stays same-tab-only
+ * (`getCachedReviewOutcome`/`CachedReview.decisions`) — no endpoint anywhere hands the learner's
+ * own past decisions back, so a truly fresh tab that already reviewed this ticket still shows
+ * `verdicts: null` for the decisions half specifically (comments/scores/attempt state are all
+ * still correctly resolved from the real server-persisted attempt either way).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -25,7 +38,7 @@ import {
   cacheReviewOutcome,
   completeAttempt,
   ensureBoardAtLeast,
-  getCachedCompletedOutcome,
+  fetchFinalizedAttempt,
   getCachedReviewOutcome,
   openAttempt,
   reviewAttempt,
@@ -121,7 +134,7 @@ export function useTicketReview({
     setPhase("loading")
     setErrorMessage(null)
 
-    let attempt = getCachedCompletedOutcome(runId, ticketKey)
+    let attempt = await fetchFinalizedAttempt(runId, ticketKey)
     if (!attempt) {
       const opened = await openAttempt({ runId, ticketKey })
       if (!opened.ok) {
