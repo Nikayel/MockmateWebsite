@@ -1,37 +1,43 @@
 /**
- * Compiler tests (docs/sprint-labs/PLAN.md Task 2). Covers this task's four
- * explicit verification points: the compiler round-trips the fixture
- * workbook, the leak-gate has a red case, output is deterministic, and a
- * Zod validation failure surfaces the offending file path.
+ * Compiler tests (docs/sprint-labs/PLAN.md Task 2). Covers this task's
+ * explicit verification points plus controller review round 1's findings
+ * (I-1 secret-side validation, I-2/R14 frontmatter casing, I-3 leak-gate
+ * wiring, I-5 pruning, M-1/M-2 key format, M-3 review comment ids).
  *
- * The round-trip / determinism / Zod-failure suites spawn the REAL CLI via
- * tsx as a subprocess. They deliberately do NOT import compile-workbooks.mjs's
- * schema-dependent functions (`compileWorkbook`, `main`) directly into this
- * vitest process: that combination doesn't resolve (see
- * scripts/compile-workbooks.mjs's file header for the empirical reason —
- * Task 1's types.ts uses extensionless internal imports that only tsx's
- * loader, not vitest's `createRequire`-bypassing native `require`, resolves
- * correctly). The leak-gate suite imports `assertPublicSafe`/`SECRET_FIELDS`
- * directly: those two exports touch no Task 1 schema, so a plain vitest
- * import of the .mjs file is safe (confirmed: nothing at module scope in
- * compile-workbooks.mjs calls `schemas()`).
+ * The round-trip / determinism / negative-authoring suites spawn the REAL
+ * CLI via tsx as a subprocess. They deliberately do NOT import
+ * compile-workbooks.mjs's schema-dependent functions (`compileWorkbook`,
+ * `main`) directly into this vitest process: that combination doesn't
+ * resolve (see scripts/compile-workbooks.mjs's file header for the
+ * empirical reason — Task 1's types.ts uses extensionless internal imports
+ * that only tsx's loader, not vitest's `createRequire`-bypassing native
+ * `require`, resolves correctly). The leak-gate and casing suites import
+ * `assertPublicSafe`/`SECRET_FIELDS`/`writePublicFile`/`rejectWrongCasing`
+ * directly: those exports touch no Task 1 schema, so a plain vitest import
+ * is safe.
  */
 
 import { execFileSync } from "node:child_process"
 import {
+  existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
   rmSync,
   statSync,
   writeFileSync,
-  mkdirSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, relative } from "node:path"
 import { fileURLToPath } from "node:url"
 import { afterEach, describe, expect, it } from "vitest"
-import { assertPublicSafe, SECRET_FIELDS } from "../../../scripts/compile-workbooks.mjs"
+import {
+  assertPublicSafe,
+  rejectWrongCasing,
+  SECRET_FIELDS,
+  writePublicFile,
+} from "../../../scripts/compile-workbooks.mjs"
 import {
   sprintPublicSchema,
   ticketPublicSchema,
@@ -61,15 +67,34 @@ function makeTmpDir(prefix: string): string {
   return dir
 }
 
+/**
+ * `workbooksRoot` defaults to `targetDir`'s own parent directory. Pruning
+ * (and no-args auto-discovery) needs SOME "workbooks/ tree" to treat as
+ * authoritative; passing an explicit `--workbooks-root` here is what keeps
+ * a temp-dir compile from having its own just-written output declared
+ * "not authored" and deleted by pruning, which scans the real repo's
+ * workbooks/ by default (see compile-workbooks.mjs's discoverAuthoredWorkbooks
+ * doc comment — this was a real bug, not just a test-setup nuance).
+ */
 function runCompiler(
   targetDir: string,
   publicDir: string,
-  sealedDir: string
+  sealedDir: string,
+  workbooksRoot: string = dirname(targetDir)
 ): { status: number; stdout: string; stderr: string } {
   try {
     const stdout = execFileSync(
       TSX_BIN,
-      [COMPILER, targetDir, "--public-dir", publicDir, "--sealed-dir", sealedDir],
+      [
+        COMPILER,
+        targetDir,
+        "--public-dir",
+        publicDir,
+        "--sealed-dir",
+        sealedDir,
+        "--workbooks-root",
+        workbooksRoot,
+      ],
       { cwd: ROOT, encoding: "utf8" }
     )
     return { status: 0, stdout, stderr: "" }
@@ -98,6 +123,105 @@ function listFilesRecursive(dir: string, base = dir): string[] {
   return out.sort()
 }
 
+function writeFileText(path: string, content: string): void {
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(path, content)
+}
+
+/**
+ * A complete, minimal, VALID workbook authoring tree (1 objective, 1
+ * sprint, 1 ticket, every required artifact present) — the shared base for
+ * every negative-authoring test below. Each test overwrites or adds
+ * exactly the one file it wants to break.
+ */
+function scaffoldMinimalWorkbook(
+  baseDir: string,
+  opts: { workbookId?: string; ticketKey?: string } = {}
+): { wbDir: string; ticketDir: string; sprintYamlPath: string; ticketMdPath: string } {
+  const workbookId = opts.workbookId ?? "temp-wb"
+  const ticketKey = opts.ticketKey ?? "TMP-1"
+  const wbDir = join(baseDir, "wb")
+  const ticketDir = join(wbDir, `sprints/01-x/tickets/${ticketKey}`)
+  const sprintYamlPath = join(wbDir, "sprints/01-x/sprint.yaml")
+  const ticketMdPath = join(ticketDir, "ticket.md")
+
+  writeFileText(
+    join(wbDir, "workbook.yaml"),
+    [
+      `id: ${workbookId}`,
+      "title: Temp",
+      "pitch: Temp",
+      "track: Test",
+      "language: typescript",
+      "level: Test",
+      "topics: [test]",
+      "sprintCount: 1",
+      "ticketCount: 1",
+      "estimatedHours: 1",
+      "requiresServerExecution: false",
+      "objectives:",
+      "  - id: obj-1",
+      "    label: Obj",
+      "    canDo: I can do the thing.",
+      "",
+    ].join("\n")
+  )
+  writeFileText(
+    sprintYamlPath,
+    [
+      "number: 1",
+      "title: X",
+      "goal: X",
+      "standupQuote: X",
+      "archMapDelta: {}",
+      "objectives: [obj-1]",
+      "",
+    ].join("\n")
+  )
+  writeFileText(
+    ticketMdPath,
+    [
+      "---",
+      "title: Temp ticket",
+      "points: 1",
+      "labels: []",
+      "ai_policy: assisted",
+      "objectives: [obj-1]",
+      "---",
+      "",
+      "Body.",
+      "",
+    ].join("\n")
+  )
+  writeFileText(join(ticketDir, "tests/visible/x.test.ts"), "// placeholder\n")
+  writeFileText(join(ticketDir, "reference.diff"), "diff --git a/x b/x\n")
+  writeFileText(
+    join(ticketDir, "rubric.yaml"),
+    [
+      "weights:",
+      "  understanding: 0.2",
+      "  problemSolving: 0.2",
+      "  codeQuality: 0.2",
+      "  communication: 0.2",
+      "  verification: 0.2",
+      "notes: {}",
+      "",
+    ].join("\n")
+  )
+  return { wbDir, ticketDir, sprintYamlPath, ticketMdPath }
+}
+
+function compile(wbDir: string): { status: number; stdout: string; stderr: string } {
+  const outBase = makeTmpDir("sprint-labs-compile-out-")
+  return runCompiler(wbDir, join(outBase, "public"), join(outBase, "sealed"))
+}
+
+// ============================================================
+// Round-trip (generalized per review round 1, I-3a: drive off
+// registry.workbookIds() -> every sprint -> every ticket, not a hardcoded
+// "fixture-demo" — so Meridian gets this coverage automatically).
+// ============================================================
+
 describe("compile-workbooks: round-trip", () => {
   it("compiles the fixture workbook and every generated public file re-validates against Task 1 schemas", async () => {
     const base = makeTmpDir("sprint-labs-roundtrip-")
@@ -111,42 +235,53 @@ describe("compile-workbooks: round-trip", () => {
     const registryPath = join(publicDir, "registry.ts")
     const registry = await import(/* @vite-ignore */ registryPath)
 
-    const summary = registry.getWorkbookSummary("fixture-demo")
-    expect(workbookSummarySchema.safeParse(summary).success).toBe(true)
-    expect(summary.id).toBe("fixture-demo")
+    const ids: string[] = registry.workbookIds()
+    expect(ids).toContain("fixture-demo")
 
-    const sprint1 = registry.getSprint("fixture-demo", 1)
-    expect(sprintPublicSchema.safeParse(sprint1).success).toBe(true)
+    for (const workbookId of ids) {
+      const summary = registry.getWorkbookSummary(workbookId)
+      expect(workbookSummarySchema.safeParse(summary).success).toBe(true)
+      expect(() => assertPublicSafe(summary, `round-trip:${workbookId}:summary`)).not.toThrow()
 
-    const demo101 = registry.getTicket("fixture-demo", "DEMO-101") as CompiledTicket
-    const demo102 = registry.getTicket("fixture-demo", "DEMO-102") as CompiledTicket
-    expect(ticketPublicSchema.safeParse(demo101.ticket).success).toBe(true)
-    expect(ticketPublicSchema.safeParse(demo102.ticket).success).toBe(true)
+      const content = await registry.loadWorkbookContent(workbookId)
+      expect(content).not.toBeNull()
+      for (const sprint of content.sprints) {
+        expect(sprintPublicSchema.safeParse(sprint).success).toBe(true)
+        expect(() =>
+          assertPublicSafe(sprint, `round-trip:${workbookId}:sprint-${sprint.number}`)
+        ).not.toThrow()
+      }
+      for (const [ticketKey, compiledTicket] of Object.entries(content.ticketsByKey) as [
+        string,
+        CompiledTicket,
+      ][]) {
+        expect(ticketPublicSchema.safeParse(compiledTicket.ticket).success).toBe(true)
+        for (const meta of compiledTicket.hiddenTests) {
+          expect(ticketSecretMetaSchema.safeParse(meta).success).toBe(true)
+        }
+        expect(() =>
+          assertPublicSafe(compiledTicket, `round-trip:${workbookId}:${ticketKey}`)
+        ).not.toThrow()
+      }
+    }
+
+    // Fixture-specific spot checks (in addition to the generic scan above).
+    const content = await registry.loadWorkbookContent("fixture-demo")
+    const demo101 = content.ticketsByKey["DEMO-101"] as CompiledTicket
+    const demo102 = content.ticketsByKey["DEMO-102"] as CompiledTicket
     expect(demo101.ticket.aiPolicy).toBe("assisted")
     expect(demo102.ticket.aiPolicy).toBe("unassisted")
     expect(demo102.ticket.aiPolicyReason).toBeTruthy()
-
-    // Hidden-test metadata: every entry validates as TicketSecretMeta and
-    // (being .strict()) would already reject a stray expected/input/body —
-    // assertPublicSafe below is the second, independent layer.
-    for (const meta of [...demo101.hiddenTests, ...demo102.hiddenTests]) {
-      expect(ticketSecretMetaSchema.safeParse(meta).success).toBe(true)
-    }
     expect(demo101.hiddenTests[0].kind).toBe("probe")
     expect(demo102.hiddenTests.every((h) => h.kind === "io-case")).toBe(true)
 
-    // The on-disk public artifact, reloaded fresh, still passes the leak-gate.
-    expect(() => assertPublicSafe(summary, "round-trip:workbook")).not.toThrow()
-    expect(() => assertPublicSafe(sprint1, "round-trip:sprint")).not.toThrow()
-    expect(() => assertPublicSafe(demo101, "round-trip:DEMO-101")).not.toThrow()
-    expect(() => assertPublicSafe(demo102, "round-trip:DEMO-102")).not.toThrow()
-
-    // The sealed half actually carries the secret data (imported directly
-    // here is safe: this is a Node test process, not a browser, so the
-    // `typeof window` guard does not fire).
     const sealed102Path = join(sealedDir, "fixture-demo/DEMO-102.server.ts")
     const sealed102 = (await import(/* @vite-ignore */ sealed102Path)).sealed as SealedTicketContent
     expect(sealed102.review?.some((c) => c.correct === false)).toBe(true)
+    expect(sealed102.review?.map((c) => c.id)).toEqual([
+      "missing-sunset-date",
+      "just-remove-page-param",
+    ])
     const ioCase = sealed102.hiddenCases.find((c) => c.id === "v1-still-accepts-page")
     expect(ioCase?.expected).toEqual({ status: 200, deprecationHeaderPresent: true })
     expect(sealed102.referenceDiff).toContain("compatibilityDescriptor")
@@ -191,6 +326,12 @@ describe("compile-workbooks: determinism", () => {
     }
   })
 })
+
+// ============================================================
+// Leak-gate: the pure classification/scan functions, PLUS (I-3/M-7) a
+// direct test of the write-site chokepoint, since deleting an ad hoc
+// assertPublicSafe call elsewhere would leave those older tests green.
+// ============================================================
 
 describe("compile-workbooks: leak-gate (secret-classification allowlist)", () => {
   it("SECRET_FIELDS names the fields this compiler must never emit publicly", () => {
@@ -249,6 +390,447 @@ describe("compile-workbooks: leak-gate (secret-classification allowlist)", () =>
   })
 })
 
+describe("compile-workbooks: writePublicFile is the leak-gate chokepoint (I-3/M-7)", () => {
+  it("throws and writes NOTHING when the payload carries a secret-classified field", () => {
+    const base = makeTmpDir("sprint-labs-writepublicfile-poisoned-")
+    const target = join(base, "poisoned.ts")
+    expect(() =>
+      writePublicFile(
+        target,
+        { hiddenTests: [{ expected: "LEAKED" }] },
+        "// should never be written\n",
+        "test"
+      )
+    ).toThrow(/secret-classified field "expected"/)
+    expect(existsSync(target)).toBe(false)
+  })
+
+  it("writes the file when the payload is clean (the only path any renderer uses to reach disk)", () => {
+    const base = makeTmpDir("sprint-labs-writepublicfile-clean-")
+    const target = join(base, "nested/clean.ts")
+    writePublicFile(target, { title: "fine" }, "export const x = 1\n", "test")
+    expect(existsSync(target)).toBe(true)
+    expect(readFileSync(target, "utf8")).toBe("export const x = 1\n")
+  })
+})
+
+// ============================================================
+// Frontmatter/YAML casing (review round 1, I-2 / ruling R14): the spec
+// wins per-field. A cheap unit test of the shared helper covers every
+// guarded pair; a handful of full-pipeline tests confirm each real
+// authoring path (ticket.md, sprint.yaml, a hidden test, author_brief.yaml)
+// actually calls it before the field can be silently dropped.
+// ============================================================
+
+describe("compile-workbooks: rejectWrongCasing (unit)", () => {
+  const PAIRS: [string, string][] = [
+    ["aiPolicy", "ai_policy"],
+    ["aiPolicyReason", "ai_policy_reason"],
+    ["payoff_for", "payoffFor"],
+    ["acceptance_criteria", "acceptanceCriteria"],
+    ["human_name", "humanName"],
+    ["standup_quote", "standupQuote"],
+    ["arch_map_delta", "archMapDelta"],
+    ["sizing_notes", "sizingNotes"],
+    ["concessionTriggers", "concession_triggers"],
+    ["do_not_volunteer", "doNotVolunteer"],
+    ["problem_solving", "problemSolving"],
+    ["code_quality", "codeQuality"],
+  ]
+
+  it.each(PAIRS)("rejects %s in favor of %s", (wrongKey, rightKey) => {
+    expect(() =>
+      rejectWrongCasing({ [wrongKey]: "x" }, "some/file.yaml", wrongKey, rightKey)
+    ).toThrow(new RegExp(`use "${rightKey}", not "${wrongKey}"`))
+  })
+
+  it("does not throw when only the right-cased key is present, or when data is null/undefined", () => {
+    expect(() =>
+      rejectWrongCasing({ ai_policy: "assisted" }, "f", "aiPolicy", "ai_policy")
+    ).not.toThrow()
+    expect(() => rejectWrongCasing(null, "f", "aiPolicy", "ai_policy")).not.toThrow()
+    expect(() => rejectWrongCasing(undefined, "f", "aiPolicy", "ai_policy")).not.toThrow()
+  })
+})
+
+describe("compile-workbooks: casing enforced end to end", () => {
+  it("ticket.md: camelCase aiPolicy is rejected, naming ai_policy", () => {
+    const base = makeTmpDir("sprint-labs-casing-ticket-")
+    const { wbDir, ticketMdPath } = scaffoldMinimalWorkbook(base)
+    writeFileText(
+      ticketMdPath,
+      [
+        "---",
+        "title: T",
+        "points: 1",
+        "labels: []",
+        "aiPolicy: assisted",
+        "objectives: [obj-1]",
+        "---",
+        "",
+        "Body.",
+      ].join("\n")
+    )
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('use "ai_policy", not "aiPolicy"')
+  })
+
+  it("ticket.md: snake_case payoff_for is rejected, naming payoffFor", () => {
+    const base = makeTmpDir("sprint-labs-casing-payoff-")
+    const { wbDir, ticketMdPath } = scaffoldMinimalWorkbook(base)
+    writeFileText(
+      ticketMdPath,
+      [
+        "---",
+        "title: T",
+        "points: 1",
+        "labels: []",
+        "ai_policy: assisted",
+        "objectives: [obj-1]",
+        "payoff_for: TMP-2",
+        "---",
+        "",
+        "Body.",
+      ].join("\n")
+    )
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('use "payoffFor", not "payoff_for"')
+  })
+
+  it("sprint.yaml: snake_case arch_map_delta is rejected, naming archMapDelta", () => {
+    const base = makeTmpDir("sprint-labs-casing-sprint-")
+    const { wbDir, sprintYamlPath } = scaffoldMinimalWorkbook(base)
+    writeFileText(
+      sprintYamlPath,
+      [
+        "number: 1",
+        "title: X",
+        "goal: X",
+        "standupQuote: X",
+        "arch_map_delta: {}",
+        "objectives: [obj-1]",
+        "",
+      ].join("\n")
+    )
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('use "archMapDelta", not "arch_map_delta"')
+  })
+
+  it("hidden test yaml: snake_case human_name is rejected, naming humanName", () => {
+    const base = makeTmpDir("sprint-labs-casing-hidden-")
+    const { wbDir, ticketDir } = scaffoldMinimalWorkbook(base)
+    writeFileText(
+      join(ticketDir, "tests/hidden/case-1.yaml"),
+      [
+        'human_name: "Escaped: something"',
+        "tags: []",
+        "kind: probe",
+        "body: assert(true)",
+        "",
+      ].join("\n")
+    )
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('use "humanName", not "human_name"')
+  })
+
+  it("author_brief.yaml: camelCase concessionTriggers is rejected, naming concession_triggers", () => {
+    const base = makeTmpDir("sprint-labs-casing-brief-")
+    const { wbDir, ticketDir } = scaffoldMinimalWorkbook(base)
+    writeFileText(
+      join(ticketDir, "author_brief.yaml"),
+      [
+        "intent: x",
+        "decisions:",
+        "  - decision: d",
+        "    justification: j",
+        "doNotVolunteer: []",
+        "concessionTriggers: []",
+        "",
+      ].join("\n")
+    )
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('use "concession_triggers", not "concessionTriggers"')
+  })
+})
+
+// ============================================================
+// Secret-side validation (review round 1, I-1): rubric.yaml,
+// author_brief.yaml, review.yaml, and hidden-test payload halves are now
+// schema-checked, not just read and trusted.
+// ============================================================
+
+describe("compile-workbooks: review.yaml is validated, not just read (I-1/M-3)", () => {
+  it("a bare top-level list (no `comments:` wrapper) is a CompileError, not a silently-empty round", () => {
+    const base = makeTmpDir("sprint-labs-review-barelist-")
+    const { wbDir, ticketDir } = scaffoldMinimalWorkbook(base)
+    writeFileText(
+      join(ticketDir, "review.yaml"),
+      ["- id: c1", "  body: hi", "  correct: true", ""].join("\n")
+    )
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain("review.yaml")
+  })
+
+  it("zero comments is a CompileError", () => {
+    const base = makeTmpDir("sprint-labs-review-empty-")
+    const { wbDir, ticketDir } = scaffoldMinimalWorkbook(base)
+    writeFileText(join(ticketDir, "review.yaml"), "comments: []\n")
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain("at least one comment")
+  })
+
+  it("a comment missing its id is a CompileError", () => {
+    const base = makeTmpDir("sprint-labs-review-noid-")
+    const { wbDir, ticketDir } = scaffoldMinimalWorkbook(base)
+    writeFileText(
+      join(ticketDir, "review.yaml"),
+      ["comments:", "  - body: hi", "    correct: true", ""].join("\n")
+    )
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain("review.yaml")
+  })
+
+  it("duplicate comment ids are a CompileError (M-3: ids key server-side release)", () => {
+    const base = makeTmpDir("sprint-labs-review-dupeid-")
+    const { wbDir, ticketDir } = scaffoldMinimalWorkbook(base)
+    writeFileText(
+      join(ticketDir, "review.yaml"),
+      [
+        "comments:",
+        "  - id: c1",
+        "    body: hi",
+        "    correct: true",
+        "  - id: c1",
+        "    body: bye",
+        "    correct: false",
+        "",
+      ].join("\n")
+    )
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('duplicate review comment id "c1"')
+  })
+})
+
+describe("compile-workbooks: rubric.yaml / author_brief.yaml / hidden payloads are validated (I-1)", () => {
+  it("rubric.yaml with a non-numeric weight is a CompileError", () => {
+    const base = makeTmpDir("sprint-labs-rubric-bad-")
+    const { wbDir, ticketDir } = scaffoldMinimalWorkbook(base)
+    writeFileText(
+      join(ticketDir, "rubric.yaml"),
+      [
+        "weights:",
+        '  understanding: "not-a-number"',
+        "  problemSolving: 0.2",
+        "  codeQuality: 0.2",
+        "  communication: 0.2",
+        "  verification: 0.2",
+        "notes: {}",
+        "",
+      ].join("\n")
+    )
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain("rubric.yaml")
+  })
+
+  it("author_brief.yaml with zero decisions is a CompileError", () => {
+    const base = makeTmpDir("sprint-labs-brief-nodecisions-")
+    const { wbDir, ticketDir } = scaffoldMinimalWorkbook(base)
+    writeFileText(
+      join(ticketDir, "author_brief.yaml"),
+      ["intent: x", "decisions: []", "doNotVolunteer: []", "concession_triggers: []", ""].join("\n")
+    )
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain("author_brief.yaml")
+  })
+
+  it("an io-case hidden test missing `expected` is a CompileError", () => {
+    const base = makeTmpDir("sprint-labs-iocase-noexpected-")
+    const { wbDir, ticketDir } = scaffoldMinimalWorkbook(base)
+    writeFileText(
+      join(ticketDir, "tests/hidden/case-1.yaml"),
+      ["humanName: Escaped case", "tags: []", "kind: io-case", "input: { a: 1 }", ""].join("\n")
+    )
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain("case-1.yaml")
+  })
+
+  it("a probe hidden test with an empty body is a CompileError", () => {
+    const base = makeTmpDir("sprint-labs-probe-emptybody-")
+    const { wbDir, ticketDir } = scaffoldMinimalWorkbook(base)
+    writeFileText(
+      join(ticketDir, "tests/hidden/case-1.yaml"),
+      ["humanName: Escaped case", "tags: []", "kind: probe", 'body: ""', ""].join("\n")
+    )
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain("case-1.yaml")
+  })
+})
+
+// ============================================================
+// M-1: duplicate / case-colliding ticket keys. M-2: id/key format.
+// ============================================================
+
+describe("compile-workbooks: ticket key uniqueness and format (M-1/M-2)", () => {
+  it("a duplicate ticket key across two sprints is a CompileError", () => {
+    const base = makeTmpDir("sprint-labs-dupe-ticket-")
+    const { wbDir } = scaffoldMinimalWorkbook(base, { ticketKey: "TMP-1" })
+    // A second sprint reusing the same ticket key.
+    writeFileText(
+      join(wbDir, "sprints/02-y/sprint.yaml"),
+      [
+        "number: 2",
+        "title: Y",
+        "goal: Y",
+        "standupQuote: Y",
+        "archMapDelta: {}",
+        "objectives: [obj-1]",
+        "",
+      ].join("\n")
+    )
+    writeFileText(
+      join(wbDir, "sprints/02-y/tickets/TMP-1/ticket.md"),
+      [
+        "---",
+        "title: Dup",
+        "points: 1",
+        "labels: []",
+        "ai_policy: assisted",
+        "objectives: [obj-1]",
+        "---",
+        "",
+        "Body.",
+      ].join("\n")
+    )
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('duplicate ticket key "TMP-1"')
+  })
+
+  it("ticket keys colliding only via camel()'s hyphen-stripping (TMP-1 vs TMP1) are a CompileError", () => {
+    // Not a same-case-differs-by-case pair (TMP-1 vs tmp-1): on a
+    // case-insensitive-but-preserving filesystem (APFS, the default on
+    // macOS — see repo-relocated-off-t7 memory note) creating "tmp-1" when
+    // "TMP-1" already exists silently overwrites the SAME directory rather
+    // than creating a second one, which would make this test pass for the
+    // wrong reason (there would only ever be one ticket on disk). A
+    // hyphen-vs-no-hyphen pair is genuinely two directories on every
+    // filesystem and exercises the identical seenExportNames collision
+    // check in compileWorkbook (camel("tmp-1") === camel("tmp1") === "tmp1").
+    const base = makeTmpDir("sprint-labs-case-collide-")
+    const { wbDir } = scaffoldMinimalWorkbook(base, { ticketKey: "TMP-1" })
+    const secondTicketDir = join(wbDir, "sprints/01-x/tickets/TMP1")
+    writeFileText(
+      join(secondTicketDir, "ticket.md"),
+      [
+        "---",
+        "title: Dup",
+        "points: 1",
+        "labels: []",
+        "ai_policy: assisted",
+        "objectives: [obj-1]",
+        "---",
+        "",
+        "Body.",
+      ].join("\n")
+    )
+    writeFileText(join(secondTicketDir, "reference.diff"), "diff\n")
+    writeFileText(
+      join(secondTicketDir, "rubric.yaml"),
+      "weights: { understanding: 0.2, problemSolving: 0.2, codeQuality: 0.2, communication: 0.2, verification: 0.2 }\nnotes: {}\n"
+    )
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain("collides with")
+  })
+
+  it("a workbook id that is not a lowercase slug is a CompileError", () => {
+    const base = makeTmpDir("sprint-labs-bad-workbook-id-")
+    const { wbDir } = scaffoldMinimalWorkbook(base, { workbookId: "Not_A_Slug" })
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain("lowercase slug")
+  })
+
+  it("a ticket key starting with a digit is a CompileError", () => {
+    const base = makeTmpDir("sprint-labs-bad-ticket-key-")
+    const { wbDir } = scaffoldMinimalWorkbook(base, { ticketKey: "1-BAD" })
+    const result = compile(wbDir)
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('ticket key "1-BAD"')
+  })
+})
+
+// ============================================================
+// I-5: pruning removes compiled output with no authored source.
+// ============================================================
+
+describe("compile-workbooks: pruning stale output (I-5)", () => {
+  it("removes a ticket's compiled output once its authored directory is deleted", () => {
+    const base = makeTmpDir("sprint-labs-prune-")
+    const { wbDir, ticketDir: firstTicketDir } = scaffoldMinimalWorkbook(base, {
+      ticketKey: "TMP-1",
+    })
+    // A second, sibling ticket in the same sprint.
+    const secondTicketDir = join(wbDir, "sprints/01-x/tickets/TMP-2")
+    writeFileText(
+      join(secondTicketDir, "ticket.md"),
+      [
+        "---",
+        "title: Second",
+        "points: 1",
+        "labels: []",
+        "ai_policy: assisted",
+        "objectives: [obj-1]",
+        "---",
+        "",
+        "Body.",
+      ].join("\n")
+    )
+    writeFileText(join(secondTicketDir, "reference.diff"), "diff\n")
+    writeFileText(
+      join(secondTicketDir, "rubric.yaml"),
+      "weights: { understanding: 0.2, problemSolving: 0.2, codeQuality: 0.2, communication: 0.2, verification: 0.2 }\nnotes: {}\n"
+    )
+
+    const outBase = makeTmpDir("sprint-labs-prune-out-")
+    const publicDir = join(outBase, "public")
+    const sealedDir = join(outBase, "sealed")
+
+    const first = runCompiler(wbDir, publicDir, sealedDir)
+    expect(first.status).toBe(0)
+    expect(existsSync(join(publicDir, "temp-wb/tickets/TMP-1.ts"))).toBe(true)
+    expect(existsSync(join(publicDir, "temp-wb/tickets/TMP-2.ts"))).toBe(true)
+    expect(existsSync(join(sealedDir, "temp-wb/TMP-2.server.ts"))).toBe(true)
+
+    // TMP-2 is pulled from authoring.
+    rmSync(secondTicketDir, { recursive: true, force: true })
+    void firstTicketDir
+
+    const second = runCompiler(wbDir, publicDir, sealedDir)
+    expect(second.status).toBe(0)
+    expect(existsSync(join(publicDir, "temp-wb/tickets/TMP-1.ts"))).toBe(true)
+    expect(existsSync(join(publicDir, "temp-wb/tickets/TMP-2.ts"))).toBe(false)
+    expect(existsSync(join(sealedDir, "temp-wb/TMP-2.server.ts"))).toBe(false)
+  })
+})
+
+// ============================================================
+// Zod validation failures surface the offending file path.
+// ============================================================
+
 describe("compile-workbooks: fails loudly on an invalid workbook", () => {
   it("a ticket.md missing a required field surfaces the file path and never writes output", () => {
     const authoringDir = makeTmpDir("sprint-labs-invalid-authoring-")
@@ -256,7 +838,7 @@ describe("compile-workbooks: fails loudly on an invalid workbook", () => {
     mkdirSync(join(workbookDir, "sprints/01-x/tickets/BAD-1/tests/visible"), { recursive: true })
     mkdirSync(join(workbookDir, "sprints/01-x/tickets/BAD-1/tests/hidden"), { recursive: true })
 
-    writeFileSync(
+    writeFileText(
       join(workbookDir, "workbook.yaml"),
       [
         "id: broken-workbook",
@@ -274,7 +856,7 @@ describe("compile-workbooks: fails loudly on an invalid workbook", () => {
         "",
       ].join("\n")
     )
-    writeFileSync(
+    writeFileText(
       join(workbookDir, "sprints/01-x/sprint.yaml"),
       [
         "number: 1",
@@ -287,13 +869,13 @@ describe("compile-workbooks: fails loudly on an invalid workbook", () => {
       ].join("\n")
     )
     // Missing `title` (required by ticketPublicSchema) on purpose.
-    writeFileSync(
+    writeFileText(
       join(workbookDir, "sprints/01-x/tickets/BAD-1/ticket.md"),
       [
         "---",
         "points: 1",
         "labels: []",
-        "aiPolicy: assisted",
+        "ai_policy: assisted",
         "objectives: []",
         "---",
         "",
