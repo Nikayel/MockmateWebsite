@@ -36,6 +36,11 @@ const nextConfig = {
   // public lesson pages are statically generated with `dynamicParams: false`, so without these the
   // old URLs would hard-404 for every already-indexed page and every existing bookmark. Permanent
   // (308) because the move is permanent and the destination is the canonical URL.
+  //
+  // The /interview-prep family (hub + 38 statically generated company pages) was retired 2026-08-26:
+  // Google sent it zero clicks, its visits were internal-nav self-referral, and its company stats
+  // were unsourced. /roadmap/preview is the honest company-prep surface, so everything lands there.
+  // Permanent because the retirement is permanent and the old URLs were in the submitted sitemap.
   async redirects() {
     return [
       {
@@ -46,6 +51,16 @@ const nextConfig = {
       {
         source: '/learn/sql/:path*',
         destination: '/learn/data-engineering/:path*',
+        permanent: true,
+      },
+      {
+        source: '/interview-prep',
+        destination: '/roadmap/preview',
+        permanent: true,
+      },
+      {
+        source: '/interview-prep/:company',
+        destination: '/roadmap/preview',
         permanent: true,
       },
     ]
