@@ -2,23 +2,28 @@
  * Service-level tests for the Sprint Labs attempts service
  * (../grading/attempts-service.ts): open/complete/review orchestration with
  * a faked Firestore, extending lib/sprint-labs/__tests__/runs.test.ts's fake
- * (path -> data map, vi.hoisted) with `runTransaction` support, which that
- * file's service (runs.ts) never needed.
+ * (path -> data map, vi.hoisted) with `runTransaction`/`tx.create` support,
+ * which that file's service (runs.ts) never needed.
  *
- * Per docs/sprint-labs/PLAN.md Task 8's explicit verification list, this
- * file is the one that proves: first submit finalizes; second submit draws
- * a variant and is formative-only; a fabricated probe "pass" cannot alter an
- * io-case verdict; and the returned projection never includes runner
- * output. Pure-logic exhaustiveness (every scorer band, every variant
- * boundary, every budget edge) lives in lib/sprint-labs/grading/__tests__/ —
- * this file is deliberately about ORCHESTRATION, not re-proving arithmetic
- * already covered there.
+ * Fix round 1 rewrote this file for: C1 (the attempt stub lifecycle —
+ * open/create, complete/require-open-and-transition, the two regression
+ * exploits the reviewer proved), I3/I4 (budget and finalize-once folded
+ * into their write transactions), I5 (review-only mastery deferred to the
+ * review round), I6 (zero io-cases collapses to 0 and renormalizes,
+ * never inflates to 100), and RULING R21 (no scoring dimension consumes a
+ * client-posted judgment — filesTouched/diffLineCount/learnerAddedTest are
+ * now asserted to come from the run's OWN file store, never the request).
+ *
+ * Pure-logic exhaustiveness (every scorer band, every variant boundary,
+ * every budget edge, every workspace-signal derivation) lives in
+ * lib/sprint-labs/grading/__tests__/ — this file is deliberately about
+ * ORCHESTRATION, not re-proving arithmetic already covered there.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 // ============================================================
-// Faked Firestore — path -> data map, extended with runTransaction
+// Faked Firestore — path -> data map, extended with runTransaction + tx.create
 // ============================================================
 
 interface FakeDocRef {
@@ -104,19 +109,26 @@ const h = vi.hoisted(() => {
   const adminDbFake = {
     collection: (name: string) => collectionRef(name),
     // Simplified for a single-threaded unit test: no real contention/retry —
-    // reads see the current store, writes land immediately. Good enough to
-    // exercise THIS module's read-then-decide-then-write logic; Firestore's
-    // own conflict-retry semantics are not what this test suite is for.
+    // reads see the current store, writes land immediately. `tx.create`
+    // enforces the one invariant this test suite actually needs: it throws
+    // if the target path already has data, mirroring real Firestore.
     runTransaction: async <T>(
       callback: (tx: {
         get: (refOrQuery: { get: () => Promise<unknown> }) => Promise<unknown>
         set: (ref: FakeDocRef, data: Record<string, unknown>) => void
+        create: (ref: FakeDocRef, data: Record<string, unknown>) => void
         update: (ref: FakeDocRef, data: Record<string, unknown>) => void
       }) => Promise<T>
     ): Promise<T> => {
       const tx = {
         get: (refOrQuery: { get: () => Promise<unknown> }) => refOrQuery.get(),
         set: (ref: FakeDocRef, data: Record<string, unknown>) => {
+          store.set(ref.__fakePath, { ...data })
+        },
+        create: (ref: FakeDocRef, data: Record<string, unknown>) => {
+          if (store.has(ref.__fakePath)) {
+            throw new Error(`fake firestore: create on existing doc ${ref.__fakePath}`)
+          }
           store.set(ref.__fakePath, { ...data })
         },
         update: (ref: FakeDocRef, data: Record<string, unknown>) => {
@@ -166,6 +178,7 @@ vi.mock("@/lib/sprint-labs/mastery", () => ({
 }))
 
 import type { StoredSprintLabRun } from "@/lib/sprint-labs/runs"
+import { encodeWorkspaceFilePathId } from "@/lib/sprint-labs/workspace-files"
 import type { CompiledTicket } from "@/lib/sprint-labs/content/types"
 import type { SealedTicketContent } from "@/lib/scenarios/sealed/sprint-labs/types"
 
@@ -248,6 +261,32 @@ function seedRun(id: string, overrides: Partial<StoredSprintLabRun> = {}): Store
   return run
 }
 
+/** Seeds a `sprintLabRuns/{runId}/files/{encodedPath}` doc, matching runs.ts's own storage shape. */
+function seedWorkspaceFile(
+  runId: string,
+  path: string,
+  content: string,
+  updatedAt = "2026-01-01T00:00:00.000Z"
+) {
+  h.store.set(`sprintLabRuns/${runId}/files/${encodeWorkspaceFilePathId(path)}`, {
+    path,
+    content,
+    updatedAt,
+    revision: 1,
+  })
+}
+
+/** Push every stored attempt doc under this run back in time, so a cooldown check reads them as long past. */
+function ageAllStoredAttempts(runId: string, seconds: number) {
+  const prefix = `sprintLabRuns/${runId}/attempts/`
+  for (const [key, data] of h.store.entries()) {
+    if (!key.startsWith(prefix) || key.slice(prefix.length).includes("/")) continue
+    if (typeof data.submittedAt !== "string") continue
+    const aged = new Date(new Date(data.submittedAt).getTime() - seconds * 1000).toISOString()
+    h.store.set(key, { ...data, submittedAt: aged })
+  }
+}
+
 import {
   openSprintLabAttempt,
   completeSprintLabAttempt,
@@ -257,14 +296,13 @@ import {
 
 const USER = "user_alice"
 
-/** Push every stored attempt doc under this run/ticket back in time, so a cooldown check reads them as long past. */
-function ageAllStoredAttempts(runId: string, seconds: number) {
-  const prefix = `sprintLabRuns/${runId}/attempts/`
-  for (const [key, data] of h.store.entries()) {
-    if (!key.startsWith(prefix) || key.slice(prefix.length).includes("/")) continue
-    if (typeof data.submittedAt !== "string") continue
-    const aged = new Date(new Date(data.submittedAt).getTime() - seconds * 1000).toISOString()
-    h.store.set(key, { ...data, submittedAt: aged })
+function completeInput(overrides: Record<string, unknown> = {}) {
+  return {
+    runId: "run1",
+    ticketKey: "MER-201",
+    ioCaseOutputs: {},
+    probeResults: {},
+    ...overrides,
   }
 }
 
@@ -281,7 +319,7 @@ beforeEach(() => {
 })
 
 describe("openSprintLabAttempt", () => {
-  it("issues io-case inputs (id/humanName/input only, never expected) and a regression manifest from done board tickets", async () => {
+  it("persists a stub doc at open (C1) and issues io-case inputs (id/humanName/input only, never expected)", async () => {
     seedRun("run1")
     const result = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
     expect(result.ioCases.length).toBeGreaterThan(0)
@@ -290,6 +328,13 @@ describe("openSprintLabAttempt", () => {
     }
     expect(result.regressionManifest).toEqual([{ ticketKey: "MER-101" }])
     expect(result.submissionsUsed).toBe(0)
+
+    const stub = h.store.get(`sprintLabRuns/run1/attempts/${result.attemptId}`)
+    expect(stub).toMatchObject({
+      ticketKey: "MER-201",
+      status: "open",
+      variantId: result.variantId,
+    })
   })
 
   it("issues probes only when the ticket is assisted", async () => {
@@ -317,108 +362,142 @@ describe("openSprintLabAttempt", () => {
       SPRINT_LAB_ATTEMPT_ERRORS.UNKNOWN_TICKET
     )
   })
+
+  it("enforces the submission budget: the 6th open for one ticket is rejected", async () => {
+    seedRun("run1")
+    for (let i = 0; i < 5; i++) {
+      h.store.set(`sprintLabRuns/run1/attempts/a${i}`, {
+        ticketKey: "MER-201",
+        variantId: `v${i}`,
+        attemptIndex: i,
+        aiPolicy: "unassisted",
+        openedAt: "2020-01-01T00:00:00.000Z",
+        status: "completed",
+        finalized: i === 0,
+        gateResults: [],
+        escapedDefects: [],
+        scores: {
+          understanding: 0,
+          problemSolving: 0,
+          codeQuality: 0,
+          communication: null,
+          verification: 0,
+          overall: 0,
+        },
+        submittedAt: "2020-01-01T00:00:00.000Z",
+      })
+    }
+    await expect(
+      openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    ).rejects.toThrow(SPRINT_LAB_ATTEMPT_ERRORS.BUDGET_EXCEEDED)
+  })
 })
 
 describe("completeSprintLabAttempt — metric integrity", () => {
   it("the FIRST submit finalizes", async () => {
     seedRun("run1")
     const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
-    const outcome = await completeSprintLabAttempt(USER, {
-      runId: "run1",
-      ticketKey: "MER-201",
-      attemptId: opened.attemptId,
-      variantId: opened.variantId,
-      ioCaseOutputs: Object.fromEntries(
-        opened.ioCases.map((c) => [
-          c.id,
-          sealedFixture().hiddenCases.find((h2) => h2.id === c.id)?.expected,
-        ])
-      ),
-      probeResults: {},
-      filesTouched: [],
-      timeToFirstEditSeconds: null,
-      diffLineCount: 0,
-      learnerAddedTest: false,
-    })
+    const outcome = await completeSprintLabAttempt(
+      USER,
+      completeInput({
+        attemptId: opened.attemptId,
+        ioCaseOutputs: Object.fromEntries(
+          opened.ioCases.map((c) => [
+            c.id,
+            sealedFixture().hiddenCases.find((h2) => h2.id === c.id)?.expected,
+          ])
+        ),
+      })
+    )
     expect(outcome.attempt.finalized).toBe(true)
+    expect(outcome.referenceDiff).toContain("diff --git") // M7: released for every policy once finalized
+
+    // I4: the finalize-once sentinel doc now exists, pointing at this attempt.
+    const sentinel = h.store.get("sprintLabRuns/run1/attemptsMeta/MER-201")
+    expect(sentinel).toMatchObject({ finalizedByAttemptId: opened.attemptId })
   })
 
   it("a SECOND submit (new attempt, new variant) is formative-only: finalized stays false", async () => {
     seedRun("run1")
     const first = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
-    await completeSprintLabAttempt(USER, {
-      runId: "run1",
-      ticketKey: "MER-201",
-      attemptId: first.attemptId,
-      variantId: first.variantId,
-      ioCaseOutputs: {},
-      probeResults: {},
-      filesTouched: [],
-      timeToFirstEditSeconds: null,
-      diffLineCount: 0,
-      learnerAddedTest: false,
-    })
+    await completeSprintLabAttempt(USER, completeInput({ attemptId: first.attemptId }))
 
-    // The cooldown is keyed off wall-clock time; push every attempt's
+    // The cooldown is keyed off wall-clock time; push the completed attempt's
     // submittedAt back so this test proves finalize-once-then-formative
-    // behavior without also having to wait out SPRINT_LAB_SUBMISSION_COOLDOWN_SECONDS.
+    // behavior without also waiting out SPRINT_LAB_SUBMISSION_COOLDOWN_SECONDS.
     ageAllStoredAttempts("run1", 3600)
 
     const second = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
     expect(second.submissionsUsed).toBe(1)
-    const secondOutcome = await completeSprintLabAttempt(USER, {
-      runId: "run1",
-      ticketKey: "MER-201",
-      attemptId: second.attemptId,
-      variantId: second.variantId,
-      ioCaseOutputs: {},
-      probeResults: {},
-      filesTouched: [],
-      timeToFirstEditSeconds: null,
-      diffLineCount: 0,
-      learnerAddedTest: false,
-    })
-    expect(secondOutcome.attempt.finalized).toBe(false)
-    // A different attempt drew a variantId derived from a different attemptIndex.
+    expect(second.attemptId).not.toEqual(first.attemptId)
     expect(second.variantId).not.toEqual(first.variantId)
+
+    const secondOutcome = await completeSprintLabAttempt(
+      USER,
+      completeInput({ attemptId: second.attemptId })
+    )
+    expect(secondOutcome.attempt.finalized).toBe(false)
   })
 
-  it("rejects a stale/replayed variantId (attempt count moved on since it was issued)", async () => {
+  it("C1 regression (a): same-attemptId resubmission is rejected — cannot freeze the budget or repeat a variant", async () => {
     seedRun("run1")
     const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
-    // Simulate a submission having landed in between, without going through this attemptId.
-    h.store.set(`sprintLabRuns/run1/attempts/other-attempt`, {
-      ticketKey: "MER-201",
-      aiPolicy: "unassisted",
-      variantId: "v0-stale",
-      finalized: true,
-      gateResults: [],
-      escapedDefects: [],
-      scores: {
-        understanding: 0,
-        problemSolving: 0,
-        codeQuality: 0,
-        communication: null,
-        verification: 0,
-        overall: 0,
-      },
-      submittedAt: "2026-01-01T00:00:01.000Z",
-    })
+    const first = await completeSprintLabAttempt(
+      USER,
+      completeInput({ attemptId: opened.attemptId })
+    )
+    expect(first.attempt.finalized).toBe(true)
 
+    // Replaying the SAME attemptId must be rejected outright, not re-scored or overwritten.
     await expect(
-      completeSprintLabAttempt(USER, {
-        runId: "run1",
-        ticketKey: "MER-201",
-        attemptId: opened.attemptId,
-        variantId: opened.variantId, // stale now — a real second attempt would draw a different variantId
-        ioCaseOutputs: {},
-        probeResults: {},
-        filesTouched: [],
-        timeToFirstEditSeconds: null,
-        diffLineCount: 0,
-        learnerAddedTest: false,
-      })
-    ).rejects.toThrow(SPRINT_LAB_ATTEMPT_ERRORS.STALE_ATTEMPT)
+      completeSprintLabAttempt(USER, completeInput({ attemptId: opened.attemptId }))
+    ).rejects.toThrow(SPRINT_LAB_ATTEMPT_ERRORS.ATTEMPT_ALREADY_COMPLETED)
+
+    // The first (real) completion's doc must be untouched by the rejected replay.
+    const stored = h.store.get(`sprintLabRuns/run1/attempts/${opened.attemptId}`)
+    expect(stored?.finalized).toBe(true)
+
+    // And the budget genuinely advanced: a fresh, legitimate re-open sees attemptIndex 1, not
+    // stuck at 0 (which "freezing the budget" would look like).
+    ageAllStoredAttempts("run1", 3600)
+    const reopened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    expect(reopened.submissionsUsed).toBe(1)
+    expect(reopened.variantId).not.toEqual(opened.variantId) // did not repeat the same variant
+  })
+
+  it("C1 regression (b): a cross-ticket attemptId cannot re-finalize or double-fire mastery", async () => {
+    seedRun("run1", { board: { "MER-101": "doing", "MER-202": "doing" } })
+    contentMocks.getTicket.mockImplementation(async (_workbookId: string, ticketKey: string) =>
+      ticketFixture({ key: ticketKey, aiPolicy: "unassisted" })
+    )
+    sealedMocks.loadSealedTicket.mockImplementation(async () => sealedFixture())
+
+    const openedA = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-101" })
+    const openedB = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-202" })
+
+    // Try to complete ticket B's request using ticket A's attemptId.
+    await expect(
+      completeSprintLabAttempt(
+        USER,
+        completeInput({ ticketKey: "MER-202", attemptId: openedA.attemptId })
+      )
+    ).rejects.toThrow(SPRINT_LAB_ATTEMPT_ERRORS.ATTEMPT_NOT_FOUND)
+
+    expect(masteryMocks.recordSprintLabMastery).not.toHaveBeenCalled()
+
+    // Ticket B's OWN, legitimate attemptId still completes normally afterward.
+    const outcome = await completeSprintLabAttempt(
+      USER,
+      completeInput({ ticketKey: "MER-202", attemptId: openedB.attemptId })
+    )
+    expect(outcome.attempt.finalized).toBe(true)
+  })
+
+  it("rejects an unknown attemptId", async () => {
+    seedRun("run1")
+    await expect(
+      completeSprintLabAttempt(USER, completeInput({ attemptId: "does-not-exist" }))
+    ).rejects.toThrow(SPRINT_LAB_ATTEMPT_ERRORS.ATTEMPT_NOT_FOUND)
   })
 
   it("a fabricated probe 'pass' cannot alter an io-case verdict or the score", async () => {
@@ -433,18 +512,14 @@ describe("completeSprintLabAttempt — metric integrity", () => {
       })
     )
     const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
-    const outcome = await completeSprintLabAttempt(USER, {
-      runId: "run1",
-      ticketKey: "MER-201",
-      attemptId: opened.attemptId,
-      variantId: opened.variantId,
-      ioCaseOutputs: { "case-a": { ok: true, value: {} } }, // WRONG output
-      probeResults: { "probe-1": true }, // client claims the probe passed
-      filesTouched: [],
-      timeToFirstEditSeconds: null,
-      diffLineCount: 0,
-      learnerAddedTest: false,
-    })
+    const outcome = await completeSprintLabAttempt(
+      USER,
+      completeInput({
+        attemptId: opened.attemptId,
+        ioCaseOutputs: { "case-a": { ok: true, value: {} } }, // WRONG output
+        probeResults: { "probe-1": true }, // client claims the probe passed
+      })
+    )
     const ioCaseEntry = outcome.attempt.gateResults
       .find((g) => g.gate === "hidden")
       ?.cases.find((c) => c.testId === "case-a")
@@ -453,28 +528,66 @@ describe("completeSprintLabAttempt — metric integrity", () => {
     expect(outcome.attempt.scores.problemSolving).toBe(0)
   })
 
-  it("the projection never includes runner output: every gate case is exactly {gate:'hidden'-shape} testId/humanName/passed", async () => {
+  it("R21: filesTouched/diffLineCount/learnerAddedTest are derived from the run's OWN file store, never a request field", async () => {
     seedRun("run1")
+    seedWorkspaceFile("run1", "src/money.test.ts", "line1\nline2\nline3")
     const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
-    const outcome = await completeSprintLabAttempt(USER, {
-      runId: "run1",
-      ticketKey: "MER-201",
-      attemptId: opened.attemptId,
-      variantId: opened.variantId,
-      ioCaseOutputs: {},
-      probeResults: {},
-      filesTouched: [],
-      timeToFirstEditSeconds: null,
-      diffLineCount: 0,
-      learnerAddedTest: false,
-    })
-    for (const gate of outcome.attempt.gateResults) {
-      expect(Object.keys(gate).sort()).toEqual(["cases", "gate"])
-      for (const c of gate.cases) {
-        expect(Object.keys(c).sort()).toEqual(["humanName", "passed", "testId"])
-      }
-    }
-    expect(JSON.stringify(outcome.attempt)).not.toMatch(/expected|reason must be|sealed/i)
+
+    // Post a fabricated filesTouched/diffLineCount/learnerAddedTest — the current schema no
+    // longer even accepts these keys (Zod strips unknowns), but the cast proves the SERVER value
+    // used is the derived one, not whatever a client might try to smuggle in.
+    const outcome = await completeSprintLabAttempt(
+      USER,
+      completeInput({
+        attemptId: opened.attemptId,
+        filesTouched: ["totally/fake/path.ts"],
+        diffLineCount: 99999,
+        learnerAddedTest: false,
+      }) as Parameters<typeof completeSprintLabAttempt>[1]
+    )
+
+    // learnerAddedTest is server-derived true (a real seeded file matches the test-path pattern),
+    // contradicting the fabricated `learnerAddedTest: false` in the (ignored) request body.
+    expect(outcome.attempt.scores.verification).toBeGreaterThan(0)
+    const meta = h.store.get(`sprintLabRuns/run1/attempts/${opened.attemptId}/meta/grading`)
+    expect(meta?.learnerAddedTest).toBe(true)
+  })
+
+  it("I6: zero io-case hidden tests collapses problemSolving/verification to 0 (never 100), and overall renormalizes around them", async () => {
+    seedRun("run1")
+    contentMocks.getTicket.mockResolvedValue(ticketFixture({ aiPolicy: "assisted" }))
+    sealedMocks.loadSealedTicket.mockResolvedValue(
+      sealedFixture({
+        hiddenCases: [{ id: "probe-1", humanName: "probe", tags: [], kind: "probe", body: "x" }], // zero io-cases
+        rubric: {
+          weights: {
+            understanding: 0.25,
+            problemSolving: 0.25,
+            codeQuality: 0.25,
+            communication: 0,
+            verification: 0.25,
+          },
+          notes: {},
+        },
+      })
+    )
+    const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    const outcome = await completeSprintLabAttempt(
+      USER,
+      completeInput({ attemptId: opened.attemptId })
+    )
+
+    expect(outcome.attempt.scores.problemSolving).toBe(0)
+    expect(outcome.attempt.scores.verification).toBe(0)
+    // Nothing was touched: understanding = 0*0.7 (files) + 70*0.3 (neutral time default) = 21;
+    // codeQuality = farScore 40 (zero learner diff vs a real reference diff). With
+    // problemSolving/verification/communication all excluded (null, or 0-weight for
+    // communication), overall renormalizes to JUST understanding+codeQuality at equal weight:
+    // (21*.25 + 40*.25) / (.25+.25) = 30.5 -> rounds to 31. This is NOT the same as the
+    // un-renormalized (wrong) average that would also divide in the two fabricated 0s.
+    expect(outcome.attempt.scores.understanding).toBe(21)
+    expect(outcome.attempt.scores.codeQuality).toBe(40)
+    expect(outcome.attempt.scores.overall).toBe(31)
   })
 
   it("releases R11 review-comment TEXTS (no correct flags) at complete time for a review-only ticket", async () => {
@@ -489,18 +602,10 @@ describe("completeSprintLabAttempt — metric integrity", () => {
       })
     )
     const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
-    const outcome = await completeSprintLabAttempt(USER, {
-      runId: "run1",
-      ticketKey: "MER-201",
-      attemptId: opened.attemptId,
-      variantId: opened.variantId,
-      ioCaseOutputs: {},
-      probeResults: {},
-      filesTouched: [],
-      timeToFirstEditSeconds: null,
-      diffLineCount: 0,
-      learnerAddedTest: false,
-    })
+    const outcome = await completeSprintLabAttempt(
+      USER,
+      completeInput({ attemptId: opened.attemptId })
+    )
     expect(outcome.reviewComments).toEqual([
       { id: "c1", body: "looks fine" },
       { id: "c2", body: "just delete it" },
@@ -510,36 +615,45 @@ describe("completeSprintLabAttempt — metric integrity", () => {
   it("does NOT release review comments for a non-review-only ticket", async () => {
     seedRun("run1")
     const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
-    const outcome = await completeSprintLabAttempt(USER, {
-      runId: "run1",
-      ticketKey: "MER-201",
-      attemptId: opened.attemptId,
-      variantId: opened.variantId,
-      ioCaseOutputs: {},
-      probeResults: {},
-      filesTouched: [],
-      timeToFirstEditSeconds: null,
-      diffLineCount: 0,
-      learnerAddedTest: false,
-    })
+    const outcome = await completeSprintLabAttempt(
+      USER,
+      completeInput({ attemptId: opened.attemptId })
+    )
     expect(outcome.reviewComments).toBeUndefined()
   })
 
-  it("records mastery only when finalized and aiPolicy is not assisted", async () => {
+  it("the projection never includes runner output or internal bookkeeping (status/attemptIndex/openedAt)", async () => {
     seedRun("run1")
     const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
-    await completeSprintLabAttempt(USER, {
-      runId: "run1",
-      ticketKey: "MER-201",
-      attemptId: opened.attemptId,
-      variantId: opened.variantId,
-      ioCaseOutputs: {},
-      probeResults: {},
-      filesTouched: [],
-      timeToFirstEditSeconds: null,
-      diffLineCount: 0,
-      learnerAddedTest: false,
-    })
+    const outcome = await completeSprintLabAttempt(
+      USER,
+      completeInput({ attemptId: opened.attemptId })
+    )
+    expect(Object.keys(outcome.attempt).sort()).toEqual(
+      [
+        "aiPolicy",
+        "escapedDefects",
+        "finalized",
+        "gateResults",
+        "modelId",
+        "scores",
+        "submittedAt",
+        "ticketKey",
+        "variantId",
+      ].sort()
+    )
+    for (const gate of outcome.attempt.gateResults) {
+      expect(Object.keys(gate).sort()).toEqual(["cases", "gate"])
+      for (const c of gate.cases) {
+        expect(Object.keys(c).sort()).toEqual(["humanName", "passed", "testId"])
+      }
+    }
+  })
+
+  it("I5: records mastery at complete time for a non-review-only, finalized ticket", async () => {
+    seedRun("run1")
+    const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    await completeSprintLabAttempt(USER, completeInput({ attemptId: opened.attemptId }))
     expect(masteryMocks.recordSprintLabMastery).toHaveBeenCalledTimes(1)
     expect(masteryMocks.recordSprintLabMastery).toHaveBeenCalledWith(
       USER,
@@ -549,22 +663,22 @@ describe("completeSprintLabAttempt — metric integrity", () => {
     )
   })
 
-  it("calls recordSprintLabMastery unconditionally, on an assisted ticket too — the ai_policy/finalized GATE is mastery.ts's own responsibility (see lib/sprint-labs/__tests__/mastery.test.ts), not re-implemented here", async () => {
+  it("I5: does NOT record mastery at complete time for a review-only ticket — deferred to the review round", async () => {
+    seedRun("run1")
+    contentMocks.getTicket.mockResolvedValue(ticketFixture({ aiPolicy: "review-only" }))
+    sealedMocks.loadSealedTicket.mockResolvedValue(
+      sealedFixture({ review: [{ id: "c1", body: "x", correct: true }] })
+    )
+    const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
+    await completeSprintLabAttempt(USER, completeInput({ attemptId: opened.attemptId }))
+    expect(masteryMocks.recordSprintLabMastery).not.toHaveBeenCalled()
+  })
+
+  it("calls recordSprintLabMastery unconditionally for non-review-only policies (the ai_policy/finalized GATE for those is mastery.ts's own job, see mastery.test.ts)", async () => {
     seedRun("run1")
     contentMocks.getTicket.mockResolvedValue(ticketFixture({ aiPolicy: "assisted" }))
     const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
-    await completeSprintLabAttempt(USER, {
-      runId: "run1",
-      ticketKey: "MER-201",
-      attemptId: opened.attemptId,
-      variantId: opened.variantId,
-      ioCaseOutputs: {},
-      probeResults: {},
-      filesTouched: [],
-      timeToFirstEditSeconds: null,
-      diffLineCount: 0,
-      learnerAddedTest: false,
-    })
+    await completeSprintLabAttempt(USER, completeInput({ attemptId: opened.attemptId }))
     expect(masteryMocks.recordSprintLabMastery).toHaveBeenCalledTimes(1)
     expect(masteryMocks.recordSprintLabMastery).toHaveBeenCalledWith(
       USER,
@@ -577,58 +691,10 @@ describe("completeSprintLabAttempt — metric integrity", () => {
   it("tracks a zero-cost sprint-labs-grading usage event", async () => {
     seedRun("run1")
     const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
-    await completeSprintLabAttempt(USER, {
-      runId: "run1",
-      ticketKey: "MER-201",
-      attemptId: opened.attemptId,
-      variantId: opened.variantId,
-      ioCaseOutputs: {},
-      probeResults: {},
-      filesTouched: [],
-      timeToFirstEditSeconds: null,
-      diffLineCount: 0,
-      learnerAddedTest: false,
-    })
+    await completeSprintLabAttempt(USER, completeInput({ attemptId: opened.attemptId }))
     expect(usageMocks.trackUsageEvent).toHaveBeenCalledWith(
       expect.objectContaining({ userId: USER, service: "sprint-labs-grading", cost: 0 })
     )
-  })
-
-  it("enforces the submission budget at complete time too (defense in depth)", async () => {
-    seedRun("run1")
-    for (let i = 0; i < 5; i++) {
-      h.store.set(`sprintLabRuns/run1/attempts/a${i}`, {
-        ticketKey: "MER-201",
-        aiPolicy: "unassisted",
-        variantId: `v${i}-x`,
-        finalized: i === 0,
-        gateResults: [],
-        escapedDefects: [],
-        scores: {
-          understanding: 0,
-          problemSolving: 0,
-          codeQuality: 0,
-          communication: null,
-          verification: 0,
-          overall: 0,
-        },
-        submittedAt: `2026-01-01T00:00:0${i}.000Z`,
-      })
-    }
-    await expect(
-      completeSprintLabAttempt(USER, {
-        runId: "run1",
-        ticketKey: "MER-201",
-        attemptId: "irrelevant",
-        variantId: "irrelevant",
-        ioCaseOutputs: {},
-        probeResults: {},
-        filesTouched: [],
-        timeToFirstEditSeconds: null,
-        diffLineCount: 0,
-        learnerAddedTest: false,
-      })
-    ).rejects.toThrow(SPRINT_LAB_ATTEMPT_ERRORS.BUDGET_EXCEEDED)
   })
 })
 
@@ -645,36 +711,14 @@ describe("reviewSprintLabAttempt", () => {
       })
     )
     const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
-    await completeSprintLabAttempt(USER, {
-      runId: "run1",
-      ticketKey: "MER-201",
-      attemptId: opened.attemptId,
-      variantId: opened.variantId,
-      ioCaseOutputs: {},
-      probeResults: {},
-      filesTouched: [],
-      timeToFirstEditSeconds: null,
-      diffLineCount: 0,
-      learnerAddedTest: false,
-    })
+    await completeSprintLabAttempt(USER, completeInput({ attemptId: opened.attemptId }))
     return { attemptId: opened.attemptId }
   }
 
   it("rejects a non-review-only ticket", async () => {
     seedRun("run1")
     const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
-    await completeSprintLabAttempt(USER, {
-      runId: "run1",
-      ticketKey: "MER-201",
-      attemptId: opened.attemptId,
-      variantId: opened.variantId,
-      ioCaseOutputs: {},
-      probeResults: {},
-      filesTouched: [],
-      timeToFirstEditSeconds: null,
-      diffLineCount: 0,
-      learnerAddedTest: false,
-    })
+    await completeSprintLabAttempt(USER, completeInput({ attemptId: opened.attemptId }))
     await expect(
       reviewSprintLabAttempt(USER, {
         runId: "run1",
@@ -685,8 +729,9 @@ describe("reviewSprintLabAttempt", () => {
     ).rejects.toThrow(SPRINT_LAB_ATTEMPT_ERRORS.NOT_REVIEW_ONLY)
   })
 
-  it("releases correctness + trap + referenceDiff when the attempt IS finalized", async () => {
+  it("releases correctness + trap + referenceDiff, and records mastery (I5), when the attempt IS finalized", async () => {
     const { attemptId } = await completeReviewOnlyAttempt()
+    masteryMocks.recordSprintLabMastery.mockClear() // clear the (skipped, I5) complete-time non-call
     const outcome = await reviewSprintLabAttempt(USER, {
       runId: "run1",
       ticketKey: "MER-201",
@@ -702,19 +747,33 @@ describe("reviewSprintLabAttempt", () => {
       { id: "c2", correct: false },
     ])
     expect(outcome.released?.referenceDiff).toContain("diff --git")
+    expect(outcome.scores.communication).toBe(100) // both decisions correct
+
+    expect(masteryMocks.recordSprintLabMastery).toHaveBeenCalledTimes(1)
+    expect(masteryMocks.recordSprintLabMastery).toHaveBeenCalledWith(
+      USER,
+      WORKBOOK_ID,
+      expect.objectContaining({ key: "MER-201" }),
+      expect.objectContaining({ finalized: true })
+    )
   })
 
-  it("does NOT release anything when the attempt is NOT finalized (a re-attempt)", async () => {
+  it("does NOT release anything, and does NOT record mastery, when the attempt is NOT finalized (a re-attempt)", async () => {
     seedRun("run1")
     contentMocks.getTicket.mockResolvedValue(ticketFixture({ aiPolicy: "review-only" }))
     sealedMocks.loadSealedTicket.mockResolvedValue(
       sealedFixture({ review: [{ id: "c1", body: "x", correct: true }] })
     )
-    // Seed a prior finalized attempt so the SECOND one is formative.
+    // Seed a prior finalized attempt (I4: the finalize-once SENTINEL doc is
+    // what actually decides "already finalized" now, not a scan over attempt
+    // docs — both are seeded here so this fixture matches the real mechanism).
     h.store.set(`sprintLabRuns/run1/attempts/prior`, {
       ticketKey: "MER-201",
+      variantId: "v-prior",
+      attemptIndex: 0,
       aiPolicy: "review-only",
-      variantId: "v0-prior",
+      openedAt: "2020-01-01T00:00:00.000Z",
+      status: "completed",
       finalized: true,
       gateResults: [],
       escapedDefects: [],
@@ -726,21 +785,16 @@ describe("reviewSprintLabAttempt", () => {
         verification: 0,
         overall: 0,
       },
-      submittedAt: "2026-01-01T00:02:00.000Z",
+      submittedAt: "2020-01-01T00:00:00.000Z",
+    })
+    h.store.set(`sprintLabRuns/run1/attemptsMeta/MER-201`, {
+      finalizedByAttemptId: "prior",
+      finalizedAt: "2020-01-01T00:00:00.000Z",
     })
     const opened = await openSprintLabAttempt(USER, { runId: "run1", ticketKey: "MER-201" })
-    await completeSprintLabAttempt(USER, {
-      runId: "run1",
-      ticketKey: "MER-201",
-      attemptId: opened.attemptId,
-      variantId: opened.variantId,
-      ioCaseOutputs: {},
-      probeResults: {},
-      filesTouched: [],
-      timeToFirstEditSeconds: null,
-      diffLineCount: 0,
-      learnerAddedTest: false,
-    })
+    await completeSprintLabAttempt(USER, completeInput({ attemptId: opened.attemptId }))
+    masteryMocks.recordSprintLabMastery.mockClear()
+
     const outcome = await reviewSprintLabAttempt(USER, {
       runId: "run1",
       ticketKey: "MER-201",
@@ -748,6 +802,7 @@ describe("reviewSprintLabAttempt", () => {
       decisions: [{ commentId: "c1", decision: "accept" }],
     })
     expect(outcome.released).toBeUndefined()
+    expect(masteryMocks.recordSprintLabMastery).not.toHaveBeenCalled()
   })
 
   it("rejects a second review call on the same attempt (idempotency)", async () => {
@@ -784,5 +839,17 @@ describe("reviewSprintLabAttempt", () => {
         decisions: [{ commentId: "c1", decision: "accept" }], // missing c2
       })
     ).rejects.toThrow(SPRINT_LAB_ATTEMPT_ERRORS.INVALID_REVIEW_DECISIONS)
+  })
+
+  it("rejects an attemptId shaped with a path separator (attemptId shape validation, C1)", async () => {
+    seedRun("run1")
+    await expect(
+      reviewSprintLabAttempt(USER, {
+        runId: "run1",
+        ticketKey: "MER-201",
+        attemptId: "some/nested/path",
+        decisions: [{ commentId: "c1", decision: "accept" }],
+      })
+    ).rejects.toThrow()
   })
 })
