@@ -246,6 +246,17 @@ export const SECRET_FIELDS = new Set([
   "input",
   "body",
   "hiddenCases",
+  // hidden test / sql-assertion payload (the sealed SQL-hidden-test
+  // subsystem) -- a SQL ticket's hidden assertion's actual SQL and its
+  // expected outcome must never reach a public emit, the same way an
+  // io-case's expected/input never does. This is what the S3 review's
+  // Critical finding was missing: before this, a "hidden-" id PREFIX inside
+  // tests/visible/*.pgsuite.yaml was the only signal that an assertion was
+  // meant to be hidden, and this allowlist had no entry to catch its `sql`/
+  // `expect` if it ever reached a public write.
+  "sql",
+  "expect",
+  "sqlHiddenAssertions",
   // io-case entryPoint (PLAN.md Task 7 review round 1, Critical 2) — names WHICH export is under
   // test, more than a learner is meant to know pre-submit, even though it doesn't itself reveal
   // the reference implementation.
@@ -489,8 +500,14 @@ function resolveObjectives(ids, vocabMap, contextPath) {
 
 function compileTicket(ticketDir, ticketKey, workbookId, objectiveVocab) {
   const { ticketPublicSchema, ticketSecretMetaSchema } = schemas()
-  const { authoredReviewSchema, sealedAuthorBriefSchema, sealedRubricSchema, sealedIoCasePayloadSchema, sealedProbePayloadSchema } =
-    sealedSchemas()
+  const {
+    authoredReviewSchema,
+    sealedAuthorBriefSchema,
+    sealedRubricSchema,
+    sealedIoCasePayloadSchema,
+    sealedProbePayloadSchema,
+    sealedSqlHiddenAssertionSchema,
+  } = sealedSchemas()
 
   const ticketMdPath = join(ticketDir, "ticket.md")
   if (!existsSync(ticketMdPath)) {
@@ -540,6 +557,7 @@ function compileTicket(ticketDir, ticketKey, workbookId, objectiveVocab) {
 
   const hiddenTests = []
   const hiddenCases = []
+  const sqlHiddenAssertions = []
   let review = null
   let authorBrief = null
   let referenceDiff = null
@@ -560,6 +578,36 @@ function compileTicket(ticketDir, ticketKey, workbookId, objectiveVocab) {
       rejectWrongCasing(raw, filePath, "entry_point", "entryPoint")
       const id = basenameNoExt(filePath)
       const tags = raw.tags ?? []
+
+      // The sealed SQL-hidden-test subsystem: a `kind: sql-assertion` hidden
+      // test is handled ENTIRELY separately from io-case/probe, before ever
+      // reaching `ticketSecretMetaSchema` below. Unlike io-case/probe, it
+      // never becomes a public `hiddenTests` entry at all -- there is no
+      // "sql-assertion" member of `ticketSecretKindSchema`
+      // (lib/sprint-labs/types.ts) on purpose, so nothing about a SQL
+      // hidden assertion (not its id, humanName, tags, or even that it
+      // exists) reaches the public bundle. This is the fix for the S3
+      // review's Critical finding: previously a SQL hidden assertion had no
+      // sealed home at all and had to live inside
+      // tests/visible/*.pgsuite.yaml, which this compiler ships verbatim
+      // into the public bundle.
+      if (raw.kind === "sql-assertion") {
+        const payloadParse = sealedSqlHiddenAssertionSchema.safeParse({
+          humanName: raw.humanName,
+          sql: raw.sql,
+          expect: raw.expect,
+        })
+        if (!payloadParse.success) throw new CompileError(filePath, payloadParse.error)
+        sqlHiddenAssertions.push({
+          id,
+          humanName: payloadParse.data.humanName,
+          tags,
+          sql: payloadParse.data.sql,
+          expect: payloadParse.data.expect,
+        })
+        continue
+      }
+
       const metaParse = ticketSecretMetaSchema.safeParse({
         id,
         humanName: raw.humanName,
@@ -592,7 +640,10 @@ function compileTicket(ticketDir, ticketKey, workbookId, objectiveVocab) {
         if (!payloadParse.success) throw new CompileError(filePath, payloadParse.error)
         hiddenCases.push({ id, humanName: raw.humanName, tags, kind: raw.kind, body: payloadParse.data.body })
       } else {
-        throw new CompileError(filePath, `unknown hidden-test kind "${raw.kind}" (expected "io-case" or "probe")`)
+        throw new CompileError(
+          filePath,
+          `unknown hidden-test kind "${raw.kind}" (expected "io-case", "probe", or "sql-assertion")`
+        )
       }
     }
 
@@ -645,7 +696,17 @@ function compileTicket(ticketDir, ticketKey, workbookId, objectiveVocab) {
   // `compileWorkbook` only records this in `sealedByTicketKey` when it is
   // non-null, so a stub's ticket key never becomes a property of that map.
   const sealed = isFullTicket
-    ? { workbookId, ticketKey, hiddenCases, adversaryFiles, review, authorBrief, referenceDiff, rubric }
+    ? {
+        workbookId,
+        ticketKey,
+        hiddenCases,
+        adversaryFiles,
+        review,
+        authorBrief,
+        referenceDiff,
+        rubric,
+        sqlHiddenAssertions,
+      }
     : null
 
   return { publicTicket: compiledTicket, sealed }
