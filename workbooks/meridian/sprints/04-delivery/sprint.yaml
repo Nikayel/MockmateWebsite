@@ -48,6 +48,8 @@ filesTouched:
   - "test/support/build-app.ts"
   # MER-404
   - "src/delivery/signature.ts"
+  # MER-405
+  - "migrations/0016_outbox_ordering.sql"
 newSourceFiles:
   # MER-401
   - "migrations/0013_idempotency_keys.sql"
@@ -60,6 +62,8 @@ newSourceFiles:
   - "test/support/failing-query-db.ts"
   # MER-403
   - "migrations/0015_dead_letters.sql"
+  # MER-405
+  - "migrations/0016_outbox_ordering.sql"
 rewrittenFiles:
   # MER-402: the in-process array is fully replaced by the durable outbox_entries table.
   - "src/queue/outbox.ts"

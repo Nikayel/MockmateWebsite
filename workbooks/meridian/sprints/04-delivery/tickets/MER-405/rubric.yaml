@@ -1,0 +1,11 @@
+weights:
+  understanding: 0.2
+  problemSolving: 0.3
+  codeQuality: 0.15
+  communication: 0.1
+  verification: 0.25
+notes:
+  understanding: "Keys off stating the guarantee as per-claim (rejecting the PM's 'just guarantee global ordering' ask) and locating the sequential drain loop as the actual cause of both symptoms, not two unrelated bugs."
+  problemSolving: "Keys off the visible pass rate across the retry-preserves-order, cross-claim-independence and slow-lane-does-not-block cases."
+  codeQuality: "Keys off claiming never returning more than one entry per claim (so concurrent delivery cannot reorder anything), rather than adding a lock or a queue per claim on top of sequential delivery."
+  verification: "Keys off whether the learner's own test proves the throughput claim by timing multiple lanes together, not just asserting the individual ordering property."

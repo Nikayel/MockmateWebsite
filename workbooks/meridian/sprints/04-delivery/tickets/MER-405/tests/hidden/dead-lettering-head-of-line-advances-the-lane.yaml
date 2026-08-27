@@ -1,0 +1,35 @@
+humanName: "Escaped: dead-lettering a claim's stuck head-of-line entry leaves its later event stranded forever"
+tags:
+  - per-claim-ordering-guarantee
+kind: probe
+body: |
+  const db = createMemoryDb()
+  const outbox = createOutbox({ db, workerId: "w1", maxAttempts: 1 })
+  return insertOutboxEntry(db, { type: "claim.processed", tenantId: "ten_a", claimId: "clm_x" })
+    .then(() => new Promise((resolve) => setTimeout(resolve, 5)))
+    .then(() => insertOutboxEntry(db, { type: "claim.processed", tenantId: "ten_a", claimId: "clm_x" }))
+    .then(() =>
+      outbox.drain(async () => {
+        throw new DeliveryFailureError({
+          message: "400 terminal",
+          classification: "terminal",
+          nextAttemptAt: new Date().toISOString(),
+          payload: "{}",
+        })
+      })
+    )
+    .then(() => listDeadLettersForTenant(db, "ten_a"))
+    .then((deadLetters) => {
+      assert.strictEqual(deadLetters.length, 1, "the stuck head-of-line entry must be dead-lettered, not left leased forever")
+      const delivered = []
+      return outbox.drain(async (entry) => {
+        delivered.push(entry.id)
+      }).then((claimedCount) => {
+        assert.strictEqual(
+          claimedCount,
+          1,
+          "the claim's second event must become claimable once its dead-lettered predecessor is out of the way"
+        )
+        assert.strictEqual(delivered.length, 1)
+      })
+    })
