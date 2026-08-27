@@ -1,7 +1,0 @@
-humanName: "Escaped: rounding drifts across 40,317 sequential reconciliations"
-tags:
-  - money
-kind: probe
-body: |
-  const total = reconcile(fixtures.fortyThousandClaims)
-  assert(total.driftCents === 0, "reconciliation must not drift")
