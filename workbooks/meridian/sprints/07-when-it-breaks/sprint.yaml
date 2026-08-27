@@ -1,6 +1,6 @@
 number: 7
 title: "When It Breaks"
-topic: "Observability and operations"
+topic: "Observability & operations"
 goal: "Make Meridian explain itself under load: request-scoped structured logs, trace context that survives the queue boundary, an honest latency signal, an SLO with alerts that fire once, and close the 14:05 incident with a review that would actually prevent it."
 standupQuote: "p99 on POST /claims went 380ms → 2.1s at 14:05 and it has not come back. Rico grabbed one trace before the tab died: it's a single 2.1s span called POST /claims with nothing inside it. Logs for that minute are 40-line pretty-printed blobs with no claim id. Nobody can tell me if this is us or Postgres."
 archMapDelta:

@@ -1,6 +1,6 @@
 number: 9
 title: "Trust it"
-topic: "Verifying AI: evals and injection defence"
+topic: "Verifying AI: evals & injection defence"
 goal: "Make every claim that 'the extractor got better' falsifiable, and make a document that tells the model what to do unable to reach another tenant's data."
 standupQuote: "We shipped the new extraction prompt on Tuesday. Northwind's ops lead says deductibles are wrong more often now. Our dashboard says 99.2%. Which one is lying?"
 archMapDelta:
