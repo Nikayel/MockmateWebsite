@@ -177,11 +177,14 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 })
     }
 
-    const current = await getSprintLabRun(auth.userId, parsed.data.runId)
-    const tierBlocked = await requireTierForSprint(auth.userId, current)
-    if (tierBlocked) return tierBlocked
-
     try {
+      // The pre-check read lives inside the try too (round 3 follow-up 1): a
+      // transient Firestore failure here must map through serviceErrorResponse
+      // like every other failure in this handler, not escape as a raw 500.
+      const current = await getSprintLabRun(auth.userId, parsed.data.runId)
+      const tierBlocked = await requireTierForSprint(auth.userId, current)
+      if (tierBlocked) return tierBlocked
+
       const run = await moveSprintLabTicket(auth.userId, parsed.data)
       return NextResponse.json({ run })
     } catch (error) {
