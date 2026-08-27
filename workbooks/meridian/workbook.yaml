@@ -23,6 +23,18 @@ sprintCount: 10
 ticketCount: 50
 estimatedHours: 58
 requiresServerExecution: false
+seedStats:
+  files: 59
+  nonTestLines: 1449
+  testCases: 19
+inheritedDefects:
+  - "money handled as floating point"
+  - "tenant scoping written by hand in each query"
+  - "a claims list that pages by offset while people are writing to it"
+  - "webhook delivery with no idempotency and no durable retry record"
+  - "one shared wire format with no version a client can pin to"
+  - "a health check that only proves the process is running, not that it can do useful work"
+  - "database migrations that run on every replica's own boot, uncoordinated"
 objectives:
   - id: typed-boundary-parsing
     label: "Typed boundary parsing"
