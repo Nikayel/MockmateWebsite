@@ -28,9 +28,25 @@ import type {
   RawRecord,
 } from "./tree"
 
+/**
+ * gray-matter@4.0.3's own gray-matter.d.ts declares `engines` only as an
+ * INPUT option shape (`GrayMatterOption.engines`), not as the runtime
+ * `matter.engines.yaml.parse` value the package actually exports (verified
+ * empirically: `node -e "require('gray-matter').engines.yaml.parse(...)"`
+ * works). scripts/compile-workbooks.mjs relies on the identical call but
+ * never hits this gap because `scripts/` is outside tsconfig's typechecked
+ * set. This is a real gap in the published package's types, not an
+ * unknown-safety issue, so it's narrowly typed and asserted once at this
+ * boundary rather than reached for `any`.
+ */
+interface GrayMatterYamlEngine {
+  engines: { yaml: { parse(input: string): unknown } }
+}
+const matterWithEngines = matter as unknown as typeof matter & GrayMatterYamlEngine
+
 function readYamlFile(path: string): RawRecord {
   const raw = readFileSync(path, "utf8")
-  const parsed: unknown = matter.engines.yaml.parse(raw)
+  const parsed: unknown = matterWithEngines.engines.yaml.parse(raw)
   return (parsed && typeof parsed === "object" ? parsed : {}) as RawRecord
 }
 
