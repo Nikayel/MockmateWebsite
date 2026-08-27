@@ -143,6 +143,28 @@ sign-off field attesting this.
   `reference.diff`; no `MERIDIAN.md` line states an invariant asserted by an
   unshipped hidden test.
 
+### 5.1 Hidden-test mechanics (found the hard way authoring Sprint 1)
+
+Apply these or the ticket fails `lab validate --dynamic` in a confusing way:
+
+- **A probe body's `it()` callback is not async.** Do not write `await` inside
+  a hidden probe test body — the workspace vitest-shim runs the callback
+  synchronously. Chain promises with `.then()` instead, or the test errors
+  rather than failing on its assertion (which reads as "couldn't run," not a
+  discriminating red).
+- **`Infinity` and `NaN` cannot be an io-case `input` or `expected`.**
+  `JSON.stringify` coerces them to `null`, so the server comparison silently
+  compares the wrong value. Use a finite sentinel and assert the classified
+  outcome, or target a shape the encoder round-trips.
+- **Every io-case needs a real `entryPoint`** (module path + exported name in
+  the workspace) whose function the `input` feeds and whose return the
+  `expected` compares against. A score-feeding ticket with an io-case missing
+  `entryPoint` is a hard `lab validate --dynamic` error (ruling from Task 7).
+- **`filesTouched` must list every file a correct reference solution touches.**
+  The Understanding dimension scores files-touched against this manifest, so a
+  short list understates the learner. No validator catches an incomplete
+  `filesTouched` today — author it from the reference diff's actual file set.
+
 ## 6. Voice and surface rules
 
 - Ticket bodies read like real Jira: wrong repro steps, pasted Slack, an
