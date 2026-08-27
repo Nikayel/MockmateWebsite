@@ -98,13 +98,23 @@ const h = vi.hoisted(() => {
   const adminDbFake = {
     collection: (name: string) => collectionRef(name),
     batch: () => {
-      const ops: Array<{ path: string; data: Record<string, unknown> }> = []
+      const ops: Array<{ path: string; data: Record<string, unknown>; kind: "set" | "update" }> = []
       return {
         set: (ref: FakeDocRef, data: Record<string, unknown>) => {
-          ops.push({ path: ref.__fakePath, data })
+          ops.push({ path: ref.__fakePath, data, kind: "set" })
+        },
+        update: (ref: FakeDocRef, data: Record<string, unknown>) => {
+          ops.push({ path: ref.__fakePath, data, kind: "update" })
         },
         commit: async () => {
-          for (const op of ops) store.set(op.path, { ...op.data })
+          for (const op of ops) {
+            if (op.kind === "update") {
+              const existing = store.get(op.path)
+              store.set(op.path, { ...(existing ?? {}), ...op.data })
+            } else {
+              store.set(op.path, { ...op.data })
+            }
+          }
         },
       }
     },
@@ -125,6 +135,29 @@ vi.mock("@/lib/firebase-admin", () => ({ adminDb: h.adminDbFake }))
 const loggerSpies = vi.hoisted(() => ({ warn: vi.fn(), error: vi.fn() }))
 vi.mock("@/lib/logger", () => ({
   logger: { ...loggerSpies, info: vi.fn(), debug: vi.fn() },
+}))
+
+/**
+ * Stubs the compiled-content registry (fix round 2026-08-26, I4). Kept
+ * independent of the real fixture-demo content Task 2 authored: this service
+ * test should not break if that content changes shape, and it lets every
+ * existing fixture below keep using "meridian"/"MER-*" without rewriting them
+ * against "fixture-demo"/"DEMO-*".
+ */
+const KNOWN_WORKBOOK_ID = "meridian"
+const KNOWN_SPRINTS = new Set([1, 2])
+const KNOWN_TICKET_KEYS = new Set(["MER-101", "MER-102", "MER-201", "MER-202"])
+vi.mock("@/lib/sprint-labs/content/registry", () => ({
+  getWorkbookSummary: (workbookId: string) =>
+    workbookId === KNOWN_WORKBOOK_ID ? { id: workbookId } : undefined,
+  getSprint: (workbookId: string, sprintNumber: number) =>
+    workbookId === KNOWN_WORKBOOK_ID && KNOWN_SPRINTS.has(sprintNumber)
+      ? { number: sprintNumber }
+      : undefined,
+  getTicket: (workbookId: string, ticketKey: string) =>
+    workbookId === KNOWN_WORKBOOK_ID && KNOWN_TICKET_KEYS.has(ticketKey)
+      ? { key: ticketKey }
+      : undefined,
 }))
 
 import {
@@ -241,6 +274,43 @@ describe("createSprintLabRun", () => {
     expect(run.id).not.toBe("completed-run")
     expect(run.status).toBe("in_progress")
   })
+
+  // I4: registry validation (fix round 2026-08-26).
+  it("rejects an unknown workbookId", async () => {
+    await expect(
+      createSprintLabRun(USER, {
+        workbookId: "not-a-real-workbook",
+        contentVersion: "v1",
+        ticketKeys: ["MER-101"],
+      })
+    ).rejects.toThrow(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+  })
+
+  it("rejects a ticket key that does not exist in the compiled workbook", async () => {
+    await expect(
+      createSprintLabRun(USER, {
+        workbookId: "meridian",
+        contentVersion: "v1",
+        ticketKeys: ["MER-101", "MER-FORGED"],
+      })
+    ).rejects.toThrow(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+  })
+
+  it("does NOT validate ticketKeys against the registry on a resume (they are discarded anyway)", async () => {
+    const first = await createSprintLabRun(USER, {
+      workbookId: "meridian",
+      contentVersion: "v1",
+      ticketKeys: ["MER-101"],
+    })
+    // A resume call with a forged ticket key must still resume cleanly: the
+    // second call's ticketKeys are never applied to an already-active run.
+    const second = await createSprintLabRun(USER, {
+      workbookId: "meridian",
+      contentVersion: "v1",
+      ticketKeys: ["totally-made-up"],
+    })
+    expect(second.id).toBe(first.id)
+  })
 })
 
 describe("getActiveSprintLabRun (resume ordering)", () => {
@@ -353,6 +423,17 @@ describe("moveSprintLabTicket", () => {
       moveSprintLabTicket(USER, { runId: "does-not-exist", ticketKey: "MER-101", to: "doing" })
     ).rejects.toThrow(SPRINT_LAB_RUN_ERRORS.NOT_FOUND)
   })
+
+  // M8: mutations closed on a completed/abandoned run (fix round 2026-08-26).
+  it.each(["completed", "abandoned"] as const)(
+    "rejects moving a ticket on a %s run",
+    async (status) => {
+      seedRun("run1", { status })
+      await expect(
+        moveSprintLabTicket(USER, { runId: "run1", ticketKey: "MER-101", to: "doing" })
+      ).rejects.toThrow(SPRINT_LAB_RUN_ERRORS.RUN_NOT_ACTIVE)
+    }
+  )
 })
 
 describe("advanceSprintLabRun", () => {
@@ -387,6 +468,31 @@ describe("advanceSprintLabRun", () => {
     await expect(
       advanceSprintLabRun(USER, { runId: "run1", toSprint: 2, ticketKeys: [] })
     ).rejects.toThrow(SPRINT_LAB_RUN_ERRORS.UNAUTHORIZED)
+  })
+
+  // I4: registry validation (fix round 2026-08-26). currentSprint: 2 -> toSprint: 3 passes
+  // the sequential check (3 === 2+1) so this specifically exercises the registry's
+  // sprint-existence check, not the sequencing rule.
+  it("rejects advancing into a sprint the workbook has not compiled", async () => {
+    seedRun("run1", { currentSprint: 2 })
+    await expect(
+      advanceSprintLabRun(USER, { runId: "run1", toSprint: 3, ticketKeys: [] })
+    ).rejects.toThrow(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+  })
+
+  it("rejects advancing with a ticket key that does not exist in the compiled workbook", async () => {
+    seedRun("run1", { currentSprint: 1 })
+    await expect(
+      advanceSprintLabRun(USER, { runId: "run1", toSprint: 2, ticketKeys: ["MER-FORGED"] })
+    ).rejects.toThrow(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+  })
+
+  // M8: mutations closed on a completed/abandoned run (fix round 2026-08-26).
+  it.each(["completed", "abandoned"] as const)("rejects advancing a %s run", async (status) => {
+    seedRun("run1", { currentSprint: 1, status })
+    await expect(
+      advanceSprintLabRun(USER, { runId: "run1", toSprint: 2, ticketKeys: [] })
+    ).rejects.toThrow(SPRINT_LAB_RUN_ERRORS.RUN_NOT_ACTIVE)
   })
 })
 
@@ -486,6 +592,106 @@ describe("saveWorkspaceFiles / listWorkspaceFiles", () => {
     seedRun("run1")
     expect(await listWorkspaceFiles(USER, "run1")).toEqual([])
   })
+
+  // M6: duplicate-path rejection (fix round 2026-08-26).
+  it("rejects a batch containing the same path twice", async () => {
+    seedRun("run1")
+    await expect(
+      saveWorkspaceFiles(USER, {
+        runId: "run1",
+        files: [
+          { path: "src/a.ts", content: "one" },
+          { path: "src/a.ts", content: "two" },
+        ],
+      })
+    ).rejects.toThrow(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+    expect(await listWorkspaceFiles(USER, "run1")).toEqual([])
+  })
+
+  // M7: the run's own updatedAt moves on a file save (fix round 2026-08-26).
+  it("bumps the run's updatedAt after a file save", async () => {
+    seedRun("run1", { updatedAt: "2020-01-01T00:00:00.000Z" })
+    await saveWorkspaceFiles(USER, { runId: "run1", files: [{ path: "src/a.ts", content: "x" }] })
+    const reloaded = await getSprintLabRun(USER, "run1")
+    expect(reloaded?.updatedAt).not.toBe("2020-01-01T00:00:00.000Z")
+  })
+
+  // M10: reserved/oversize Firestore doc ids (fix round 2026-08-26).
+  it("rejects a path that encodes to a reserved Firestore doc id", async () => {
+    seedRun("run1")
+    await expect(
+      saveWorkspaceFiles(USER, { runId: "run1", files: [{ path: "__proto__", content: "x" }] })
+    ).rejects.toThrow(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+  })
+
+  it("rejects a path whose encoded doc id exceeds the byte cap", async () => {
+    seedRun("run1")
+    // isValidWorkspacePath has no length limit of its own; a very long single
+    // segment is otherwise a perfectly "valid" workspace path.
+    const hugePath = `src/${"a".repeat(1500)}.ts`
+    await expect(
+      saveWorkspaceFiles(USER, { runId: "run1", files: [{ path: hugePath, content: "x" }] })
+    ).rejects.toThrow(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+  })
+
+  // Per-run file-count ceiling (fix round 2026-08-26, I5).
+  it("rejects a save that would push the run's total file count over the per-run ceiling", async () => {
+    seedRun("run1")
+    for (let i = 0; i < 200; i++) {
+      h.store.set(`sprintLabRuns/run1/files/src%2Ff${i}.ts`, {
+        path: `src/f${i}.ts`,
+        content: "x",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        revision: 1,
+      })
+    }
+    await expect(
+      saveWorkspaceFiles(USER, {
+        runId: "run1",
+        files: [{ path: "src/one-too-many.ts", content: "x" }],
+      })
+    ).rejects.toThrow(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+  })
+
+  it("allows re-saving an EXISTING file even when the run is already at the per-run ceiling", async () => {
+    seedRun("run1")
+    for (let i = 0; i < 200; i++) {
+      h.store.set(`sprintLabRuns/run1/files/src%2Ff${i}.ts`, {
+        path: `src/f${i}.ts`,
+        content: "x",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        revision: 1,
+      })
+    }
+    const saved = await saveWorkspaceFiles(USER, {
+      runId: "run1",
+      files: [{ path: "src/f0.ts", content: "updated" }],
+    })
+    expect(saved[0].revision).toBe(2)
+  })
+
+  // M8: mutations closed on a completed/abandoned run, but reads still work (fix round 2026-08-26).
+  it.each(["completed", "abandoned"] as const)(
+    "rejects saving files to a %s run",
+    async (status) => {
+      seedRun("run1", { status })
+      await expect(
+        saveWorkspaceFiles(USER, { runId: "run1", files: [{ path: "src/a.ts", content: "x" }] })
+      ).rejects.toThrow(SPRINT_LAB_RUN_ERRORS.RUN_NOT_ACTIVE)
+    }
+  )
+
+  it.each(["completed", "abandoned"] as const)(
+    "still allows LISTING files on a %s run (reads stay open)",
+    async (status) => {
+      seedRun("run1", { status: "in_progress" })
+      await saveWorkspaceFiles(USER, { runId: "run1", files: [{ path: "src/a.ts", content: "x" }] })
+      // Flip status after saving, the way a real run would reach a finished state.
+      const raw = h.store.get("sprintLabRuns/run1")
+      h.store.set("sprintLabRuns/run1", { ...raw, status })
+      await expect(listWorkspaceFiles(USER, "run1")).resolves.toHaveLength(1)
+    }
+  )
 })
 
 describe("sprintLabRunErrorStatus", () => {
@@ -497,6 +703,7 @@ describe("sprintLabRunErrorStatus", () => {
     [SPRINT_LAB_RUN_ERRORS.INVALID_TRANSITION, 409],
     [SPRINT_LAB_RUN_ERRORS.TICKET_ALREADY_DOING, 409],
     [SPRINT_LAB_RUN_ERRORS.INVALID_SPRINT_ADVANCE, 409],
+    [SPRINT_LAB_RUN_ERRORS.RUN_NOT_ACTIVE, 409],
   ])("maps %s to %i", (code, status) => {
     expect(sprintLabRunErrorStatus(new Error(code))).toBe(status)
   })

@@ -22,6 +22,7 @@ import { z } from "zod"
 import { adminDb } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
 import { isValidWorkspacePath } from "@/lib/workspace-execution/validators"
+import { getSprint, getTicket, getWorkbookSummary } from "@/lib/sprint-labs/content/registry"
 import {
   sprintLabRunSchema,
   ticketBoardStatusSchema,
@@ -40,6 +41,23 @@ import {
 const COLLECTION = "sprintLabRuns"
 const FILES_SUBCOLLECTION = "files"
 
+/** Per-run cap on total saved files (fix round 2026-08-26, I5) — a runaway or malicious
+ * client should not be able to grow one run's workspace store without bound. Meridian's
+ * seed is ~60 files; 200 leaves ample headroom for learner-created files. */
+const MAX_WORKSPACE_FILES_PER_RUN = 200
+
+/** Firestore document ids may not be exactly `__.*__` (reserved) and are capped at 1,500
+ * bytes; bounded here to 1,400 to leave margin, and checked before ever reaching Firestore
+ * so a bad path fails as a clean 400 instead of an opaque write-time error (fix round
+ * 2026-08-26, M10). */
+const RESERVED_FIRESTORE_DOC_ID_PATTERN = /^__.*__$/
+const MAX_FIRESTORE_DOC_ID_BYTES = 1400
+
+function isValidFirestoreDocId(docId: string): boolean {
+  if (RESERVED_FIRESTORE_DOC_ID_PATTERN.test(docId)) return false
+  return new TextEncoder().encode(docId).length <= MAX_FIRESTORE_DOC_ID_BYTES
+}
+
 /**
  * Error codes thrown by the mutating functions below, as plain `Error`
  * messages (the `upsertCaseLabRun` convention: `throw new Error("UNAUTHORIZED")`,
@@ -55,6 +73,8 @@ export const SPRINT_LAB_RUN_ERRORS = {
   INVALID_TRANSITION: "INVALID_TRANSITION",
   TICKET_ALREADY_DOING: "TICKET_ALREADY_DOING",
   INVALID_SPRINT_ADVANCE: "INVALID_SPRINT_ADVANCE",
+  /** The run is completed/abandoned; board, sprint, and file mutations are closed (fix round 2026-08-26, M8). */
+  RUN_NOT_ACTIVE: "RUN_NOT_ACTIVE",
 } as const
 
 type SprintLabRunErrorCode = (typeof SPRINT_LAB_RUN_ERRORS)[keyof typeof SPRINT_LAB_RUN_ERRORS]
@@ -73,6 +93,7 @@ export function sprintLabRunErrorStatus(error: unknown): number | null {
     case SPRINT_LAB_RUN_ERRORS.INVALID_TRANSITION:
     case SPRINT_LAB_RUN_ERRORS.TICKET_ALREADY_DOING:
     case SPRINT_LAB_RUN_ERRORS.INVALID_SPRINT_ADVANCE:
+    case SPRINT_LAB_RUN_ERRORS.RUN_NOT_ACTIVE:
       return 409
     default:
       return null
@@ -198,6 +219,47 @@ async function requireOwnedRun(userId: string, runId: string): Promise<StoredSpr
   return run
 }
 
+/**
+ * Same as {@link requireOwnedRun}, plus: the run must still be `in_progress`.
+ * Used by every MUTATING entry point (board moves, sprint advance, file
+ * saves) so a completed/abandoned run is closed to further writes (fix round
+ * 2026-08-26, M8) — reads (`listWorkspaceFiles`, `getSprintLabRun`) stay on
+ * the plain `requireOwnedRun`/no-check path, since viewing a finished run's
+ * final state (retro/summary) must keep working.
+ */
+async function requireOwnedActiveRun(userId: string, runId: string): Promise<StoredSprintLabRun> {
+  const run = await requireOwnedRun(userId, runId)
+  if (run.status !== "in_progress") throw new Error(SPRINT_LAB_RUN_ERRORS.RUN_NOT_ACTIVE)
+  return run
+}
+
+/**
+ * Validate that `workbookId` is a compiled workbook, `sprintNumber` is one of
+ * its compiled sprints, and every key in `ticketKeys` resolves to a real
+ * ticket somewhere in that workbook (fix round 2026-08-26, I4) — closes the
+ * gap where a client could forge an arbitrary board with made-up ticket keys
+ * or advance into a workbook/sprint that was never authored.
+ *
+ * Known limitation: `lib/sprint-labs/content/registry.ts` (Task 2) indexes
+ * tickets by key across the whole workbook (`ticketsByKey`), not per sprint —
+ * there is no exposed "ticket keys for sprint N" lookup. `getTicket` here
+ * therefore confirms a ticket exists SOMEWHERE in the compiled workbook, not
+ * that it belongs to exactly `sprintNumber`. Tightening this to an exact
+ * per-sprint set needs a Task-2-owned registry addition; noted in the fix
+ * report rather than forked around here.
+ */
+function requireKnownWorkbookAndTickets(
+  workbookId: string,
+  sprintNumber: number,
+  ticketKeys: string[]
+): void {
+  if (!getWorkbookSummary(workbookId)) throw new Error(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+  if (!getSprint(workbookId, sprintNumber)) throw new Error(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+  for (const key of ticketKeys) {
+    if (!getTicket(workbookId, key)) throw new Error(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+  }
+}
+
 // ============================================================
 // Run reads
 // ============================================================
@@ -264,6 +326,12 @@ export async function createSprintLabRun(
   const active = await getActiveSprintLabRun(userId, workbookId)
   if (active && active.status === "in_progress") return active
 
+  // Validated here (not at the top of the function): a resume above returns
+  // before this ever runs, so a stale/irrelevant ticketKeys array on a resume
+  // call is never rejected for content it will never touch. A genuine create
+  // always validates before anything is written.
+  requireKnownWorkbookAndTickets(workbookId, 1, ticketKeys)
+
   const now = new Date().toISOString()
   const board = Object.fromEntries(ticketKeys.map((key) => [key, "todo" as const])) as Record<
     string,
@@ -303,10 +371,11 @@ export async function advanceSprintLabRun(
   if (!parsed.success) throw new Error(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
   const { runId, toSprint, ticketKeys } = parsed.data
 
-  const run = await requireOwnedRun(userId, runId)
+  const run = await requireOwnedActiveRun(userId, runId)
   if (toSprint !== run.currentSprint + 1) {
     throw new Error(SPRINT_LAB_RUN_ERRORS.INVALID_SPRINT_ADVANCE)
   }
+  requireKnownWorkbookAndTickets(run.workbookId, toSprint, ticketKeys)
 
   const now = new Date().toISOString()
   const board = { ...run.board }
@@ -338,7 +407,7 @@ export async function moveSprintLabTicket(
   if (!parsed.success) throw new Error(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
   const { runId, ticketKey, to } = parsed.data
 
-  const run = await requireOwnedRun(userId, runId)
+  const run = await requireOwnedActiveRun(userId, runId)
   const from = run.board[ticketKey]
   if (from === undefined) throw new Error(SPRINT_LAB_RUN_ERRORS.UNKNOWN_TICKET)
   if (!isLegalBoardTransition(from, to)) throw new Error(SPRINT_LAB_RUN_ERRORS.INVALID_TRANSITION)
@@ -384,20 +453,29 @@ export async function listWorkspaceFiles(
 
 /**
  * Batched save of changed workspace files (up to {@link MAX_WORKSPACE_FILES_PER_SAVE}
- * per call). Validation is all-or-nothing over the WHOLE batch before any
- * write happens: an invalid path (fails `isValidWorkspacePath`, reusing the
- * repo's existing validator rather than forking it) or oversize content
- * (`>MAX_WORKSPACE_FILE_CONTENT_CHARS`, enforced by the Zod schema) rejects
- * every file in the call, not just the bad one — a partial save would leave
- * the client's dirty-tracking out of sync with what actually landed.
+ * per call, and never past {@link MAX_WORKSPACE_FILES_PER_RUN} total for the
+ * run). Validation is all-or-nothing over the WHOLE batch before any write
+ * happens: an invalid path (fails `isValidWorkspacePath`, reusing the repo's
+ * existing validator rather than forking it), a duplicate path within the
+ * same call (M6 — two entries for one path would race each other's revision
+ * and silently pick a batch-order-dependent winner), a reserved/oversize
+ * Firestore doc id (M10), or oversize content (`>MAX_WORKSPACE_FILE_CONTENT_CHARS`,
+ * enforced by the Zod schema) rejects every file in the call, not just the
+ * bad one — a partial save would leave the client's dirty-tracking out of
+ * sync with what actually landed.
  *
- * Revision is computed via a pre-read (existing revision + 1, or 1 for a
- * brand-new path) rather than `FieldValue.increment`, so the returned values
- * are exact, deterministic numbers the caller can use immediately. This is
- * safe under this feature's actual write pattern (the client hook debounces
- * and flushes single-flight, so two concurrent saves of the same run's same
- * path are not a realistic race); a true concurrent-writer scenario would
- * need `FieldValue.increment` instead.
+ * One bulk read of the run's existing files backs both the per-run file-count
+ * ceiling and each file's current revision (replacing the previous per-file
+ * `.get()` calls). Revision is computed from that read (existing + 1, or 1
+ * for a brand-new path) rather than `FieldValue.increment`, so the returned
+ * values are exact, deterministic numbers the caller can use immediately.
+ * This is safe under this feature's actual write pattern (the client hook
+ * debounces and flushes single-flight, so two concurrent saves of the same
+ * run's same path are not a realistic race); a true concurrent-writer
+ * scenario would need `FieldValue.increment` instead.
+ *
+ * Also bumps the run doc's own `updatedAt` (M7) in the same batch, so
+ * file-only activity still moves the run's last-touched timestamp.
  */
 export async function saveWorkspaceFiles(
   userId: string,
@@ -407,30 +485,43 @@ export async function saveWorkspaceFiles(
   if (!parsed.success) throw new Error(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
   const { runId, files } = parsed.data
 
+  const paths = files.map((file) => file.path)
+  if (new Set(paths).size !== paths.length) throw new Error(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+
   for (const file of files) {
     if (!isValidWorkspacePath(file.path)) throw new Error(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+    if (!isValidFirestoreDocId(encodeWorkspaceFilePathId(file.path))) {
+      throw new Error(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+    }
   }
 
-  await requireOwnedRun(userId, runId)
+  await requireOwnedActiveRun(userId, runId)
 
   const filesCollection = adminDb.collection(COLLECTION).doc(runId).collection(FILES_SUBCOLLECTION)
   const now = new Date().toISOString()
 
-  const refs = files.map((file) => ({
-    file,
-    docId: encodeWorkspaceFilePathId(file.path),
-    ref: filesCollection.doc(encodeWorkspaceFilePathId(file.path)),
-  }))
+  // One read for the whole existing file set backs the per-run ceiling AND
+  // every file's current revision, replacing what used to be N individual
+  // per-file reads.
+  const existingSnap = await filesCollection.get()
+  const existingRevisionById = new Map<string, number>()
+  for (const doc of existingSnap.docs) {
+    const existing = parseStoredWorkspaceFile(doc.data(), doc.id)
+    existingRevisionById.set(doc.id, existing?.revision ?? 0)
+  }
 
-  const existingSnaps = await Promise.all(refs.map(({ ref }) => ref.get()))
+  const refs = files.map((file) => {
+    const docId = encodeWorkspaceFilePathId(file.path)
+    return { file, docId, ref: filesCollection.doc(docId) }
+  })
 
-  const toWrite: WorkspaceFileDoc[] = refs.map(({ file }, index) => {
-    const snap = existingSnaps[index]
-    // A brand-new path (no prior doc) is the common case, not a data problem —
-    // only parse (and risk a malformed-doc warning) when something is actually
-    // there to parse.
-    const existing = snap.exists ? parseStoredWorkspaceFile(snap.data(), refs[index].docId) : null
-    const revision = (existing?.revision ?? 0) + 1
+  const newFileCount = refs.filter(({ docId }) => !existingRevisionById.has(docId)).length
+  if (existingRevisionById.size + newFileCount > MAX_WORKSPACE_FILES_PER_RUN) {
+    throw new Error(SPRINT_LAB_RUN_ERRORS.VALIDATION_FAILED)
+  }
+
+  const toWrite: WorkspaceFileDoc[] = refs.map(({ file, docId }) => {
+    const revision = (existingRevisionById.get(docId) ?? 0) + 1
     return { path: file.path, content: file.content, updatedAt: now, revision }
   })
 
@@ -442,6 +533,7 @@ export async function saveWorkspaceFiles(
     const validated = workspaceFileDocSchema.parse(doc)
     batch.set(refs[index].ref, validated)
   })
+  batch.update(adminDb.collection(COLLECTION).doc(runId), { updatedAt: now })
   await batch.commit()
 
   return toWrite
