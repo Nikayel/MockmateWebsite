@@ -1,0 +1,13 @@
+comments:
+  - id: "timestamp-header-unsigned-enables-replay"
+    body: "The timestamp travels as its own header, separate from what gets hashed. A signature computed over the body alone says nothing about when the request was made - an attacker who ever captures one legitimate delivery can resend it forever with the timestamp header rewritten to whatever 'now' is, and the signature still checks out, because it was never a function of the timestamp in the first place."
+    correct: true
+  - id: "no-replay-cache-fresh-is-not-unique"
+    body: "Even granting a receiver that correctly binds the timestamp into the signature, nothing here stops the exact same delivery from being POSTed twice inside its own freshness window. 'Fresh' and 'not a replay' are different properties - the PR's description only ever mentions the first."
+    correct: true
+  - id: "single-secret-breaks-rotation"
+    body: "There is exactly one secret in play. The moment it rotates, every delivery still in flight signed with the outgoing key starts failing verification with no overlap window - which means rotating the secret at all requires either accepting a burst of false rejections or coordinating a flag-day cutover with every partner, neither of which anyone is going to actually do in practice."
+    correct: true
+  - id: "string-equality-fine-body-is-hex"
+    body: "Comparing with === here is fine - the signature is hex-encoded and short, so any timing difference is going to be swamped by ordinary network jitter long before an attacker could extract anything useful from it. Constant-time comparison is the right idea for something like a raw password, but it's overkill for a fixed-length hex digest travelling over HTTP."
+    correct: false

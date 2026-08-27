@@ -1,0 +1,174 @@
+diff --git a/src/delivery/signature.ts b/src/delivery/signature.ts
+index bbe1efd..45d9a63 100644
+--- a/src/delivery/signature.ts
++++ b/src/delivery/signature.ts
+@@ -1,9 +1,19 @@
+ /**
+- * PR #447: HMAC-SHA256 over the JSON body, hex-encoded - replaces the placeholder keyed hash.
+- * Built on the Web Crypto API (the global `crypto.subtle`, no import needed) rather than Node's
+- * `crypto` module, since this code runs inside the same sandboxed workspace as everything else
+- * in this repo.
++ * PR #447 signed HMAC-SHA256 over the JSON body alone and compared with `===`, sending the
++ * timestamp as a separate, unsigned header. Rejected in review: an attacker who ever captures one
++ * legitimate delivery can replay it forever with the timestamp header rewritten to "now" -
++ * nothing in the signed material ties the signature to the moment it was issued, so a freshness
++ * check that reads that header is checking a value the sender never actually vouched for. This
++ * module signs the timestamp and the body together, compares in constant time, and adds a replay
++ * cache so even a technically fresh, correctly signed delivery cannot be accepted twice.
++ *
++ * Built on the Web Crypto API (the global `crypto.subtle` - no import) rather than Node's
++ * `crypto` module: this code runs inside the same sandboxed workspace as everything else in this
++ * repo, which is a browser worker in production and mirrors that exact module surface in CI -
++ * neither exposes `node:crypto`, and `crypto.subtle` is the one signing primitive both
++ * environments actually provide, identically.
+  */
++
+ async function hmacSha256Hex(payload: string, secret: string): Promise<string> {
+   const encoder = new TextEncoder()
+   const key = await crypto.subtle.importKey(
+@@ -19,21 +29,114 @@ async function hmacSha256Hex(payload: string, secret: string): Promise<string> {
+     .join("")
+ }
+ 
++/**
++ * The exact bytes that get signed - the timestamp INSIDE the signed material, never sent
++ * alongside it unsigned. Exported so a receiver verifying our signature reconstructs the
++ * identical base string, never a second, hand-written concatenation that could drift from this
++ * one.
++ */
++export function buildSignedBase(timestamp: string, body: string): string {
++  return `${timestamp}.${body}`
++}
++
++/**
++ * A raw HMAC-SHA256 digest of `payload` under `secret`, hex-encoded. Never called directly on a
++ * webhook body - see `signWebhookDelivery`, which signs `buildSignedBase`'s output, not the body
++ * alone.
++ */
+ export async function signPayload(payload: string, secret: string): Promise<string> {
+   return hmacSha256Hex(payload, secret)
+ }
+ 
++/** Signs a webhook delivery: the timestamp and the body together, never the body alone. */
++export async function signWebhookDelivery(timestamp: string, body: string, secret: string): Promise<string> {
++  return signPayload(buildSignedBase(timestamp, body), secret)
++}
++
++/**
++ * Constant-time string comparison - never short-circuits on the first differing character, so an
++ * attacker timing responses cannot learn how many leading characters of their guess were correct.
++ * A length mismatch is checked up front and returns false immediately: constant-time comparison
++ * is about not leaking WHICH bytes are wrong, not about hiding the length itself, and comparing
++ * character-by-character past the shorter string's end has nothing meaningful to compare anyway.
++ */
++export function constantTimeEqual(a: string, b: string): boolean {
++  if (a.length !== b.length) return false
++  let difference = 0
++  for (let i = 0; i < a.length; i++) {
++    difference |= a.charCodeAt(i) ^ b.charCodeAt(i)
++  }
++  return difference === 0
++}
++
+ export interface VerifyWebhookSignatureInput {
+   body: string
++  /** Whatever the sender put in x-meridian-timestamp - seconds since the epoch, as a string. */
++  timestamp: string
+   signature: string
+-  secret: string
++  /**
++   * Every currently active secret, in preference order. A receiver checking both the current and
++   * the just-retired secret means a key rotation's overlap window never rejects a delivery signed
++   * a moment before the old key was retired.
++   */
++  secrets: string[]
++  nowMs: number
++  windowSeconds: number
+ }
+ 
+ /**
+- * Recomputes the signature the same way and compares. Receivers are expected to check this
+- * alongside the x-meridian-timestamp header to reject stale deliveries.
++ * Verifies a delivery's signature AND its freshness together - never one without the other,
++ * since a signature check alone says nothing about when the request was made, and a freshness
++ * check alone means nothing unless the timestamp it reads was actually part of what got signed.
+  */
+ export async function verifyWebhookSignature(input: VerifyWebhookSignatureInput): Promise<boolean> {
+-  const expected = await signPayload(input.body, input.secret)
+-  return expected === input.signature
++  const timestampMs = Number(input.timestamp) * 1000
++  if (!Number.isFinite(timestampMs)) return false
++
++  const age = input.nowMs - timestampMs
++  if (age < 0 || age > input.windowSeconds * 1000) return false
++
++  const signedBase = buildSignedBase(input.timestamp, input.body)
++  const candidates = await Promise.all(input.secrets.map((secret) => signPayload(signedBase, secret)))
++  return candidates.some((candidate) => constantTimeEqual(candidate, input.signature))
++}
++
++export interface ReplayCache {
++  hasSeen(signature: string, nowMs: number): boolean
++  record(signature: string, nowMs: number): void
++}
++
++/**
++ * Remembers every signature seen within `windowMs`, so the exact same valid, fresh delivery
++ * cannot be accepted twice - the gap a freshness check alone cannot close, since a delivery
++ * replayed a second time inside its own freshness window is, by definition, still "fresh".
++ */
++export function createReplayCache(windowMs: number): ReplayCache {
++  const seenAt = new Map<string, number>()
++  return {
++    hasSeen(signature, nowMs) {
++      for (const [candidate, recordedAt] of seenAt) {
++        if (nowMs - recordedAt > windowMs) seenAt.delete(candidate)
++      }
++      return seenAt.has(signature)
++    },
++    record(signature, nowMs) {
++      seenAt.set(signature, nowMs)
++    },
++  }
++}
++
++export interface VerifyAndRecordWebhookDeliveryInput extends VerifyWebhookSignatureInput {
++  cache: ReplayCache
++}
++
++/**
++ * The one function a receiver should actually call: signature, freshness, and replay protection
++ * all in one place, so nobody verifying a delivery can accidentally skip the cache check.
++ */
++export async function verifyAndRecordWebhookDelivery(input: VerifyAndRecordWebhookDeliveryInput): Promise<boolean> {
++  if (!(await verifyWebhookSignature(input))) return false
++  if (input.cache.hasSeen(input.signature, input.nowMs)) return false
++  input.cache.record(input.signature, input.nowMs)
++  return true
+ }
+diff --git a/src/delivery/webhooks.ts b/src/delivery/webhooks.ts
+index 4ca724e..13676b0 100644
+--- a/src/delivery/webhooks.ts
++++ b/src/delivery/webhooks.ts
+@@ -7,7 +7,7 @@ import type { DrainHandler } from "../queue/outbox"
+ import { generateId } from "../util/ids"
+ import { log } from "../util/logger"
+ import { classifyDeliveryFailure, computeNextAttemptAt, DeliveryFailureError, parseRetryAfterSeconds } from "./retry"
+-import { signPayload } from "./signature"
++import { signWebhookDelivery } from "./signature"
+ import type { WebhookHttpClient } from "./types"
+ import { buildWebhookPayload } from "./webhook-payload"
+ 
+@@ -34,8 +34,10 @@ export async function deliverWebhook(deps: DeliverWebhookDeps, claim: Claim, att
+   }
+ 
+   const payload = JSON.stringify(buildWebhookPayload(claim))
+-  const signature = await signPayload(payload, tenant.webhookSecret)
+-  const timestamp = Date.now().toString()
++  // MER-404: the timestamp is signed together with the body - never sent as a separate,
++  // unsigned header - so a captured delivery cannot be replayed with its timestamp rewritten.
++  const timestamp = Math.floor(Date.now() / 1000).toString()
++  const signature = await signWebhookDelivery(timestamp, payload, tenant.webhookSecret)
+   const now = new Date().toISOString()
+ 
+   const fail = (statusCode: number | null, message: string, retryAfterSeconds: number | null) => {

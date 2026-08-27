@@ -46,6 +46,8 @@ filesTouched:
   - "src/delivery/webhooks.ts"
   - "test/support/fake-http-client.ts"
   - "test/support/build-app.ts"
+  # MER-404
+  - "src/delivery/signature.ts"
 newSourceFiles:
   # MER-401
   - "migrations/0013_idempotency_keys.sql"
@@ -65,3 +67,5 @@ rewrittenFiles:
   # backoff state; delivery no longer records a row before the send has actually succeeded.
   - "src/delivery/retry.ts"
   - "src/delivery/webhooks.ts"
+  # MER-404: PR #447's body-only HMAC and === comparison are replaced end to end.
+  - "src/delivery/signature.ts"

@@ -1,0 +1,75 @@
+diff --git a/src/delivery/signature.ts b/src/delivery/signature.ts
+index 18ed5f2..bbe1efd 100644
+--- a/src/delivery/signature.ts
++++ b/src/delivery/signature.ts
+@@ -1,12 +1,39 @@
+ /**
+- * A placeholder signature - not HMAC, just enough of a keyed digest to prove the wiring works
+- * end to end for a tenant's shared secret.
++ * PR #447: HMAC-SHA256 over the JSON body, hex-encoded - replaces the placeholder keyed hash.
++ * Built on the Web Crypto API (the global `crypto.subtle`, no import needed) rather than Node's
++ * `crypto` module, since this code runs inside the same sandboxed workspace as everything else
++ * in this repo.
+  */
+-export function signPayload(payload: string, secret: string): string {
+-  const combined = `${secret}:${payload}`
+-  let hash = 0
+-  for (let i = 0; i < combined.length; i++) {
+-    hash = (hash * 31 + combined.charCodeAt(i)) | 0
+-  }
+-  return (hash >>> 0).toString(16)
++async function hmacSha256Hex(payload: string, secret: string): Promise<string> {
++  const encoder = new TextEncoder()
++  const key = await crypto.subtle.importKey(
++    "raw",
++    encoder.encode(secret),
++    { name: "HMAC", hash: "SHA-256" },
++    false,
++    ["sign"]
++  )
++  const digest = await crypto.subtle.sign("HMAC", key, encoder.encode(payload))
++  return Array.from(new Uint8Array(digest))
++    .map((byte) => byte.toString(16).padStart(2, "0"))
++    .join("")
++}
++
++export async function signPayload(payload: string, secret: string): Promise<string> {
++  return hmacSha256Hex(payload, secret)
++}
++
++export interface VerifyWebhookSignatureInput {
++  body: string
++  signature: string
++  secret: string
++}
++
++/**
++ * Recomputes the signature the same way and compares. Receivers are expected to check this
++ * alongside the x-meridian-timestamp header to reject stale deliveries.
++ */
++export async function verifyWebhookSignature(input: VerifyWebhookSignatureInput): Promise<boolean> {
++  const expected = await signPayload(input.body, input.secret)
++  return expected === input.signature
+ }
+diff --git a/src/delivery/webhooks.ts b/src/delivery/webhooks.ts
+index 03f6ec3..4ca724e 100644
+--- a/src/delivery/webhooks.ts
++++ b/src/delivery/webhooks.ts
+@@ -34,7 +34,8 @@ export async function deliverWebhook(deps: DeliverWebhookDeps, claim: Claim, att
+   }
+ 
+   const payload = JSON.stringify(buildWebhookPayload(claim))
+-  const signature = signPayload(payload, tenant.webhookSecret)
++  const signature = await signPayload(payload, tenant.webhookSecret)
++  const timestamp = Date.now().toString()
+   const now = new Date().toISOString()
+ 
+   const fail = (statusCode: number | null, message: string, retryAfterSeconds: number | null) => {
+@@ -56,6 +57,7 @@ export async function deliverWebhook(deps: DeliverWebhookDeps, claim: Claim, att
+     response = await deps.httpClient.post(tenant.webhookUrl, payload, {
+       "content-type": "application/json",
+       "x-meridian-signature": signature,
++      "x-meridian-timestamp": timestamp,
+     })
+   } catch (error) {
+     throw fail(null, error instanceof Error ? error.message : "network error calling webhook endpoint", null)

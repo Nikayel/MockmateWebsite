@@ -1,0 +1,16 @@
+humanName: "Escaped: a tampered body is accepted because the signature is compared against the wrong bytes"
+tags:
+  - webhook-hmac-verification-review
+kind: io-case
+input:
+  body: "{\"claimId\":\"clm_8842\",\"status\":\"paid\",\"amount\":412.19,\"currency\":\"USD\"}tampered"
+  timestamp: "1770000000"
+  signature: "804bd96626b2eaad356c5c97247e5b903214b9aafc2726452fcc14049696da27"
+  secrets:
+    - "shh-secret"
+  nowMs: 1770000000000
+  windowSeconds: 300
+expected: false
+entryPoint:
+  module: "src/delivery/signature.ts"
+  export: "verifyWebhookSignature"
