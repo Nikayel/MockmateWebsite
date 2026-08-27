@@ -1,0 +1,52 @@
+humanName: "Escaped: a reordered-but-identical retry replays instead of 409ing, even though JSON.stringify disagrees on the two encodings"
+tags:
+  - idempotent-post-with-replay
+kind: probe
+body: |
+  const bodyA = { approvedBy: "adjuster_griffin", memo: "Approved after review" }
+  const bodyB = { memo: "Approved after review", approvedBy: "adjuster_griffin" }
+  assert(
+    JSON.stringify(bodyA) !== JSON.stringify(bodyB),
+    "the two bodies must actually serialize differently under JSON.stringify for this to prove anything"
+  )
+
+  const { meridian } = buildTestApp()
+  return meridian.app
+    .inject({
+      method: "POST",
+      url: "/claims",
+      headers: { "x-tenant-id": "ten_northwind" },
+      payload: { externalRef: "NW-8842", amount: 8842, claimantName: "Jordan Rivera", lossDate: "2026-01-15" },
+    })
+    .then((created) => {
+      const claimId = created.json().id
+      return meridian.drainOutbox().then(() =>
+        meridian.app
+          .inject({
+            method: "POST",
+            url: `/claims/${claimId}/payment-authorizations`,
+            headers: { "x-tenant-id": "ten_northwind", "idempotency-key": "hidden-key-a" },
+            payload: bodyA,
+          })
+          .then((first) =>
+            meridian.app
+              .inject({
+                method: "POST",
+                url: `/claims/${claimId}/payment-authorizations`,
+                headers: { "x-tenant-id": "ten_northwind", "idempotency-key": "hidden-key-a" },
+                payload: bodyB,
+              })
+              .then((retry) => {
+                assert(
+                  retry.statusCode === 201,
+                  `a reordered-but-identical retry must replay with 201, got ${retry.statusCode}`
+                )
+                assert.deepStrictEqual(retry.json(), first.json())
+                assert(
+                  meridian.outbox.pendingCount() === 1,
+                  "the reordered retry must not enqueue a second delivery"
+                )
+              })
+          )
+      )
+    })

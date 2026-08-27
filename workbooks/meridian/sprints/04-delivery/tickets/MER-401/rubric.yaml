@@ -1,0 +1,11 @@
+weights:
+  understanding: 0.2
+  problemSolving: 0.3
+  codeQuality: 0.15
+  communication: 0.1
+  verification: 0.25
+notes:
+  understanding: "Keys off locating the idempotency-key seam as a request-scoped storage problem, not a client-side check-before-submit workaround."
+  problemSolving: "Keys off the visible pass rate across replay, conflict and tenant-scoping cases, and whether the hidden reordered-body case passes without special-casing key order."
+  codeQuality: "Keys off reusing the canonical encoder from src/util/canonical-json.ts for the fingerprint rather than hashing JSON.stringify output directly."
+  verification: "Keys off whether the learner's own test proves a replay returns the exact original response (including a time-dependent field) rather than a freshly recomputed equivalent one."

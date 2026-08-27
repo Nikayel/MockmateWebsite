@@ -20,10 +20,17 @@ objectives:
   - webhook-hmac-verification-review
   - per-claim-ordering-guarantee
 filesTouched:
+  # MER-401
   - "migrations/0013_idempotency_keys.sql"
+  - "src/db/repositories/idempotency-keys.ts"
   - "src/http/idempotency.ts"
-  - "src/http/routes/claims.ts"
-  - "src/util/canonical-json.ts"
+  - "src/http/routes/payment-authorizations.ts"
+  - "src/http/error-codes.ts"
+  - "src/http/errors.ts"
+  - "src/db/queries.ts"
+  - "src/db/memory-db.ts"
+  - "src/app.ts"
+  - "src/http/compatibility-descriptor.ts"
   - "migrations/0014_outbox.sql"
   - "src/queue/outbox.ts"
   - "src/db/repositories/webhook-deliveries.ts"
@@ -36,8 +43,11 @@ filesTouched:
   - "src/delivery/webhook-payload.ts"
   - "migrations/0016_outbox_ordering.sql"
 newSourceFiles:
+  # MER-401
   - "migrations/0013_idempotency_keys.sql"
+  - "src/db/repositories/idempotency-keys.ts"
   - "src/http/idempotency.ts"
+  - "src/http/routes/payment-authorizations.ts"
   - "migrations/0014_outbox.sql"
   - "migrations/0015_dead_letters.sql"
   - "migrations/0016_outbox_ordering.sql"

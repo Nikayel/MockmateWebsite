@@ -1,0 +1,16 @@
+humanName: "Escaped: reordering keys inside a nested object still fingerprints identically"
+tags:
+  - idempotent-post-with-replay
+kind: probe
+body: |
+  const a = fingerprintIdempotentRequest({
+    method: "POST",
+    path: "/claims/clm_8842/payment-authorizations",
+    body: { approvedBy: "adjuster_griffin", context: { region: "midwest", tier: "gold" } },
+  })
+  const b = fingerprintIdempotentRequest({
+    method: "POST",
+    path: "/claims/clm_8842/payment-authorizations",
+    body: { context: { tier: "gold", region: "midwest" }, approvedBy: "adjuster_griffin" },
+  })
+  assert.strictEqual(a, b, "a reordered nested object must fingerprint the same as the original")
