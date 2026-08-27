@@ -72,6 +72,31 @@
  * staging checkout) must not have pruning declare its own just-written
  * output "not authored" because it scanned the wrong tree.
  *
+ * PRUNING SAFETY (review round 2, I-5 residual — the reviewer reproduced a
+ * wrong/empty/subset --workbooks-root deleting EVERYTHING, including the
+ * workbook this same invocation had just compiled): three layers now
+ * guard this. (a) The keep set is the authoring-tree scan's ids UNION the
+ * ids THIS invocation just compiled, unconditionally — self-protection
+ * never depends on --workbooks-root having scanned the right place. (b) If
+ * the authoring-tree scan finds ZERO workbooks, pruning refuses to run at
+ * all and prints a loud warning naming the root: an empty scan is far
+ * likelier a wrong path than a genuinely emptied catalog. (c) `--no-prune`
+ * skips pruning entirely, for CI partial-checkout scenarios where neither
+ * (a) nor (b) is the right call.
+ *
+ * FORMATTING GENERATED CONTENT (found verifying round 2's own fix, not
+ * asked for by name in any finding, but load-bearing for THIS task's
+ * "regenerated bundles diff cleanly" requirement): every generated file
+ * this script writes is run through this repo's own `.prettierrc`
+ * (`prettier`'s `format`+`resolveConfig`, not hardcoded defaults) before
+ * `writeFileSync`. Without this, committing a freshly-compiled file still
+ * fires the pre-commit hook's `prettier --write`, which reformats
+ * `JSON.stringify`'s quoted keys and short arrays — silently mutating the
+ * COMMITTED content away from what this script itself just emitted, so
+ * every later recompile-and-diff shows that formatting churn as a false
+ * "content changed" signal. Formatting here makes the hook's pass a no-op
+ * on already-clean output.
+ *
  * TICKET IDENTITY (review round 1, M-1/M-2): a workbook id must be a
  * lowercase slug and a ticket key must start with a letter (never a
  * digit) — both are compiled into JS export names and directory
@@ -133,6 +158,7 @@ import {
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath } from "node:path"
 import { fileURLToPath } from "node:url"
 import matter from "gray-matter"
+import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from "prettier"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const WORKBOOKS_DIR = join(ROOT, "workbooks")
@@ -246,6 +272,42 @@ export function assertPublicSafe(value, context) {
 }
 
 /**
+ * Formats generated content through this repo's own .prettierrc before
+ * writing (discovered verifying round 2's fix, not asked for by name in
+ * any finding, but load-bearing for this task's own "regenerated bundles
+ * diff cleanly" requirement): committing a generated file runs it through
+ * the pre-commit hook's `prettier --write` regardless, which reformats
+ * `JSON.stringify`'s quoted object keys and short arrays — silently
+ * mutating the committed content away from what this script itself just
+ * emitted. Every later `pnpm workbooks:compile` + `git diff` would then
+ * show that formatting churn as if it were a real content change.
+ * Formatting here, once, with the project's real config
+ * (`resolveConfig`, not hardcoded defaults) makes the hook's pass a no-op
+ * on already-clean output. Config is resolved once and cached: it is the
+ * same for every generated file in this repo.
+ */
+let _prettierConfig = null
+async function prettierConfig() {
+  if (_prettierConfig === null) {
+    _prettierConfig = (await resolvePrettierConfig(ROOT)) ?? {}
+  }
+  return _prettierConfig
+}
+
+async function formatGenerated(content, filePath) {
+  try {
+    const config = await prettierConfig()
+    return await prettierFormat(content, { ...config, filepath: filePath })
+  } catch (err) {
+    // A formatting hiccup must never block a successful compile; the
+    // content is still syntactically valid and correctly gated, just not
+    // prettier-clean until the next `pnpm lint:fix`.
+    console.error(`Warning: prettier formatting failed for ${relative(ROOT, filePath)}: ${err.message}`)
+    return content
+  }
+}
+
+/**
  * THE chokepoint for every public-bundle write (review round 1, I-3/M-7).
  * `payload` is the plain data object the file's content was rendered from
  * (or, for registry.ts, the discovery array of workbook/sprint/ticket
@@ -255,10 +317,11 @@ export function assertPublicSafe(value, context) {
  * call is exactly what the "writePublicFile" test in compiler.test.ts
  * exists to catch.
  */
-export function writePublicFile(filePath, payload, content, context) {
+export async function writePublicFile(filePath, payload, content, context) {
   assertPublicSafe(payload, context ?? relative(ROOT, filePath))
+  const formatted = await formatGenerated(content, filePath)
   mkdirSync(dirname(filePath), { recursive: true })
-  writeFileSync(filePath, content)
+  writeFileSync(filePath, formatted)
 }
 
 // ============================================================
@@ -850,19 +913,29 @@ export function sealedTicketRegistryKeys(): string[] {
 // Disk writes
 // ============================================================
 
-function writeCompiledWorkbook(workbookId, compiled, sealedByTicketKey, publicDir, sealedDir) {
+async function writeSealedFile(filePath, content) {
+  const formatted = await formatGenerated(content, filePath)
+  mkdirSync(dirname(filePath), { recursive: true })
+  writeFileSync(filePath, formatted)
+}
+
+async function writeCompiledWorkbook(workbookId, compiled, sealedByTicketKey, publicDir, sealedDir) {
   const pubWbDir = join(publicDir, workbookId)
-  writePublicFile(
+  await writePublicFile(
     join(pubWbDir, "workbook.ts"),
     compiled.summary,
     renderWorkbookModule(workbookId, compiled.summary)
   )
   for (const sprint of compiled.sprints) {
     const nn = String(sprint.number).padStart(2, "0")
-    writePublicFile(join(pubWbDir, "sprints", `sprint-${nn}.ts`), sprint, renderSprintModule(workbookId, sprint))
+    await writePublicFile(
+      join(pubWbDir, "sprints", `sprint-${nn}.ts`),
+      sprint,
+      renderSprintModule(workbookId, sprint)
+    )
   }
   for (const [ticketKey, compiledTicket] of Object.entries(compiled.ticketsByKey)) {
-    writePublicFile(
+    await writePublicFile(
       join(pubWbDir, "tickets", `${ticketKey}.ts`),
       compiledTicket,
       renderTicketModule(ticketKey, compiledTicket)
@@ -870,9 +943,8 @@ function writeCompiledWorkbook(workbookId, compiled, sealedByTicketKey, publicDi
   }
 
   const sealWbDir = join(sealedDir, workbookId)
-  mkdirSync(sealWbDir, { recursive: true })
   for (const [ticketKey, sealed] of Object.entries(sealedByTicketKey)) {
-    writeFileSync(join(sealWbDir, `${ticketKey}.server.ts`), renderSealedTicketModule(sealed))
+    await writeSealedFile(join(sealWbDir, `${ticketKey}.server.ts`), renderSealedTicketModule(sealed))
   }
 }
 
@@ -924,8 +996,27 @@ function discoverAuthoredWorkbooks(workbooksRoot) {
  * workbook.yaml/sprint.yaml fails to parse (a sibling mid-edit), pruning is
  * skipped for this run rather than deleting output based on an incomplete
  * picture of what currently exists.
+ *
+ * Review round 2 finding (I-5 residual, reproduced by the reviewer): a
+ * wrong, empty, or subset `--workbooks-root` used to prune EVERYTHING,
+ * including the workbook(s) this very invocation had just compiled and
+ * written — an empty authoring-tree scan is a far more likely sign of a
+ * bad path than a genuinely emptied catalog. Three layers now guard
+ * against that:
+ *  (a) `justCompiledIds` (the workbook ids THIS invocation just compiled)
+ *      are unconditionally added to the keep set, regardless of whether
+ *      the authoring-tree scan happens to also find them. If one of them
+ *      isn't in the scan (because `workbooksRoot` doesn't cover it), its
+ *      whole directory is still protected, though its OWN stale
+ *      ticket/sprint files can't be fine-grained-pruned this run (there is
+ *      no authoritative per-ticket data for it without a matching
+ *      authoring-tree entry) — safe degradation, never data loss.
+ *  (b) if the authoring-tree scan finds ZERO workbooks, pruning refuses to
+ *      run at all and prints a loud warning naming the root.
+ *  (c) `--no-prune` (see parseArgs/main) skips this function entirely, for
+ *      CI partial-checkout scenarios where neither (a) nor (b) apply.
  */
-function pruneStaleOutput(publicDir, sealedDir, workbooksRoot) {
+function pruneStaleOutput(publicDir, sealedDir, workbooksRoot, justCompiledIds) {
   let authored
   try {
     authored = discoverAuthoredWorkbooks(workbooksRoot)
@@ -937,7 +1028,15 @@ function pruneStaleOutput(publicDir, sealedDir, workbooksRoot) {
     return
   }
 
-  const keepWorkbookIds = new Set(authored.map((w) => w.workbookId))
+  if (authored.length === 0) {
+    console.error(
+      `Skipping stale-output pruning: authoring root "${workbooksRoot}" contains no workbooks; ` +
+        `refusing to prune. An empty scan is far likelier a wrong --workbooks-root than a genuinely ` +
+        `emptied catalog. Pass --no-prune if this is intentional (e.g. a CI partial checkout).`
+    )
+    return
+  }
+
   const keepTicketsByWorkbook = new Map(authored.map((w) => [w.workbookId, new Set(w.ticketKeys)]))
   const keepSprintStemsByWorkbook = new Map(
     authored.map((w) => [
@@ -945,6 +1044,7 @@ function pruneStaleOutput(publicDir, sealedDir, workbooksRoot) {
       new Set(w.sprintNumbers.map((n) => `sprint-${String(n).padStart(2, "0")}`)),
     ])
   )
+  const keepWorkbookIds = new Set([...authored.map((w) => w.workbookId), ...justCompiledIds])
 
   for (const workbookId of safeReaddirDirs(publicDir)) {
     if (!keepWorkbookIds.has(workbookId)) {
@@ -953,13 +1053,14 @@ function pruneStaleOutput(publicDir, sealedDir, workbooksRoot) {
       continue
     }
     const keptTickets = keepTicketsByWorkbook.get(workbookId)
+    const keptStems = keepSprintStemsByWorkbook.get(workbookId)
+    if (!keptTickets || !keptStems) continue // self-protected (a) but absent from this root's scan — no fine-grained data to prune against.
     for (const file of safeReaddir(join(publicDir, workbookId, "tickets")).filter((n) => n.endsWith(".ts"))) {
       if (!keptTickets.has(file.replace(/\.ts$/, ""))) {
         rmSync(join(publicDir, workbookId, "tickets", file), { force: true })
         console.log(`pruned stale ticket output: ${workbookId}/tickets/${file}`)
       }
     }
-    const keptStems = keepSprintStemsByWorkbook.get(workbookId)
     for (const file of safeReaddir(join(publicDir, workbookId, "sprints")).filter((n) => n.endsWith(".ts"))) {
       if (!keptStems.has(file.replace(/\.ts$/, ""))) {
         rmSync(join(publicDir, workbookId, "sprints", file), { force: true })
@@ -975,6 +1076,7 @@ function pruneStaleOutput(publicDir, sealedDir, workbooksRoot) {
       continue
     }
     const keptTickets = keepTicketsByWorkbook.get(workbookId)
+    if (!keptTickets) continue // self-protected (a) but absent from this root's scan.
     for (const file of safeReaddir(join(sealedDir, workbookId)).filter((n) => n.endsWith(".server.ts"))) {
       if (!keptTickets.has(file.replace(/\.server\.ts$/, ""))) {
         rmSync(join(sealedDir, workbookId, file), { force: true })
@@ -984,12 +1086,22 @@ function pruneStaleOutput(publicDir, sealedDir, workbooksRoot) {
   }
 }
 
-function regenerateRegistries(publicDir, sealedDir) {
+async function regenerateRegistries(publicDir, sealedDir) {
   const workbooks = discoverCompiledWorkbooks(publicDir)
   mkdirSync(publicDir, { recursive: true })
   mkdirSync(sealedDir, { recursive: true })
-  writeFileSync(join(publicDir, "registry.ts"), renderPublicRegistry(workbooks))
-  writeFileSync(join(sealedDir, "registry.server.ts"), renderSealedRegistry(workbooks))
+  // Review round 2 (I-3 residual): this PUBLIC write used to bypass
+  // writePublicFile via a bare writeFileSync, making "every public emit
+  // goes through the one chokepoint" false for exactly this path. `workbooks`
+  // (filenames/ids only) passes assertPublicSafe trivially today; the point
+  // is the invariant now holds structurally, not that this particular
+  // payload was ever a realistic leak vector.
+  await writePublicFile(join(publicDir, "registry.ts"), workbooks, renderPublicRegistry(workbooks))
+  // The SEALED registry is not a public emit — writePublicFile's
+  // assertPublicSafe would be the wrong check to run against content that
+  // is SUPPOSED to reference secret-classified fields (that's the entire
+  // point of the sealed registry.server.ts's own runtime window guard).
+  await writeSealedFile(join(sealedDir, "registry.server.ts"), renderSealedRegistry(workbooks))
   return workbooks.length
 }
 
@@ -999,12 +1111,18 @@ function regenerateRegistries(publicDir, sealedDir) {
 
 function parseArgs(argv) {
   const positional = []
-  const options = { publicDir: DEFAULT_PUBLIC_DIR, sealedDir: DEFAULT_SEALED_DIR, workbooksRoot: WORKBOOKS_DIR }
+  const options = {
+    publicDir: DEFAULT_PUBLIC_DIR,
+    sealedDir: DEFAULT_SEALED_DIR,
+    workbooksRoot: WORKBOOKS_DIR,
+    noPrune: false,
+  }
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
     if (arg === "--public-dir") options.publicDir = resolvePath(process.cwd(), argv[++i])
     else if (arg === "--sealed-dir") options.sealedDir = resolvePath(process.cwd(), argv[++i])
     else if (arg === "--workbooks-root") options.workbooksRoot = resolvePath(process.cwd(), argv[++i])
+    else if (arg === "--no-prune") options.noPrune = true
     else positional.push(arg)
   }
   return { positional, options }
@@ -1020,7 +1138,7 @@ function discoverWorkbookDirs(workbooksRoot) {
   return listSubdirs(workbooksRoot).filter((name) => existsSync(join(workbooksRoot, name, "workbook.yaml")))
 }
 
-export function main(argv = process.argv.slice(2)) {
+export async function main(argv = process.argv.slice(2)) {
   const { positional, options } = parseArgs(argv)
   const targets =
     positional.length > 0
@@ -1053,15 +1171,25 @@ export function main(argv = process.argv.slice(2)) {
   }
 
   for (const { workbookId, compiled, sealedByTicketKey } of results) {
-    writeCompiledWorkbook(workbookId, compiled, sealedByTicketKey, options.publicDir, options.sealedDir)
+    await writeCompiledWorkbook(workbookId, compiled, sealedByTicketKey, options.publicDir, options.sealedDir)
   }
 
-  pruneStaleOutput(options.publicDir, options.sealedDir, options.workbooksRoot)
+  if (options.noPrune) {
+    console.log("Skipping stale-output pruning: --no-prune was passed.")
+  } else {
+    const justCompiledIds = new Set(results.map((r) => r.workbookId))
+    pruneStaleOutput(options.publicDir, options.sealedDir, options.workbooksRoot, justCompiledIds)
+  }
 
-  const count = regenerateRegistries(options.publicDir, options.sealedDir)
+  const count = await regenerateRegistries(options.publicDir, options.sealedDir)
   console.log(`regenerated public + sealed registries (${count} workbook(s))`)
 }
 
 const isMain =
   typeof process.argv[1] === "string" && fileURLToPath(import.meta.url) === resolvePath(process.argv[1])
-if (isMain) main()
+if (isMain) {
+  main().catch((err) => {
+    console.error(err instanceof Error ? err.stack : err)
+    process.exitCode = 1
+  })
+}
