@@ -112,7 +112,8 @@ export const GAP_TICKETS: GapTicket[] = [
       },
     ],
     pending: "Why a Set to catch that, and not a DISTINCT in the query?",
-    copilotBlurb: "Copilot proposes deduping retried events by id before they hit the rollup.",
+    copilotBlurb:
+      "Found it — retried billing events aren't deduped by id before they're summed. Here's the fix:",
     diff: [
       ["-", "totals.set(id, prev + e.units)"],
       ["+", "if (seen.has(e.id)) continue"],
@@ -160,7 +161,8 @@ export const GAP_TICKETS: GapTicket[] = [
       },
     ],
     pending: "Does an idempotency key alone stop that, or do you still need a lock?",
-    copilotBlurb: "Copilot proposes keying token issuance off the request, not the user.",
+    copilotBlurb:
+      "Two workers can both mint a token for the same request. Keying it off the request instead of the user closes that:",
     diff: [
       ["-", "const token = await issueToken(user)"],
       ["+", "const idempotencyKey = requestId ?? crypto.randomUUID()"],

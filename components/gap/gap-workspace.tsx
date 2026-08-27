@@ -206,32 +206,58 @@ export function GapWorkspace() {
                 <span className="text-destructive">received {ticket.received}</span>
               </div>
 
-              {/* Copilot — enabled and correct on purpose. The obvious objection to
-                  this product is "AI can do the coding round too"; showing the fix
-                  applied and asking the candidate to explain it answers that here,
-                  not in a FAQ. */}
+              {/* Copilot — a second, distinct AI persona from Sparra: an always-on
+                  coding agent, not an interviewer. Framed like a real agent panel
+                  (Cursor, Copilot Chat) rather than a static blurb-and-button card:
+                  avatar + name, first-person prose, then an inline file-diff card
+                  with its own +/− stat pill, then the action row. Enabled and
+                  correct on purpose — the obvious objection to this product is "AI
+                  can do the coding round too"; showing the fix already applied and
+                  asking the candidate to explain it answers that here, not in a FAQ. */}
               <div className="bg-editor-bg border-border border-t p-3">
-                <div className="mb-2 flex items-center gap-1.5">
-                  <Sparkles className="text-accent h-3.5 w-3.5" aria-hidden />
-                  <span className="text-foreground text-[11px] font-bold tracking-[0.06em] uppercase">
-                    Copilot
+                <div className="mb-2 flex items-center gap-2">
+                  <span
+                    className="bg-foreground text-background flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px]"
+                    aria-hidden
+                  >
+                    <Sparkles className="h-3 w-3" />
                   </span>
+                  <span className="text-foreground text-[12px] font-bold">Copilot</span>
                   <span className="bg-neural/15 text-neural-strong rounded-full px-2 py-0.5 text-[10px] font-semibold">
                     enabled
                   </span>
                   <span className="text-muted-foreground text-[11px]">— on purpose</span>
                 </div>
-                <p className="text-muted-foreground mb-2 text-[12px] leading-relaxed">
+
+                <p className="text-foreground/90 mb-2.5 text-[12.5px] leading-relaxed">
                   {ticket.copilotBlurb}
                 </p>
-                <pre className="mb-2 overflow-x-auto font-mono text-[11.5px] leading-relaxed">
-                  {ticket.diff.map(([op, text], i) => (
-                    <div key={i} className={op === "+" ? "text-neural-strong" : "text-destructive"}>
-                      {op} {text}
-                    </div>
-                  ))}
-                </pre>
-                <div className="flex flex-wrap items-center gap-2.5">
+
+                <div className="border-border overflow-hidden rounded-[6px] border">
+                  <div className="bg-muted/60 border-border flex items-center justify-between border-b px-2.5 py-1.5 font-mono text-[10.5px]">
+                    <span className="text-foreground">{ticket.file}</span>
+                    <span className="flex items-center gap-1.5" aria-hidden>
+                      <span className="text-neural-strong">
+                        +{ticket.diff.filter(([op]) => op === "+").length}
+                      </span>
+                      <span className="text-destructive">
+                        −{ticket.diff.filter(([op]) => op === "-").length}
+                      </span>
+                    </span>
+                  </div>
+                  <pre className="overflow-x-auto p-2.5 font-mono text-[11.5px] leading-relaxed">
+                    {ticket.diff.map(([op, text], i) => (
+                      <div
+                        key={i}
+                        className={op === "+" ? "text-neural-strong" : "text-destructive"}
+                      >
+                        {op} {text}
+                      </div>
+                    ))}
+                  </pre>
+                </div>
+
+                <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
                   <button
                     type="button"
                     className="bg-accent-strong text-accent-foreground rounded-[4px] px-2.5 py-1 text-[12px] font-medium"
@@ -260,44 +286,50 @@ export function GapWorkspace() {
               </div>
             </div>
 
-            <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
-              {ticket.chat.map((m, i) => (
-                <div key={i} className={m.who === "you" ? "self-end text-right" : "self-start"}>
-                  <p
-                    className={cn(
-                      "max-w-[220px] px-3 py-2 text-[12.5px] leading-[1.45]",
-                      m.who === "sparra"
-                        ? "bg-muted rounded-[10px_10px_10px_3px]"
-                        : "bg-accent/10 border-accent/20 rounded-[10px_10px_3px_10px] border"
-                    )}
-                  >
-                    {m.text}
-                  </p>
-                  <p className="text-muted-foreground mt-0.5 flex items-center gap-1 text-[10px]">
-                    {m.who === "you" && m.spokenFor && (
-                      <span className="ml-auto flex items-center gap-1">
+            <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto">
+              {ticket.chat.map((m, i) =>
+                m.who === "sparra" ? (
+                  <div key={i} className="flex items-start gap-1.5 self-start">
+                    <Sparra size={20} className="mt-0.5 shrink-0" />
+                    <div>
+                      <p className="bg-muted max-w-[196px] rounded-[10px_10px_10px_3px] px-3 py-2 text-[12.5px] leading-[1.45]">
+                        {m.text}
+                      </p>
+                      <p className="text-muted-foreground mt-0.5 text-[10px]">{m.time}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div key={i} className="self-end text-right">
+                    <p className="bg-accent/10 border-accent/20 max-w-[220px] rounded-[10px_10px_3px_10px] border px-3 py-2 text-[12.5px] leading-[1.45]">
+                      {m.text}
+                    </p>
+                    {m.spokenFor && (
+                      <p className="text-muted-foreground mt-0.5 flex items-center justify-end gap-1 text-[10px]">
                         <Mic className="h-2.5 w-2.5" aria-hidden />
                         spoken · {m.spokenFor}
-                      </span>
+                      </p>
                     )}
-                    {m.who === "sparra" && <span>{m.time}</span>}
+                  </div>
+                )
+              )}
+
+              {/* Pending question, pinned to the bottom — Sparra is waiting. Same
+                  per-message avatar as every other Sparra turn above. */}
+              <div className="mt-auto flex items-start gap-1.5 self-start">
+                <Sparra size={20} className="mt-0.5 shrink-0" />
+                <div>
+                  <p className="bg-muted max-w-[196px] rounded-[10px_10px_10px_3px] px-3 py-2 text-[12.5px] leading-[1.45]">
+                    {ticket.pending}
+                  </p>
+                  <p className="text-muted-foreground mt-1 flex items-center gap-1.5 text-[10.5px]">
+                    <span className="flex gap-0.5" aria-hidden>
+                      <span className="bg-accent h-1 w-1 animate-pulse rounded-full" />
+                      <span className="bg-accent h-1 w-1 animate-pulse rounded-full [animation-delay:150ms]" />
+                      <span className="bg-accent h-1 w-1 animate-pulse rounded-full [animation-delay:300ms]" />
+                    </span>
+                    waiting for you
                   </p>
                 </div>
-              ))}
-
-              {/* Pending question, pinned to the bottom — Sparra is waiting. */}
-              <div className="mt-auto self-start">
-                <p className="bg-muted max-w-[220px] rounded-[10px_10px_10px_3px] px-3 py-2 text-[12.5px] leading-[1.45]">
-                  {ticket.pending}
-                </p>
-                <p className="text-muted-foreground mt-1 flex items-center gap-1.5 text-[10.5px]">
-                  <span className="flex gap-0.5" aria-hidden>
-                    <span className="bg-accent h-1 w-1 animate-pulse rounded-full" />
-                    <span className="bg-accent h-1 w-1 animate-pulse rounded-full [animation-delay:150ms]" />
-                    <span className="bg-accent h-1 w-1 animate-pulse rounded-full [animation-delay:300ms]" />
-                  </span>
-                  waiting for you
-                </p>
               </div>
             </div>
 
