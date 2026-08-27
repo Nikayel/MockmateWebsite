@@ -10,11 +10,16 @@
  * ticket/run context and the live-state seams they were built to accept), `useSprintLabRunSync`
  * (Task 6's autosave, reused verbatim), `AiPolicyBanner` (Task 11's).
  *
- * CONTENT GAP (see `lib/sprint-labs/workspace/tree.ts`'s header, restated here because it is this
- * component's single biggest known limitation): no compiled field carries a ticket's editable
- * `src/` seed content today, so `seedFiles` below is always `[]` and a fresh ticket's `src` group
- * renders honestly empty rather than fabricated. Everything downstream (autosave, the runner, Layer
- * B, the tree) is wired end to end and will light up unchanged the moment that field exists.
+ * INITIAL-TREE PROVISIONING (RULING R27): the seed passed to `useSprintLabRunSync` used to be a
+ * permanent `[]` -- no compiled field carries a ticket's editable `src/` seed content, and R27
+ * chose request-time provisioning over teaching the content compiler a new field. On mount / ticket
+ * switch, `provisionSprintLabWorkspace` (`lib/sprint-labs/runs-client.ts`) POSTs to
+ * `/api/sprint-labs/runs/provision`, which reuses Task 7's dynamic materializer server-side and
+ * idempotently seeds the T6 file store (first open only, per path -- see that route's own doc
+ * comment). `useSprintLabRunSync`'s own `runId` is deliberately withheld (`null`) until that fetch
+ * resolves, so its internal load-and-reassemble effect never runs against a still-empty seed --
+ * once it does run, `reassembleWorkspaceFiles` layers the learner's saved overlay on top exactly as
+ * it always has, unchanged by where the seed came from.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -39,6 +44,8 @@ import { toNotStartedObjectiveView } from "@/components/sprint-labs/ui/Objective
 import { useSprintLabRunSync } from "@/components/sprint-labs/useSprintLabRunSync"
 import {
   moveSprintLabRunTicket,
+  provisionSprintLabWorkspace,
+  type ProvisionedWorkspaceFile,
   type SprintLabRunRecord,
   type WorkspaceFileLike,
 } from "@/lib/sprint-labs/runs-client"
@@ -60,10 +67,8 @@ import { fetchPartnerTranscript, setDirectiveMuted } from "@/lib/sprint-labs/par
 const SANDBOX_NOTICE =
   "Server side isolated grading lands next month. Until then Sprint Labs runs TypeScript, JavaScript, Python and SQL in your browser."
 
-const EMPTY_SOURCE_SEED: WorkspaceFileLike[] = []
-const EMPTY_SEED_FILES: Record<string, string> = Object.fromEntries(
-  EMPTY_SOURCE_SEED.map((f) => [f.path, f.content])
-)
+/** Diff-stat base while a ticket's provisioned tree hasn't resolved yet -- see the effect below. */
+const NO_FILES: Record<string, string> = {}
 
 export interface WorkspaceViewProps {
   workbookId: string
@@ -108,13 +113,56 @@ export function WorkspaceView({
     }
   }, [run.id, run.board, ticketKey])
 
-  // T6's autosave hook, reused verbatim. Seed is always [] today -- see this file's header and
-  // lib/sprint-labs/workspace/tree.ts's for the content-compiler gap this is wired-but-dormant for.
-  const sync = useSprintLabRunSync(run.id, EMPTY_SOURCE_SEED)
+  // Provisioning (RULING R27, see this file's header): materializes + idempotently seeds this
+  // ticket's initial tree on mount and on every ticket switch. `provisioned` stays `null` (never `[]`)
+  // while a fetch is in flight or has not yet started, so "loading" and "provisioned zero files" are
+  // never confused -- mirrors useSprintLabRunSync's own null-vs-[] discipline for the same reason.
+  const [provisioned, setProvisioned] = useState<ProvisionedWorkspaceFile[] | null>(null)
+  const [provisionError, setProvisionError] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    setProvisioned(null)
+    setProvisionError(null)
+    provisionSprintLabWorkspace({ runId: run.id, ticketKey }).then((files) => {
+      if (cancelled) return
+      if (!files) {
+        setProvisionError("Couldn't load this ticket's starting files.")
+        return
+      }
+      setProvisioned(files)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [run.id, ticketKey])
+
+  const editableSeed = useMemo<WorkspaceFileLike[]>(
+    () =>
+      (provisioned ?? [])
+        .filter((f) => f.role === "editable")
+        .map((f) => ({ path: f.path, content: f.content })),
+    [provisioned]
+  )
+  const editableSeedMap = useMemo(
+    () => Object.fromEntries(editableSeed.map((f) => [f.path, f.content])),
+    [editableSeed]
+  )
+  const meridianMd = useMemo(
+    () => provisioned?.find((f) => f.role === "docs" && f.path === "MERIDIAN.md")?.content,
+    [provisioned]
+  )
+
+  // T6's autosave hook, reused verbatim. `runId` is withheld until `provisioned` resolves (see the
+  // effect above and this file's header) so its own load-and-reassemble effect never runs against a
+  // still-empty seed.
+  const sync = useSprintLabRunSync(provisioned ? run.id : null, editableSeed)
 
   const [activePath, setActivePath] = useState<string | undefined>(undefined)
 
-  const diffStat = useMemo(() => computeDiffStat(EMPTY_SEED_FILES, sync.files), [sync.files])
+  const diffStat = useMemo(
+    () => computeDiffStat(provisioned ? editableSeedMap : NO_FILES, sync.files),
+    [provisioned, editableSeedMap, sync.files]
+  )
 
   const layerBInput = useMemo(() => {
     const sourceForLayerB = [
@@ -137,14 +185,12 @@ export function WorkspaceView({
       buildWorkspaceTree({
         ticket: compiledTicket,
         editableFiles: sync.files,
-        // Wired-but-dormant: no compiled field carries MERIDIAN.md yet (mirrors Task 14's layerA
-        // seam for the identical reason). Passing undefined here is the documented, correct state.
-        meridianMd: undefined,
+        meridianMd,
         mapMd,
       }),
     // compiledTicket omitted for the same reason as the memo above: stable for one ticket's lifetime.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sync.files, mapMd]
+    [sync.files, meridianMd, mapMd]
   )
 
   // Opens on MERIDIAN.md (or the generated map, per tree.ts's fallback) exactly once, when the tree
@@ -372,6 +418,11 @@ export function WorkspaceView({
             </p>
           )}
 
+          {provisionError && (
+            <p className="text-destructive text-xs" role="alert">
+              {provisionError}
+            </p>
+          )}
           {sync.error && (
             <p className="text-destructive text-xs" role="alert">
               {sync.error}
