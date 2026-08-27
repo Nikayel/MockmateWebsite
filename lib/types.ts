@@ -170,6 +170,21 @@ export interface InterviewSession {
     aiCollaborationQuality?: number
     communication?: number
   }
+  // Sprint Labs' five-dimension rubric (docs/sprint-labs/WORKBOOK-SPEC.md §5),
+  // additive sibling to bugfix_score_breakdown per that precedent
+  // (docs/sprint-labs/PLAN.md Task 8). `communication` is nullable: present
+  // only when a ticket collects prose, else null and the other four
+  // dimensions are renormalized (see lib/sprint-labs/grading/scorer.ts). Only
+  // unassisted + review-only attempts ever populate this field — assisted
+  // attempts are formative-only and never write it.
+  sprint_score_breakdown?: {
+    overall?: number
+    understanding?: number
+    problemSolving?: number
+    codeQuality?: number
+    communication?: number | null
+    verification?: number
+  }
   // Guided bug-fix lab: marks a scaffolded teaching run so it is kept OUT of the
   // interview-readiness aggregate and shown as a labeled practice/mastery signal
   // rather than an (invalid) interview score.

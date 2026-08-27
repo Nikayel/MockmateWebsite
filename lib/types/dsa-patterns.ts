@@ -95,6 +95,15 @@ export const DSA_PATTERNS = {
   // Intentionally absent from PATTERN_ROADMAP so it never surfaces as a DSA
   // skill node; only used at the labs mastery boundary.
   CASE_LAB: "case-lab",
+
+  // Sprint Labs (docs/sprint-labs/PLAN.md Task 8) — NOT a DSA pattern either,
+  // for the exact same reason as CASE_LAB: a ticket on a persistent codebase
+  // (Meridian) is graded on escaped-defect rate and rubric dimensions, not on
+  // one DSA pattern, so it must not inflate a real pattern's stats. See
+  // lib/labs/case-lab-mastery.ts for why this needs its own bucket rather
+  // than reusing "case-lab" or falling back to "arrays-hashing". Intentionally
+  // absent from PATTERN_ROADMAP.
+  SPRINT_LAB: "sprint-lab",
 } as const
 
 export type DSAPattern = (typeof DSA_PATTERNS)[keyof typeof DSA_PATTERNS]
@@ -698,6 +707,29 @@ export const PATTERN_METADATA: Record<DSAPattern, PatternMetadata> = {
     interviewerFollowUps: [
       "What is the single bottleneck the software is here to fix?",
       "Which failure mode hurts a real user if you get it wrong?",
+    ],
+  },
+
+  // Non-DSA bucket for Sprint Labs (see DSA_PATTERNS.SPRINT_LAB). Present so
+  // Record<DSAPattern, ...> lookups stay total; not in PATTERN_ROADMAP, so it
+  // never renders as a skill node.
+  "sprint-lab": {
+    id: "sprint-lab",
+    name: "Sprint Lab (Codebase)",
+    description:
+      "Ticket-shaped work on a persistent, multi-sprint codebase (Meridian) — graded on escaped-defect rate and rubric dimensions, not a DSA pattern.",
+    keyTechniques: [
+      "Codebase Navigation",
+      "Contract Design",
+      "Regression Discipline",
+      "Reviewing an AI's PR",
+    ],
+    commonQuestions: ["Claim intake 500s on a valid payload", "Continental can see Bekins' claims"],
+    timeComplexityHints: ["N/A"],
+    spaceComplexityHints: ["N/A"],
+    interviewerFollowUps: [
+      "What would break in an earlier sprint if you changed this?",
+      "Which hidden case did you not think to write yourself?",
     ],
   },
 }
