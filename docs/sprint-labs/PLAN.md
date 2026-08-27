@@ -282,11 +282,13 @@ Verification: stub-seam unit tests; one real run deferred to Task 21
 
 ## Task 10: Screens — /labs chooser, catalog, workbook overview
 
-Owned: `app/labs/page.tsx` edits (chooser section), `components/labs/
-SurfaceChooser.tsx` (or per UX-SPEC naming), `app/labs/workbooks/**`
-(catalog + `[workbookId]` overview route pair per Pattern B),
-`components/sprint-labs/catalog/**`. Touch-with-care:
-`components/header.tsx` only if UX-SPEC says so.
+Owned: `app/labs/page.tsx` edits (chooser section per UX-SPEC: anchor
+strip + SprintLabsSection after the Case Labs grid, hero/SEO untouched),
+`app/sprint-labs/**` public half (catalog + `[workbookId]` overview per
+Pattern B — route root per UX-SPEC, NOT nested under `app/labs/[labId]`),
+`components/sprint-labs/catalog/**`, plus the `.workbook-surface` selector
+addition to the four `--wb-*` blocks in `app/globals.css` (zero value
+changes). Touch-with-care: `components/header.tsx` only if UX-SPEC says so.
 
 Build exactly to UX-SPEC sections 1-2: Case Labs content does not regress
 (SEO sections intact); Sprint Labs entries render only when
@@ -300,8 +302,9 @@ typecheck/lint; screenshot or DOM assertions per repo convention.
 
 ## Task 11: Screens — standup, board, ticket
 
-Owned: `app/labs/workbooks/[workbookId]/sprint/[n]/**` (standup, board,
-ticket routes per UX-SPEC), `components/sprint-labs/board/**`,
+Owned: the standup, board, and ticket segments of the auth-gated
+`app/sprint-labs/[workbookId]/run/**` branch (force-dynamic + noindex per
+UX-SPEC routing), `components/sprint-labs/board/**`,
 `components/sprint-labs/ticket/**`.
 
 Standup: goal, inciting quote, arch-map delta, sprint objectives. Board:
@@ -316,8 +319,8 @@ badges; typecheck/lint.
 
 ## Task 12: Screen — workspace
 
-Owned: `app/labs/workbooks/[workbookId]/sprint/[n]/ticket/[key]/workspace/**`
-(force-dynamic, noindex, auth-gated layout per Pattern B),
+Owned: the workspace segment of `app/sprint-labs/[workbookId]/run/**`
+(force-dynamic, noindex, auth-gated layout per UX-SPEC routing),
 `components/sprint-labs/workspace/**`.
 
 BuildStation-derived: file tree + tabs (locked files per role;
@@ -335,7 +338,8 @@ derivation; typecheck/lint.
 
 Owned: `components/sprint-labs/submit/**`, `components/sprint-labs/
 review/**`, `components/sprint-labs/retro/**`, `components/sprint-labs/
-summary/**`, their routes under the sprint segment per UX-SPEC.
+summary/**`, their segments under the `app/sprint-labs/[workbookId]/run/**`
+branch per UX-SPEC.
 
 Submit/CI: staged four-gate reveal (Sparra scoring states, determinate,
 never completes early), hidden failures as humanNames only, escaped-defect
