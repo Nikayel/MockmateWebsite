@@ -1,0 +1,11 @@
+weights:
+  understanding: 0.2
+  problemSolving: 0.25
+  codeQuality: 0.15
+  communication: 0.1
+  verification: 0.3
+notes:
+  understanding: "Keys off recognizing that the leak is one query missing a tenant filter, and that the fix should scope tenant identity to the call rather than trusting a caller to pass a tenant id correctly every time."
+  problemSolving: "Keys off the visible pass rate across cross-tenant lookups, the shared-external-ref case, and the pool-of-one release proof."
+  codeQuality: "Keys off findClaimByExternalRef reading its tenant off the connection instead of taking a second, independently-suppliable tenant argument that could disagree with it."
+  verification: "Keys off whether the learner's own test proves the exact SUP-2291 shape - two tenants, one shared external reference - rather than a single-tenant happy path."

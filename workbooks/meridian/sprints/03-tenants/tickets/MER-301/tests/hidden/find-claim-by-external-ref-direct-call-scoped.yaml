@@ -1,0 +1,31 @@
+humanName: "Escaped: findClaimByExternalRef called directly (not through reconciliation) still enforces tenant scope"
+tags:
+  - transaction-scoped-tenant-context
+kind: probe
+body: |
+  const { meridian } = buildTestApp()
+  return seedContinentalAndBekins(meridian.db)
+    .then(() =>
+      meridian.app.inject({
+        method: "POST",
+        url: "/claims",
+        headers: { "x-tenant-id": "ten_bekins" },
+        payload: {
+          externalRef: "DIRECT-1",
+          amount: 300,
+          claimantName: "Bekins Claimant",
+          lossDate: "2026-01-14",
+        },
+      })
+    )
+    .then(() => {
+      const pool = createConnectionPool(meridian.db, 4)
+      const connection = pool.acquire("ten_continental")
+      return findClaimByExternalRef(connection, "DIRECT-1").then((result) => {
+        pool.release(connection)
+        return result
+      })
+    })
+    .then((result) => {
+      assert(result === null, "a connection scoped to Continental must never resolve Bekins' claim, even calling the repository function directly")
+    })

@@ -1,0 +1,451 @@
+diff --git a/src/db/memory-db.ts b/src/db/memory-db.ts
+index 55e9dc8..292ed73 100644
+--- a/src/db/memory-db.ts
++++ b/src/db/memory-db.ts
+@@ -105,8 +105,10 @@ export function createMemoryDb(): DbClient {
+       }
+ 
+       case queries.FIND_CLAIM_BY_EXTERNAL_REF: {
+-        const [externalRef] = params
+-        const row = claims.find((claim) => claim.external_ref === externalRef)
++        const [tenantId, externalRef] = params
++        const row = claims.find(
++          (claim) => claim.tenant_id === tenantId && claim.external_ref === externalRef
++        )
+         return { rows: row ? [row as T] : [] }
+       }
+ 
+diff --git a/src/db/queries.ts b/src/db/queries.ts
+index ba9f750..943e6f7 100644
+--- a/src/db/queries.ts
++++ b/src/db/queries.ts
+@@ -30,8 +30,11 @@ export const LIST_CLAIMS_KEYSET =
+   " ORDER BY created_at, id LIMIT $4"
+ 
+ /** Used by the reconciliation job, which only ever has the insurer's own reference number
+- * to go on. */
+-export const FIND_CLAIM_BY_EXTERNAL_REF = "SELECT * FROM claims WHERE external_ref = $1"
++ * to go on - scoped by tenant_id too (SUP-2291): `external_ref` is only meaningful within the
++ * tenant that sent it, so a lookup that omits the tenant filter can return a different
++ * tenant's claim whenever two insurers happen to reuse the same reference number. */
++export const FIND_CLAIM_BY_EXTERNAL_REF =
++  "SELECT * FROM claims WHERE tenant_id = $1 AND external_ref = $2"
+ 
+ export const INSERT_DOCUMENT =
+   "INSERT INTO documents (id, claim_id, file_name, content_type, legacy_path, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *"
+diff --git a/src/db/repositories/claims.ts b/src/db/repositories/claims.ts
+index dc43bf6..b646559 100644
+--- a/src/db/repositories/claims.ts
++++ b/src/db/repositories/claims.ts
+@@ -1,4 +1,5 @@
+ import type { DbClient } from "../client"
++import type { PooledConnection } from "../tenant-context"
+ import type { Claim, CreateClaimInput } from "../../domain/claim"
+ import type { ClaimStatus } from "../../domain/claim-status"
+ import { AUDIT_PROJECTION_VERSION, computeClaimAuditHash } from "../../util/canonical-json"
+@@ -139,13 +140,20 @@ export async function listClaimsByTenantKeyset(
+ 
+ /**
+  * Looks a claim up by the insurer's own reference number - used by the reconciliation job,
+- * which does not have a tenant id to go on, only whatever reference the insurer quotes back
+- * to us.
++ * which does not have a tenant id of its own to go on, only whatever reference the insurer
++ * quotes back to us. SUP-2291: this used to take a bare `externalRef` with no tenant filter at
++ * all, so it returned whichever tenant's row matched, regardless of who asked. It now takes a
++ * `PooledConnection` and reads `connection.tenantId` itself rather than a tenant id some
++ * caller passed in - a caller cannot get this wrong by forgetting an argument, because there
++ * is no separate argument to forget.
+  */
+ export async function findClaimByExternalRef(
+-  db: DbClient,
++  connection: PooledConnection,
+   externalRef: string
+ ): Promise<Claim | null> {
+-  const { rows } = await db.query<ClaimRow>(FIND_CLAIM_BY_EXTERNAL_REF, [externalRef])
++  const { rows } = await connection.query<ClaimRow>(FIND_CLAIM_BY_EXTERNAL_REF, [
++    connection.tenantId,
++    externalRef,
++  ])
+   return rows[0] ? toClaim(rows[0]) : null
+ }
+diff --git a/src/db/tenant-context.ts b/src/db/tenant-context.ts
+new file mode 100644
+index 0000000..229243f
+--- /dev/null
++++ b/src/db/tenant-context.ts
+@@ -0,0 +1,76 @@
++import type { DbClient, QueryResult } from "./client"
++
++/**
++ * A connection checked out of the pool for exactly one tenant's request. There is no real
++ * Postgres connection here yet - `query` delegates straight through to the same underlying
++ * `DbClient` every connection in the pool shares - but `tenantId` is mutable and the object
++ * itself is REUSED across checkouts, the same way a real pooled connection is one physical
++ * object handed to many callers over its lifetime. A repository function reads `tenantId` off
++ * whatever connection it was given instead of a tenant id passed as a loose parameter. See
++ * migrations/0010_row_level_security.sql for where tenant scoping stops depending on this
++ * object at all and moves into Postgres itself.
++ */
++export interface PooledConnection {
++  tenantId: string | null
++  query<T = unknown>(sql: string, params?: unknown[]): Promise<QueryResult<T>>
++}
++
++export interface ConnectionPool {
++  acquire(tenantId: string): PooledConnection
++  release(connection: PooledConnection): void
++}
++
++/**
++ * `size` fixed connection objects, handed out round-robin and REUSED, never recreated - a pool
++ * of size one always hands the next `acquire()` the exact same object the last caller had.
++ * That is what makes it possible to prove a released connection's tenant tag cannot survive
++ * into the next caller: with only one object, "the next caller's connection" and "the
++ * connection whoever just released it was holding" are the same object, not merely similar.
++ */
++export function createConnectionPool(db: DbClient, size: number): ConnectionPool {
++  if (size < 1) throw new Error("pool size must be at least 1")
++  const connections: PooledConnection[] = Array.from({ length: size }, () => ({
++    tenantId: null,
++    query: (sql, params) => db.query(sql, params),
++  }))
++  let nextIndex = 0
++
++  return {
++    acquire(tenantId) {
++      const connection = connections[nextIndex]
++      nextIndex = (nextIndex + 1) % connections.length
++      connection.tenantId = tenantId
++      return connection
++    },
++
++    /**
++     * Clears the connection's tenant tag synchronously, inline, before `release()` returns -
++     * never scheduled onto a listener, an event emitter, or a later tick. That is the entire
++     * fix SUP-2291 needed: nothing runs between "released" and "cleared" for a later callback
++     * to race against, so the very next `acquire()` (which stamps its own tenant id
++     * immediately, synchronously, in the same call) can never observe - or be clobbered by - a
++     * reset left pending from the connection's previous tenant.
++     */
++    release(connection) {
++      connection.tenantId = null
++    },
++  }
++}
++
++/**
++ * Runs `fn` against a connection acquired for `tenantId`, releasing it when `fn` settles either
++ * way. Scopes tenant identity to the lifetime of this one call - the caller never threads a raw
++ * tenantId string into whatever repository function it calls next; the connection carries it.
++ */
++export async function withTenant<T>(
++  pool: ConnectionPool,
++  tenantId: string,
++  fn: (connection: PooledConnection) => Promise<T>
++): Promise<T> {
++  const connection = pool.acquire(tenantId)
++  try {
++    return await fn(connection)
++  } finally {
++    pool.release(connection)
++  }
++}
+diff --git a/src/jobs/reconcile.ts b/src/jobs/reconcile.ts
+index d613720..e364bb6 100644
+--- a/src/jobs/reconcile.ts
++++ b/src/jobs/reconcile.ts
+@@ -1,15 +1,24 @@
+-import type { DbClient } from "../db/client"
++import type { ConnectionPool } from "../db/tenant-context"
++import { withTenant } from "../db/tenant-context"
+ import { findClaimByExternalRef } from "../db/repositories/claims"
+ 
+ /**
+  * Looks up a batch of claims by the insurer's own reference numbers, the same lookup an
+  * insurer's reconciliation email points at. Ops runs this by hand today; nothing schedules
+- * it.
++ * it. Takes the tenant pool and a single tenantId, not a raw db handle - the whole run happens
++ * inside one `withTenant` checkout, so every lookup inside it is scoped to that same tenant with
++ * no chance of a caller forgetting to pass it down to one of them.
+  */
+-export async function runReconciliation(db: DbClient, externalRefs: string[]) {
+-  const results: Record<string, Awaited<ReturnType<typeof findClaimByExternalRef>>> = {}
+-  for (const externalRef of externalRefs) {
+-    results[externalRef] = await findClaimByExternalRef(db, externalRef)
+-  }
+-  return results
++export async function runReconciliation(
++  pool: ConnectionPool,
++  tenantId: string,
++  externalRefs: string[]
++) {
++  return withTenant(pool, tenantId, async (connection) => {
++    const results: Record<string, Awaited<ReturnType<typeof findClaimByExternalRef>>> = {}
++    for (const externalRef of externalRefs) {
++      results[externalRef] = await findClaimByExternalRef(connection, externalRef)
++    }
++    return results
++  })
+ }
+diff --git a/test/fixtures/tenants.sql b/test/fixtures/tenants.sql
+deleted file mode 100644
+index 25cd79a..0000000
+--- a/test/fixtures/tenants.sql
++++ /dev/null
+@@ -1,10 +0,0 @@
+--- Reference fixture data. Not run by this repo's own test suite (nothing in test/ reads
+--- this file) - it exists for whoever needs a realistic tenant row to seed a database with.
+-insert into tenants (id, name, webhook_url, webhook_secret, created_at)
+-values (
+-  'ten_northwind',
+-  'Northwind Mutual',
+-  'https://northwind.example.com/webhooks/meridian',
+-  'nw-shared-secret',
+-  '2025-11-02T08:00:00.000Z'
+-);
+diff --git a/test/fixtures/tenants.ts b/test/fixtures/tenants.ts
+new file mode 100644
+index 0000000..aa5d09e
+--- /dev/null
++++ b/test/fixtures/tenants.ts
+@@ -0,0 +1,58 @@
++import type { DbClient } from "../../src/db/client"
++import { insertTenant } from "../../src/db/repositories/tenants"
++import type { Tenant } from "../../src/domain/tenant"
++
++/**
++ * This sprint's two named tenants - the two insurers SUP-2291 is about. A cross-tenant leak
++ * cannot be demonstrated with only one tenant seeded, which is the whole reason this fixture
++ * needs a second one where `test/support/fixtures.ts`'s single generic `seedTenant` sufficed
++ * before now.
++ */
++export const CONTINENTAL_TENANT_ID = "ten_continental"
++export const BEKINS_TENANT_ID = "ten_bekins"
++
++export interface BuildTenantFixtureOptions {
++  id: string
++  name?: string
++  webhookUrl?: string | null
++  webhookSecret?: string | null
++  timeZone?: string
++}
++
++/**
++ * Inserts one named tenant through the same repository layer every other insert goes
++ * through. Replaces `test/fixtures/tenants.sql`, which nothing in this repo's test suite ever
++ * read.
++ */
++export async function seedTenantFixture(
++  db: DbClient,
++  options: BuildTenantFixtureOptions
++): Promise<Tenant> {
++  return insertTenant(db, {
++    id: options.id,
++    name: options.name ?? "Reference Tenant",
++    webhookUrl: options.webhookUrl ?? null,
++    webhookSecret: options.webhookSecret ?? null,
++    timeZone: options.timeZone ?? "America/Chicago",
++    createdAt: new Date().toISOString(),
++  })
++}
++
++export interface ContinentalAndBekins {
++  continental: Tenant
++  bekins: Tenant
++}
++
++/** Seeds both of SUP-2291's tenants in one call - the fixture every cross-tenant test in this
++ * sprint starts from. */
++export async function seedContinentalAndBekins(db: DbClient): Promise<ContinentalAndBekins> {
++  const continental = await seedTenantFixture(db, {
++    id: CONTINENTAL_TENANT_ID,
++    name: "Continental Freight Insurance",
++  })
++  const bekins = await seedTenantFixture(db, {
++    id: BEKINS_TENANT_ID,
++    name: "Bekins Van Lines",
++  })
++  return { continental, bekins }
++}
+diff --git a/test/tenants/connection-pool.test.ts b/test/tenants/connection-pool.test.ts
+new file mode 100644
+index 0000000..7746cab
+--- /dev/null
++++ b/test/tenants/connection-pool.test.ts
+@@ -0,0 +1,47 @@
++import { describe, expect, it } from "vitest"
++import { createMemoryDb } from "../../src/db/memory-db"
++import { createConnectionPool, withTenant } from "../../src/db/tenant-context"
++
++describe("connection pool tenant tagging", () => {
++  it("a pool of size one never hands the next caller the previous caller's tenant id", async () => {
++    const pool = createConnectionPool(createMemoryDb(), 1)
++
++    const first = pool.acquire("ten_continental")
++    expect(first.tenantId).toBe("ten_continental")
++    pool.release(first)
++
++    const second = pool.acquire("ten_bekins")
++    expect(second.tenantId).toBe("ten_bekins")
++  })
++
++  it("withTenant releases the connection even when the callback throws", async () => {
++    const pool = createConnectionPool(createMemoryDb(), 1)
++
++    await expect(
++      withTenant(pool, "ten_continental", async () => {
++        throw new Error("boom")
++      })
++    ).rejects.toThrow("boom")
++
++    const next = pool.acquire("ten_bekins")
++    expect(next.tenantId).toBe("ten_bekins")
++  })
++
++  it("two sequential withTenant calls against a pool of one each see only their own tenant id", async () => {
++    const pool = createConnectionPool(createMemoryDb(), 1)
++    const seen: string[] = []
++
++    await withTenant(pool, "ten_continental", async (connection) => {
++      seen.push(connection.tenantId)
++    })
++    await withTenant(pool, "ten_bekins", async (connection) => {
++      seen.push(connection.tenantId)
++    })
++
++    expect(seen).toEqual(["ten_continental", "ten_bekins"])
++  })
++
++  it("rejects a pool size below one", () => {
++    expect(() => createConnectionPool(createMemoryDb(), 0)).toThrow()
++  })
++})
+diff --git a/test/tenants/reconciliation-tenant-scope.test.ts b/test/tenants/reconciliation-tenant-scope.test.ts
+new file mode 100644
+index 0000000..394420e
+--- /dev/null
++++ b/test/tenants/reconciliation-tenant-scope.test.ts
+@@ -0,0 +1,123 @@
++import { describe, expect, it } from "vitest"
++import { buildTestApp } from "../support/build-app"
++import { createConnectionPool } from "../../src/db/tenant-context"
++import { findClaimByExternalRef } from "../../src/db/repositories/claims"
++import { runReconciliation } from "../../src/jobs/reconcile"
++import { seedContinentalAndBekins } from "../fixtures/tenants"
++
++describe("SUP-2291: reconciliation never crosses tenants", () => {
++  it("does not return Bekins' claim when Continental reconciles the same external ref", async () => {
++    const { meridian } = buildTestApp()
++    await seedContinentalAndBekins(meridian.db)
++
++    await meridian.app.inject({
++      method: "POST",
++      url: "/claims",
++      headers: { "x-tenant-id": "ten_bekins" },
++      payload: {
++        externalRef: "SHARED-REF-1",
++        amount: 900,
++        claimantName: "Bekins Claimant",
++        lossDate: "2026-01-10",
++      },
++    })
++
++    const pool = createConnectionPool(meridian.db, 4)
++    const results = await runReconciliation(pool, "ten_continental", ["SHARED-REF-1"])
++
++    expect(results["SHARED-REF-1"]).toBeNull()
++  })
++
++  it("still finds a claim that really does belong to the requesting tenant", async () => {
++    const { meridian } = buildTestApp()
++    await seedContinentalAndBekins(meridian.db)
++
++    await meridian.app.inject({
++      method: "POST",
++      url: "/claims",
++      headers: { "x-tenant-id": "ten_continental" },
++      payload: {
++        externalRef: "CONT-1",
++        amount: 400,
++        claimantName: "Continental Claimant",
++        lossDate: "2026-01-11",
++      },
++    })
++
++    const pool = createConnectionPool(meridian.db, 4)
++    const results = await runReconciliation(pool, "ten_continental", ["CONT-1"])
++
++    expect(results["CONT-1"]).not.toBeNull()
++    expect(results["CONT-1"]?.tenantId).toBe("ten_continental")
++  })
++
++  it("resolves two tenants reusing the exact same external ref to two different claims", async () => {
++    const { meridian } = buildTestApp()
++    await seedContinentalAndBekins(meridian.db)
++
++    await meridian.app.inject({
++      method: "POST",
++      url: "/claims",
++      headers: { "x-tenant-id": "ten_continental" },
++      payload: {
++        externalRef: "DUP-100",
++        amount: 100,
++        claimantName: "Continental Claimant",
++        lossDate: "2026-01-12",
++      },
++    })
++    await meridian.app.inject({
++      method: "POST",
++      url: "/claims",
++      headers: { "x-tenant-id": "ten_bekins" },
++      payload: {
++        externalRef: "DUP-100",
++        amount: 200,
++        claimantName: "Bekins Claimant",
++        lossDate: "2026-01-12",
++      },
++    })
++
++    const pool = createConnectionPool(meridian.db, 4)
++    const continentalResult = await runReconciliation(pool, "ten_continental", ["DUP-100"])
++    const bekinsResult = await runReconciliation(pool, "ten_bekins", ["DUP-100"])
++
++    expect(continentalResult["DUP-100"]?.tenantId).toBe("ten_continental")
++    expect(bekinsResult["DUP-100"]?.tenantId).toBe("ten_bekins")
++    expect(continentalResult["DUP-100"]?.id).not.toBe(bekinsResult["DUP-100"]?.id)
++  })
++
++  it("findClaimByExternalRef itself reads the tenant off the connection, not a separate argument", async () => {
++    const { meridian } = buildTestApp()
++    await seedContinentalAndBekins(meridian.db)
++
++    await meridian.app.inject({
++      method: "POST",
++      url: "/claims",
++      headers: { "x-tenant-id": "ten_bekins" },
++      payload: {
++        externalRef: "REPO-DIRECT-1",
++        amount: 150,
++        claimantName: "Bekins Claimant",
++        lossDate: "2026-01-13",
++      },
++    })
++
++    const pool = createConnectionPool(meridian.db, 4)
++    const connection = pool.acquire("ten_continental")
++    const result = await findClaimByExternalRef(connection, "REPO-DIRECT-1")
++    pool.release(connection)
++
++    expect(result).toBeNull()
++  })
++
++  it("returns null, not an error, for an external ref nobody has filed", async () => {
++    const { meridian } = buildTestApp()
++    await seedContinentalAndBekins(meridian.db)
++
++    const pool = createConnectionPool(meridian.db, 4)
++    const results = await runReconciliation(pool, "ten_continental", ["NEVER-FILED"])
++
++    expect(results["NEVER-FILED"]).toBeNull()
++  })
++})
