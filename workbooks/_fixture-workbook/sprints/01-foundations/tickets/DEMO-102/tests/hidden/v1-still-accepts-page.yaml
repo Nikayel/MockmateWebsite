@@ -1,0 +1,9 @@
+humanName: "Escaped: the v1 endpoint stops accepting page and per_page"
+tags:
+  - contract-versioning
+kind: io-case
+input:
+  path: "/v1/claims?page=2&per_page=25"
+expected:
+  status: 200
+  deprecationHeaderPresent: true

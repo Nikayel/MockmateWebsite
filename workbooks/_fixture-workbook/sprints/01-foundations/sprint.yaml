@@ -1,0 +1,13 @@
+number: 1
+title: "Foundations"
+goal: "Replace the loose, any-typed edges of the claims intake endpoint with validated, narrow types, and decide how the API signals a breaking change."
+standupQuote: "Northwind's engineer swears the payload is valid, and the parser just shrugged and returned any."
+archMapDelta:
+  added:
+    - "POST /v2/claims (versioned alongside v1)"
+  invariants:
+    - "Every external payload is parsed through a validator before any handler code touches its fields."
+objectives:
+  - typed-boundaries
+  - contract-versioning
+sizingNotes: "Two tickets only. This workbook exists to exercise the compiler, not to teach a full sprint."

@@ -1,0 +1,7 @@
+humanName: "Escaped: a boolean amount is still accepted as a claim amount"
+tags:
+  - typed-boundaries
+kind: probe
+body: |
+  const rejected = parseClaimPayload({ tenantId: "northwind", amount: true })
+  assert(rejected.ok === false, "a boolean amount must be rejected")

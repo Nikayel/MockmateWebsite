@@ -1,0 +1,8 @@
+humanName: "Escaped: the v2 endpoint silently accepts page instead of rejecting it"
+tags:
+  - contract-versioning
+kind: io-case
+input:
+  path: "/v2/claims?page=2"
+expected:
+  status: 400
