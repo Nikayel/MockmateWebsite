@@ -251,7 +251,7 @@ describe("POST /api/sprint-labs/chat", () => {
     expect(systemPrompt).not.toContain("EXPORTED SYMBOLS")
   })
 
-  it("chat and author-agent modes legitimately keep Layer B when the client posts one", async () => {
+  it("chat mode legitimately keeps Layer B when the client posts one", async () => {
     const { POST } = await import("./route")
     const layerBBody = {
       sha: "a1b2c3d",
@@ -266,6 +266,34 @@ describe("POST /api/sprint-labs/chat", () => {
     const [systemPrompt] = mocks.generateAIResponse.mock.calls[0]
     expect(systemPrompt).toContain("generated at a1b2c3d")
     expect(systemPrompt).toContain("postClaim")
+  })
+
+  it("author-agent mode ALSO legitimately keeps Layer B when the client posts one (mirrors the tutor-blind guard above)", async () => {
+    mocks.resolvePartnerModeForTicket.mockResolvedValue({
+      kind: "author-agent",
+      brief: {
+        intent: "intent",
+        decisions: [],
+        doNotVolunteer: [],
+        concessionTriggers: [],
+      },
+    })
+    const { POST } = await import("./route")
+    const layerBBody = {
+      sha: "e5f6a7b",
+      generatedAt: "2026-08-27T00:00:00.000Z",
+      files: [{ path: "src/http/claims.ts", exports: ["postClaim"] }],
+      routes: ["POST /claims"],
+      migrations: [],
+      tests: ["claims-parser.test.ts"],
+      diffStat: "1 file changed",
+    }
+    await POST(createRequest({ ...VALID_BODY, layerB: layerBBody }))
+    const [systemPrompt] = mocks.generateAIResponse.mock.calls[0]
+    expect(systemPrompt).toContain("generated at e5f6a7b")
+    expect(systemPrompt).toContain("postClaim")
+    expect(systemPrompt).toContain("POST /claims")
+    expect(systemPrompt).toContain("claims-parser.test.ts")
   })
 
   it("on success: calls generateAIResponse with service sprint-labs-chat, persists both turns, and returns the reply", async () => {
