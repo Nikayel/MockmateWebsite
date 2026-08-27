@@ -285,6 +285,27 @@ describe("runPgSuiteNode: learner SQL cannot escape the grading role", () => {
 
     expect(result.results[0].passed).toBe(true)
   })
+
+  it("accepts learner SQL whose final statement has NO trailing semicolon (New Breakage 1 regression lock)", async () => {
+    // A prior version of runAsAppRole appended "\nselect current_user;" directly onto the
+    // learner's own SQL string. If the learner's last statement lacked a trailing semicolon, the
+    // concatenation ran the two together as one malformed statement ("select 1\nselect
+    // current_user..." has no separator between the two SELECTs). Fixed by running the role
+    // switch, the learner's script, and the role-escape check as three SEPARATE exec() calls.
+    const suite: PgSuite = {
+      migrations,
+      // Deliberately NO trailing semicolon -- entirely valid SQL, and a very common way to write
+      // a single statement.
+      learnerSql: `insert into t (n) values (1)`,
+      assertions: [{ id: "count", sql: `select count(*)::int from t;`, expect: { rows: [[1]] } }],
+    }
+
+    const result = await runPgSuiteNode(suite)
+
+    expect(result.error).toBeNull()
+    expect(result.results[0].suite).toBe("assertion")
+    expect(result.results[0].passed).toBe(true)
+  })
 })
 
 describe("runPgSuiteNode: grading role integrity", () => {
@@ -318,6 +339,30 @@ describe("runPgSuiteNode: grading role integrity", () => {
     expect(result.results[0].suite).toBe("integrity")
     expect(result.results[0].passed).toBe(false)
     expect(result.results[0].error).toMatch(/rolbypassrls/i)
+  })
+
+  it("fails loudly when a migration pre-creates the grading role EVEN WITH the exact correct flags", async () => {
+    // Critical 4 sub-clause: existence itself is the violation, not just wrong flags. A migration
+    // that creates sprintlab_app with the exact attributes this module's own provisioning would
+    // have used is STILL disallowed -- this module must be the sole definer of that role's
+    // identity, since a correctly-flagged-but-foreign role could still carry other state (a group
+    // membership, for instance) this flag-only check would never see.
+    const roleName = await getAppRoleName()
+    const suite: PgSuite = {
+      migrations: [
+        `create table t (n int not null);`,
+        `create role ${roleName} nosuperuser nobypassrls nologin;`,
+      ],
+      learnerSql: `select 1;`,
+      assertions: [{ id: "unreachable", sql: `select 1;`, expect: "zero-rows" }],
+    }
+
+    const result = await runPgSuiteNode(suite)
+
+    expect(result.results).toHaveLength(1)
+    expect(result.results[0].suite).toBe("integrity")
+    expect(result.results[0].passed).toBe(false)
+    expect(result.results[0].error).toMatch(/already existed/i)
   })
 
   it("passes normally when nothing pre-creates the role", async () => {
@@ -372,6 +417,51 @@ describe("runPgSuiteNode: ownership transfer resists a crafted (SQL-injection-sh
 
     expect(result.error).toBeNull()
     expect(result.results.map((r) => r.passed)).toEqual([true, true, true])
+  })
+})
+
+describe("runPgSuiteNode: temp-table shadowing cannot fake-pass an assertion (probe D)", () => {
+  it("REJECTS learner SQL that tries to create a temp table shadowing a real one", async () => {
+    // The root-cause fix (REVOKE TEMP ON DATABASE ... FROM PUBLIC) means the app role cannot
+    // create ANY temp object at all, so the attempt itself must fail as a learner-sql error --
+    // this is the primary proof the bypass is closed, stronger than "the shadow didn't work".
+    const suite: PgSuite = {
+      migrations: [`create table docs (id int, tenant_id text);`],
+      seedSql: `insert into docs values (1, 't1'), (2, 't2');`,
+      learnerSql: `create temp table docs (id int, tenant_id text);`,
+      assertions: [{ id: "unreachable", sql: `select 1;`, expect: "zero-rows" }],
+    }
+
+    const result = await runPgSuiteNode(suite)
+
+    expect(result.results).toHaveLength(1)
+    expect(result.results[0].suite).toBe("learner-sql")
+    expect(result.results[0].passed).toBe(false)
+    expect(result.results[0].error).toMatch(/permission denied.*temporary/i)
+  })
+
+  it("an unqualified assertion still sees the real table's data even after learner SQL tried search_path tricks", async () => {
+    // Companion proof at the assertion layer: even if learner SQL manages to change search_path
+    // (not create a temp table, which the test above already shows is blocked outright), the
+    // search_path reset this module prepends to every assertion's own SQL means an author's
+    // ordinary unqualified `FROM docs` still resolves to the real table.
+    const roleName = await getAppRoleName()
+    const suite: PgSuite = {
+      migrations: [`create table docs (id int, tenant_id text);`],
+      seedSql: `insert into docs values (1, 't1'), (2, 't2');`,
+      learnerSql: `set search_path = public, pg_catalog;`,
+      assertions: [
+        {
+          id: "sees-real-data",
+          sql: `set role ${roleName}; select count(*)::int from docs;`,
+          expect: { rows: [[2]] },
+        },
+      ],
+    }
+
+    const result = await runPgSuiteNode(suite)
+
+    expect(result.results[0].passed).toBe(true)
   })
 })
 
