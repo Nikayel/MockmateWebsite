@@ -1,17 +1,25 @@
 /**
- * Run with `pnpm lab:validate <workbookDir>` (wraps `tsx
- * scripts/lab-validate.mjs`) — not `node scripts/lab-validate.mjs` directly:
- * this file imports TypeScript (`lib/sprint-labs/validate/index.ts`), which
- * plain `node` cannot load. No shebang here on purpose, for the same reason
- * scripts/compile-workbooks.mjs has none: this is never executed standalone
- * in this repo's workflow, only via `tsx` or the npm script.
+ * Run with `pnpm lab:validate <workbookDir>` or `pnpm lab:validate:dynamic
+ * <workbookDir>` (both wrap `tsx scripts/lab-validate.mjs`) — not `node
+ * scripts/lab-validate.mjs` directly: this file imports TypeScript
+ * (`lib/sprint-labs/validate/index.ts`), which plain `node` cannot load. No
+ * shebang here on purpose, for the same reason scripts/compile-workbooks.mjs
+ * has none: this is never executed standalone in this repo's workflow, only
+ * via `tsx` or an npm script.
  *
- * A thin CLI over `lib/sprint-labs/validate`'s static gates (PLAN.md Task
- * 3): parse argv for a workbook directory, load its authored tree, run
- * every rule, print one line of PASS or a grouped failure report naming
- * ticket keys, exit 0/1. All real logic (the tree-snapshot loader, every
- * rule) lives in `lib/sprint-labs/validate/*` as plain, unit-tested
- * functions — this file owns none of it, only argv/stdout/exit code.
+ * A thin CLI over `lib/sprint-labs/validate`'s static gates (PLAN.md Task 3)
+ * AND, behind `--dynamic`, `lib/sprint-labs/validate/dynamic`'s red/green +
+ * regression + provisioning gates (PLAN.md Task 7): parse argv for a
+ * workbook directory and the `--dynamic` flag, load the authored tree, run
+ * the static rules (always) and the dynamic gate (only with `--dynamic`),
+ * print one line of PASS or a grouped failure report naming ticket keys,
+ * exit 0/1. Static-only stays the default — `pnpm lab:validate` never pays
+ * for a `git apply` + Node-harness replay of every ticket — so plain
+ * `lab:validate` is still the cheap, fast, every-commit check; `--dynamic`
+ * is the slower, thorough one for CI/content-authoring gates. All real
+ * logic (the tree-snapshot loader, every static rule, the dynamic gate)
+ * lives in `lib/sprint-labs/validate/*` as plain, unit-tested functions —
+ * this file owns none of it, only argv/stdout/exit code.
  *
  * Imported via `createRequire`, not a static `import`, matching
  * scripts/compile-workbooks.mjs's own documented workaround: this repo's
@@ -32,10 +40,11 @@ import { fileURLToPath } from "node:url"
 const ROOT = resolvePath(fileURLToPath(import.meta.url), "..", "..")
 const require = createRequire(import.meta.url)
 const { loadWorkbookTree, validateWorkbook } = require("../lib/sprint-labs/validate/index.ts")
+const { validateWorkbookDynamic } = require("../lib/sprint-labs/validate/dynamic/index.ts")
 
 function usageError(message) {
   console.error(message)
-  console.error("Usage: pnpm lab:validate <workbookDir>")
+  console.error("Usage: pnpm lab:validate [--dynamic] <workbookDir>")
   process.exitCode = 1
 }
 
@@ -64,8 +73,9 @@ function groupByRule(findings) {
   return byRule
 }
 
-export function main(argv = process.argv.slice(2)) {
-  const [target] = argv
+export async function main(argv = process.argv.slice(2)) {
+  const dynamic = argv.includes("--dynamic")
+  const [target] = argv.filter((arg) => arg !== "--dynamic")
   if (!target) {
     usageError("Missing required <workbookDir> argument.")
     return
@@ -86,7 +96,9 @@ export function main(argv = process.argv.slice(2)) {
     return
   }
 
-  const findings = validateWorkbook(workbook)
+  const staticFindings = validateWorkbook(workbook)
+  const dynamicFindings = dynamic ? await validateWorkbookDynamic(workbook) : []
+  const findings = [...staticFindings, ...dynamicFindings]
   const errors = findings.filter((f) => f.severity === "error")
   const warnings = findings.filter((f) => f.severity === "warn")
 
@@ -119,4 +131,9 @@ export function main(argv = process.argv.slice(2)) {
 }
 
 const isMain = typeof process.argv[1] === "string" && fileURLToPath(import.meta.url) === resolvePath(process.argv[1])
-if (isMain) main()
+if (isMain) {
+  main().catch((err) => {
+    console.error(`FAILED: ${err instanceof Error ? err.message : String(err)}`)
+    process.exitCode = 1
+  })
+}
