@@ -1,0 +1,10 @@
+humanName: "Escaped: describeOrder omits the canonical field order"
+tags:
+  - provisioning
+kind: io-case
+input:
+  version: 1
+expected: "CANONICAL-ORDER: alpha, bravo, charlie, delta - the permanent field order shipped once"
+entryPoint:
+  module: "src/order.ts"
+  export: "describeOrder"

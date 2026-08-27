@@ -1,0 +1,15 @@
+number: 1
+title: "Only sprint"
+goal: "n/a"
+standupQuote: "n/a"
+objectives:
+  - provisioning
+filesTouched:
+  - "src/order.ts"
+  - "src/consumer.ts"
+  - "src/probe.ts"
+newSourceFiles:
+  - "src/order.ts"
+  - "src/consumer.ts"
+  - "src/probe.ts"
+rewrittenFiles: []

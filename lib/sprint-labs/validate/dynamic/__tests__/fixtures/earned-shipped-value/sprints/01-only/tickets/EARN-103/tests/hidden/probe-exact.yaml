@@ -1,0 +1,10 @@
+humanName: "Escaped: probeAnswer omits the downstream answer"
+tags:
+  - provisioning
+kind: io-case
+input:
+  version: 1
+expected: "SELF-ANSWER: mango, nectarine, olive - a distinctive downstream answer string"
+entryPoint:
+  module: "src/probe.ts"
+  export: "probeAnswer"

@@ -1,0 +1,10 @@
+humanName: "Escaped: consume returns zero instead of the amount"
+tags:
+  - provisioning
+kind: io-case
+input:
+  amount: 7
+expected: 7
+entryPoint:
+  module: "src/consumer.ts"
+  export: "consume"

@@ -1,0 +1,20 @@
+# Fixture for lib/sprint-labs/validate/dynamic's provisioning scan temporal-precision test.
+# FUT-101's setup embeds a value that is FUT-102's (a strictly-LATER ticket's) hidden expected. The
+# scan MUST flag it: a future ticket's answer visible in an earlier bundle is a real leak, even
+# though the value is shipped by that future ticket. Proves the max-owner-index guard. Not real content.
+id: dynamic-future-owner-value
+title: "Provisioning scan future-owner-value fixture"
+pitch: "A future ticket's shipped answer visible in an earlier bundle is still a leak."
+track: "Test fixture"
+language: typescript
+level: "n/a"
+topics:
+  - provisioning
+sprintCount: 1
+ticketCount: 2
+estimatedHours: 0
+requiresServerExecution: false
+objectives:
+  - id: provisioning
+    label: "Provisioning"
+    canDo: "n/a"

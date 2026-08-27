@@ -1,0 +1,10 @@
+diff --git a/src/probe.ts b/src/probe.ts
+index 5555555..6666666 100644
+--- a/src/probe.ts
++++ b/src/probe.ts
+@@ -1,4 +1,4 @@
+-// git blame context: Escaped: describeOrder omits the canonical field order
++// git blame resolved: the canonical field order is derived elsewhere now
+ export function probeAnswer(): string {
+   return "SELF-ANSWER: mango, nectarine, olive - a distinctive downstream answer string"
+ }

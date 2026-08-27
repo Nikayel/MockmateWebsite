@@ -57,6 +57,45 @@ interface Signature {
   ticketKey: string
   kind: string
   text: string
+  /** Hidden-test signatures only (undefined on secret-file signatures, which are never eligible for
+   *  the earned-shipped suppression). `ownerIndex` is the play-order index of the LATEST ticket that
+   *  authors this exact text (max over ALL owners, so a later independent re-use still blocks
+   *  suppression); `shippedByAnyOwner` is whether some authoring ticket's reference.diff ships the
+   *  text into permanent source. Consumed by `isEarnedShippedSignature`. */
+  ownerIndex?: number
+  shippedByAnyOwner?: boolean
+}
+
+/** Whether `referenceDiff` ships `text` into source. `text` is a hidden signature's text -- already
+ *  JSON-encoded for io-case values. Matches the JSON-encoded form OR, when the value was a string,
+ *  its raw unquoted content, so a reference that ships it with different quoting still counts. A
+ *  false negative here only ever means "do not suppress" (keep flagging); it can never hide a leak. */
+function referenceShipsValue(referenceDiff: string | undefined | null, text: string): boolean {
+  if (typeof referenceDiff !== "string" || referenceDiff.length === 0) return false
+  if (referenceDiff.includes(text)) return true
+  try {
+    const parsed = JSON.parse(text)
+    if (typeof parsed === "string" && parsed.length > 0) return referenceDiff.includes(parsed)
+  } catch {
+    // `text` is not a JSON literal (a raw probe body); the direct includes above already answered.
+  }
+  return false
+}
+
+/** A hidden-test-signature hit is an EARNED, SHIPPED value -- not a leak -- when every ticket that
+ *  authors the signature is STRICTLY before the scanned ticket in play order (`ownerIndex <
+ *  bundleIndex`) AND some owner ships it into source (`shippedByAnyOwner`). Rationale: once ticket Y
+ *  is earned, its reference.diff is permanent source every later ticket's cumulative tree carries,
+ *  and Y's hidden tier is never replayed downstream (red-green.ts regresses VISIBLE tiers only), so
+ *  Y's shipped value surfacing in a strictly-later bundle cannot be exploited. Same-ticket
+ *  (`ownerIndex === bundleIndex`) and future-owner hits still fire, and so do non-shipped grading
+ *  identifiers (a humanName is never `shippedByAnyOwner`). */
+function isEarnedShippedSignature(signature: Signature, bundleIndex: number): boolean {
+  return (
+    signature.ownerIndex !== undefined &&
+    signature.shippedByAnyOwner === true &&
+    signature.ownerIndex < bundleIndex
+  )
 }
 
 /** De-duplicates by exact `.text` (first occurrence wins), keeping insertion order. A ticket whose
@@ -75,30 +114,69 @@ function dedupeSignatures(signatures: Signature[]): Signature[] {
   return out
 }
 
-/** Every hidden test's leak-worthy text, across every ticket in the workbook. `humanName`/
- *  `fileName` are NEVER length-gated (see this file's header); `body`/`expected`/`input` keep the
- *  free-text floor. */
+/** Every hidden test's leak-worthy text, across every ticket in the workbook, each carrying the
+ *  temporal metadata `isEarnedShippedSignature` needs. `humanName`/`fileName` are NEVER length-gated
+ *  (see this file's header) and are NEVER shipped-eligible (a grading identifier is never
+ *  legitimately shipped source); `body` keeps the free-text floor and is likewise not
+ *  shipped-eligible (assertion code is not shipped source); only io-case `expected`/`input` VALUES
+ *  can be a value a ticket's own reference.diff legitimately ships into permanent source. Per unique
+ *  text we keep the MAX owner index and OR the shipped flag across all owners, so a later independent
+ *  re-use of the same text still blocks suppression (never suppress a FUTURE ticket's answer). */
 function collectHiddenTestSignatures(workbook: AuthoredWorkbook): Signature[] {
-  const signatures: Signature[] = []
-  for (const { ticket } of allTicketsInOrder(workbook)) {
+  interface Aggregate {
+    kind: string
+    firstOwnerKey: string
+    ownerIndex: number
+    shippedByAnyOwner: boolean
+  }
+  const byText = new Map<string, Aggregate>()
+
+  allTicketsInOrder(workbook).forEach(({ ticket }, index) => {
+    const candidates: Array<{ text: string; shippedEligible: boolean }> = []
     for (const hidden of ticket.hiddenTests) {
       for (const candidate of [hidden.humanName, hidden.fileName]) {
         if (typeof candidate === "string" && candidate.trim().length > 0) {
-          signatures.push({ ticketKey: ticket.key, kind: "hidden-test", text: candidate })
+          candidates.push({ text: candidate, shippedEligible: false })
         }
       }
-      const freeTextCandidates = [hidden.raw.body]
-      if (hidden.raw.expected !== undefined)
-        freeTextCandidates.push(JSON.stringify(hidden.raw.expected))
-      if (hidden.raw.input !== undefined) freeTextCandidates.push(JSON.stringify(hidden.raw.input))
-      for (const candidate of freeTextCandidates) {
-        if (typeof candidate === "string" && longEnough(candidate)) {
-          signatures.push({ ticketKey: ticket.key, kind: "hidden-test", text: candidate })
-        }
+      if (typeof hidden.raw.body === "string" && longEnough(hidden.raw.body)) {
+        candidates.push({ text: hidden.raw.body, shippedEligible: false })
+      }
+      for (const value of [hidden.raw.expected, hidden.raw.input]) {
+        if (value === undefined) continue
+        const text = JSON.stringify(value)
+        if (longEnough(text)) candidates.push({ text, shippedEligible: true })
       }
     }
+
+    for (const { text, shippedEligible } of candidates) {
+      const ships = shippedEligible && referenceShipsValue(ticket.referenceDiff, text)
+      const existing = byText.get(text)
+      if (existing) {
+        existing.ownerIndex = Math.max(existing.ownerIndex, index)
+        existing.shippedByAnyOwner = existing.shippedByAnyOwner || ships
+      } else {
+        byText.set(text, {
+          kind: "hidden-test",
+          firstOwnerKey: ticket.key,
+          ownerIndex: index,
+          shippedByAnyOwner: ships,
+        })
+      }
+    }
+  })
+
+  const out: Signature[] = []
+  for (const [text, aggregate] of byText) {
+    out.push({
+      ticketKey: aggregate.firstOwnerKey,
+      kind: aggregate.kind,
+      text,
+      ownerIndex: aggregate.ownerIndex,
+      shippedByAnyOwner: aggregate.shippedByAnyOwner,
+    })
   }
-  return dedupeSignatures(signatures)
+  return out
 }
 
 /** `reference.diff` (always read via `load-tree.ts`) plus `review.yaml`/`author_brief.yaml`'s raw
@@ -199,7 +277,16 @@ export function scanProvisionedBundleContent(
     const bundle = readAllFiles(materialized.ws)
     const findings: ValidationFinding[] = []
 
-    const hiddenHits = scanFilesForSignatures(bundle, collectHiddenTestSignatures(workbook))
+    const orderedTickets = allTicketsInOrder(workbook)
+    const bundleIndex = orderedTickets.findIndex((entry) => entry.ticket.key === ticket.key)
+
+    // Hidden-test signatures get the earned-shipped suppression (a downstream ticket legitimately
+    // carrying an earlier, earned ticket's shipped value is not a leak). Secret-file signatures
+    // (raw reference.diff/review.yaml/author_brief.yaml text) never legitimately appear in a
+    // materialized bundle, so they stay timing-independent.
+    const hiddenHits = scanFilesForSignatures(bundle, collectHiddenTestSignatures(workbook)).filter(
+      (hit) => !isEarnedShippedSignature(hit.signature, bundleIndex)
+    )
     const secretHits = scanFilesForSignatures(bundle, collectSecretFileSignatures(workbook))
     for (const hit of [...hiddenHits, ...secretHits]) {
       findings.push({
@@ -217,9 +304,7 @@ export function scanProvisionedBundleContent(
     // real risk -- gating this on length would have silently made the check a no-op for every
     // realistically-shaped key (caught by this task's own leak-future-marker fixture test, whose
     // "LEAK-102" is 8 characters). Checks path too, same reasoning as the hidden-test scan above.
-    const allKeys = allTicketsInOrder(workbook)
-    const thisIndex = allKeys.findIndex((entry) => entry.ticket.key === ticket.key)
-    const futureKeys = allKeys.slice(thisIndex + 1).map((entry) => entry.ticket.key)
+    const futureKeys = orderedTickets.slice(bundleIndex + 1).map((entry) => entry.ticket.key)
     for (const futureKey of futureKeys) {
       const hit = bundle.find(
         (file) => file.content.includes(futureKey) || file.path.includes(futureKey)
@@ -275,7 +360,13 @@ export function scanFreshWorkspaceGitObjects(
     const signatures = collectHiddenTestSignatures(workbook)
     const findings: ValidationFinding[] = []
 
+    const orderedTickets = allTicketsInOrder(workbook)
+    const bundleIndex = orderedTickets.findIndex((entry) => entry.ticket.key === ticket.key)
+
     for (const signature of signatures) {
+      // Same earned-shipped suppression as the content scan: a git blob for an earlier, earned
+      // ticket's shipped source file legitimately contains that ticket's now-public value.
+      if (isEarnedShippedSignature(signature, bundleIndex)) continue
       const blobHit = blobs.some((blob) => blob.includes(signature.text))
       const nameHit = names.some((name) => name.includes(signature.text))
       if (blobHit || nameHit) {

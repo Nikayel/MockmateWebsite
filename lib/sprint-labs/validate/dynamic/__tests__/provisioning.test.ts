@@ -118,3 +118,52 @@ describe("scanProvisioning (composition)", () => {
     expect(result.gitObjectFindings).toEqual([])
   })
 })
+
+describe("scanProvisionedBundleContent -- earned, shipped value carried downstream is not a leak", () => {
+  // The MER-205 regression: a hidden io-case expected value that the OWNING ticket ships into
+  // permanent source (its own reference.diff), then legitimately inherited by every strictly-later
+  // ticket's cumulative tree. Once earned, the owner's hidden tier is never replayed downstream
+  // (red-green.ts regresses visible tiers only), so the value surfacing later is not a leak.
+  const EARNED = join(FIXTURES, "earned-shipped-value")
+  const FUTURE = join(FIXTURES, "future-owner-value")
+
+  it("the upstream shipper's own bundle is clean (it ships the value in its reference, never its setup)", () => {
+    const workbook = loadWorkbookTree(EARNED)
+    const { ticket } = findTicketLocation(workbook, "EARN-101")
+
+    expect(scanProvisionedBundleContent(workbook, ticket)).toEqual([])
+  })
+
+  it("SUPPRESSED: a strictly-later ticket inheriting the earlier ticket's shipped source is not flagged, in BOTH the content and git-object scans", () => {
+    const workbook = loadWorkbookTree(EARNED)
+    const { ticket } = findTicketLocation(workbook, "EARN-102")
+
+    expect(scanProvisionedBundleContent(workbook, ticket)).toEqual([])
+    expect(scanFreshWorkspaceGitObjects(workbook, ticket)).toEqual([])
+  })
+
+  it("STILL FIRES: a ticket's OWN answer in its OWN setup and an earlier ticket's NON-shipped humanName both report, while the earned shipped value stays suppressed", () => {
+    const workbook = loadWorkbookTree(EARNED)
+    const { ticket } = findTicketLocation(workbook, "EARN-103")
+
+    const findings = scanProvisionedBundleContent(workbook, ticket)
+
+    // Own io-case answer leaked into its own setup: owner index == bundle index, not suppressed.
+    expect(findings.some((f) => f.message.includes("SELF-ANSWER: mango"))).toBe(true)
+    // An earlier ticket's humanName (a grading identifier, never shipped source): not suppressed.
+    expect(
+      findings.some((f) => f.message.includes("describeOrder omits the canonical field order"))
+    ).toBe(true)
+    // The earned, shipped value from the earlier ticket is NOT reported.
+    expect(findings.some((f) => f.message.includes("CANONICAL-ORDER: alpha"))).toBe(false)
+  })
+
+  it("STILL FIRES: a FUTURE ticket's shipped answer visible in an earlier bundle is flagged (max-owner guard -- never suppress a future ticket's answer)", () => {
+    const workbook = loadWorkbookTree(FUTURE)
+    const { ticket } = findTicketLocation(workbook, "FUT-101")
+
+    const findings = scanProvisionedBundleContent(workbook, ticket)
+
+    expect(findings.some((f) => f.message.includes("FUTURE-VALUE: quartz"))).toBe(true)
+  })
+})
