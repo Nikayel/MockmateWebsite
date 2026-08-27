@@ -1,0 +1,11 @@
+humanName: "Escaped: an unrelated header set is mistaken for an explicit version request"
+tags:
+  - backward-compatible-wire-format
+kind: io-case
+input:
+  x-tenant-id: "ten_northwind"
+  x-correlation-id: "corr_1"
+expected: null
+entryPoint:
+  module: "src/http/subscription-version.ts"
+  export: "requestedVersion"

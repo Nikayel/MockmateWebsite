@@ -1,0 +1,31 @@
+humanName: "Escaped: only the first claim in a v2 list response gets the nested money shape"
+tags:
+  - backward-compatible-wire-format
+kind: probe
+body: |
+  const { meridian } = buildTestApp()
+  const post = (externalRef) =>
+    meridian.app.inject({
+      method: "POST",
+      url: "/claims",
+      headers: { "x-tenant-id": "ten_northwind" },
+      payload: { externalRef, amount: 50, claimantName: "Test Claimant", lossDate: "2026-01-01" },
+    })
+  return post("NW-9701")
+    .then(() => post("NW-9702"))
+    .then(() => post("NW-9703"))
+    .then(() =>
+      meridian.app.inject({
+        method: "GET",
+        url: "/claims",
+        headers: { "x-tenant-id": "ten_northwind", "x-api-version": "2" },
+      })
+    )
+    .then((response) => {
+      const body = response.json()
+      assert(body.claims.length === 3, "expected all three claims back")
+      for (const claim of body.claims) {
+        assert(claim.money !== undefined, "every v2 claim must carry the nested money shape")
+        assert(claim.amount === undefined, "no v2 claim may also carry the v1 flat amount field")
+      }
+    })

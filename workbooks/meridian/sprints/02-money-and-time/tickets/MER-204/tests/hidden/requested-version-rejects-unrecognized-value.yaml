@@ -1,0 +1,10 @@
+humanName: "Escaped: an unrecognized version header value is silently treated as a real version"
+tags:
+  - backward-compatible-wire-format
+kind: io-case
+input:
+  x-api-version: "v2"
+expected: null
+entryPoint:
+  module: "src/http/subscription-version.ts"
+  export: "requestedVersion"

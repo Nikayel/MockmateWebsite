@@ -1,0 +1,23 @@
+humanName: "Escaped: the v2 money shape carries a rounded float instead of the exact minor-unit integer"
+tags:
+  - backward-compatible-wire-format
+kind: probe
+body: |
+  const { meridian } = buildTestApp()
+  return meridian.app
+    .inject({
+      method: "POST",
+      url: "/claims",
+      headers: { "x-tenant-id": "ten_northwind", "x-api-version": "2" },
+      payload: {
+        externalRef: "NW-9901",
+        amount: 412.19,
+        claimantName: "Robin Alvarez",
+        lossDate: "2026-01-18",
+      },
+    })
+    .then((response) => {
+      const body = response.json()
+      assert(Number.isInteger(body.money.minorUnits), "v2 money.minorUnits must be an exact integer")
+      assert(body.money.minorUnits === 41219, "v2 money.minorUnits must be the exact cent count, not a rounded float")
+    })

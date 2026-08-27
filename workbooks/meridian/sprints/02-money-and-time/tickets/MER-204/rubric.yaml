@@ -1,0 +1,11 @@
+weights:
+  understanding: 0.2
+  problemSolving: 0.25
+  codeQuality: 0.2
+  communication: 0.05
+  verification: 0.3
+notes:
+  understanding: "Keys off whether the compatibility descriptor stays the single source for both versions' query parameters, rather than a second parallel list."
+  problemSolving: "Keys off the visible pass rate across default-to-v1, the v2 money shape, and offset dropping cleanly out of v2."
+  codeQuality: "Keys off whether the v1 serializer is left byte-for-byte untouched rather than refactored in passing."
+  verification: "Keys off escaped-defect rate on the hidden cases - especially whether a version pinned on one request is honored by a later request that sends no version header at all."
