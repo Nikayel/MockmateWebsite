@@ -30,6 +30,7 @@ import { Check, ChevronDown, Lock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ObjectiveList } from "@/components/sprint-labs/ui/ObjectiveList"
 import { toNotStartedObjectiveView } from "@/components/sprint-labs/ui/ObjectiveChip"
+import { sprintRequiresPro } from "@/lib/sprint-labs/entitlements"
 import type { SprintPublic } from "@/lib/sprint-labs/types"
 
 export type SprintMapRowState = "done" | "current" | "available" | "locked"
@@ -49,11 +50,11 @@ const STATE_WORD: Record<SprintMapRowState, string> = {
 
 function rowState(sprintNumber: number, currentSprint: number | undefined): SprintMapRowState {
   if (currentSprint === undefined) {
-    return sprintNumber === 1 ? "available" : "locked"
+    return sprintRequiresPro(sprintNumber) ? "locked" : "available"
   }
   if (sprintNumber < currentSprint) return "done"
   if (sprintNumber === currentSprint) return "current"
-  return sprintNumber === 1 ? "available" : "locked"
+  return sprintRequiresPro(sprintNumber) ? "locked" : "available"
 }
 
 export function SprintMap({ sprints, currentSprint }: SprintMapProps) {
@@ -64,7 +65,7 @@ export function SprintMap({ sprints, currentSprint }: SprintMapProps) {
       {sprints.map((sprint) => {
         const state = rowState(sprint.number, currentSprint)
         const isOpen = openNumber === sprint.number
-        const isPro = sprint.number > 1
+        const isPro = sprintRequiresPro(sprint.number)
         const rowId = `sprint-map-row-${sprint.number}`
         const objectiveCount = sprint.objectives.length
 
