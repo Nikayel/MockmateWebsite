@@ -23,12 +23,19 @@
  * version had: a review-only ticket already finalized+reviewed in an EARLIER session, revisited in
  * a fresh tab, used to find no cache, call `openAttempt` again, and consume another submission slot
  * for a ticket that was already done — `fetchFinalizedAttempt` finds the real, already-finalized
- * attempt instead, so a fresh tab correctly reuses it rather than re-opening a new one. The
- * decisions/verdicts reconstruction below is UNCHANGED and stays same-tab-only
- * (`getCachedReviewOutcome`/`CachedReview.decisions`) — no endpoint anywhere hands the learner's
- * own past decisions back, so a truly fresh tab that already reviewed this ticket still shows
- * `verdicts: null` for the decisions half specifically (comments/scores/attempt state are all
- * still correctly resolved from the real server-persisted attempt either way).
+ * attempt instead, so a fresh tab correctly reuses it rather than re-opening a new one.
+ *
+ * Review round fix: `CachedAttempt.reviewCorrectness` (present only once the GET's own
+ * finalized-AND-submitted gate has cleared — see `attempt-client.ts`'s doc comment) is now threaded
+ * into `reviewCorrectness` below AND used to correct `alreadySubmitted` on a cold bootstrap: a fresh
+ * tab that never saw this tab's `getCachedReviewOutcome` decisions cache, but for which the server
+ * confirms the round WAS already submitted, now locks the thread read-only immediately instead of
+ * inviting the learner to decide again and 409ing on submit. Full per-comment VERDICTS
+ * (`CommentVerdict`, which combines correctness with the learner's OWN decision) still cannot be
+ * reconstructed cold — no endpoint anywhere returns the decisions themselves, only correctness — so
+ * `verdicts` stays `null` in that specific case; `reviewCorrectness` is exposed separately so the
+ * raw, already-gated correctness fact is not silently dropped even though a full verdict can't be
+ * built from it alone.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -56,6 +63,10 @@ export interface TicketReviewState {
   comments: Array<{ id: string; body: string }>
   decisions: Record<string, CommentDecisionState>
   verdicts: Record<string, CommentVerdict> | null
+  /** `{commentId: correct}`, server-gated (finalized + review round submitted — see this file's
+   *  header), independent of whether THIS tab knows the learner's own decisions. `null` until the
+   *  round has actually been submitted (in any session). */
+  reviewCorrectness: Record<string, boolean> | null
   agentReplies: Record<string, string | null>
   agentReplyLoading: Record<string, boolean>
   submitting: boolean
@@ -127,6 +138,10 @@ export function useTicketReview({
   const turnIndexRef = useRef(0)
 
   const comments = useMemo(() => cached?.outcome.reviewComments ?? [], [cached])
+  const reviewCorrectness = useMemo(() => {
+    if (!cached?.reviewCorrectness) return null
+    return Object.fromEntries(cached.reviewCorrectness.map((c) => [c.id, c.correct]))
+  }, [cached])
 
   const bootstrap = useCallback(async () => {
     if (runId === null) return
@@ -175,6 +190,15 @@ export function useTicketReview({
       const reconstructed = decisionsFromCachedReview(cachedReview)
       setDecisions(reconstructed)
       setVerdicts(verdictsFromCachedReview(cachedReview, reconstructed))
+      setAlreadySubmitted(true)
+    } else if (attempt.reviewCorrectness) {
+      // Review round fix: this tab has no record of the learner's own decisions (no
+      // getCachedReviewOutcome hit), but the server confirms the round WAS already submitted
+      // (reviewCorrectness only ever populates once finalized AND submitted). Lock the thread
+      // read-only now rather than letting the learner "decide" again and hit ALREADY_REVIEWED on
+      // submit. Verdicts stay null -- resolving one needs the actual decision, which no endpoint
+      // returns -- but reviewCorrectness itself (set below, outside this branch) is still exposed.
+      setDecisions(initialDecisions(reviewComments))
       setAlreadySubmitted(true)
     } else {
       setDecisions(initialDecisions(reviewComments))
@@ -283,6 +307,7 @@ export function useTicketReview({
     comments,
     decisions,
     verdicts,
+    reviewCorrectness,
     agentReplies,
     agentReplyLoading,
     submitting,

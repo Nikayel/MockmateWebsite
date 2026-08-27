@@ -165,6 +165,36 @@ describe("fetchFinalizedAttempt", () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
+  it("review round fix: threads reviewCorrectness through from the GET instead of dropping it", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          attemptId: "attempt-9",
+          outcome: CACHED.outcome,
+          reviewCorrectness: [
+            { id: "c1", correct: true },
+            { id: "c2", correct: false },
+          ],
+        }),
+    })
+    global.fetch = fetchSpy as unknown as typeof fetch
+
+    const result = await fetchFinalizedAttempt("run1", "MER-305")
+
+    expect(result?.reviewCorrectness).toEqual([
+      { id: "c1", correct: true },
+      { id: "c2", correct: false },
+    ])
+    // Cached too -- a second same-tab read (still a cache hit) keeps carrying it.
+    fetchSpy.mockClear()
+    const second = await fetchFinalizedAttempt("run1", "MER-305")
+    expect(second?.reviewCorrectness).toEqual([
+      { id: "c1", correct: true },
+      { id: "c2", correct: false },
+    ])
+  })
+
   it("returns null on a 404 (nothing finalized yet) without throwing", async () => {
     global.fetch = vi
       .fn()

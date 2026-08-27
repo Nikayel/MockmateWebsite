@@ -145,10 +145,18 @@ function writeCache(key: string, value: unknown): void {
  * field — see lib/sprint-labs/types.ts). The review round's input schema requires one anyway
  * (`reviewAttemptInputSchema.attemptId`), so the cache keeps it alongside the outcome rather than
  * discarding the one value `POST /attempts` (open) ever hands back.
+ *
+ * `reviewCorrectness` (review round fix, optional): `{id, correct}` per review comment, present
+ * only when `GET /api/sprint-labs/attempts/[attemptId]` populated it (finalized AND the review
+ * round actually submitted — the same strict, server-side gate `finalized-attempt-projection.ts`
+ * enforces; this field is never present pre-gate). `undefined` on an outcome that came from
+ * `POST /attempts/complete` directly (that endpoint never releases this at all) — only a
+ * `fetchFinalizedAttempt` hit ever populates it.
  */
 export interface CachedAttempt {
   attemptId: string
   outcome: CompleteAttemptOutcome
+  reviewCorrectness?: Array<{ id: string; correct: boolean }>
 }
 
 export function getCachedCompletedOutcome(runId: string, ticketKey: string): CachedAttempt | null {
@@ -212,7 +220,11 @@ export async function fetchFinalizedAttempt(
     const data = (await res.json()) as FinalizedAttemptResponse
     if (!data.attemptId || !data.outcome) return null
 
-    const result: CachedAttempt = { attemptId: data.attemptId, outcome: data.outcome }
+    const result: CachedAttempt = {
+      attemptId: data.attemptId,
+      outcome: data.outcome,
+      reviewCorrectness: data.reviewCorrectness,
+    }
     cacheCompletedOutcome(runId, ticketKey, result)
     return result
   } catch {

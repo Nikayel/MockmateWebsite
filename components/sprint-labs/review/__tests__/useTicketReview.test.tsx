@@ -84,6 +84,46 @@ describe("useTicketReview", () => {
     expect(mocks.openAttempt).not.toHaveBeenCalled()
   })
 
+  it("review round fix: a fresh tab with no decisions cache but a server-confirmed reviewCorrectness locks read-only instead of inviting a re-decide (which would 409)", async () => {
+    mocks.fetchFinalizedAttempt.mockResolvedValue({
+      attemptId: "a1",
+      outcome: OUTCOME_WITH_COMMENTS,
+      reviewCorrectness: [
+        { id: "c1", correct: true },
+        { id: "c2", correct: false },
+      ],
+    })
+    // No getCachedReviewOutcome hit -- mocks default (afterEach) already sets this to null,
+    // simulating a genuinely fresh tab that never saw this browser submit the round.
+
+    const { result } = renderHook(() =>
+      useTicketReview({ runId: "run1", ticketKey: "MER-303", boardStatus: "review" })
+    )
+
+    await waitFor(() => expect(result.current.phase).toBe("deciding"))
+    expect(result.current.alreadySubmitted).toBe(true)
+    // The raw, server-gated correctness IS available cold now...
+    expect(result.current.reviewCorrectness).toEqual({ c1: true, c2: false })
+    // ...but full verdicts (which need the learner's OWN decision, never returned by any
+    // endpoint) genuinely cannot be reconstructed from correctness alone -- not fabricated.
+    expect(result.current.verdicts).toBeNull()
+  })
+
+  it("reviewCorrectness is null when nothing has released it yet", async () => {
+    mocks.fetchFinalizedAttempt.mockResolvedValue({
+      attemptId: "a1",
+      outcome: OUTCOME_WITH_COMMENTS,
+    })
+
+    const { result } = renderHook(() =>
+      useTicketReview({ runId: "run1", ticketKey: "MER-303", boardStatus: "review" })
+    )
+
+    await waitFor(() => expect(result.current.phase).toBe("deciding"))
+    expect(result.current.reviewCorrectness).toBeNull()
+    expect(result.current.alreadySubmitted).toBe(false)
+  })
+
   it("lands on 'no-round' when the ticket has no review comments", async () => {
     mocks.fetchFinalizedAttempt.mockResolvedValue({
       attemptId: "a1",
