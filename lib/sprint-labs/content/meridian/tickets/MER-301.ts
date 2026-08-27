@@ -24,9 +24,42 @@ export const mer301Ticket: CompiledTicket = {
       "A two-tenant load against a connection pool of size one proves a connection released after one tenant's request cannot carry that tenant's context into the next request.",
     ],
     adversaryPresent: false,
-    playable: false,
+    playable: true,
   },
   setupDiff: null,
-  visibleTestFiles: [],
-  hiddenTests: [],
+  visibleTestFiles: [
+    {
+      path: "connection-pool.test.ts",
+      content:
+        'import { describe, expect, it } from "vitest"\nimport { createMemoryDb } from "../../src/db/memory-db"\nimport { createConnectionPool, withTenant } from "../../src/db/tenant-context"\n\ndescribe("connection pool tenant tagging", () => {\n  it("a pool of size one never hands the next caller the previous caller\'s tenant id", async () => {\n    const pool = createConnectionPool(createMemoryDb(), 1)\n\n    const first = pool.acquire("ten_continental")\n    expect(first.tenantId).toBe("ten_continental")\n    pool.release(first)\n\n    const second = pool.acquire("ten_bekins")\n    expect(second.tenantId).toBe("ten_bekins")\n  })\n\n  it("withTenant releases the connection even when the callback throws", async () => {\n    const pool = createConnectionPool(createMemoryDb(), 1)\n\n    await expect(\n      withTenant(pool, "ten_continental", async () => {\n        throw new Error("boom")\n      })\n    ).rejects.toThrow("boom")\n\n    const next = pool.acquire("ten_bekins")\n    expect(next.tenantId).toBe("ten_bekins")\n  })\n\n  it("two sequential withTenant calls against a pool of one each see only their own tenant id", async () => {\n    const pool = createConnectionPool(createMemoryDb(), 1)\n    const seen: string[] = []\n\n    await withTenant(pool, "ten_continental", async (connection) => {\n      seen.push(connection.tenantId)\n    })\n    await withTenant(pool, "ten_bekins", async (connection) => {\n      seen.push(connection.tenantId)\n    })\n\n    expect(seen).toEqual(["ten_continental", "ten_bekins"])\n  })\n\n  it("rejects a pool size below one", () => {\n    expect(() => createConnectionPool(createMemoryDb(), 0)).toThrow()\n  })\n})\n',
+    },
+    {
+      path: "reconciliation-tenant-scope.test.ts",
+      content:
+        'import { describe, expect, it } from "vitest"\nimport { buildTestApp } from "../../test/support/build-app"\nimport { createConnectionPool } from "../../src/db/tenant-context"\nimport { findClaimByExternalRef } from "../../src/db/repositories/claims"\nimport { runReconciliation } from "../../src/jobs/reconcile"\nimport { seedContinentalAndBekins } from "../../test/fixtures/tenants"\n\ndescribe("SUP-2291: reconciliation never crosses tenants", () => {\n  it("does not return Bekins\' claim when Continental reconciles the same external ref", async () => {\n    const { meridian } = buildTestApp()\n    await seedContinentalAndBekins(meridian.db)\n\n    await meridian.app.inject({\n      method: "POST",\n      url: "/claims",\n      headers: { "x-tenant-id": "ten_bekins" },\n      payload: {\n        externalRef: "SHARED-REF-1",\n        amount: 900,\n        claimantName: "Bekins Claimant",\n        lossDate: "2026-01-19",\n      },\n    })\n\n    const pool = createConnectionPool(meridian.db, 4)\n    const results = await runReconciliation(pool, "ten_continental", ["SHARED-REF-1"])\n\n    expect(results["SHARED-REF-1"]).toBeNull()\n  })\n\n  it("still finds a claim that really does belong to the requesting tenant", async () => {\n    const { meridian } = buildTestApp()\n    await seedContinentalAndBekins(meridian.db)\n\n    await meridian.app.inject({\n      method: "POST",\n      url: "/claims",\n      headers: { "x-tenant-id": "ten_continental" },\n      payload: {\n        externalRef: "CONT-1",\n        amount: 400,\n        claimantName: "Continental Claimant",\n        lossDate: "2026-01-11",\n      },\n    })\n\n    const pool = createConnectionPool(meridian.db, 4)\n    const results = await runReconciliation(pool, "ten_continental", ["CONT-1"])\n\n    expect(results["CONT-1"]).not.toBeNull()\n    expect(results["CONT-1"]?.tenantId).toBe("ten_continental")\n  })\n\n  it("resolves two tenants reusing the exact same external ref to two different claims", async () => {\n    const { meridian } = buildTestApp()\n    await seedContinentalAndBekins(meridian.db)\n\n    await meridian.app.inject({\n      method: "POST",\n      url: "/claims",\n      headers: { "x-tenant-id": "ten_continental" },\n      payload: {\n        externalRef: "DUP-100",\n        amount: 100,\n        claimantName: "Continental Claimant",\n        lossDate: "2026-01-12",\n      },\n    })\n    await meridian.app.inject({\n      method: "POST",\n      url: "/claims",\n      headers: { "x-tenant-id": "ten_bekins" },\n      payload: {\n        externalRef: "DUP-100",\n        amount: 200,\n        claimantName: "Bekins Claimant",\n        lossDate: "2026-01-12",\n      },\n    })\n\n    const pool = createConnectionPool(meridian.db, 4)\n    const continentalResult = await runReconciliation(pool, "ten_continental", ["DUP-100"])\n    const bekinsResult = await runReconciliation(pool, "ten_bekins", ["DUP-100"])\n\n    expect(continentalResult["DUP-100"]?.tenantId).toBe("ten_continental")\n    expect(bekinsResult["DUP-100"]?.tenantId).toBe("ten_bekins")\n    expect(continentalResult["DUP-100"]?.id).not.toBe(bekinsResult["DUP-100"]?.id)\n  })\n\n  it("findClaimByExternalRef itself reads the tenant off the connection, not a separate argument", async () => {\n    const { meridian } = buildTestApp()\n    await seedContinentalAndBekins(meridian.db)\n\n    await meridian.app.inject({\n      method: "POST",\n      url: "/claims",\n      headers: { "x-tenant-id": "ten_bekins" },\n      payload: {\n        externalRef: "REPO-DIRECT-1",\n        amount: 150,\n        claimantName: "Bekins Claimant",\n        lossDate: "2026-01-13",\n      },\n    })\n\n    const pool = createConnectionPool(meridian.db, 4)\n    const connection = pool.acquire("ten_continental")\n    const result = await findClaimByExternalRef(connection, "REPO-DIRECT-1")\n    pool.release(connection)\n\n    expect(result).toBeNull()\n  })\n\n  it("returns null, not an error, for an external ref nobody has filed", async () => {\n    const { meridian } = buildTestApp()\n    await seedContinentalAndBekins(meridian.db)\n\n    const pool = createConnectionPool(meridian.db, 4)\n    const results = await runReconciliation(pool, "ten_continental", ["NEVER-FILED"])\n\n    expect(results["NEVER-FILED"]).toBeNull()\n  })\n})\n',
+    },
+  ],
+  hiddenTests: [
+    {
+      id: "find-claim-by-external-ref-direct-call-scoped",
+      humanName:
+        "Escaped: findClaimByExternalRef called directly (not through reconciliation) still enforces tenant scope",
+      tags: ["transaction-scoped-tenant-context"],
+      kind: "probe",
+    },
+    {
+      id: "pool-of-one-three-tenants-in-a-row",
+      humanName:
+        "Escaped: a pool of size one still leaks a stale tenant id across a third caller, not just a second",
+      tags: ["transaction-scoped-tenant-context"],
+      kind: "probe",
+    },
+    {
+      id: "reconciliation-batch-still-leaks-other-tenant",
+      humanName:
+        "Escaped: reconciling a batch with a mix of refs still returns another tenant's claim for the ones it does not own",
+      tags: ["transaction-scoped-tenant-context"],
+      kind: "probe",
+    },
+  ],
 }

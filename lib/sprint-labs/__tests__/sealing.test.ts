@@ -146,7 +146,31 @@ async function collectSealedMarkers(): Promise<string[]> {
   // already assumed markers this short don't carry the scan (it hand-picks one `> 8` chars), so
   // this codifies an assumption the suite already made, rather than introducing a new one.
   const MIN_MARKER_LENGTH = 10
-  return markers.filter((m) => typeof m === "string" && m.length >= MIN_MARKER_LENGTH)
+  return markers.filter(
+    (m) => typeof m === "string" && m.length >= MIN_MARKER_LENGTH && !isGenericMarker(m)
+  )
+}
+
+// Review round 3 (I-4 content-overlap false positive, MER-202): a BARE ISO calendar date
+// (`JSON.stringify`d, so quoted -- an io-case `input`/`expected` that is just the string
+// "2026-03-08", not an object containing one) is well past MIN_MARKER_LENGTH but is not a
+// distinctive secret. There are only a handful of calendar-quirk dates (a DST transition, a leap
+// day, a month boundary) worth authoring a fixture around for any given year, so unrelated hidden
+// and public fixtures across the WHOLE workbook legitimately reuse the same one on purpose --
+// confirmed empirically: MER-202's own public visible tests already assert the exact pairs its
+// hidden tests check (calendarDateFromISO("2026-03-08") is asserted in both), and the same
+// "2026-11-01"/"2026-03-08" dates recur in MER-403's hidden tests too, an entirely unrelated
+// ticket in a later sprint. Mirrors `lib/sprint-labs/validate/diff-utils.ts`'s `isGenericWindow`:
+// a value this generic is excluded from the marker set entirely, rather than raising
+// MIN_MARKER_LENGTH high enough to swallow it (12 chars) -- which would also swallow genuinely
+// distinctive 12-13 char secrets. Deliberately narrow: matches ONLY a marker that is nothing but a
+// quoted bare date (`^"\d{4}-\d{2}-\d{2}"$`); a longer string that merely CONTAINS a date
+// (`"the deadline is 2026-03-08 exactly"`) does not match and stays fully checked, since that much
+// surrounding prose is exactly the kind of distinctive context a coincidental date reuse lacks.
+const BARE_ISO_DATE_MARKER_RE = /^"\d{4}-\d{2}-\d{2}"$/
+
+function isGenericMarker(marker: string): boolean {
+  return BARE_ISO_DATE_MARKER_RE.test(marker)
 }
 
 /** Every generated public .ts file's raw text that contains at least one marker, paired with which marker. */
@@ -266,5 +290,19 @@ describe("Sealing test 4 — no sealed marker's TEXT leaks into a public file (I
     } finally {
       writeFileSync(target, original)
     }
+  })
+
+  it("generic-marker guard: excludes ONLY a bare quoted ISO date, never a longer distinctive string that merely contains one", () => {
+    // The exact two markers that produced the MER-202 false positive.
+    expect(isGenericMarker('"2026-03-08"')).toBe(true)
+    expect(isGenericMarker('"2026-11-01"')).toBe(true)
+    // A full ISO timestamp (date + time-of-day) is much higher-entropy than a bare calendar day
+    // and is NOT exempted -- only the bare-date shape is provably safe to exclude.
+    expect(isGenericMarker('"2026-10-03T04:50:00.000Z"')).toBe(false)
+    // Prose that happens to CONTAIN a date is exactly the distinctive context a coincidental
+    // date reuse lacks, and must stay fully checked.
+    expect(isGenericMarker('"the deadline is 2026-03-08 exactly"')).toBe(false)
+    // An ordinary distinctive marker of comparable length is unaffected.
+    expect(isGenericMarker('"some ordinary distinctive secret value"')).toBe(false)
   })
 })

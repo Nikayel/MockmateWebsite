@@ -25,9 +25,29 @@ export const mer304Ticket: CompiledTicket = {
       "A composite index supports the query pattern the fix introduces, with column order matching the pagination cursor's own ordering.",
     ],
     adversaryPresent: false,
-    playable: false,
+    playable: true,
   },
   setupDiff: null,
-  visibleTestFiles: [],
-  hiddenTests: [],
+  visibleTestFiles: [
+    {
+      path: "documents-batch-fetch.test.ts",
+      content:
+        'import { describe, expect, it } from "vitest"\nimport type { DbClient } from "../../src/db/client"\nimport { createMemoryDb } from "../../src/db/memory-db"\nimport { insertDocument } from "../../src/db/repositories/documents"\nimport { getDocumentsForClaims } from "../../src/db/repositories/documents"\n\nfunction spyOnQueries(db: DbClient): { db: DbClient; count: () => number } {\n  let calls = 0\n  return {\n    db: {\n      query: (sql, params) => {\n        calls += 1\n        return db.query(sql, params)\n      },\n    },\n    count: () => calls,\n  }\n}\n\ndescribe("getDocumentsForClaims issues a bounded number of queries", () => {\n  it("fetches documents for five claims in exactly one query, not five", async () => {\n    const db = createMemoryDb()\n    const claimIds = ["clm_1", "clm_2", "clm_3", "clm_4", "clm_5"]\n    for (const claimId of claimIds) {\n      await insertDocument(db, {\n        claimId,\n        fileName: `${claimId}.pdf`,\n        contentType: "application/pdf",\n        legacyPath: `/x/${claimId}`,\n      })\n    }\n\n    const spy = spyOnQueries(db)\n    const result = await getDocumentsForClaims(spy.db, claimIds)\n\n    expect(spy.count()).toBe(1)\n    for (const claimId of claimIds) {\n      expect(result[claimId]).toHaveLength(1)\n      expect(result[claimId][0].fileName).toBe(`${claimId}.pdf`)\n    }\n  })\n\n  it("still issues exactly one query for fifty claims", async () => {\n    const db = createMemoryDb()\n    const claimIds = Array.from({ length: 50 }, (_, i) => `clm_${i}`)\n\n    const spy = spyOnQueries(db)\n    await getDocumentsForClaims(spy.db, claimIds)\n\n    expect(spy.count()).toBe(1)\n  })\n\n  it("issues zero queries for an empty page", async () => {\n    const db = createMemoryDb()\n    const spy = spyOnQueries(db)\n\n    await getDocumentsForClaims(spy.db, [])\n\n    expect(spy.count()).toBe(0)\n  })\n\n  it("every claim id on the page gets an entry, even ones with no documents at all", async () => {\n    const db = createMemoryDb()\n    await insertDocument(db, {\n      claimId: "clm_has_docs",\n      fileName: "estimate.pdf",\n      contentType: "application/pdf",\n      legacyPath: "/x",\n    })\n\n    const result = await getDocumentsForClaims(db, ["clm_has_docs", "clm_no_docs"])\n\n    expect(result.clm_has_docs).toHaveLength(1)\n    expect(result.clm_no_docs).toEqual([])\n  })\n})\n',
+    },
+  ],
+  hiddenTests: [
+    {
+      id: "duplicate-claim-ids-still-one-query",
+      humanName: "Escaped: duplicate claim ids on the same page still cost only one query",
+      tags: ["n-plus-one-diagnosis-concurrent-index"],
+      kind: "probe",
+    },
+    {
+      id: "large-page-still-one-query-and-correct-grouping",
+      humanName:
+        "Escaped: a large page (200 claims) still costs one query and keeps every claim's documents grouped correctly",
+      tags: ["n-plus-one-diagnosis-concurrent-index"],
+      kind: "probe",
+    },
+  ],
 }

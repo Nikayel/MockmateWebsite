@@ -68,4 +68,5 @@ export const sealed: SealedTicketContent = {
         "Keys off escaped-defect rate on the hidden cases, especially whether a claim inserted mid-page ever reappears on the next page.",
     },
   },
+  sqlHiddenAssertions: [],
 }

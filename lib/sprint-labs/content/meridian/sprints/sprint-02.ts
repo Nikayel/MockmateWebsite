@@ -53,7 +53,7 @@ export const meridianSprint02: SprintPublic = {
     },
   ],
   sizingNotes:
-    "Originally scoped at 127 visible and 32 hidden test cases, which inverts the point of this sprint: the whole lesson is that the obvious float fix is wrong, so the hidden tier should carry more of that weight. About 20 visible cases move into the hidden tier here, targeting roughly 107 visible and 52 hidden.",
+    "Originally scoped at 127 visible and 32 hidden test cases, which inverts the point of this sprint: the whole lesson is that the obvious float fix is wrong, so the hidden tier should carry more of that weight. As authored: 113 visible / 45 hidden across the five tickets (MER-201 36v/12h, MER-202 25v/11h, MER-203 13v/7h, MER-204 26v/9h, MER-205 13v/6h) - the hidden share is far larger relative to sprint 1's own ratio than the original 127/32 draft, and every hidden tier leans on io-case or probe cases that discriminate the setup state from the reference, not restatements of the visible tier.",
   topic: "Serialization & data contracts",
   ticketCount: 5,
   points: 26,

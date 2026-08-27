@@ -26,6 +26,7 @@ export const demo102Ticket: CompiledTicket = {
       "The v2 list endpoint does not accept page or per_page at all.",
     ],
     adversaryPresent: false,
+    playable: true,
   },
   setupDiff:
     'diff --git a/src/http/claims-list.ts b/src/http/claims-list.ts\nnew file mode 100644\nindex 0000000..1ccd10b\n--- /dev/null\n+++ b/src/http/claims-list.ts\n@@ -0,0 +1,7 @@\n+import type { FastifyRequest, FastifyReply } from "../types"\n+import { parseClaimPayload } from "./claims-parser"\n+\n+export async function listClaims(request: FastifyRequest, reply: FastifyReply) {\n+  const { page, per_page } = request.query as Record<string, string>\n+  return { page, per_page }\n+}\ndiff --git a/src/http/compatibility-descriptor.ts b/src/http/compatibility-descriptor.ts\nnew file mode 100644\nindex 0000000..2f3656a\n--- /dev/null\n+++ b/src/http/compatibility-descriptor.ts\n@@ -0,0 +1,23 @@\n+interface ParameterDescriptor {\n+  status: "active" | "deprecated"\n+  sunset?: string\n+}\n+\n+interface CompatibilityDescriptor {\n+  parameters: Record<string, ParameterDescriptor>\n+}\n+\n+const V1: CompatibilityDescriptor = {\n+  parameters: {\n+    page: { status: "deprecated" },\n+    per_page: { status: "deprecated" },\n+  },\n+}\n+\n+const V2: CompatibilityDescriptor = {\n+  parameters: {},\n+}\n+\n+export function compatibilityDescriptor(version: "v1" | "v2"): CompatibilityDescriptor {\n+  return version === "v1" ? V2 : V1\n+}\n',

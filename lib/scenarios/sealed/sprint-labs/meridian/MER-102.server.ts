@@ -129,4 +129,5 @@ export const sealed: SealedTicketContent = {
         "Keys off whether the internal-error path can be shown to leak nothing beyond the fixed message and the correlation id.",
     },
   },
+  sqlHiddenAssertions: [],
 }

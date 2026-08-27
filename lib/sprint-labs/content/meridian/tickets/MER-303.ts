@@ -24,9 +24,31 @@ export const mer303Ticket: CompiledTicket = {
       "The accepted design ties tenant context to the lifetime of a single transaction, not to a listener that runs at some point after release.",
     ],
     adversaryPresent: false,
-    playable: false,
+    playable: true,
   },
-  setupDiff: null,
-  visibleTestFiles: [],
-  hiddenTests: [],
+  setupDiff:
+    "diff --git a/src/db/tenant-context.ts b/src/db/tenant-context.ts\nindex 229243f..60d40b7 100644\n--- a/src/db/tenant-context.ts\n+++ b/src/db/tenant-context.ts\n@@ -44,15 +44,15 @@ export function createConnectionPool(db: DbClient, size: number): ConnectionPool\n     },\n \n     /**\n-     * Clears the connection's tenant tag synchronously, inline, before `release()` returns -\n-     * never scheduled onto a listener, an event emitter, or a later tick. That is the entire\n-     * fix SUP-2291 needed: nothing runs between \"released\" and \"cleared\" for a later callback\n-     * to race against, so the very next `acquire()` (which stamps its own tenant id\n-     * immediately, synchronously, in the same call) can never observe - or be clobbered by - a\n-     * reset left pending from the connection's previous tenant.\n+     * PR #431: resets the connection's tenant tag on a listener registered at release time,\n+     * so the reset runs \"on release\" without blocking whatever called release(). The\n+     * connection is handed back to the pool immediately - acquire() can reuse it before this\n+     * listener has actually run.\n      */\n     release(connection) {\n-      connection.tenantId = null\n+      queueMicrotask(() => {\n+        connection.tenantId = null\n+      })\n     },\n   }\n }\n@@ -74,3 +74,48 @@ export async function withTenant<T>(\n     pool.release(connection)\n   }\n }\n+\n+export interface ReleaseTimingCheckInput {\n+  firstTenantId: string\n+  secondTenantId: string\n+}\n+\n+export interface ReleaseTimingCheckResult {\n+  /** The second connection's tenant id read the instant acquire() returns it. */\n+  immediatelyAfterReacquire: string | null\n+  /** The same connection's tenant id read after yielding to the microtask queue once - the\n+   * same kind of yield a real `await connection.query(...)` inside the second caller's own\n+   * request would cause. */\n+  afterYieldingOnce: string | null\n+}\n+\n+/**\n+ * A pool of size one: acquires `firstTenantId`, releases it, immediately acquires\n+ * `secondTenantId` with no await in between, then reports what the second connection's tenant\n+ * id reads as right away and after one microtask-queue yield. A pool whose release() clears the\n+ * tag synchronously reports the same value both times; one that defers the reset to a listener\n+ * can report `secondTenantId` immediately and then something else once the deferred reset\n+ * finally runs - corrupting a request that already believed it was safely holding its own\n+ * connection.\n+ */\n+export async function checkReleaseTimingSurvivesReacquire(\n+  input: ReleaseTimingCheckInput\n+): Promise<ReleaseTimingCheckResult> {\n+  const pool = createConnectionPool(createMemoryDbForCheck(), 1)\n+  const first = pool.acquire(input.firstTenantId)\n+  pool.release(first)\n+  const second = pool.acquire(input.secondTenantId)\n+  const immediatelyAfterReacquire = second.tenantId\n+  await Promise.resolve()\n+  const afterYieldingOnce = second.tenantId\n+  return { immediatelyAfterReacquire, afterYieldingOnce }\n+}\n+\n+/** A minimal, self-contained `DbClient` this module's own diagnostic check can run against -\n+ * it never actually queries anything, so it does not need to depend on `./memory-db` (which\n+ * depends on `./queries`, which has nothing to do with connection pooling). */\n+function createMemoryDbForCheck(): DbClient {\n+  return {\n+    query: async () => ({ rows: [] }),\n+  }\n+}\n",
+  visibleTestFiles: [
+    {
+      path: "pr-431-review.test.ts",
+      content:
+        'import { describe, expect, it } from "vitest"\nimport { createConnectionPool, withTenant } from "../../src/db/tenant-context"\nimport { createMemoryDb } from "../../src/db/memory-db"\n\ndescribe("PR #431 - claimed fix", () => {\n  it("a released connection is available for the next tenant to acquire", async () => {\n    const pool = createConnectionPool(createMemoryDb(), 1)\n\n    await withTenant(pool, "ten_continental", async () => {})\n    const next = pool.acquire("ten_bekins")\n\n    expect(next.tenantId).toBe("ten_bekins")\n  })\n})\n\ndescribe("PR #431 - the defect its own tests do not cover", () => {\n  it("the reused connection\'s tenant tag does not survive a later, deferred reset from the connection it replaced", async () => {\n    const pool = createConnectionPool(createMemoryDb(), 1)\n\n    const first = pool.acquire("ten_continental")\n    pool.release(first)\n    const second = pool.acquire("ten_bekins")\n\n    // A real request holding `second` yields at least once before it finishes (an awaited\n    // query, if nothing else) - simulated here with a single microtask-queue yield.\n    await Promise.resolve()\n\n    expect(second.tenantId).toBe("ten_bekins")\n  })\n})\n',
+    },
+  ],
+  hiddenTests: [
+    {
+      id: "reset-listener-corrupts-a-different-tenant-pair",
+      humanName:
+        "Escaped: the same corruption reproduces for a second, unrelated pair of tenant ids",
+      tags: ["review-concurrency-fix-pushback"],
+      kind: "io-case",
+    },
+    {
+      id: "reset-listener-corrupts-reused-connection",
+      humanName:
+        "Escaped: a deferred release reset corrupts the tenant tag of the connection that reused it",
+      tags: ["review-concurrency-fix-pushback"],
+      kind: "io-case",
+    },
+  ],
 }

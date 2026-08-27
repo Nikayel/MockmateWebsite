@@ -94,4 +94,5 @@ export const sealed: SealedTicketContent = {
         "Keys off escaped-defect rate on the two io-cases and whether the learner pushed back on the wrong review comment.",
     },
   },
+  sqlHiddenAssertions: [],
 }

@@ -61,4 +61,5 @@ export const sealed: SealedTicketContent = {
         "Keys off escaped-defect rate on whether a Sunset header can ever say something the document does not.",
     },
   },
+  sqlHiddenAssertions: [],
 }

@@ -120,4 +120,5 @@ export const sealed: SealedTicketContent = {
         "Keys off escaped-defect rate on the hidden io-cases: a boolean, string, null, or array amount must never reach the repository.",
     },
   },
+  sqlHiddenAssertions: [],
 }

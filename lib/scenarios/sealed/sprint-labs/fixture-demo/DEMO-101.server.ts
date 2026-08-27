@@ -42,4 +42,5 @@ export const sealed: SealedTicketContent = {
         "Keys off whether the learner's own added test would have caught the boolean-amount case.",
     },
   },
+  sqlHiddenAssertions: [],
 }

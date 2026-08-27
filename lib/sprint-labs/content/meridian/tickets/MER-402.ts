@@ -25,9 +25,43 @@ export const mer402Ticket: CompiledTicket = {
       "A worker that dies mid-delivery releases its claimed work after a bounded time instead of leaving it stuck forever.",
     ],
     adversaryPresent: false,
-    playable: false,
+    playable: true,
   },
   setupDiff: null,
-  visibleTestFiles: [],
-  hiddenTests: [],
+  visibleTestFiles: [
+    {
+      path: "transactional-outbox.test.ts",
+      content:
+        'import { describe, expect, it } from "vitest"\nimport { buildTestApp } from "../../test/support/build-app"\nimport { seedTenant } from "../../test/support/fixtures"\nimport { createFailingQueryDb } from "../../test/support/failing-query-db"\nimport { createMemoryDb } from "../../src/db/memory-db"\nimport { INSERT_OUTBOX_ENTRY } from "../../src/db/queries"\nimport { claimOutboxBatch, insertOutboxEntry } from "../../src/db/repositories/outbox"\nimport { findIdempotencyKey } from "../../src/db/repositories/idempotency-keys"\nimport { createOutbox } from "../../src/queue/outbox"\n\ndescribe("the transactional outbox", () => {\n  it("commits a claim and its outbox event together, and drains it end to end", async () => {\n    const { meridian, httpClient } = buildTestApp()\n    await seedTenant(meridian.db, {\n      id: "ten_northwind",\n      webhookUrl: "https://northwind.example.com/webhooks",\n      webhookSecret: "shh",\n    })\n\n    const response = await meridian.app.inject({\n      method: "POST",\n      url: "/claims",\n      headers: { "x-tenant-id": "ten_northwind" },\n      payload: {\n        externalRef: "NW-402",\n        amount: 100,\n        claimantName: "Test Claimant",\n        lossDate: "2026-01-01",\n      },\n    })\n\n    expect(response.statusCode).toBe(201)\n    expect(meridian.outbox.pendingCount()).toBe(1)\n\n    const drained = await meridian.drainOutbox()\n    expect(drained).toBe(1)\n    expect(httpClient.calls).toHaveLength(1)\n  })\n\n  it("rolls back the claim write if the outbox write inside the same transaction fails", async () => {\n    const realDb = createMemoryDb()\n    const failingDb = createFailingQueryDb(realDb, INSERT_OUTBOX_ENTRY)\n    const { meridian } = buildTestApp({ db: failingDb })\n\n    const response = await meridian.app.inject({\n      method: "POST",\n      url: "/claims",\n      headers: { "x-tenant-id": "ten_northwind" },\n      payload: {\n        externalRef: "NW-ROLLBACK",\n        amount: 100,\n        claimantName: "Test Claimant",\n        lossDate: "2026-01-01",\n      },\n    })\n\n    expect(response.statusCode).toBe(500)\n\n    const listResponse = await meridian.app.inject({\n      method: "GET",\n      url: "/claims",\n      headers: { "x-tenant-id": "ten_northwind" },\n    })\n    const body = listResponse.json<{ claims: Array<{ externalRef: string }> }>()\n    expect(body.claims.some((claim) => claim.externalRef === "NW-ROLLBACK")).toBe(false)\n  })\n\n  it("commits a payment authorization\'s idempotency record and its outbox event together too", async () => {\n    const { meridian } = buildTestApp()\n    const created = await meridian.app.inject({\n      method: "POST",\n      url: "/claims",\n      headers: { "x-tenant-id": "ten_northwind" },\n      payload: {\n        externalRef: "NW-402-PA",\n        amount: 100,\n        claimantName: "Test Claimant",\n        lossDate: "2026-01-01",\n      },\n    })\n    const claimId = created.json<{ id: string }>().id\n    await meridian.drainOutbox()\n\n    const response = await meridian.app.inject({\n      method: "POST",\n      url: `/claims/${claimId}/payment-authorizations`,\n      headers: { "x-tenant-id": "ten_northwind", "idempotency-key": "pa-transaction-key" },\n      payload: { approvedBy: "adjuster_test" },\n    })\n\n    expect(response.statusCode).toBe(201)\n    expect(meridian.outbox.pendingCount()).toBe(1)\n    const record = await findIdempotencyKey(meridian.db, "ten_northwind", "pa-transaction-key")\n    expect(record).not.toBeNull()\n  })\n\n  it("an enqueued event survives a restart: a fresh Outbox against the same db still delivers it", async () => {\n    const db = createMemoryDb()\n    const outboxBeforeRestart = createOutbox({ db, workerId: "worker-a" })\n    await outboxBeforeRestart.enqueue({\n      type: "claim.processed",\n      tenantId: "ten_northwind",\n      claimId: "clm_1",\n    })\n    expect(outboxBeforeRestart.pendingCount()).toBe(1)\n\n    // A fresh instance against the SAME db - its own in-process gauge starts at zero, the way a\n    // real restart would lose an in-memory counter, but the durable row is still there to claim.\n    const outboxAfterRestart = createOutbox({ db, workerId: "worker-b" })\n    expect(outboxAfterRestart.pendingCount()).toBe(0)\n\n    let delivered = 0\n    const drainedCount = await outboxAfterRestart.drain(async () => {\n      delivered += 1\n    })\n\n    expect(drainedCount).toBe(1)\n    expect(delivered).toBe(1)\n  })\n\n  it("two workers draining the same backlog concurrently never claim overlapping batches", async () => {\n    const db = createMemoryDb()\n    for (let i = 0; i < 6; i++) {\n      await insertOutboxEntry(db, {\n        type: "claim.processed",\n        tenantId: "ten_northwind",\n        claimId: `clm_${i}`,\n      })\n    }\n\n    const [batchA, batchB] = await Promise.all([\n      claimOutboxBatch(db, { workerId: "worker-a", leaseDurationMs: 30_000, limit: 4 }),\n      claimOutboxBatch(db, { workerId: "worker-b", leaseDurationMs: 30_000, limit: 4 }),\n    ])\n\n    const idsA = new Set(batchA.map((entry) => entry.id))\n    const idsB = new Set(batchB.map((entry) => entry.id))\n    const overlap = [...idsA].filter((id) => idsB.has(id))\n\n    expect(batchA.length + batchB.length).toBe(6)\n    expect(overlap).toEqual([])\n  })\n\n  it("a worker that dies mid-delivery releases its claimed entry once the lease expires, not before", async () => {\n    const db = createMemoryDb()\n    await insertOutboxEntry(db, {\n      type: "claim.processed",\n      tenantId: "ten_northwind",\n      claimId: "clm_stuck",\n    })\n\n    const claimedByDeadWorker = await claimOutboxBatch(db, {\n      workerId: "worker-dead",\n      leaseDurationMs: 10,\n      limit: 10,\n    })\n    expect(claimedByDeadWorker).toHaveLength(1)\n\n    const tooSoon = await claimOutboxBatch(db, {\n      workerId: "worker-live",\n      leaseDurationMs: 30_000,\n      limit: 10,\n    })\n    expect(tooSoon).toHaveLength(0)\n\n    await new Promise((resolve) => setTimeout(resolve, 30))\n\n    const afterLeaseExpires = await claimOutboxBatch(db, {\n      workerId: "worker-live",\n      leaseDurationMs: 30_000,\n      limit: 10,\n    })\n    expect(afterLeaseExpires).toHaveLength(1)\n    expect(afterLeaseExpires[0].id).toBe(claimedByDeadWorker[0].id)\n  })\n})\n',
+    },
+  ],
+  hiddenTests: [
+    {
+      id: "delivered-entry-never-reclaimed",
+      humanName:
+        "Escaped: a delivered entry is never reclaimed, even after what would have been its lease window",
+      tags: ["transactional-outbox-skip-locked"],
+      kind: "probe",
+    },
+    {
+      id: "empty-backlog-drains-cleanly",
+      humanName: "Escaped: claiming from an empty backlog returns nothing, not an error",
+      tags: ["transactional-outbox-skip-locked"],
+      kind: "probe",
+    },
+    {
+      id: "partial-claim-leaves-remainder-pending",
+      humanName:
+        "Escaped: claiming fewer than the whole backlog leaves the remainder genuinely pending, not silently leased",
+      tags: ["transactional-outbox-skip-locked"],
+      kind: "probe",
+    },
+    {
+      id: "payment-authorization-transaction-also-rolls-back",
+      humanName:
+        "Escaped: the payment-authorization endpoint's own transaction rolls back too, not just claim creation's",
+      tags: ["transactional-outbox-skip-locked"],
+      kind: "probe",
+    },
+  ],
 }

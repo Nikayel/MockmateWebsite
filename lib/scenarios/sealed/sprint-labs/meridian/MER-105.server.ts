@@ -146,4 +146,5 @@ export const sealed: SealedTicketContent = {
         "Keys off whether the learner's own regression test reproduces the silently-accepted non-numeric amount before rejecting the PR.",
     },
   },
+  sqlHiddenAssertions: [],
 }
