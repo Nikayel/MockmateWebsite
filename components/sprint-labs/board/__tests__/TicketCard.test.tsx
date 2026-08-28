@@ -118,22 +118,22 @@ describe("TicketCard", () => {
     expect(screen.getByText("2 escaped")).not.toBeNull()
   })
 
-  it("shows a muted Content coming tag for a content stub, and keeps the card a link to the ticket screen", () => {
+  it("shows a muted Coming soon tag for a content stub, and keeps the card a link to the ticket screen", () => {
     render(<TicketCard workbookId="fixture-demo" ticket={ticket({ playable: false })} />)
-    expect(screen.getByText("Content coming")).not.toBeNull()
+    expect(screen.getByText("Coming soon")).not.toBeNull()
     const link = screen.getByRole("link", {
       name: "Open MER-304: Claims list is 4.2s for Continental",
     })
     expect(link.getAttribute("href")).toBe("/sprint-labs/fixture-demo/run/ticket/MER-304")
   })
 
-  it("omits the Content coming tag once a ticket is playable, whether explicitly true or unset", () => {
+  it("omits the Coming soon tag once a ticket is playable, whether explicitly true or unset", () => {
     const { rerender } = render(
       <TicketCard workbookId="fixture-demo" ticket={ticket({ playable: true })} />
     )
-    expect(screen.queryByText("Content coming")).toBeNull()
+    expect(screen.queryByText("Coming soon")).toBeNull()
 
     rerender(<TicketCard workbookId="fixture-demo" ticket={ticket()} />)
-    expect(screen.queryByText("Content coming")).toBeNull()
+    expect(screen.queryByText("Coming soon")).toBeNull()
   })
 })

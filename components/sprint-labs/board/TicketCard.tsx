@@ -14,7 +14,7 @@
  *
  * `playable === false` (a compiled content stub — no `reference.diff`/`rubric.yaml` yet, see
  * `TicketPublic.playable`'s own doc comment): the card stays a normal link to the ticket screen — a
- * learner can still read a stub's body/criteria there — but carries a muted "Content coming" tag so
+ * learner can still read a stub's body/criteria there — but carries a muted "Coming soon" tag so
  * the board never implies there is a workspace to open. `undefined` (every ticket compiled before
  * this field existed) reads the same as `true`.
  */
@@ -76,7 +76,7 @@ export function TicketCard({ workbookId, ticket }: TicketCardProps) {
           <AiPolicyBadge policy={ticket.aiPolicy} />
           {ticket.playable === false && (
             <span className="inline-flex w-fit shrink-0 items-center rounded-full border border-[var(--wb-border)] bg-[var(--wb-panel)] px-2 py-0.5 text-[10px] font-semibold tracking-[0.04em] text-[var(--wb-disabled)] uppercase">
-              Content coming
+              Coming soon
             </span>
           )}
         </div>

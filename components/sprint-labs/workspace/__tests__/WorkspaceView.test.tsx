@@ -7,7 +7,7 @@
  * has its own dedicated unit tests; here `useWorkspaceVisibleTests` is mocked to a controlled
  * result so this file tests WIRING, not re-deriving the same logic twice.
  */
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { CompiledTicket } from "@/lib/sprint-labs/content/types"
 import type { SprintLabRunRecord } from "@/lib/sprint-labs/runs-client"
@@ -21,7 +21,14 @@ const mocks = vi.hoisted(() => ({
   }),
   setDirectiveMuted: vi.fn().mockResolvedValue(["d1", "d2"]),
   setFileContent: vi.fn(),
+  provisionSprintLabWorkspace: vi.fn(),
   runVisibleTestsSpy: vi.fn(),
+  useWorkspaceVisibleTestsSpy: vi.fn(),
+  syncState: {
+    files: { "src/http/claims.ts": "export function postClaim() {}\n" },
+    isLoading: false,
+    error: null as string | null,
+  },
 }))
 
 vi.mock("next/navigation", () => ({
@@ -32,7 +39,11 @@ vi.mock("@/lib/sprint-labs/runs-client", async () => {
   const actual = await vi.importActual<typeof import("@/lib/sprint-labs/runs-client")>(
     "@/lib/sprint-labs/runs-client"
   )
-  return { ...actual, moveSprintLabRunTicket: mocks.moveSprintLabRunTicket }
+  return {
+    ...actual,
+    moveSprintLabRunTicket: mocks.moveSprintLabRunTicket,
+    provisionSprintLabWorkspace: mocks.provisionSprintLabWorkspace,
+  }
 })
 
 vi.mock("@/lib/sprint-labs/partner/chat-client", () => ({
@@ -55,10 +66,8 @@ vi.mock("@/components/editor", () => ({
 
 vi.mock("@/components/sprint-labs/useSprintLabRunSync", () => ({
   useSprintLabRunSync: () => ({
-    files: { "src/http/claims.ts": "export function postClaim() {}\n" },
+    ...mocks.syncState,
     setFileContent: mocks.setFileContent,
-    isLoading: false,
-    error: null,
     reload: vi.fn(),
   }),
 }))
@@ -73,7 +82,10 @@ let visibleTestsState: {
 }
 
 vi.mock("../useWorkspaceVisibleTests", () => ({
-  useWorkspaceVisibleTests: () => ({ ...visibleTestsState, run: mocks.runVisibleTestsSpy }),
+  useWorkspaceVisibleTests: (...args: unknown[]) => {
+    mocks.useWorkspaceVisibleTestsSpy(...args)
+    return { ...visibleTestsState, run: mocks.runVisibleTestsSpy }
+  },
 }))
 
 vi.mock("../PartnerChat", () => ({
@@ -136,6 +148,19 @@ const fixtureRun: SprintLabRunRecord = {
   updatedAt: "2026-01-01T00:00:00.000Z",
 }
 
+const READY_WORKSPACE_FILES = [
+  {
+    path: "src/http/claims.ts",
+    content: "export function postClaim() {}\n",
+    role: "editable" as const,
+  },
+  {
+    path: "test/support/build-app.ts",
+    content: "export function buildTestApp() { return {} }\n",
+    role: "readonly" as const,
+  },
+]
+
 function renderWorkspace(overrides: Partial<React.ComponentProps<typeof WorkspaceView>> = {}) {
   return render(
     <WorkspaceView
@@ -150,6 +175,19 @@ function renderWorkspace(overrides: Partial<React.ComponentProps<typeof Workspac
   )
 }
 
+async function renderReadyWorkspace(
+  overrides: Partial<React.ComponentProps<typeof WorkspaceView>> = {}
+) {
+  mocks.provisionSprintLabWorkspace.mockResolvedValue(READY_WORKSPACE_FILES)
+  const rendered = renderWorkspace(overrides)
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "Run visible tests" }).hasAttribute("disabled")).toBe(
+      false
+    )
+  })
+  return rendered
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.moveSprintLabRunTicket.mockResolvedValue(null)
@@ -158,6 +196,12 @@ beforeEach(() => {
     mutedDirectiveIds: ["d1"],
   })
   mocks.setDirectiveMuted.mockResolvedValue(["d1", "d2"])
+  mocks.provisionSprintLabWorkspace.mockReturnValue(new Promise(() => {}))
+  mocks.syncState = {
+    files: { "src/http/claims.ts": "export function postClaim() {}\n" },
+    isLoading: false,
+    error: null,
+  }
   visibleTestsState = {
     status: "never-run",
     results: [],
@@ -177,24 +221,24 @@ describe("WorkspaceView — file tree lock state", () => {
     expect(editor.textContent).toContain("if the tree disagrees with this file, the tree is right")
   })
 
-  it("switching to the editable src file shows it as NOT read-only", () => {
-    renderWorkspace()
+  it("switching to the editable src file shows it as NOT read-only", async () => {
+    await renderReadyWorkspace()
     fireEvent.click(screen.getByRole("tab", { name: "claims.ts" }))
     const editor = screen.getByTestId("codemirror")
     expect(editor.getAttribute("data-readonly")).toBe("false")
     expect(editor.textContent).toBe("export function postClaim() {}\n")
   })
 
-  it("switching to the visible test file shows it as read-only", () => {
-    renderWorkspace()
+  it("switching to the visible test file shows it as read-only", async () => {
+    await renderReadyWorkspace()
     fireEvent.click(screen.getByRole("tab", { name: "claims-parser.test.ts" }))
     const editor = screen.getByTestId("codemirror")
     expect(editor.getAttribute("data-readonly")).toBe("true")
     expect(screen.getByText("Read only. This file is part of the brief.")).not.toBeNull()
   })
 
-  it("editing the active editable file calls setFileContent with its path", () => {
-    renderWorkspace()
+  it("editing the active editable file calls setFileContent with its path", async () => {
+    await renderReadyWorkspace()
     fireEvent.click(screen.getByRole("tab", { name: "claims.ts" }))
     // The mocked CodeMirrorEditor never fires onChange itself (it's a stub); this test asserts the
     // wiring is reachable via the real onChange prop passed to it -- covered structurally by the
@@ -204,13 +248,20 @@ describe("WorkspaceView — file tree lock state", () => {
     expect(screen.getByTestId("codemirror").getAttribute("data-readonly")).toBe("false")
   })
 
-  it("never renders any hidden-test content anywhere on the screen", () => {
-    renderWorkspace()
+  it("never renders any hidden-test content anywhere on the screen", async () => {
+    await renderReadyWorkspace()
     fireEvent.click(screen.getByRole("tab", { name: "claims.ts" }))
     fireEvent.click(screen.getByRole("tab", { name: "claims-parser.test.ts" }))
     fireEvent.click(screen.getByRole("tab", { name: "MAP.md" }))
     expect(document.body.textContent).not.toMatch(/Escaped:/)
     expect(document.body.textContent).not.toMatch(/rejects-boolean-amount/)
+  })
+
+  it("shows provisioned test support files as locked references", async () => {
+    await renderReadyWorkspace()
+    fireEvent.click(screen.getByRole("tab", { name: "build-app.ts" }))
+    expect(screen.getByTestId("codemirror").getAttribute("data-readonly")).toBe("true")
+    expect(screen.getByTestId("codemirror").textContent).toContain("buildTestApp")
   })
 
   it("shows the empty-src-group line when no editable files exist (the content gap, exercised via override)", () => {
@@ -246,18 +297,47 @@ describe("WorkspaceView — per-turn strip derives from real test state", () => 
     expect(screen.getAllByText(/AssertionError/).length).toBeGreaterThan(0)
   })
 
-  it("clicking Run visible tests calls the hook's run()", () => {
-    renderWorkspace()
+  it("clicking Run visible tests calls the hook's run()", async () => {
+    await renderReadyWorkspace()
     fireEvent.click(screen.getByRole("button", { name: /Run visible tests/ }))
     expect(mocks.runVisibleTestsSpy).toHaveBeenCalled()
   })
 
-  it("Cmd+Enter inside the editor pane also triggers a run", () => {
-    renderWorkspace()
+  it("Cmd+Enter inside the editor pane also triggers a run", async () => {
+    await renderReadyWorkspace()
     const editorPane = screen.getByTestId("codemirror").closest("div[class*='overflow-hidden']")
     expect(editorPane).not.toBeNull()
     fireEvent.keyDown(editorPane as Element, { key: "Enter", metaKey: true })
     expect(mocks.runVisibleTestsSpy).toHaveBeenCalled()
+  })
+
+  it("keeps click and Cmd+Enter execution disabled until workspace files are ready", () => {
+    mocks.provisionSprintLabWorkspace.mockReturnValue(new Promise(() => {}))
+    renderWorkspace()
+
+    const runButton = screen.getByRole("button", { name: "Preparing workspace…" })
+    expect(runButton.hasAttribute("disabled")).toBe(true)
+    expect(screen.getByText("Loading workspace files…")).not.toBeNull()
+
+    const editorPane = screen.getByTestId("codemirror").closest("div[class*='overflow-hidden']")
+    fireEvent.keyDown(editorPane as Element, { key: "Enter", metaKey: true })
+    expect(mocks.runVisibleTestsSpy).not.toHaveBeenCalled()
+  })
+
+  it("passes provisioned read-only support files to the visible-test runner", async () => {
+    await renderReadyWorkspace()
+
+    expect(mocks.useWorkspaceVisibleTestsSpy).toHaveBeenLastCalledWith(
+      { "src/http/claims.ts": "export function postClaim() {}\n" },
+      [
+        {
+          path: "test/support/build-app.ts",
+          content: "export function buildTestApp() { return {} }\n",
+        },
+        { path: "claims-parser.test.ts", content: 'describe("x", () => {})\n' },
+      ],
+      ["claims-parser.test.ts"]
+    )
   })
 })
 

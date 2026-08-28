@@ -24,6 +24,8 @@ import {
   scanFreshWorkspaceGitObjects,
   scanProvisionedBundleContent,
 } from "@/lib/sprint-labs/validate/dynamic/provisioning"
+import { mer101Ticket } from "@/lib/sprint-labs/content/meridian/tickets/MER-101"
+import { runTsWorkspace } from "@/lib/workspace-execution/ts-workspace/node-harness"
 
 import { materializeInitialTree, type ProvisionedFile } from "../materialize-initial-tree"
 
@@ -146,6 +148,26 @@ describe("materializeInitialTree -- meridian MER-101 (real seed, direct-dirname 
     expect(files.some((f) => f.path.startsWith("test/money/"))).toBe(false)
 
     assertNoForbiddenPaths(files)
+  })
+
+  it("loads the real visible suite with the same editable + readonly + compiled-test file set the browser receives", async () => {
+    const provisioned = materializeInitialTree("meridian", "MER-101")
+    const runtimeFiles = [
+      ...provisioned
+        .filter((file) => file.role === "editable" || file.role === "readonly")
+        .map(({ path, content }) => ({ path, content })),
+      ...mer101Ticket.visibleTestFiles,
+    ]
+
+    const result = await runTsWorkspace({
+      files: runtimeFiles,
+      testPaths: mer101Ticket.visibleTestFiles.map((file) => file.path),
+      hiddenTestPaths: [],
+    })
+
+    expect(result.results.length).toBeGreaterThan(0)
+    expect(result.results.some((test) => test.name === "Test file failed to load")).toBe(false)
+    expect(result.results.some((test) => test.suite === "POST /claims")).toBe(true)
   })
 
   it("carries zero hidden-test/secret signatures with test scaffolding included -- Task 7's own scans on the underlying materialized tree (MER-101 now has 4 real hidden-test YAMLs)", () => {

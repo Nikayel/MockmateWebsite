@@ -19,6 +19,13 @@ describe("labs-tracks registry", () => {
     }
   })
 
+  it("marks both Labs tracks as beta", () => {
+    expect(LABS_TRACKS.map(({ id, statusLabel }) => [id, statusLabel])).toEqual([
+      ["decomposition", "Beta"],
+      ["sprint", "Beta"],
+    ])
+  })
+
   it("routes Decomposition at the live /labs catalog, ungated", () => {
     const decomposition = LABS_TRACKS.find((t) => t.id === "decomposition")
     expect(decomposition?.href).toBe("/labs")

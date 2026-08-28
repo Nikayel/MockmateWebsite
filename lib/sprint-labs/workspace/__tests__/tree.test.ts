@@ -54,6 +54,26 @@ describe("buildWorkspaceTree", () => {
     expect(byPath["claims-parser.test.ts"].editable).toBe(false)
   })
 
+  it("shows provisioned test support files as locked references without duplicating a visible test", () => {
+    const tree = buildWorkspaceTree({
+      ticket: fixtureTicket,
+      editableFiles: { "src/http/claims.ts": "code" },
+      readonlyFiles: [
+        { path: "test/support/build-app.ts", content: "export const buildTestApp = () => ({})" },
+        { path: "claims-parser.test.ts", content: "stale duplicate" },
+      ],
+      meridianMd: null,
+      mapMd: "map content",
+    })
+
+    const support = tree.find((file) => file.path === "test/support/build-app.ts")
+    expect(support).toMatchObject({ editable: false, group: "tests" })
+    expect(tree.filter((file) => file.path === "claims-parser.test.ts")).toHaveLength(1)
+    expect(tree.find((file) => file.path === "claims-parser.test.ts")?.content).toContain(
+      'describe("x"'
+    )
+  })
+
   it("omits MERIDIAN.md entirely when no content is given (the dormant seam), MAP.md always present", () => {
     const tree = buildWorkspaceTree({
       ticket: fixtureTicket,

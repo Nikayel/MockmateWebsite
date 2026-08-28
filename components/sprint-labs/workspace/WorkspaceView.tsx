@@ -147,6 +147,13 @@ export function WorkspaceView({
     () => Object.fromEntries(editableSeed.map((f) => [f.path, f.content])),
     [editableSeed]
   )
+  const readonlySupportFiles = useMemo<WorkspaceFileLike[]>(
+    () =>
+      (provisioned ?? [])
+        .filter((f) => f.role === "readonly")
+        .map((f) => ({ path: f.path, content: f.content })),
+    [provisioned]
+  )
   const meridianMd = useMemo(
     () => provisioned?.find((f) => f.role === "docs" && f.path === "MERIDIAN.md")?.content,
     [provisioned]
@@ -156,6 +163,12 @@ export function WorkspaceView({
   // effect above and this file's header) so its own load-and-reassemble effect never runs against a
   // still-empty seed.
   const sync = useSprintLabRunSync(provisioned ? run.id : null, editableSeed)
+  const workspaceReady =
+    provisioned !== null &&
+    !sync.isLoading &&
+    editableSeed.every((file) => Object.prototype.hasOwnProperty.call(sync.files, file.path))
+  const workspaceUnavailable = !workspaceReady && (provisionError !== null || sync.error !== null)
+  const workspaceIsPreparing = !workspaceReady && !workspaceUnavailable
 
   const [activePath, setActivePath] = useState<string | undefined>(undefined)
 
@@ -185,12 +198,13 @@ export function WorkspaceView({
       buildWorkspaceTree({
         ticket: compiledTicket,
         editableFiles: sync.files,
+        readonlyFiles: readonlySupportFiles,
         meridianMd,
         mapMd,
       }),
     // compiledTicket omitted for the same reason as the memo above: stable for one ticket's lifetime.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sync.files, meridianMd, mapMd]
+    [sync.files, readonlySupportFiles, meridianMd, mapMd]
   )
 
   // Opens on MERIDIAN.md (or the generated map, per tree.ts's fallback) exactly once, when the tree
@@ -203,15 +217,18 @@ export function WorkspaceView({
 
   const activeFile = tree.find((f) => f.path === activePath)
 
-  const fixedTestFiles = useMemo(
-    () => compiledTicket.visibleTestFiles.map((f) => ({ path: f.path, content: f.content })),
-    [compiledTicket.visibleTestFiles]
+  const fixedRuntimeFiles = useMemo(
+    () => [
+      ...readonlySupportFiles,
+      ...compiledTicket.visibleTestFiles.map((f) => ({ path: f.path, content: f.content })),
+    ],
+    [readonlySupportFiles, compiledTicket.visibleTestFiles]
   )
   const testPaths = useMemo(
     () => compiledTicket.visibleTestFiles.map((f) => f.path),
     [compiledTicket.visibleTestFiles]
   )
-  const visibleTests = useWorkspaceVisibleTests(sync.files, fixedTestFiles, testPaths)
+  const visibleTests = useWorkspaceVisibleTests(sync.files, fixedRuntimeFiles, testPaths)
 
   // Stable-identity callbacks reading the LATEST values via refs, so PartnerChat's props never
   // change identity across renders while still always posting current state at send-time (it only
@@ -274,7 +291,9 @@ export function WorkspaceView({
       const meta = e.metaKey || e.ctrlKey
       if (meta && e.key === "Enter") {
         e.preventDefault()
-        void visibleTests.run()
+        if (workspaceReady && visibleTests.status !== "running") {
+          void visibleTests.run()
+        }
         return
       }
       if (meta && e.key === "s") {
@@ -285,7 +304,7 @@ export function WorkspaceView({
         e.preventDefault()
       }
     },
-    [visibleTests]
+    [visibleTests, workspaceReady]
   )
 
   const consoleResults: TestResult[] = visibleTests.infraError
@@ -332,11 +351,19 @@ export function WorkspaceView({
         {/* Left rail: file tree + ticket summary + submit */}
         <div className="flex min-h-0 flex-col gap-3 overflow-y-auto rounded-lg border border-[var(--wb-border)] bg-[var(--wb-sidebar)] p-3">
           <div ref={fileTabsRef}>
-            <WorkspaceFileTabs
-              files={tree}
-              activePath={activePath ?? ""}
-              onSelect={setActivePath}
-            />
+            {workspaceReady ? (
+              <WorkspaceFileTabs
+                files={tree}
+                activePath={activePath ?? ""}
+                onSelect={setActivePath}
+              />
+            ) : (
+              <p className="px-1 text-[12px] text-[var(--wb-text-secondary)]" role="status">
+                {workspaceUnavailable
+                  ? "Workspace files are unavailable."
+                  : "Loading workspace files…"}
+              </p>
+            )}
           </div>
 
           <div className="mt-auto flex flex-col gap-2 border-t border-[var(--wb-border)] pt-3">
@@ -434,10 +461,17 @@ export function WorkspaceView({
               type="button"
               size="sm"
               onClick={() => void visibleTests.run()}
-              disabled={visibleTests.status === "running"}
+              loading={workspaceIsPreparing}
+              disabled={!workspaceReady || visibleTests.status === "running"}
             >
-              <Play className="h-3.5 w-3.5" aria-hidden />
-              {visibleTests.status === "running" ? "Running…" : "Run visible tests"}
+              {workspaceReady && <Play className="h-3.5 w-3.5" aria-hidden />}
+              {visibleTests.status === "running"
+                ? "Running…"
+                : workspaceReady
+                  ? "Run visible tests"
+                  : workspaceUnavailable
+                    ? "Tests unavailable"
+                    : "Preparing workspace…"}
             </Button>
             {visibleTests.summary && (
               <span className="text-xs text-[var(--wb-text-secondary)]">

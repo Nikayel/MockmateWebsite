@@ -108,7 +108,7 @@ describe("TicketView", () => {
     expect(screen.getByText(/Nothing escaped\./)).not.toBeNull()
   })
 
-  it("disables the CTA with a muted Content coming soon control for a content stub, and keeps the body/criteria/objectives readable", () => {
+  it("disables the CTA with a muted Coming soon control for a content stub, and keeps the body/criteria/objectives readable", () => {
     render(
       <TicketView
         workbookId="fixture-demo"
@@ -120,7 +120,7 @@ describe("TicketView", () => {
       />
     )
     expect(screen.queryByRole("link", { name: "Open workspace" })).toBeNull()
-    const cta = screen.getByRole("button", { name: "Content coming soon" })
+    const cta = screen.getByRole("button", { name: "Coming soon" })
     expect(cta.hasAttribute("disabled")).toBe(true)
 
     expect(screen.getByText(/Support reopened CX-88431 this morning/)).not.toBeNull()
@@ -143,7 +143,7 @@ describe("TicketView", () => {
           status={status}
         />
       )
-      expect(screen.getByRole("button", { name: "Content coming soon" })).not.toBeNull()
+      expect(screen.getByRole("button", { name: "Coming soon" })).not.toBeNull()
       expect(
         screen.queryByRole("link", {
           name: /Open workspace|Back to workspace|See CI|See retro|Open the PR/,
@@ -158,7 +158,7 @@ describe("TicketView", () => {
       <TicketView workbookId="fixture-demo" ticket={ticket({ playable: true })} status="todo" />
     )
     expect(screen.getByRole("link", { name: "Open workspace" })).not.toBeNull()
-    expect(screen.queryByText("Content coming soon")).toBeNull()
+    expect(screen.queryByText("Coming soon")).toBeNull()
 
     rerender(<TicketView workbookId="fixture-demo" ticket={ticket()} status="todo" />)
     expect(screen.getByRole("link", { name: "Open workspace" })).not.toBeNull()

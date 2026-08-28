@@ -50,6 +50,9 @@ export function LabsTrackCards({
             </span>
             <span className="text-foreground mt-3.5 flex items-center gap-1.5 text-base font-semibold">
               {track.label}
+              <span className="border-border/80 bg-muted/60 text-muted-foreground rounded-full border px-1.5 py-px text-[10px] leading-4 font-medium tracking-[0.08em] uppercase">
+                {track.statusLabel}
+              </span>
               <ArrowRight
                 className="h-4 w-4 -translate-x-1 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-70"
                 aria-hidden="true"

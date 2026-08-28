@@ -21,6 +21,8 @@ export interface LabsTrack {
   id: LabsTrackId
   /** Full name, shown on the picker card. */
   label: string
+  /** Quiet lifecycle label shown beside the track name. */
+  statusLabel: "Beta"
   /** What this lab family actually is, in a candidate's words. */
   blurb: string
   /** The shape of the work, shown as chips on the card. */
@@ -40,6 +42,7 @@ export const LABS_TRACKS: LabsTrack[] = [
   {
     id: "decomposition",
     label: "Decomposition",
+    statusLabel: "Beta",
     blurb:
       "One underspecified problem, one sitting. Scope it, commit to a design, then build on a real multi-file codebase until the tests pass. The round Palantir FDSE and Stripe interviews actually run.",
     // The five milestones, pinned by lib/labs/__tests__/case-labs-registry.test.ts.
@@ -50,6 +53,7 @@ export const LABS_TRACKS: LabsTrack[] = [
   {
     id: "sprint",
     label: "Sprint",
+    statusLabel: "Beta",
     blurb:
       "Ten sprints on one growing codebase. The repo remembers what you did, and sprint 9 breaks the code you wrote in sprint 4. The long game on one system.",
     loop: ["Ten sprints", "One codebase", "It remembers"],

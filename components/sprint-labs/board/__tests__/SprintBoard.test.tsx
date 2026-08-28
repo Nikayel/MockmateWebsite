@@ -79,6 +79,6 @@ describe("SprintBoard", () => {
       { ...ticket("MER-803", "doing"), playable: false },
     ]
     render(<SprintBoard workbookId="fixture-demo" tickets={allStubs} />)
-    expect(screen.getAllByText("Content coming")).toHaveLength(3)
+    expect(screen.getAllByText("Coming soon")).toHaveLength(3)
   })
 })

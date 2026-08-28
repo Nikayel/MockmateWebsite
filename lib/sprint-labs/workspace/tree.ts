@@ -8,8 +8,10 @@
  * explicitly): the platform's canonical copy is what actually grades at submit
  * (AGENT-CONTEXT.md §4 launch blocker 5, "the grader runs the content repo's canonical
  * `tests/visible`, never the learner's copy"), so a learner-editable local copy would be editable
- * but functionally inert — an editable-looking dead end. Read-only reference material, exactly like
- * `MERIDIAN.md`/`MAP.md`, is the honest framing.
+ * but functionally inert — an editable-looking dead end. Provisioned `test/support/**` and
+ * `test/fixtures/**` dependencies live in the same locked group: visible tests import them, and
+ * hiding those files while exposing the importing test makes the mounted project look incomplete.
+ * Read-only reference material, exactly like `MERIDIAN.md`/`MAP.md`, is the honest framing.
  *
  * Hidden test files are never a parameter anywhere in this module's input shape, which is the
  * structural guarantee that they cannot appear in the tree: `CompiledTicket.hiddenTests` (this
@@ -42,6 +44,8 @@ export interface BuildWorkspaceTreeInput {
   /** Learner's current editable-file content (seed + overlay + live edits), keyed by path. See the
    *  content-gap note above: `{}` today for every ticket. */
   editableFiles: Readonly<Record<string, string>>
+  /** Provisioned dependencies imported by visible tests. They are readable but never editable. */
+  readonlyFiles?: readonly { path: string; content: string }[]
   /** Wired-but-dormant (see file header): `undefined`/`null` renders no MERIDIAN.md entry at all
    *  rather than a lockable-but-empty file. */
   meridianMd?: string | null
@@ -81,8 +85,12 @@ export function buildWorkspaceTree(input: BuildWorkspaceTreeInput): WorkspaceTre
     }))
   )
 
+  const visibleAndSupportFiles = [...(input.readonlyFiles ?? []), ...input.ticket.visibleTestFiles]
+  const uniqueVisibleAndSupportFiles = Array.from(
+    new Map(visibleAndSupportFiles.map((file) => [file.path, file])).values()
+  )
   const tests = sortedByPath(
-    input.ticket.visibleTestFiles.map((f) => ({
+    uniqueVisibleAndSupportFiles.map((f) => ({
       path: f.path,
       content: f.content,
       editable: false,

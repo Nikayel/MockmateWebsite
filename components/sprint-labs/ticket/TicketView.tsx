@@ -25,7 +25,7 @@
  * **`playable === false` overrides the CTA resolution above entirely.** A compiled content stub (no
  * `reference.diff`/`rubric.yaml` yet — see `TicketPublic.playable`'s doc comment) has no workspace
  * content and no sealed bundle to grade against, so none of `workspace`/`submit`/`review`/`retro` has
- * anything real to show. The CTA renders as a disabled, muted "Content coming soon" control instead
+ * anything real to show. The CTA renders as a disabled, muted "Coming soon" control instead
  * of a link, whatever `resolveCta` would otherwise have picked. Everything else on the screen (body,
  * acceptance criteria, objectives, policy banner) stays exactly as authored — a learner can still
  * read a stub, just not play it. `undefined` (every ticket compiled before this field existed) reads
@@ -145,7 +145,7 @@ export function TicketView({ workbookId, ticket, status, escapedCount }: TicketV
         <div className="flex flex-wrap items-center gap-4 border-t border-[var(--wb-border)] pt-4">
           {ticket.playable === false ? (
             <Button size="lg" disabled className={NOT_PLAYABLE_CTA_CLASS}>
-              Content coming soon
+              Coming soon
             </Button>
           ) : (
             <Button asChild size="lg" className={CTA_BUTTON_CLASS}>
