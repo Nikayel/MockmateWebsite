@@ -23,6 +23,7 @@ import { OnsiteTimer } from "@/components/labs/OnsiteTimer"
 import { CompanyLogo } from "@/components/labs/CompanyLogo"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { Header } from "@/components/header"
+import { CaseLabOnboardingGate } from "@/components/labs/CaseLabOnboardingGate"
 import { trackCaseLabStarted, trackCaseLabViewed } from "@/lib/labs/case-lab-analytics"
 import { reportFunnelEvent } from "@/lib/metrics/funnel-client"
 import { SparraLoader } from "@/components/brand/SparraLoader"
@@ -159,6 +160,10 @@ export default function CaseLabPlayPage() {
   return (
     <>
       <Header />
+      {/* First-run "you're in the room" cinematic, over the setup screen only (never the immersive
+          workspace). Self-gating and client-only; it plays once per lab and unmounts on handoff,
+          leaving the navbar and the brief underneath. */}
+      <CaseLabOnboardingGate lab={lab} />
       <main className="case-lab-workbook min-h-screen bg-[var(--wb-page)] text-[var(--wb-text)]">
         <div className="container mx-auto flex max-w-2xl flex-col gap-4 px-4 pt-24 pb-12 sm:pt-28">
           {/* No ThemeToggle on this screen: unlike the immersive one below, it renders <Header />,
