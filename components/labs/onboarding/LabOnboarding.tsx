@@ -135,13 +135,23 @@ const OVERLAY_CSS = `
   position: absolute;
   top: 0;
   left: 0;
+  /* Above the WebGL canvas (z-index 0), or the tile reads as an empty box. */
+  z-index: 2;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.01em;
   color: #E6E9EF;
   white-space: nowrap;
   pointer-events: none;
-  transition: opacity 0.3s;
+  /* Invisible until the render loop projects it onto its tile, so there's no first-frame pile in
+     the top-left corner; the loop fades each label in as it's positioned. */
+  opacity: 0;
+  transition: opacity 0.3s, border-color 0.3s;
+  /* A readable chip so the module name reads cleanly against the glow behind it. */
+  padding: 3px 9px;
+  border-radius: 7px;
+  background: rgba(11, 14, 20, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
 }
 .lab-onb-map-caption {

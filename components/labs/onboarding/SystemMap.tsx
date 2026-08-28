@@ -121,6 +121,9 @@ export function SystemMap({ modules }: { modules: OnboardingModule[] }) {
       inset: "0",
       width: "100%",
       height: "100%",
+      // Sit UNDER the projected HTML labels. Without this the canvas (appended last) paints over
+      // them and every tile reads as an empty glowing box — its name hidden behind the canvas.
+      zIndex: "0",
     })
     host.appendChild(renderer.domElement)
 
@@ -183,7 +186,9 @@ export function SystemMap({ modules }: { modules: OnboardingModule[] }) {
         const sx = (projected.x * 0.5 + 0.5) * w
         const sy = (-projected.y * 0.5 + 0.5) * h
         label.style.transform = `translate(${sx}px, ${sy}px) translate(-50%, -50%)`
-        label.style.opacity = i === activeRef.current ? "1" : "0.45"
+        const isActive = i === activeRef.current
+        label.style.opacity = isActive ? "1" : "0.6"
+        label.style.borderColor = isActive ? "rgba(232, 161, 60, 0.9)" : "rgba(255, 255, 255, 0.12)"
       })
     }
 
