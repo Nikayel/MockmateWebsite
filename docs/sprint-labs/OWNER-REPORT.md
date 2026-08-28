@@ -32,6 +32,66 @@ Set `SPRINT_LABS_ENABLED` to `true` (per the feature-flag mechanism in
 **Sprint 1 of Meridian is free** for signed-in users; **sprints 2-10 require
 Pro**. Submissions are always authed.
 
+## Update 2026-08-28 — Labs nav chooser + "you're hired" onboarding
+
+Shipped this session on `sprint-labs` (typecheck 0 errors, full suite 8636
+passing, lint 0 errors, `next build` compiles clean; page-data collection still
+needs your Firebase env, exactly as before).
+
+**1. The Labs nav opens a chooser panel** (mirrors the Interview picker).
+- The header "Labs" button now opens a two-card window: **Decomposition**
+  (-> `/labs`) and **Sprint** (-> `/sprint-labs/meridian`), instead of routing
+  straight to the Case Labs gallery.
+- The **Sprint row is gated on `SPRINT_LABS_ENABLED`** through a new client probe
+  (`GET /api/sprint-labs/enabled` + a `useSprintLabsEnabled` hook) and **fails
+  closed**: with the flag off the panel shows only Decomposition and behaves
+  exactly like today's direct link. Nothing leaks before you flip it.
+- Labs now reads "active" across `/sprint-labs/**` as well as `/labs`.
+
+**2. A reusable "you're hired" onboarding cinematic.**
+- One config-driven overlay (`LabOnboarding`) plays a five-beat arrival
+  (offer -> company -> **3D system map** -> Sable -> handoff), then unmounts onto
+  the page underneath, so the app navbar is present the moment it ends.
+- The one 3D moment is vanilla three.js (already a dependency; mirrors
+  `components/three/ThreeOrb.tsx`), lighting one module at a time, with an
+  **identical-content 2D fallback** for reduced-motion / no-WebGL. It is
+  lazy-loaded and `ssr:false`, so nothing heavy touches first paint or the server.
+- Plays **once per company/lab** (localStorage), skippable, keyboard-navigable.
+
+**3. Where it's wired.**
+- **Meridian:** mounts on the workbook overview, **dormant behind
+  `SPRINT_LABS_ENABLED`** like the rest of Sprint Labs. Every system-map module
+  names a real Meridian repo directory, pinned by a test so the "this is this"
+  can't drift.
+- **Case Labs (decomposition):** the same overlay, a lighter lab-derived arc
+  (offer -> the brief -> the room -> handoff, **no 3D map** — a one-sitting
+  problem has no six-module repo to tour). Every line comes from the lab's own
+  authored fields.
+
+### The one decision that needs your eye
+
+The **decomposition onboarding is live on the Case Labs funnel the moment
+`sprint-labs` merges to main** — unlike Meridian, which stays dormant behind the
+flag. You asked for decomp to reuse the onboarding "for new users," so it ships
+on. It is first-run-only, skippable, and remembered per lab, so a returning user
+pays nothing. But it is a real change to the first thing a new visitor sees when
+they open a lab, on a funnel you watch closely, so you should know it's live.
+
+- **Prefer a kill switch?** ~10-minute follow-up: a `LAB_ONBOARDING_ENABLED`
+  flag read through the same client probe, so you can toggle it from
+  `/admin/feature-flags` without a redeploy.
+- **Remove it entirely?** Delete the one `<CaseLabOnboardingGate lab={lab} />`
+  mount in `app/labs/[labId]/page.tsx`.
+
+### Not built yet, by choice
+
+- A "replay intro" link in the workbook menu (the cinematic plays once; there's
+  no re-entry affordance yet).
+- Auto-advance between beats (kept manual — lower cognitive load, reader-paced).
+- The prototype's Instrument Serif / IBM Plex faces: the in-app overlay uses a
+  system serif stack to avoid a site-wide Google-font load for a flagged,
+  first-run surface.
+
 ## Owner decisions honored (asked and answered 2026-08-26)
 
 1. **Ship behind a flag** when the acceptance bar is green; you flip it after a
