@@ -67,7 +67,11 @@ const mutableFlagSchema = z.object({
   targetTiers: z.array(z.string().trim().min(1)).max(20).default([]),
   targetUserIds: z.array(z.string().trim().min(1)).max(500).default([]),
   environment: flagEnvironmentSchema.default("all"),
-  expiresAt: z.string().datetime().or(z.string().date()).nullable().optional(),
+  // The admin form sends "" for "no expiry" (page.tsx defaults + a cleared date input), so an empty
+  // string must be accepted alongside a real datetime/date: the create/update handlers already treat
+  // any falsy expiresAt as null (no expiry). Without the `z.literal("")` branch, toggling a flag that
+  // has no expiry set failed with "expiresAt: Invalid datetime".
+  expiresAt: z.string().datetime().or(z.string().date()).or(z.literal("")).nullable().optional(),
 })
 
 export const createFlagSchema = mutableFlagSchema.extend({ key: flagKeySchema })
