@@ -20,6 +20,7 @@ import { ArrowLeft } from "lucide-react"
 
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
+import { MeridianOnboardingGate } from "@/components/sprint-labs/MeridianOnboardingGate"
 import { getWorkbookSummary, getWorkbookSprints } from "@/lib/sprint-labs/content/registry"
 import {
   workbookIsRunnable,
@@ -85,6 +86,10 @@ export default async function SprintLabWorkbookOverviewPage({
   return (
     <>
       <Header />
+      {/* First-run "you're hired" cinematic, Meridian only. Self-gating and client-only, so it never
+          touches this static page's HTML; it plays over the page and unmounts on handoff, leaving the
+          navbar and workbook underneath. */}
+      {summary.id === "meridian" && <MeridianOnboardingGate />}
       <main className="workbook-surface min-h-screen bg-[var(--wb-page)] text-[var(--wb-text)]">
         <div className="container mx-auto flex max-w-[900px] flex-col gap-10 px-4 pt-20 pb-16 sm:pt-24">
           <Link
