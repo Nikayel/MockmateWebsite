@@ -6,7 +6,6 @@ import { RelevanceGapSection } from "@/components/relevance-gap-section"
 import { CompanyRoadmapSection } from "@/components/company-roadmap-section"
 import { FeaturesSection } from "@/components/features-section"
 import { AIAssistedSection } from "@/components/ai-assisted-section"
-import { ComparisonSection } from "@/components/comparison-section"
 import { MetricsMarketingSection } from "@/components/metrics-marketing-section"
 import { Footer } from "@/components/footer"
 import { HomePageClient } from "@/components/home/HomePageClient"
@@ -63,7 +62,6 @@ export default function HomePage() {
         <FeaturesSection />
         <ProblemTeaser />
         <MetricsMarketingSection />
-        <ComparisonSection />
         <Footer />
       </main>
     </LenisProvider>

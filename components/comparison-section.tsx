@@ -329,9 +329,8 @@ export function ComparisonSection() {
               // Says WHICH plan this price is, because on /pricing the plan card
               // two scrolls up defaults to Annually and shows $19/mo. Without
               // this, one product appeared at two prices on one page with
-              // nothing explaining the difference. This section also renders on
-              // the homepage, where there is no billing toggle at all, so it
-              // states the plan rather than reading the toggle.
+              // nothing explaining the difference. State the plan here rather
+              // than making the reader infer it from the toggle above.
               note={`${proMonthly.billingNote}. Cancel anytime.`}
               points={[
                 { included: true, text: "AI adapts to your skill level" },
