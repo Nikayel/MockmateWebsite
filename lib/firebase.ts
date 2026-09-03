@@ -151,6 +151,16 @@ export function startAnalytics(): Analytics | null {
   if (!firebaseConfig.measurementId) return null
   if (analyticsInstance) return analyticsInstance
 
+  // Do not start GA4 while the browser is offline. `getAnalytics()` is not
+  // synchronous underneath: it starts a Firebase Installations registration in
+  // the background. Offline, that request rejects a promise the try/catch below
+  // can never see, because the SDK settles it one IndexedDB turn later. The
+  // rejection then escapes as an unhandled "installations/app-offline" error
+  // and error tracking files it as a site defect. GA4 is meant to be inert
+  // until it can run, so skip it here; the next tracked event after the
+  // connection returns starts it cleanly.
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return null
+
   try {
     analyticsInstance = getAnalytics(app)
     return analyticsInstance
