@@ -25,6 +25,7 @@ import { hasPendingGuestMigration, migrateGuestSessionsOnLogin } from "@/lib/gue
 import { trackLogin, trackSignup } from "@/lib/analytics"
 import { reportFunnelEvent } from "@/lib/metrics/funnel-client"
 import { SparraLoader } from "@/components/brand/SparraLoader"
+import { guestDebriefResumePath } from "@/lib/interview/guest-debrief-resume"
 
 function getLoginErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) return "Please try again."
@@ -173,15 +174,17 @@ function LoginPageContent() {
           // visitor a recovered session (SignupPrompt marker or the
           // trial-used wall headline).
           let migratedSessionId: string | null = null
+          let migratedScenarioId: string | null = null
           const promisedRecovery = hasPendingGuestMigration() || isTrialUsed
           if (hasPendingGuestMigration() || getGuestId()) {
             const token = await firebaseUser.getIdToken()
             const migration = await migrateGuestSessionsOnLogin({ idToken: token })
             if (migration.status === "migrated") {
               migratedSessionId = migration.sessionId
+              migratedScenarioId = migration.scenarioId
               toast.success("Your trial session has been saved!", {
                 description: migratedSessionId
-                  ? "Opening your results..."
+                  ? "Opening your interview debrief..."
                   : "View it in your sessions history.",
               })
             } else if (migration.status === "gone" && promisedRecovery) {
@@ -253,7 +256,12 @@ function LoginPageContent() {
           // because reading it is what clears it.
           const storedPath = getStoredRedirectPath()
           router.push(
-            migratedSessionId ? `/sessions/${migratedSessionId}` : (storedPath ?? safeRedirect)
+            migratedSessionId
+              ? guestDebriefResumePath({
+                  sessionId: migratedSessionId,
+                  scenarioId: migratedScenarioId,
+                })
+              : (storedPath ?? safeRedirect)
           )
         } catch (profileError: unknown) {
           // Do NOT redirect past this.
