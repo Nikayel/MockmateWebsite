@@ -189,6 +189,30 @@ export const GuestSessionUpdateSchema = z.object({
       chatMessages: z.array(BoundedStateElement).max(100, "Too many messages").optional(),
       interviewerMessages: z.array(BoundedStateElement).max(100, "Too many messages").optional(),
       testResults: z.array(BoundedStateElement).max(100, "Too many test results").optional(),
+      testSummary: z
+        .object({
+          total: z.number().min(0),
+          passed: z.number().min(0),
+          failed: z.number().min(0),
+          passRate: z.number().min(0).max(100),
+        })
+        .optional(),
+      workspaceContext: z
+        .array(BoundedStateElement)
+        .max(100, "Too many workspace files")
+        .optional(),
+      activeWorkspacePath: z.string().max(1000).nullable().optional(),
+      consoleLogs: z.array(BoundedStateElement).max(500, "Too many console logs").optional(),
+      bugfixEvidenceEvents: z
+        .array(BoundedStateElement)
+        .max(500, "Too many evidence events")
+        .optional(),
+      bugfixHypothesis: z.string().max(10000).optional(),
+      bugfixRootCause: z.string().max(10000).optional(),
+      bugfixPrevention: z.string().max(10000).optional(),
+      isPostInterviewDiscussion: z.boolean().optional(),
+      realInterviewMode: z.boolean().optional(),
+      strictTimeLimit: z.number().min(0).max(86400).nullable().optional(),
     })
     .optional(),
   performanceScore: z

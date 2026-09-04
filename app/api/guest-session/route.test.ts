@@ -205,6 +205,17 @@ describe("PUT /api/guest-session validation (API-3)", () => {
           chatMessages: [{ type: "user", message: "hint please" }],
           interviewerMessages: [{ type: "ai", message: "Welcome" }],
           testResults: [{ passed: true }],
+          testSummary: { total: 1, passed: 1, failed: 0, passRate: 100 },
+          workspaceContext: [{ path: "src/index.ts", content: "export {}" }],
+          activeWorkspacePath: "src/index.ts",
+          consoleLogs: [{ type: "log", message: "done", timestamp: 1 }],
+          bugfixEvidenceEvents: [{ type: "test_run", timestamp: 1 }],
+          bugfixHypothesis: "The boundary check is wrong.",
+          bugfixRootCause: "The loop includes the final index.",
+          bugfixPrevention: "Add a boundary regression test.",
+          isPostInterviewDiscussion: true,
+          realInterviewMode: false,
+          strictTimeLimit: 1800,
         },
       })
     )) as MockResponse
