@@ -115,6 +115,7 @@
     "@firebase/rules-unit-testing": "^5.0.1",
     "@next/bundle-analyzer": "^15.1.0",
     "@playwright/test": "^1.60.0",
+    "@posthog/nextjs-config": "^1.10.0",
     "@tailwindcss/postcss": "^4.1.9",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^22",
@@ -149,6 +150,7 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "@posthog/cli",
       "core-js",
       "esbuild",
       "protobufjs",
