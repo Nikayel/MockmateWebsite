@@ -24,7 +24,10 @@ const PENDING_KEY = "pending_guest_migration"
 const fetchMock = vi.fn()
 
 function seedGuestState() {
-  localStorage.setItem(PENDING_KEY, JSON.stringify({ guestId: GUEST_ID, sessionId: "sess-1" }))
+  localStorage.setItem(
+    PENDING_KEY,
+    JSON.stringify({ guestId: GUEST_ID, sessionId: "sess-1", scenarioId: "scenario-1" })
+  )
   localStorage.setItem("mockmate_guest_id", GUEST_ID)
 }
 
@@ -45,7 +48,11 @@ describe("migrateGuestSessionsOnLogin", () => {
 
     const result = await migrateGuestSessionsOnLogin({ idToken: "token-1" })
 
-    expect(result).toEqual({ status: "migrated", sessionId: "sess-1" })
+    expect(result).toEqual({
+      status: "migrated",
+      sessionId: "sess-1",
+      scenarioId: "scenario-1",
+    })
     expect(localStorage.getItem(PENDING_KEY)).toBeNull()
     // confirmGuestSessionMigration retires the guest identity.
     expect(localStorage.getItem("mockmate_guest_id")).toBeNull()

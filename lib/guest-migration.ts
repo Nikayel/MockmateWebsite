@@ -16,12 +16,12 @@
  * - none: there was no guest identity to migrate at all.
  */
 
-import { confirmGuestSessionMigration, getGuestId } from "./guest-session"
+import { confirmGuestSessionMigration, getGuestId, getGuestSessionData } from "./guest-session"
 
 const PENDING_MIGRATION_KEY = "pending_guest_migration"
 
 export type LoginMigrationResult =
-  | { status: "migrated"; sessionId: string | null }
+  | { status: "migrated"; sessionId: string | null; scenarioId: string | null }
   | { status: "none" }
   | { status: "gone" }
   | { status: "transient" }
@@ -41,11 +41,17 @@ export async function migrateGuestSessionsOnLogin(params: {
   const raw = localStorage.getItem(PENDING_MIGRATION_KEY)
   let markerGuestId: string | null = null
   let markerSessionId: string | null = null
+  let markerScenarioId: string | null = null
   if (raw) {
     try {
-      const parsed = JSON.parse(raw) as { guestId?: string; sessionId?: string }
+      const parsed = JSON.parse(raw) as {
+        guestId?: string
+        sessionId?: string
+        scenarioId?: string
+      }
       markerGuestId = parsed.guestId ?? null
       markerSessionId = parsed.sessionId ?? null
+      markerScenarioId = parsed.scenarioId ?? null
     } catch {
       // Unreadable marker: fall through to the stored guest id.
     }
@@ -78,9 +84,14 @@ export async function migrateGuestSessionsOnLogin(params: {
   } | null
 
   if (response.ok && result && (result.migrated ?? 0) > 0) {
+    const storedSession = getGuestSessionData()
+    const migratedSessionId = result.sessionIds?.[0] ?? markerSessionId ?? null
+    const scenarioId =
+      markerScenarioId ??
+      (storedSession?.sessionId === migratedSessionId ? storedSession.scenarioId : null)
     confirmGuestSessionMigration()
     localStorage.removeItem(PENDING_MIGRATION_KEY)
-    return { status: "migrated", sessionId: result.sessionIds?.[0] ?? markerSessionId ?? null }
+    return { status: "migrated", sessionId: migratedSessionId, scenarioId }
   }
 
   if (response.status === 404 || (response.ok && result && result.migrated === 0)) {
