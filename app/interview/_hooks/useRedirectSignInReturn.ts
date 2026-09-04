@@ -8,6 +8,7 @@ import { getAttribution } from "@/lib/attribution"
 import { trackLogin, trackSignup } from "@/lib/analytics"
 import { reportFunnelEvent } from "@/lib/metrics/funnel-client"
 import { hasPendingGuestMigration, migrateGuestSessionsOnLogin } from "@/lib/guest-migration"
+import { guestDebriefResumePath } from "@/lib/interview/guest-debrief-resume"
 
 export interface UseRedirectSignInReturnOptions {
   firebaseUser: FirebaseUser | null
@@ -33,7 +34,7 @@ export interface UseRedirectSignInReturnResult {
  * post-sign-in work (profile creation, sign-up analytics, guest migration)
  * only existed on /login, so a redirected convert used to come back to a
  * blank restarted interview with no profile and no migrated session. This
- * hook runs that same work here and lands the convert on /sessions/{id}.
+ * hook runs that same work here and resumes the migrated interview debrief.
  */
 export function useRedirectSignInReturn(
   opts: UseRedirectSignInReturnOptions
@@ -107,11 +108,18 @@ export function useRedirectSignInReturn(
 
       if (migration.status === "migrated" && migration.sessionId) {
         toast.success("Your trial session has been saved!", {
-          description: "Opening your results...",
+          description: "Opening your interview debrief...",
         })
-        // Pending stays raised: this page is navigating away, and releasing
-        // it would let the reopen effect race the redirect.
-        opts.router.replace(`/sessions/${migration.sessionId}`)
+        opts.router.replace(
+          guestDebriefResumePath({
+            sessionId: migration.sessionId,
+            scenarioId: migration.scenarioId,
+          })
+        )
+        // This is an in-place /interview navigation, so the cover must release
+        // and let the migrated session render its debrief rather than waiting
+        // for an unmount that will never happen.
+        setRedirectReturnPending(false)
         return
       }
 

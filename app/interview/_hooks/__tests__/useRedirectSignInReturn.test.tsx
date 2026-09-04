@@ -8,7 +8,7 @@
  * migration, and the reopen effect restarted a blank interview bound to a
  * session their new account cannot own — burning the AI call into a persist
  * 403. This hook is the /interview return leg: it finishes the sign-in
- * (profile, analytics, migration) and lands the convert on their results,
+ * (profile, analytics, migration) and lands the convert on their debrief,
  * while its pending flag holds the reopen effect back so nothing races it.
  */
 
@@ -95,7 +95,11 @@ beforeEach(() => {
 describe("useRedirectSignInReturn", () => {
   it("finishes the sign-in and lands the convert on their migrated session", async () => {
     auth.inFlight = true
-    migrateGuestSessionsOnLogin.mockResolvedValueOnce({ status: "migrated", sessionId: "sess-9" })
+    migrateGuestSessionsOnLogin.mockResolvedValueOnce({
+      status: "migrated",
+      sessionId: "sess-9",
+      scenarioId: "scenario-9",
+    })
     const opts = buildOpts()
 
     const { result } = renderHook(() => useRedirectSignInReturn(opts as never))
@@ -115,9 +119,10 @@ describe("useRedirectSignInReturn", () => {
     // in-page popup one in the funnel.
     expect(trackSignup).toHaveBeenCalledWith("google", "user-new", "redirect")
     expect(migrateGuestSessionsOnLogin).toHaveBeenCalledWith({ idToken: "token-1" })
-    expect(opts.router.replace).toHaveBeenCalledWith("/sessions/sess-9")
-    // Pending stays up through the navigation so the reopen effect never runs.
-    expect(result.current.redirectReturnPending).toBe(true)
+    expect(opts.router.replace).toHaveBeenCalledWith(
+      "/interview?session=sess-9&scenario=scenario-9&postInterview=true&startDebrief=true"
+    )
+    expect(result.current.redirectReturnPending).toBe(false)
     // The stored destination was for the /login lane; this handler lands the
     // user itself. Left behind, it hijacks the NEXT /login visit's redirect.
     expect(localStorage.getItem("auth_redirect")).toBeNull()
