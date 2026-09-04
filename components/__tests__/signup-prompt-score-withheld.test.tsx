@@ -60,7 +60,14 @@ const popupUser = {
 }
 
 function renderPrompt(onSignedIn = vi.fn()) {
-  render(<SignupPrompt sessionId="sess-1" scenarioTitle="Two Sum" onSignedIn={onSignedIn} />)
+  render(
+    <SignupPrompt
+      sessionId="sess-1"
+      scenarioId="scenario-1"
+      scenarioTitle="Two Sum"
+      onSignedIn={onSignedIn}
+    />
+  )
   return onSignedIn
 }
 
@@ -79,6 +86,7 @@ describe("SignupPrompt dialog semantics", () => {
     render(
       <SignupPrompt
         sessionId="sess-1"
+        scenarioId="scenario-1"
         scenarioTitle="Two Sum"
         onSignedIn={vi.fn()}
         onDismiss={onDismiss}
@@ -144,6 +152,7 @@ describe("SignupPrompt with the score withheld", () => {
     render(
       <SignupPrompt
         sessionId="sess-1"
+        scenarioId="scenario-1"
         scenarioTitle="Two Sum"
         onSignedIn={onSignedIn}
         onAuthAttempt={onAuthAttempt}
@@ -171,6 +180,7 @@ describe("SignupPrompt with the score withheld", () => {
     render(
       <SignupPrompt
         sessionId="sess-1"
+        scenarioId="scenario-1"
         scenarioTitle="Two Sum"
         onSignedIn={onSignedIn}
         onAuthAborted={onAuthAborted}
@@ -193,6 +203,7 @@ describe("SignupPrompt with the score withheld", () => {
     render(
       <SignupPrompt
         sessionId="sess-1"
+        scenarioId="scenario-1"
         scenarioTitle="Two Sum"
         onSignedIn={vi.fn()}
         onAuthAttempt={onAuthAttempt}
@@ -240,6 +251,14 @@ describe("SignupPrompt with the score withheld", () => {
     fireEvent.click(screen.getByRole("button", { name: /github/i }))
 
     await waitFor(() => expect(localStorage.getItem("pending_guest_migration")).not.toBeNull())
+    expect(JSON.parse(localStorage.getItem("pending_guest_migration") || "{}")).toEqual({
+      guestId: "guest-1",
+      sessionId: "sess-1",
+      scenarioId: "scenario-1",
+    })
+    expect(localStorage.getItem("auth_redirect")).toBe(
+      "interview?session=sess-1&scenario=scenario-1&postInterview=true&startDebrief=true"
+    )
     expect(onSignedIn).not.toHaveBeenCalled()
   })
 })

@@ -16,10 +16,12 @@ import { createOrUpdateProfile } from "@/lib/firestore-helpers"
 import { getAttribution } from "@/lib/attribution"
 import { getGuestId, markFreeTrialUsed } from "@/lib/guest-session"
 import { trackEvent } from "@/lib/analytics"
+import { guestDebriefResumePath } from "@/lib/interview/guest-debrief-resume"
 import { toast } from "sonner"
 
 interface SignupPromptProps {
   sessionId: string
+  scenarioId: string
   scenarioTitle: string
   onDismiss?: () => void
   /**
@@ -53,6 +55,7 @@ interface SignupPromptProps {
  */
 export function SignupPrompt({
   sessionId,
+  scenarioId,
   scenarioTitle,
   onDismiss,
   onSignedIn,
@@ -98,10 +101,14 @@ export function SignupPrompt({
           JSON.stringify({
             guestId,
             sessionId,
+            scenarioId,
           })
         )
       }
-      localStorage.setItem("auth_redirect", `sessions/${sessionId}`)
+      localStorage.setItem(
+        "auth_redirect",
+        guestDebriefResumePath({ sessionId, scenarioId }).replace(/^\//, "")
+      )
 
       const result = provider === "github" ? await signInWithGitHub() : await signInWithGoogle()
 

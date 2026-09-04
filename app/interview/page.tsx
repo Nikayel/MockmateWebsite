@@ -2282,6 +2282,7 @@ function InterviewPageContent() {
       {(isGuestMode || guestConversion !== "idle") && showFeedback && showSignupPrompt && (
         <SignupPrompt
           sessionId={currentSessionId || ""}
+          scenarioId={selectedScenario?.id || ""}
           scenarioTitle={selectedScenario?.title || ""}
           onSignedIn={handleGuestSignedIn}
           onAuthAttempt={() => {
