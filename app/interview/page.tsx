@@ -1228,14 +1228,15 @@ function InterviewPageContent() {
 
   // The reopen effect re-runs when firebaseUser flips — which is exactly what
   // a guest signing in from the post-trial prompt does. This ref lets the
-  // effect tell "sign-in on top of results already on screen" apart from a
+  // effect tell "sign-in on top of post-submit state already on screen" apart from a
   // genuine reopen, without widening its dependency array.
-  const completedSessionOnScreenRef = useRef<string | null>(null)
+  const postSubmitSessionOnScreenRef = useRef<string | null>(null)
   useEffect(() => {
-    completedSessionOnScreenRef.current = showFeedback ? currentSessionId : null
-  }, [showFeedback, currentSessionId])
-  const isShowingCompletedSession = useCallback(
-    (sessionId: string) => completedSessionOnScreenRef.current === sessionId,
+    postSubmitSessionOnScreenRef.current =
+      showFeedback || showPostInterviewDiscussion ? currentSessionId : null
+  }, [showFeedback, showPostInterviewDiscussion, currentSessionId])
+  const isShowingPostSubmitSession = useCallback(
+    (sessionId: string) => postSubmitSessionOnScreenRef.current === sessionId,
     []
   )
 
@@ -1264,7 +1265,7 @@ function InterviewPageContent() {
     exitGuestMode,
     refreshUsageLimit,
     startInterview,
-    isShowingCompletedSession,
+    isShowingPostSubmitSession,
     resetBugfixSessionState,
     setIsLoading,
     setSelectedScenario,

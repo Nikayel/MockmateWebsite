@@ -84,7 +84,7 @@ function buildOpts(overrides: Record<string, unknown> = {}) {
     setBugfixEvidenceEvents: vi.fn(),
     setShowPostInterviewDiscussion: vi.fn(),
     recordedBugfixEditPathsRef: { current: new Set<string>() },
-    isShowingCompletedSession: () => false,
+    isShowingPostSubmitSession: () => false,
     ...overrides,
   }
 }
@@ -104,7 +104,7 @@ beforeEach(() => {
 
 describe("useSessionReopen when the submitted session is already on screen", () => {
   it("leaves the page alone instead of redirecting the fresh convert away", async () => {
-    const opts = buildOpts({ isShowingCompletedSession: () => true })
+    const opts = buildOpts({ isShowingPostSubmitSession: () => true })
 
     renderHook(() => useSessionReopen(opts as never))
     await flush()
@@ -121,6 +121,36 @@ describe("useSessionReopen when the submitted session is already on screen", () 
     await flush()
 
     expect(opts.router.push).toHaveBeenCalledWith("/sessions/sess-1")
+  })
+
+  it("restores a fast post-submit checkpoint even with little prior conversation", async () => {
+    getSessionState.mockResolvedValueOnce({
+      code: "return 42",
+      elapsedTime: 25,
+      interviewerMessages: [{ type: "ai", message: "Welcome" }],
+      chatMessages: [],
+      testResults: [{ passed: true }],
+      testSummary: { total: 1, passed: 1, failed: 0, passRate: 100 },
+      isPostInterviewDiscussion: true,
+    })
+    const opts = buildOpts({
+      searchParams: new URLSearchParams(
+        "session=sess-1&scenario=dsa-two-sum&postInterview=true&startDebrief=true"
+      ),
+    })
+
+    renderHook(() => useSessionReopen(opts as never))
+    await flush()
+
+    expect(opts.setCode).toHaveBeenCalledWith("return 42")
+    expect(opts.setTestSummary).toHaveBeenCalledWith({
+      total: 1,
+      passed: 1,
+      failed: 0,
+      passRate: 100,
+    })
+    expect(opts.setShowPostInterviewDiscussion).toHaveBeenCalledWith(true)
+    expect(opts.router.push).not.toHaveBeenCalled()
   })
 })
 
