@@ -85,6 +85,8 @@ import { useInterviewFeedback } from "./_hooks/useInterviewFeedback"
 import { useSystemDesignFeedback } from "./_hooks/useSystemDesignFeedback"
 import { useSystemDesignSubmit } from "./_hooks/useSystemDesignSubmit"
 import { SparraLoader } from "@/components/brand/SparraLoader"
+import { guestDebriefResumePath } from "@/lib/interview/guest-debrief-resume"
+import { usePostInterviewResumeKickoff } from "./_hooks/usePostInterviewResumeKickoff"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -1362,6 +1364,17 @@ function InterviewPageContent() {
     updateTrackerOnMessage,
   })
 
+  usePostInterviewResumeKickoff({
+    searchParams,
+    hasUser: !!firebaseUser,
+    currentSessionId,
+    showPostInterviewDiscussion,
+    interviewerMessages,
+    testResults,
+    testSummary,
+    triggerPostInterviewDiscussion,
+  })
+
   const { applyFallbackFeedback, lastFeedbackRequestRef } = useFeedbackStreaming({
     currentSessionId,
     streamingFeedback,
@@ -1449,7 +1462,12 @@ function InterviewPageContent() {
         setShowPostInterviewDiscussion(true)
         setIsGeneratingFeedback(false)
         setGuestConversion("idle")
-        await triggerPostInterviewDiscussion(testResults, testSummary)
+        router.replace(
+          guestDebriefResumePath({
+            sessionId: currentSessionId,
+            scenarioId: selectedScenario?.id ?? null,
+          })
+        )
       } catch (error) {
         setIsGeneratingFeedback(false)
         // The lock returns with retry semantics; the signed-in feedback view
@@ -1461,11 +1479,10 @@ function InterviewPageContent() {
     [
       guestId,
       currentSessionId,
+      router,
+      selectedScenario?.id,
       setIsGeneratingFeedback,
       setShowSignupPrompt,
-      testResults,
-      testSummary,
-      triggerPostInterviewDiscussion,
     ]
   )
 
