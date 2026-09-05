@@ -2271,36 +2271,40 @@ function InterviewPageContent() {
         </section>
       )}
 
-      {/* Guest User Signup Prompt - shown after feedback. No performanceScore
+      {/* Guest User Signup Prompt - shown before the debrief. No performanceScore
           condition: a guest's score never enters page state (it is what the
           sign-in reveals), so gating on it would keep this modal from ever
-          rendering. The guestConversion clause keeps the modal mounted
+          rendering. Either post-submit surface may open it while legacy
+          completed trials remain recoverable. The guestConversion clause
+          keeps the modal mounted
           through the conversion itself: useSessionReopen flips isGuestMode
           off the moment auth lands, which would otherwise unmount the modal
           mid-migration and strand its loading/failure UI. */}
-      {(isGuestMode || guestConversion !== "idle") && showFeedback && showSignupPrompt && (
-        <SignupPrompt
-          sessionId={currentSessionId || ""}
-          scenarioId={selectedScenario?.id || ""}
-          scenarioTitle={selectedScenario?.title || ""}
-          onSignedIn={handleGuestSignedIn}
-          onAuthAttempt={() => {
-            // The cover must start at the provider click: Firebase commits
-            // the new user before the popup promise resolves, and this is
-            // the only hook that runs before that commit.
-            setGuestConversion("covering")
-            setIsGeneratingFeedback(true)
-          }}
-          onAuthAborted={() => {
-            setGuestConversion("idle")
-            setIsGeneratingFeedback(false)
-          }}
-          onDismiss={() => {
-            setShowSignupPrompt(false)
-            // Note: markFreeTrialUsed() is already called in SignupPrompt component
-          }}
-        />
-      )}
+      {(isGuestMode || guestConversion !== "idle") &&
+        (showFeedback || showPostInterviewDiscussion) &&
+        showSignupPrompt && (
+          <SignupPrompt
+            sessionId={currentSessionId || ""}
+            scenarioId={selectedScenario?.id || ""}
+            scenarioTitle={selectedScenario?.title || ""}
+            onSignedIn={handleGuestSignedIn}
+            onAuthAttempt={() => {
+              // The cover must start at the provider click: Firebase commits
+              // the new user before the popup promise resolves, and this is
+              // the only hook that runs before that commit.
+              setGuestConversion("covering")
+              setIsGeneratingFeedback(true)
+            }}
+            onAuthAborted={() => {
+              setGuestConversion("idle")
+              setIsGeneratingFeedback(false)
+            }}
+            onDismiss={() => {
+              setShowSignupPrompt(false)
+              // Note: markFreeTrialUsed() is already called in SignupPrompt component
+            }}
+          />
+        )}
 
       {/* Post-submit onboarding for signed-in users who haven't completed it
           (see the offer effect above). Completing here means the dashboard
