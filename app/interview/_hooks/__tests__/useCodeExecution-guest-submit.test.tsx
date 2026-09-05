@@ -28,6 +28,11 @@ vi.mock("@/lib/firestore-helpers", () => ({
   saveSessionState: vi.fn(() => Promise.resolve()),
 }))
 
+const persistGuestPostSubmitState = vi.fn(() => Promise.resolve())
+vi.mock("../../_lib/persist-guest-post-submit", () => ({
+  persistGuestPostSubmitState: (...args: unknown[]) => persistGuestPostSubmitState(...args),
+}))
+
 vi.mock("@/lib/interview", () => ({
   analyzeCodeEfficiency: () => ({
     efficiencyScore: 70,
@@ -63,6 +68,7 @@ function buildOpts(overrides: Record<string, unknown> = {}) {
     user: null,
     firebaseUser: null,
     isGuestMode: true,
+    guestId: "guest-12345678-1234-1234-1234-123456789abc",
     isFromRoadmap: false,
     activeRoadmap: null,
     setTestResults: vi.fn(),
@@ -98,7 +104,7 @@ beforeEach(() => {
 })
 
 describe("submitCode handoff for a guest", () => {
-  it("enters the post-submit phase without kicking off the auth-walled discussion", async () => {
+  it("saves the recovery point before entering the account-gated post-submit phase", async () => {
     const opts = buildOpts()
     const { result } = renderHook(() => useCodeExecution(opts as never))
 
@@ -106,8 +112,27 @@ describe("submitCode handoff for a guest", () => {
       await result.current.submitCode()
     })
 
+    expect(persistGuestPostSubmitState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: "sess-guest-1",
+        guestId: "guest-12345678-1234-1234-1234-123456789abc",
+        testSummary: { passed: 2, total: 2, failed: 0, passRate: 100 },
+      })
+    )
     expect(opts.setShowPostInterviewDiscussion).toHaveBeenCalledWith(true)
     expect(opts.triggerPostInterviewDiscussion).not.toHaveBeenCalled()
+  })
+
+  it("does not expose signup when the recovery point could not be saved", async () => {
+    persistGuestPostSubmitState.mockRejectedValueOnce(new Error("offline"))
+    const opts = buildOpts()
+    const { result } = renderHook(() => useCodeExecution(opts as never))
+
+    await act(async () => {
+      await result.current.submitCode()
+    })
+
+    expect(opts.setShowPostInterviewDiscussion).not.toHaveBeenCalled()
   })
 })
 

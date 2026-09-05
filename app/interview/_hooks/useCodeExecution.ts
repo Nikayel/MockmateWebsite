@@ -23,6 +23,7 @@ import {
   executeScenario,
 } from "./code-execution-helpers"
 import { useGuidedLabStore } from "@/lib/stores/guided-lab-store"
+import { persistGuestPostSubmitState } from "../_lib/persist-guest-post-submit"
 
 /**
  * Feed workspace test results into the guided-lab gating store. For workspace
@@ -63,6 +64,7 @@ export interface UseCodeExecutionOptions {
   user: unknown | null
   firebaseUser: { uid: string } | null
   isGuestMode: boolean
+  guestId: string | null
   isFromRoadmap: boolean
   activeRoadmap: unknown | null
 
@@ -122,6 +124,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
     user,
     firebaseUser,
     isGuestMode,
+    guestId,
     isFromRoadmap,
     activeRoadmap,
     setTestResults,
@@ -469,8 +472,41 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
             // Don't clear localStorage if Firestore save failed - keep the backup
           }
         } else if (isGuestMode && selectedScenario) {
-          // For guests, clear localStorage only after we know we're transitioning to wrap-up
-          // The guest session state will be saved via API during auto-save
+          if (!currentSessionId || !guestId) {
+            toast.error("Couldn't save your interview", {
+              description: "Please try submitting again before you create your account.",
+            })
+            return
+          }
+
+          try {
+            await persistGuestPostSubmitState({
+              sessionId: currentSessionId,
+              guestId,
+              code,
+              language: selectedLanguage,
+              elapsedTime,
+              chatMessages,
+              interviewerMessages,
+              testResults: data.results,
+              testSummary: data.summary,
+              workspaceContext,
+              activeWorkspacePath,
+              consoleLogs: data.consoleLogs ?? [],
+              bugfixEvidenceEvents: buildBugfixEvidencePayload(),
+              realInterviewMode,
+              strictTimeLimit,
+            })
+          } catch (saveError) {
+            console.error("Failed to save guest post-submit state:", saveError)
+            toast.error("Couldn't save your interview", {
+              description: "Please try submitting again before you create your account.",
+            })
+            return
+          }
+
+          // The API now owns the exact post-submit recovery point, so the
+          // interval-era local snapshot is safe to retire.
           const storageKey = `interview_autosave_guest_${selectedScenario.id}`
           try {
             localStorage.removeItem(storageKey)
@@ -479,11 +515,8 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
           }
         }
 
-        // Proceed to post-interview discussion. For guests the phase flag
-        // still flips (it renders GuestFeedbackLock and arms the trial's
-        // auto-finalization) but the kickoff is skipped: its complexity
-        // analysis and /api/chat debrief are both auth-walled, and no guest
-        // surface renders the conversation it would build.
+        // Guests pause behind the account wall after the recovery point is
+        // durable. Their authenticated handoff starts this same discussion.
         setIsRunningTests(false)
         setShowPostInterviewDiscussion(true)
         if (user) {
