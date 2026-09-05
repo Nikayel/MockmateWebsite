@@ -18,26 +18,26 @@ import { describe, expect, it, vi } from "vitest"
 import { GuestFeedbackLock } from "../GuestFeedbackLock"
 
 describe("GuestFeedbackLock", () => {
-  it("tells the guest their results are ready behind a free account", () => {
+  it("tells the guest their debrief continues behind a free account", () => {
     render(<GuestFeedbackLock onSignIn={() => {}} scenarioTitle="Two Sum" />)
 
-    expect(screen.getByRole("heading", { name: /scored/i })).toBeTruthy()
+    expect(screen.getByRole("heading", { name: /continue with your interviewer/i })).toBeTruthy()
     // "Create a free account", not "sign in": the guest has no account yet,
     // and every other surface uses the create-account verb.
     expect(screen.getByText(/create a free account/i)).toBeTruthy()
     // The button sells the bundle, not the number the guest can already
     // compute from their own test results.
-    expect(screen.getByRole("button", { name: /unlock your results/i })).toBeTruthy()
+    expect(screen.getByRole("button", { name: /create account & continue/i })).toBeTruthy()
     // Specific and true beats vague: the server keeps a completed trial for
-    // 30 days, so the chip says exactly that instead of "kept".
-    expect(screen.getByText(/saved for 30 days/i)).toBeTruthy()
+    // Incomplete guest sessions retain their seven-day recovery window.
+    expect(screen.getByText(/saved for 7 days/i)).toBeTruthy()
   })
 
   it("fires onSignIn when the guest asks for their results", () => {
     const onSignIn = vi.fn()
     render(<GuestFeedbackLock onSignIn={onSignIn} scenarioTitle="Two Sum" />)
 
-    fireEvent.click(screen.getByRole("button", { name: /unlock your results/i }))
+    fireEvent.click(screen.getByRole("button", { name: /create account & continue/i }))
 
     expect(onSignIn).toHaveBeenCalledTimes(1)
   })

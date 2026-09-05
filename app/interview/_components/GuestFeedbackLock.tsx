@@ -16,15 +16,14 @@ interface GuestFeedbackLockProps {
 }
 
 /**
- * The feedback slot for a guest whose trial session is submitted.
+ * The result slot for a guest whose trial code is submitted.
  *
  * Guests never stream AI feedback (that path is signed-in only), so rendering
  * InterviewFeedbackView here showed a shell of empty sections whose fallback
  * caption ("Review feedback for details") read as a button and dead-clicked.
  * This panel replaces the shell with the actual state of the world: the
- * session is scored and saved, and signing in is what turns it into a
- * results page. The score value itself is deliberately absent — it is the
- * thing the sign-in is traded for.
+ * submission is saved, and signing in continues the interview debrief before
+ * final scoring.
  */
 export function GuestFeedbackLock({ onSignIn, scenarioTitle, retry }: GuestFeedbackLockProps) {
   return (
@@ -34,18 +33,15 @@ export function GuestFeedbackLock({ onSignIn, scenarioTitle, retry }: GuestFeedb
           <Lock className="text-accent-strong h-6 w-6" aria-hidden="true" />
         </div>
         <h2 className="text-foreground text-lg font-semibold">
-          {retry ? "We couldn't unlock your results" : "Your interview is scored"}
+          {retry ? "We couldn't connect your interview" : "Continue with your interviewer"}
         </h2>
         <p className="text-muted-foreground mt-2 text-sm">
           {retry
-            ? `${scenarioTitle} is submitted and saved, and your sign-in worked. Connecting the session to your new account failed, likely a network hiccup.`
-            : // Review-first, score last: the guest just watched their tests
-              // run, so a 10/10 guest can already compute the number. The
-              // review and the breakdown are the assets they cannot.
-              `${scenarioTitle} is submitted and saved. Create a free account to see the full review of your code, your score, and where you lost points.`}
+            ? `${scenarioTitle} is submitted and saved, and your sign-in worked. Connecting the interview to your new account failed, likely a network hiccup.`
+            : `${scenarioTitle} is submitted and saved. Create a free account to discuss your solution with the AI interviewer. That conversation will be included in your final feedback and score.`}
         </p>
         <Button onClick={onSignIn} className="mt-6 w-full">
-          {retry ? "Try again" : "Unlock your results"}
+          {retry ? "Try again" : "Create account & continue"}
         </Button>
         <div className="text-muted-foreground mt-4 flex justify-center gap-4 text-xs">
           <span className="flex items-center gap-1">
@@ -54,7 +50,7 @@ export function GuestFeedbackLock({ onSignIn, scenarioTitle, retry }: GuestFeedb
           </span>
           <span className="flex items-center gap-1">
             <CheckCircle className="h-3 w-3" aria-hidden="true" />
-            Saved for 30 days
+            Saved for 7 days
           </span>
         </div>
       </div>

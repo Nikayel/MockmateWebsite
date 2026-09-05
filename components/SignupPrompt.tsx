@@ -46,7 +46,7 @@ interface SignupPromptProps {
 }
 
 /**
- * Signup prompt shown after a guest completes their free trial session.
+ * Signup prompt shown after a guest submits their free trial code.
  *
  * The score is deliberately NOT shown here (and no longer arrives as a prop):
  * it is what the sign-in reveals. The first version led with "{score}%" as
@@ -189,7 +189,7 @@ export function SignupPrompt({
             <Lock className="text-accent-strong h-6 w-6" aria-hidden="true" />
           </div>
           <DialogTitle className="text-foreground text-sm font-medium">
-            Your interview is scored
+            Continue your interview
           </DialogTitle>
           <DialogDescription className="text-muted-foreground mt-1 truncate text-sm">
             {scenarioTitle}
@@ -200,11 +200,11 @@ export function SignupPrompt({
           {/* Value prop - what the sign-in reveals */}
           <div className="border-border/50 bg-muted/50 rounded-lg border p-3">
             <p className="text-muted-foreground text-sm font-medium">
-              Create your free account to see your results
+              Create your free account to start the debrief
             </p>
             <p className="text-muted-foreground mt-0.5 text-xs">
-              The full feedback breakdown, your code review, and your score are saved to this
-              session and unlock with a free account.
+              Discuss your solution with the AI interviewer first. Your answers will be included in
+              the final feedback and score.
             </p>
           </div>
 

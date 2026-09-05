@@ -4,11 +4,11 @@
  * The post-trial signup prompt used to open with the guest's score as its
  * hero element — a 100-scorer read "100%", had no further reason to sign up,
  * and left (observed end-to-end in PostHog on 2026-08-25). The prompt's job
- * is now the opposite: the score exists, is saved, and is what signing in
- * reveals. So the component must never render a score or stamp one onto
+ * is now the opposite: signing in continues the debrief before scoring. The
+ * component must never render a score or stamp one onto
  * analytics, and a successful in-page (popup) sign-in must hand the firebase
  * user to onSignedIn so the page can migrate the session and start the real
- * feedback stream. The popup-blocked path still goes through /login, which
+ * debrief. The popup-blocked path still goes through /login, which
  * needs the pending_guest_migration marker — so that marker is only cleared
  * on the popup path that handled migration itself.
  */
@@ -252,7 +252,7 @@ describe("SignupPrompt with the score withheld", () => {
 
     await waitFor(() => expect(localStorage.getItem("pending_guest_migration")).not.toBeNull())
     expect(JSON.parse(localStorage.getItem("pending_guest_migration") || "{}")).toEqual({
-      guestId: "guest-1",
+      guestId: "guest-12345678-1234-1234-1234-123456789abc",
       sessionId: "sess-1",
       scenarioId: "scenario-1",
     })
