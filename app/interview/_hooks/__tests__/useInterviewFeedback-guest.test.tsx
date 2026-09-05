@@ -234,29 +234,21 @@ describe("proceedToFinalFeedback for a guest", () => {
   })
 })
 
-describe("guest auto-finalization after submit", () => {
-  // Shipped broken on 2026-08-25: submitCode routes EVERYONE into the
-  // post-interview discussion phase, but the only invokers of
-  // proceedToFinalFeedback live in the signed-in view and behind the guest
-  // chat wall. A guest therefore saw GuestFeedbackLock while showFeedback
-  // stayed false — so the SignupPrompt gate (isGuestMode && showFeedback &&
-  // showSignupPrompt) could never open, and no score was ever persisted.
-  // The hook itself must finalize the moment a guest reaches the post-submit
-  // phase; nothing else in the tree can.
-  it("finalizes the trial the moment a guest lands in the post-submit phase", async () => {
+describe("guest post-submit pause", () => {
+  it("does not finalize or calculate a score before the guest signs in", async () => {
     const opts = buildOpts({ showPostInterviewDiscussion: true, showFeedback: false })
     renderHook(() => useInterviewFeedback(opts as never))
 
     await act(async () => {})
 
-    expect(opts.setShowFeedback).toHaveBeenCalledWith(true)
-    expect(opts.lastFeedbackRequestRef.current).not.toBeNull()
-    expect(markFreeTrialUsed).toHaveBeenCalled()
+    expect(opts.setShowFeedback).not.toHaveBeenCalled()
+    expect(opts.lastFeedbackRequestRef.current).toBeNull()
+    expect(markFreeTrialUsed).not.toHaveBeenCalled()
     const guestPut = fetchMock.mock.calls.find(([url]) => url === "/api/guest-session")
-    expect(guestPut).toBeTruthy()
+    expect(guestPut).toBeFalsy()
   })
 
-  it("does not auto-finalize for signed-in users, whose wrap-up phase has the button", async () => {
+  it("also waits for the explicit wrap-up action from signed-in users", async () => {
     const opts = buildOpts({
       user: { id: "user-1" },
       isGuestMode: false,
@@ -270,15 +262,6 @@ describe("guest auto-finalization after submit", () => {
 
     expect(opts.setShowFeedback).not.toHaveBeenCalled()
     expect(opts.streamingFeedback.startStreaming).not.toHaveBeenCalled()
-  })
-
-  it("does not re-finalize once the feedback screen is already up", async () => {
-    const opts = buildOpts({ showPostInterviewDiscussion: true, showFeedback: true })
-    renderHook(() => useInterviewFeedback(opts as never))
-
-    await act(async () => {})
-
-    expect(opts.setShowFeedback).not.toHaveBeenCalled()
   })
 })
 

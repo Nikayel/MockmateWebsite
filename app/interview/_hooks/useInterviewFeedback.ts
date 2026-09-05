@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useRef } from "react"
 import { isHarnessError } from "@/lib/workspace-execution/harness-errors"
 import type { Dispatch, SetStateAction } from "react"
 import { toast } from "sonner"
@@ -65,12 +65,6 @@ export interface UseInterviewFeedbackOptions {
   isFromRoadmap: boolean
   activeRoadmap: RoadmapWithId | null
   currentSessionId: string | null
-  // Both flags are read (not just set) so the hook can finalize a guest's
-  // submit itself: the post-submit phase renders GuestFeedbackLock for
-  // guests, which contains no path to proceedToFinalFeedback.
-  showFeedback: boolean
-  showPostInterviewDiscussion: boolean
-
   // Streaming feedback (injected — do not import the hook at runtime)
   streamingFeedback: StreamingFeedbackController
 
@@ -123,12 +117,6 @@ export function useInterviewFeedback(
   // toast) so the one-time completion writes fire exactly once. Reset in the
   // finally below so a retry after a genuine failure still works.
   const isGeneratingFeedbackRef = useRef(false)
-
-  // One-shot latch for the guest auto-finalize effect below. Unlike the
-  // in-flight guard above it never resets: a guest gets exactly one trial, so
-  // its completion writes must never re-run off a late render with stale
-  // props.
-  const hasAutoFinalizedRef = useRef(false)
 
   const proceedToFinalFeedback = async () => {
     const bugfixEvidencePayload = opts.buildBugfixEvidencePayload()
@@ -565,23 +553,6 @@ export function useInterviewFeedback(
       opts.setIsGeneratingFeedback(false)
     }
   }
-
-  // A guest's submit has no human trigger for finalization: submitCode flips
-  // showPostInterviewDiscussion for everyone, but the wrap-up view with the
-  // "See Full Interview Score" button only renders for signed-in users —
-  // guests get GuestFeedbackLock. Without this effect the trial dead-ends:
-  // showFeedback stays false, so the SignupPrompt gate never opens, and the
-  // score is never persisted. An effect rather than a call inside submitCode
-  // so the test state set during submit is committed before we read it here.
-  // proceedToFinalFeedback itself flips both flags, so the condition
-  // self-disarms; the latch covers renders that still carry stale props.
-  useEffect(() => {
-    if (opts.user || !opts.isGuestMode) return
-    if (!opts.showPostInterviewDiscussion || opts.showFeedback) return
-    if (hasAutoFinalizedRef.current) return
-    hasAutoFinalizedRef.current = true
-    void proceedToFinalFeedback()
-  })
 
   return { proceedToFinalFeedback }
 }
