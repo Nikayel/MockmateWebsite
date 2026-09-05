@@ -1414,27 +1414,24 @@ function InterviewPageContent() {
     lastFeedbackRequestRef,
   })
 
-  // A guest who signs in from the post-trial prompt stays on this page and
-  // gets the regular feedback experience. The handoff has a strict order: the
-  // session must belong to the new account BEFORE the stream runs, because
-  // /api/feedback/persist refuses to write to a session the caller does not
-  // own — streaming first would spend the AI call and save nothing.
+  // A guest who signs in from the post-submit prompt stays on this page and
+  // enters the same debrief as a regular user. Migration must finish before
+  // the authenticated AI request so the conversation remains attached to the
+  // session the new account now owns.
   const handleGuestSignedIn = useCallback(
     async (signedInUser: FirebaseAuthUser) => {
-      // Cover the migrate window with the loading state so the feedback view
-      // never flashes its empty shell between modal-close and stream-start.
-      // useFeedbackStreaming resets this when the stream completes or errors.
+      // Cover the migration window so the signed-in view cannot render before
+      // the guest-owned session belongs to the new account.
       setGuestConversion("covering")
       setIsGeneratingFeedback(true)
       try {
-        const staged = lastFeedbackRequestRef.current
         // useSessionReopen calls exitGuestMode() as soon as auth lands, which
         // nulls the guestId state — so a retry after a failed migrate must
         // fall back to the durable copy in guest storage.
         const migrateGuestId = guestId ?? getGuestId()
         if (!migrateGuestId || !currentSessionId) {
-          // Fail closed: streaming an unmigrated session spends the AI call
-          // and then 403s at persist (migrate-before-stream invariant).
+          // Fail closed: starting an authenticated debrief without its session
+          // would produce an orphaned conversation.
           throw new Error("We could not find your trial session to connect")
         }
         const idToken = await signedInUser.getIdToken()
@@ -1447,17 +1444,11 @@ function InterviewPageContent() {
         // so nothing re-runs migration or re-enters guest mode with it.
         confirmGuestSessionMigration()
         setShowSignupPrompt(false)
-        if (staged) {
-          staged.userId = signedInUser.uid
-          streamingFeedback.startStreaming(staged)
-          setGuestConversion("idle")
-        } else {
-          // Nothing staged (defensive): the migrated session still has its
-          // stored score and code — land there rather than on a blank view.
-          setIsGeneratingFeedback(false)
-          setGuestConversion("idle")
-          router.push(`/sessions/${currentSessionId}`)
-        }
+        setShowFeedback(false)
+        setShowPostInterviewDiscussion(true)
+        setIsGeneratingFeedback(false)
+        setGuestConversion("idle")
+        await triggerPostInterviewDiscussion(testResults, testSummary)
       } catch (error) {
         setIsGeneratingFeedback(false)
         // The lock returns with retry semantics; the signed-in feedback view
@@ -1469,11 +1460,11 @@ function InterviewPageContent() {
     [
       guestId,
       currentSessionId,
-      lastFeedbackRequestRef,
-      streamingFeedback,
-      router,
       setIsGeneratingFeedback,
       setShowSignupPrompt,
+      testResults,
+      testSummary,
+      triggerPostInterviewDiscussion,
     ]
   )
 
