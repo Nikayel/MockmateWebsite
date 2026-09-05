@@ -44,7 +44,7 @@ export interface UsePostInterviewDiscussionOptions {
 }
 
 export interface UsePostInterviewDiscussionResult {
-  triggerPostInterviewDiscussion: (testResults: TestResult[], summary: any) => Promise<void>
+  triggerPostInterviewDiscussion: (testResults: TestResult[], summary: any) => Promise<boolean>
 }
 
 /**
@@ -62,7 +62,7 @@ export function usePostInterviewDiscussion(
 
     try {
       if (!opts.selectedScenario) {
-        return
+        return false
       }
 
       const optimalComplexity = (opts.selectedScenario as any)?.optimalComplexity
@@ -193,13 +193,24 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       }
 
       if (data.reply) {
-        opts.setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+        opts.setInterviewerMessages((prev) => [
+          ...prev,
+          {
+            type: "ai",
+            message: data.reply,
+            timestamp: Date.now(),
+            phase: "post_interview",
+          },
+        ])
         // Track interviewer response for conversation context
         opts.updateTrackerOnMessage(data.reply, "interviewer")
+        return true
       }
+      return false
     } catch (error) {
       console.error("Error in post-interview discussion:", error)
       toast.error("Failed to start discussion")
+      return false
     } finally {
       opts.setIsGeneratingDiscussion(false)
     }

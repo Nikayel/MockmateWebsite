@@ -27,6 +27,7 @@ export type ChatMessage = {
   type: "user" | "ai"
   message: string
   timestamp?: number
+  phase?: "post_interview"
 }
 
 export type TestResult = {

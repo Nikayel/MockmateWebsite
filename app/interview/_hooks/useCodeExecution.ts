@@ -89,7 +89,7 @@ export interface UseCodeExecutionOptions {
     summary: { passed: number; total: number; failed: number },
     results: TestResult[] | undefined
   ) => void
-  triggerPostInterviewDiscussion: (testResults: TestResult[], summary: any) => Promise<void> | void
+  triggerPostInterviewDiscussion: (testResults: TestResult[], summary: any) => unknown
   markQuestionEvaluating: (scenarioId: string) => void
 }
 
