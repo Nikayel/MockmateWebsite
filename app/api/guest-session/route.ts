@@ -347,6 +347,17 @@ export async function PUT(request: NextRequest) {
         chat_messages: sessionState.chatMessages?.slice(-20),
         interviewer_messages: sessionState.interviewerMessages?.slice(-20),
         test_results: sessionState.testResults?.slice(-10),
+        test_summary: sessionState.testSummary,
+        workspace_context: sessionState.workspaceContext,
+        active_workspace_path: sessionState.activeWorkspacePath,
+        console_logs: sessionState.consoleLogs,
+        bugfix_evidence_events: sessionState.bugfixEvidenceEvents,
+        bugfix_hypothesis: sessionState.bugfixHypothesis,
+        bugfix_root_cause: sessionState.bugfixRootCause,
+        bugfix_prevention: sessionState.bugfixPrevention,
+        is_post_interview_discussion: sessionState.isPostInterviewDiscussion,
+        real_interview_mode: sessionState.realInterviewMode,
+        strict_time_limit: sessionState.strictTimeLimit,
         saved_at: new Date().toISOString(),
       }
     }

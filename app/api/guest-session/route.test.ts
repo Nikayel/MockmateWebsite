@@ -221,6 +221,22 @@ describe("PUT /api/guest-session validation (API-3)", () => {
     )) as MockResponse
     expect(res.status).toBe(200)
     expect(docUpdate).toHaveBeenCalledTimes(1)
+    const saved = docUpdate.mock.calls[0][0] as {
+      session_state: Record<string, unknown>
+    }
+    expect(saved.session_state).toMatchObject({
+      test_summary: { total: 1, passed: 1, failed: 0, passRate: 100 },
+      workspace_context: [{ path: "src/index.ts", content: "export {}" }],
+      active_workspace_path: "src/index.ts",
+      console_logs: [{ type: "log", message: "done", timestamp: 1 }],
+      bugfix_evidence_events: [{ type: "test_run", timestamp: 1 }],
+      bugfix_hypothesis: "The boundary check is wrong.",
+      bugfix_root_cause: "The loop includes the final index.",
+      bugfix_prevention: "Add a boundary regression test.",
+      is_post_interview_discussion: true,
+      real_interview_mode: false,
+      strict_time_limit: 1800,
+    })
   })
 
   it("accepts an in-range completion and preserves full test-result fields", async () => {
