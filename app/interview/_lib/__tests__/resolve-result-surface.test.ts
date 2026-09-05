@@ -56,10 +56,10 @@ describe("resolveResultSurface", () => {
     ).toBe("guest_lock")
   })
 
-  it("hands a mid-conversion user the feedback view, whose loading state is the cover", () => {
+  it("keeps a mid-conversion user behind the lock until migration settles", () => {
     expect(
       resolveResultSurface({ ...postSubmit, hasUser: true, guestConversion: "covering" })
-    ).toBe("feedback_view")
+    ).toBe("guest_lock")
   })
 
   it("returns a failed conversion to the lock so the guest can retry", () => {

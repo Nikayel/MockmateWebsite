@@ -1,6 +1,6 @@
 /**
  * The lifecycle of a guest's post-trial sign-in, as seen by the feedback
- * slot. "covering" spans provider-click to stream-start (Firebase commits the
+ * slot. "covering" spans provider-click to debrief-start (Firebase commits the
  * new user before the popup promise resolves, so the slot must already know a
  * conversion is in flight); "failed" means auth succeeded but the session
  * migration did not, and the guest needs a retry surface.
@@ -23,8 +23,8 @@ export function resolveResultSurface(state: {
 }): ResultSurface {
   if (!state.showFeedback && !state.showPostInterviewDiscussion) return "workspace"
   if (!state.hasUser) return "guest_lock"
-  // Auth landed but migration failed: the signed-in view would be an empty
-  // shell (nothing streamed), so the lock returns with retry semantics.
-  if (state.guestConversion === "failed") return "guest_lock"
+  // Until migration settles, the authenticated view has no safe session to
+  // render. Failure uses the same lock with retry semantics.
+  if (state.guestConversion !== "idle") return "guest_lock"
   return "feedback_view"
 }
