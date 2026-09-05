@@ -10,7 +10,13 @@ import {
 import type { Scenario } from "@/lib/scenarios"
 import type { ConversationTracker } from "@/lib/interview/interview-phases"
 import type { InterviewTargetCompany } from "@/lib/stores"
-import type { ChatMessage, ConsoleLogEntry, EfficiencyMetrics, TestResult } from "../_types"
+import type {
+  ChatMessage,
+  ConsoleLogEntry,
+  EfficiencyMetrics,
+  TestResult,
+  TestSummary,
+} from "../_types"
 
 export interface UsePostInterviewDiscussionOptions {
   // Auth / entitlement
@@ -41,10 +47,18 @@ export interface UsePostInterviewDiscussionOptions {
   getCachedUserProfile: () => Promise<Profile | null>
   getEdgeCasesForInterviewer: () => { description: string; input: unknown }[]
   updateTrackerOnMessage: (message: string, role: "user" | "interviewer") => void
+  onDiscussionStarted?: (state: {
+    interviewerMessages: ChatMessage[]
+    testResults: TestResult[]
+    testSummary: TestSummary
+  }) => Promise<void> | void
 }
 
 export interface UsePostInterviewDiscussionResult {
-  triggerPostInterviewDiscussion: (testResults: TestResult[], summary: any) => Promise<boolean>
+  triggerPostInterviewDiscussion: (
+    testResults: TestResult[],
+    summary: TestSummary
+  ) => Promise<boolean>
 }
 
 /**
@@ -57,7 +71,10 @@ export interface UsePostInterviewDiscussionResult {
 export function usePostInterviewDiscussion(
   opts: UsePostInterviewDiscussionOptions
 ): UsePostInterviewDiscussionResult {
-  const triggerPostInterviewDiscussion = async (testResults: TestResult[], summary: any) => {
+  const triggerPostInterviewDiscussion = async (
+    testResults: TestResult[],
+    summary: TestSummary
+  ): Promise<boolean> => {
     opts.setIsGeneratingDiscussion(true)
 
     try {
@@ -193,17 +210,26 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       }
 
       if (data.reply) {
-        opts.setInterviewerMessages((prev) => [
-          ...prev,
-          {
-            type: "ai",
-            message: data.reply,
-            timestamp: Date.now(),
-            phase: "post_interview",
-          },
-        ])
+        const kickoffMessage: ChatMessage = {
+          type: "ai",
+          message: data.reply,
+          timestamp: Date.now(),
+          phase: "post_interview",
+        }
+        const updatedMessages = [...opts.interviewerMessages, kickoffMessage]
+        opts.setInterviewerMessages(updatedMessages)
         // Track interviewer response for conversation context
         opts.updateTrackerOnMessage(data.reply, "interviewer")
+        try {
+          await opts.onDiscussionStarted?.({
+            interviewerMessages: updatedMessages,
+            testResults,
+            testSummary: summary,
+          })
+        } catch (persistError) {
+          // The reply is already visible and the regular autosave can retry.
+          console.warn("Failed to checkpoint post-interview kickoff:", persistError)
+        }
         return true
       }
       return false

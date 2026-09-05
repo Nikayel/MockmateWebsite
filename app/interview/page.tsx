@@ -11,7 +11,7 @@ import { getDbLazy } from "@/lib/firebase-lazy"
 import { collection, getDocs, query, where, orderBy, limit } from "firebase/firestore"
 import { useAuth } from "@/lib/auth-context"
 import type { Profile } from "@/lib/types"
-import { getUserProfile } from "@/lib/firestore-helpers"
+import { getUserProfile, saveSessionState } from "@/lib/firestore-helpers"
 import { SignupPrompt } from "@/components/SignupPrompt"
 import { upgradeGuestSession } from "@/lib/interview/guest-upgrade"
 import type { User as FirebaseAuthUser } from "firebase/auth"
@@ -1362,6 +1362,25 @@ function InterviewPageContent() {
     getCachedUserProfile,
     getEdgeCasesForInterviewer,
     updateTrackerOnMessage,
+    onDiscussionStarted: async ({ interviewerMessages, testResults, testSummary }) => {
+      if (!currentSessionId) return
+      await saveSessionState(currentSessionId, {
+        code,
+        selectedLanguage,
+        elapsedTime,
+        chatMessages,
+        interviewerMessages,
+        testResults,
+        testSummary,
+        workspaceContext,
+        activeWorkspacePath,
+        consoleLogs,
+        bugfixEvidenceEvents: buildBugfixEvidencePayload(),
+        isPostInterviewDiscussion: true,
+        realInterviewMode,
+        strictTimeLimit,
+      })
+    },
   })
 
   usePostInterviewResumeKickoff({

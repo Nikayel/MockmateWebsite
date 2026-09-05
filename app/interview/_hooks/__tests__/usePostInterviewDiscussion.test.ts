@@ -45,12 +45,13 @@ function buildOptions() {
       chatWorkspaceContext: null,
       setIsGeneratingDiscussion: vi.fn(),
       setEfficiencyMetrics: vi.fn(),
-      setInterviewerMessages: vi.fn((update) => {
-        savedMessages = update([])
+      setInterviewerMessages: vi.fn((messages) => {
+        savedMessages = messages
       }),
       getCachedUserProfile: vi.fn(async () => null),
       getEdgeCasesForInterviewer: vi.fn(() => []),
       updateTrackerOnMessage: vi.fn(),
+      onDiscussionStarted: vi.fn(async () => {}),
     },
     getSavedMessages: () => savedMessages,
   }
@@ -73,6 +74,7 @@ describe("usePostInterviewDiscussion", () => {
     const started = await triggerPostInterviewDiscussion([], {
       passed: 1,
       total: 1,
+      failed: 0,
       passRate: 100,
     })
 
@@ -84,6 +86,12 @@ describe("usePostInterviewDiscussion", () => {
         phase: "post_interview",
       }),
     ])
+    expect(options.onDiscussionStarted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        interviewerMessages: getSavedMessages(),
+        testSummary: { passed: 1, total: 1, failed: 0, passRate: 100 },
+      })
+    )
   })
 
   it("reports that kickoff did not start when the API returns no reply", async () => {
@@ -92,7 +100,7 @@ describe("usePostInterviewDiscussion", () => {
     const { triggerPostInterviewDiscussion } = usePostInterviewDiscussion(options as never)
 
     await expect(
-      triggerPostInterviewDiscussion([], { passed: 0, total: 1, passRate: 0 })
+      triggerPostInterviewDiscussion([], { passed: 0, total: 1, failed: 1, passRate: 0 })
     ).resolves.toBe(false)
   })
 })
