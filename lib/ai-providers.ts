@@ -30,8 +30,8 @@ import { SYSTEM_USER_ID, type UsageServiceId } from "./usage/services"
 import { checkRequestCostAnomaly } from "./cost-anomaly-detection"
 import {
   checkRateLimit,
-  recordRequestStart,
-  recordRequestEnd,
+  startRequestTracking,
+  endRequestTracking,
   updateTokenCount,
   RateLimitTier,
 } from "./rate-limiter"
@@ -825,10 +825,17 @@ export async function generateAIResponse(
   } = options
 
   const startTime = Date.now()
+  const estimatedInputTokens = Math.ceil(
+    (systemPrompt.length +
+      userMessage.length +
+      history.reduce((sum, message) => sum + message.content.length, 0)) /
+      4
+  )
+  const estimatedTokens = estimatedInputTokens + 500
 
   // 1. Check rate limit if userId provided
   if (userId && !skipRateLimit) {
-    const rateLimitCheck = await checkRateLimit(userId, userTier)
+    const rateLimitCheck = await checkRateLimit(userId, userTier, estimatedTokens)
     if (!rateLimitCheck.allowed) {
       throw new Error(rateLimitCheck.message || "Rate limit exceeded")
     }
@@ -870,21 +877,12 @@ export async function generateAIResponse(
     }
   }
 
-  // 3. Record request start for rate limiting.
-  //
-  // Skipped when the caller already metered this request. `enforceMeteredAiRequest` opens
-  // the window entry and the concurrency slot itself and ends them in the route, so
-  // recording again here counted one request twice: its estimate landed in the sliding
-  // window on top of the route's, and it held two concurrency slots at once. A free user
-  // gets two, so a single chat request sat at the limit for its whole duration and running
-  // tests while the interviewer was replying was refused by construction.
-  //
-  // `updateTokenCount` below stays unconditional either way. It overwrites the most recent
-  // window entry with the measured total, which is the route's entry when we skip here, so
-  // the window ends up holding real usage rather than an estimate.
+  // 3. Track the actual provider call separately from the route-level request bucket.
+  // A submitted action consumes one request token even when validation or retries need
+  // multiple model calls; each model call owns one concurrency slot and its token estimate.
   const shouldTrackConcurrency = Boolean(userId) && !skipRateLimit
   if (userId && shouldTrackConcurrency) {
-    recordRequestStart(userId, 500) // Estimate 500 tokens
+    await startRequestTracking(userId, estimatedTokens)
   }
 
   // Determine provider order
@@ -918,7 +916,7 @@ export async function generateAIResponse(
   providerOrder = enabledProviders
 
   if (providerOrder.length === 0) {
-    if (userId && shouldTrackConcurrency) recordRequestEnd(userId)
+    if (userId && shouldTrackConcurrency) await endRequestTracking(userId)
     const missingKeys = disabledProviders
       .map((p) => `${ENV_KEY_FOR_PROVIDER[p]} (for ${p})`)
       .join(", ")
@@ -958,12 +956,6 @@ export async function generateAIResponse(
 
         // Fallback estimate (4 chars per token) for providers that report no
         // usage. Only ever used when `providerUsage` is absent.
-        const estimatedInputTokens = Math.ceil(
-          (systemPrompt.length +
-            userMessage.length +
-            history.reduce((sum, h) => sum + h.content.length, 0)) /
-            4
-        )
         const estimatedOutputTokens = Math.ceil(text.length / 4)
 
         // Prefer the provider's MEASURED usage for everything downstream.
@@ -1008,7 +1000,7 @@ export async function generateAIResponse(
         // recordGlobalSpend call here: it would double-count the dollar).
         if (userId) {
           updateTokenCount(userId, totalTokens)
-          if (shouldTrackConcurrency) recordRequestEnd(userId)
+          if (shouldTrackConcurrency) await endRequestTracking(userId)
         }
         trackUsageEvent({
           userId: userId ?? SYSTEM_USER_ID,
@@ -1120,7 +1112,7 @@ export async function generateAIResponse(
   }
 
   // All providers failed
-  if (userId && shouldTrackConcurrency) recordRequestEnd(userId)
+  if (userId && shouldTrackConcurrency) await endRequestTracking(userId)
 
   // Build helpful error message
   const isQuotaError =

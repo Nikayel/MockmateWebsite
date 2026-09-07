@@ -58,8 +58,8 @@ vi.mock("../cost-anomaly-detection", () => ({
 
 vi.mock("../rate-limiter", () => ({
   checkRateLimit: vi.fn(async () => ({ allowed: true })),
-  recordRequestStart: vi.fn(),
-  recordRequestEnd: vi.fn(),
+  startRequestTracking: vi.fn(async () => undefined),
+  endRequestTracking: vi.fn(async () => undefined),
   updateTokenCount: vi.fn(),
 }))
 
