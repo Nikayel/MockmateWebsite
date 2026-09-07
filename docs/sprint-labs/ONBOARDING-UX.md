@@ -23,7 +23,7 @@ next screen, it is cut.
   on the working surface is cost with no payoff.
 - **Constraints that make it safe, not a gimmick:**
   - Lazy-loaded *after* the first text beats, so first paint is instant.
-  - **Skippable** ("Skip the tour") and **remembered** — full cinematic once,
+  - **Skippable** ("Skip the tour") and **remembered per account** — full cinematic once,
     a compact "Back to Meridian" resume on every return.
   - `prefers-reduced-motion` collapses the whole thing to a calm static/2D
     version. No WebGL / low power -> the same 2D fallback. The map's *content*
@@ -61,10 +61,13 @@ Each beat is one screen, auto-advances with a manual "next," ~10-20s, skippable.
 
 ## Managing the return visit
 
-Onboarding is a first-run event, not a toll booth. First time: the full 75s
-cinematic. Every time after: a 2-second "Back to Meridian, sprint N" resume card,
-skippable, that drops straight to the board. Store the seen-state per user; a
-"replay intro" link lives in the workbook menu for anyone who wants it again.
+Onboarding is a first-run event, not a toll booth. First time for an authenticated
+account: the full cinematic. Every time after: a 2-second "Back to Meridian,
+sprint N" resume card, skippable, that drops straight to the board. Completion is
+stored at `profiles/{userId}/lab_onboarding/{onboardingId}`, so a second account on
+the same device still receives its own tour. A direct first-time visit to a Sprint
+Lab run is redirected to the overview before work begins. A "replay intro" link
+can live in the workbook menu for anyone who wants it again.
 
 ## The file-level "this is this," without a manual
 

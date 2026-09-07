@@ -5,7 +5,6 @@ import dynamic from "next/dynamic"
 import { AnimatePresence, MotionConfig, motion } from "framer-motion"
 
 import type { OnboardingBeat, OnboardingConfig } from "@/lib/labs/onboarding/config"
-import { markOnboardingSeen } from "@/lib/labs/onboarding/onboarding-state"
 
 /**
  * The "you're hired" onboarding cinematic — one reusable overlay for every lab.
@@ -327,24 +326,26 @@ export function LabOnboarding({
   onDone,
 }: {
   config: OnboardingConfig
-  /** Called once the cinematic is finished or skipped; the overlay is done. */
-  onDone: () => void
+  /** Called once the cinematic is finished or skipped; may persist completion. */
+  onDone: () => void | Promise<void>
 }) {
   const [beatIndex, setBeatIndex] = useState(0)
+  const [isFinishing, setIsFinishing] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
   const beats = config.beats
   const isLast = beatIndex === beats.length - 1
   const beat = beats[beatIndex]
 
-  const finish = useCallback(() => {
-    markOnboardingSeen(config.id)
-    onDone()
-  }, [config.id, onDone])
+  const finish = useCallback(async () => {
+    if (isFinishing) return
+    setIsFinishing(true)
+    await onDone()
+  }, [isFinishing, onDone])
 
   const next = useCallback(() => {
     setBeatIndex((i) => {
       if (i >= beats.length - 1) {
-        finish()
+        void finish()
         return i
       }
       return i + 1
@@ -424,7 +425,12 @@ export function LabOnboarding({
         </div>
 
         <div className="lab-onb-controls">
-          <button type="button" className="lab-onb-skip" onClick={finish}>
+          <button
+            type="button"
+            className="lab-onb-skip"
+            onClick={() => void finish()}
+            disabled={isFinishing}
+          >
             Skip the tour
           </button>
           <div className="lab-onb-controls-right">
@@ -433,8 +439,8 @@ export function LabOnboarding({
                 Back
               </button>
             )}
-            <button type="button" className="lab-onb-next" onClick={next}>
-              {finalCtaLabel}
+            <button type="button" className="lab-onb-next" onClick={next} disabled={isFinishing}>
+              {isFinishing ? "Entering…" : finalCtaLabel}
             </button>
           </div>
         </div>

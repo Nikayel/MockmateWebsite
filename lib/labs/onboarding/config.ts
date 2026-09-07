@@ -16,6 +16,8 @@
  * next screen, it does not belong in the list.
  */
 
+import type { LabOnboardingId } from "./ids"
+
 /** The kinds of beat the overlay knows how to render, in their natural order. */
 export type OnboardingBeatKind = "offer" | "company" | "system-map" | "pair" | "handoff"
 
@@ -78,10 +80,10 @@ export type OnboardingBeat = OfferBeat | CompanyBeat | SystemMapBeat | PairBeat 
 
 export interface OnboardingConfig {
   /**
-   * Stable id for seen-state, scoped per company/lab (e.g. "meridian",
-   * "case-lab:palantir-fdse"). Changing it re-shows the cinematic.
+   * Stable database id, scoped per company/lab (for example, `meridian`).
+   * Changing the version in `state.ts` re-shows the cinematic.
    */
-  id: string
+  id: LabOnboardingId
   /** Company name, for the resume card and the accessible label. */
   company: string
   /** The beats, in order. Four or five; see the two configs that build these. */

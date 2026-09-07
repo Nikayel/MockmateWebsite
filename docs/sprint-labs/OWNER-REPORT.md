@@ -56,7 +56,9 @@ needs your Firebase env, exactly as before).
   `components/three/ThreeOrb.tsx`), lighting one module at a time, with an
   **identical-content 2D fallback** for reduced-motion / no-WebGL. It is
   lazy-loaded and `ssr:false`, so nothing heavy touches first paint or the server.
-- Plays **once per company/lab** (localStorage), skippable, keyboard-navigable.
+- Plays **once per company/lab and authenticated account** (Firestore), skippable,
+  keyboard-navigable. Direct first-time Sprint Lab run links return to the overview
+  so the arrival experience cannot be bypassed.
 
 **3. Where it's wired.**
 - **Meridian:** mounts on the workbook overview, **dormant behind

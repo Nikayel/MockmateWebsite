@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import type { ReactNode } from "react"
+import { SprintLabOnboardingRedirect } from "@/components/sprint-labs/SprintLabOnboardingRedirect"
 import { SprintLabAuthGuard } from "@/components/sprint-labs/ui/SprintLabAuthGuard"
 
 /**
@@ -27,10 +28,20 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-export default function SprintLabRunLayout({ children }: { children: ReactNode }) {
+export default async function SprintLabRunLayout({
+  children,
+  params,
+}: {
+  children: ReactNode
+  params: Promise<{ workbookId: string }>
+}) {
+  const { workbookId } = await params
+
   return (
     <SprintLabAuthGuard>
-      <div className="workbook-surface">{children}</div>
+      <SprintLabOnboardingRedirect workbookId={workbookId}>
+        <div className="workbook-surface">{children}</div>
+      </SprintLabOnboardingRedirect>
     </SprintLabAuthGuard>
   )
 }

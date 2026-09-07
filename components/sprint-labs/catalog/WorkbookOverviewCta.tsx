@@ -60,7 +60,9 @@ export function WorkbookOverviewCta({
   position = "primary",
 }: WorkbookOverviewCtaProps) {
   const runPath = `/sprint-labs/${workbookId}/run`
-  const loginRedirect = `/login?redirect=${encodeURIComponent(`${runPath}/standup`)}`
+  // New learners return to the overview after sign-in so their account-scoped
+  // onboarding can play before the protected run surface opens.
+  const loginRedirect = `/login?redirect=${encodeURIComponent(`/sprint-labs/${workbookId}`)}`
 
   if (state.kind === "loading") {
     if (position !== "primary") return null
