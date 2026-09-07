@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
-import { apiRateLimit } from "@/lib/rate-limit"
+import { apiRateLimit } from "@/lib/rate-limiting"
 import { logger } from "@/lib/logger"
 import { getSprintLabRun, sprintLabRunErrorStatus } from "@/lib/sprint-labs/runs"
 import { requireSprintLabsEnabled, requireTierForSprint } from "@/lib/sprint-labs/route-guards"

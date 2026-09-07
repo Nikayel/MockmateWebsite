@@ -24,7 +24,7 @@ const state = vi.hoisted(() => ({
   putUpdates: [] as Record<string, unknown>[],
 }))
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/lib/rate-limiting", () => ({
   guestSessionRateLimit: vi.fn(async () => null),
   guestApiRateLimit: vi.fn(async () => null),
 }))

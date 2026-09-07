@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import ts from "typescript"
-import { executeRateLimit } from "@/lib/rate-limit"
+import { executeRateLimit } from "@/lib/rate-limiting"
 
 export const dynamic = "force-dynamic"
 

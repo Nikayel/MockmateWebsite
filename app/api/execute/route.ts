@@ -7,15 +7,8 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { getScenarioById, type Scenario } from "@/lib/scenarios"
-import { executeRateLimit } from "@/lib/rate-limit"
+import { enforceExecuteRateLimit } from "@/lib/rate-limiting"
 import { enforceQuota } from "@/lib/quota-enforcement"
-import {
-  checkRateLimit,
-  startRequestTracking,
-  endRequestTracking,
-  buildRateLimitResponse,
-  type RateLimitTier,
-} from "@/lib/rate-limiter"
 import { trackCodeExecutionServer } from "@/lib/analytics-server"
 import { executeWithPiston, parseExecutionOutput } from "@/lib/piston"
 import { logger } from "@/lib/logger"
@@ -264,12 +257,6 @@ function buildFullCode(code: string, scenario: ScenarioWithCodebase, language: s
 }
 
 export async function POST(request: NextRequest) {
-  // Apply IP-based rate limiting (first layer)
-  const rateLimitResponse = await executeRateLimit(request)
-  if (rateLimitResponse) {
-    return rateLimitResponse
-  }
-
   // Enforce quota limits (session & budget) and get user tier.
   // requireAuth: code execution is a cost-bearing operation — signed-out
   // callers are rejected with 401 "please sign in" before reaching Piston.
@@ -278,17 +265,12 @@ export async function POST(request: NextRequest) {
     return quotaResult.response
   }
 
-  // Apply tier-based rate limiting (second layer)
-  const tier = (quotaResult.tier || "free") as RateLimitTier
-  const rateLimitUserId = quotaResult.userId || "anonymous"
-
-  if (rateLimitUserId !== "anonymous") {
-    const tierRateCheck = await checkRateLimit(rateLimitUserId, tier, 100) // Code execution uses minimal tokens
-    if (!tierRateCheck.allowed) {
-      return buildRateLimitResponse(tierRateCheck)
-    }
-    await startRequestTracking(rateLimitUserId, 100)
+  if (!quotaResult.userId) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 })
   }
+  const userId = quotaResult.userId
+  const rateLimitResponse = await enforceExecuteRateLimit(userId)
+  if (rateLimitResponse) return rateLimitResponse
 
   const startTime = Date.now()
 
@@ -304,8 +286,6 @@ export async function POST(request: NextRequest) {
     // SECURITY: attribute usage to the VERIFIED user (from the auth token),
     // never the client-supplied body field — that would let a caller spoof
     // another user's identity. requireAuth guarantees this is a real uid.
-    const userId = rateLimitUserId
-
     logger.info("Execute API called", { scenarioId, language, codeLength: code?.length })
 
     const MAX_CODE_LENGTH = 100000 // 100KB limit
@@ -369,10 +349,6 @@ export async function POST(request: NextRequest) {
           passedTests: workspaceResult.summary.passed,
           executionTimeMs,
         }).catch((err) => logger.error("Analytics tracking error", { error: err }))
-      }
-
-      if (rateLimitUserId !== "anonymous") {
-        await endRequestTracking(rateLimitUserId)
       }
 
       return NextResponse.json({
@@ -550,11 +526,6 @@ export async function POST(request: NextRequest) {
       }).catch((err) => logger.error("Analytics tracking error", { error: err }))
     }
 
-    // End request tracking
-    if (rateLimitUserId !== "anonymous") {
-      await endRequestTracking(rateLimitUserId)
-    }
-
     return NextResponse.json({
       success: allPassed && serviceErrorCount === 0, // Only fully successful if no service errors
       results,
@@ -571,11 +542,6 @@ export async function POST(request: NextRequest) {
       error: null,
     })
   } catch (error) {
-    // End request tracking on error
-    if (rateLimitUserId !== "anonymous") {
-      await endRequestTracking(rateLimitUserId).catch(() => {})
-    }
-
     logger.error("Execute API error", { error, endpoint: "/api/execute" })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to execute code" },

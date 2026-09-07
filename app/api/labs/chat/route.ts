@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { chatRateLimit } from "@/lib/rate-limit"
 import { enforceMeteredAiRequest } from "@/lib/ai/metered-request"
-import { endRequestTracking } from "@/lib/rate-limiter"
 import { logger } from "@/lib/logger"
 import { generateCaseLabChatReply } from "@/lib/labs/case-lab-chat"
 
@@ -38,22 +36,20 @@ const bodySchema = z.object({
 /**
  * POST /api/labs/chat — milestone-aware interviewer reply for a Case Lab.
  *
- * Metered exactly like the interview `/api/chat`: IP rate limit -> quota + auth
- * (paid LLM path, signed-out rejected) -> per-user tier rate limit -> concurrent
- * request tracking. Without this, the lab chat route was an unmetered LLM hole
- * (free/exhausted users could run unlimited chat). Cost/usage is attributed to
- * the VERIFIED uid from the token, never a body field.
+ * Metered exactly like the interview `/api/chat`: authenticate and enforce quota,
+ * then charge one tiered request token for the submitted action. Each provider
+ * call meters its own token and concurrency use. Cost is attributed to the
+ * verified uid from the token, never a body field.
  */
 export async function POST(request: NextRequest) {
-  // Cost-metering preamble: IP limit -> quota + auth -> per-user tier limit + concurrent tracking.
+  // Authenticate and charge this submitted action once; provider calls meter their own work.
   const metered = await enforceMeteredAiRequest(request, {
-    estimatedTokens: 1000, // ~1000 tokens per reply
-    ipLimiter: chatRateLimit,
+    policy: "chat",
   })
   if (metered.response) {
     return metered.response
   }
-  const { userId, trackingStarted } = metered
+  const { userId } = metered
 
   try {
     const parsed = bodySchema.safeParse(await request.json())
@@ -72,9 +68,5 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     logger.error("Error in case lab chat:", { error })
     return NextResponse.json({ error: "Failed to respond" }, { status: 500 })
-  } finally {
-    if (trackingStarted) {
-      await endRequestTracking(userId).catch(() => {})
-    }
   }
 }

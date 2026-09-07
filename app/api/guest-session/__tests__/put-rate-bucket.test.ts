@@ -17,7 +17,7 @@ const buckets = vi.hoisted(() => ({
   guestApiRateLimit: vi.fn(async () => null),
 }))
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/lib/rate-limiting", () => ({
   guestSessionRateLimit: buckets.guestSessionRateLimit,
   guestApiRateLimit: buckets.guestApiRateLimit,
 }))

@@ -11,7 +11,7 @@ import { Profile } from "@/lib/types"
 import Stripe from "stripe"
 import { logger } from "@/lib/logger"
 import { syncSubscriptionFromStripe } from "@/lib/stripe-helpers"
-import { sensitiveOperationRateLimit } from "@/lib/rate-limit"
+import { sensitiveOperationRateLimit } from "@/lib/rate-limiting"
 // See create-checkout: the inline localhost fallback would strand a customer on
 // localhost after managing their billing. getAppBaseUrl falls back to SITE_ORIGIN.
 import { getAppBaseUrl } from "@/lib/site-url"

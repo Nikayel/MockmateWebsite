@@ -31,7 +31,7 @@ const token = await auth.currentUser?.getIdToken()
 
 | Category | Endpoints | Auth Required |
 |----------|-----------|---------------|
-| [Interview](#interview-apis) | `/chat`, `/execute`, `/generate-feedback` | Optional (rate-limited) |
+| [Interview](#interview-apis) | `/chat`, `/execute`, `/generate-feedback` | Yes |
 | [User](#user-apis) | `/user/profile`, `/user/metrics` | Yes |
 | [Spaced Repetition](#spaced-repetition-apis) | `/spaced-repetition/*` | Yes |
 | [Payments](#payment-apis) | `/create-checkout`, `/customer-portal` | Yes |
@@ -41,13 +41,14 @@ const token = await auth.currentUser?.getIdToken()
 
 ## Rate Limits
 
-All endpoints implement rate limiting:
+Costly and sensitive endpoints use named application policies. A Cloudflare `/api/*` rule provides
+the universal edge layer; see [the rate-limiting design](./security/rate-limiting.md).
 
 | Tier | Requests/min | Tokens/min | Concurrent |
 |------|--------------|------------|------------|
-| Free | 10 | 5,000 | 2 |
-| Pro | 30 | 20,000 | 5 |
-| Enterprise | 100 | 100,000 | 20 |
+| Free | 20 | 240,000 | 3 |
+| Pro | 200 | 2,400,000 | 10 |
+| Enterprise | 600 | 7,200,000 | 30 |
 
 **Response Headers:**
 ```http

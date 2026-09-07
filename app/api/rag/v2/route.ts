@@ -38,7 +38,7 @@ import {
   getCompanyInterviewKnowledge,
   companyKnowledgeToDocument,
 } from "@/lib/rag/knowledge-base/company-knowledge"
-import { rateLimit } from "@/lib/rate-limit"
+import { embeddingRateLimit, ragV2RateLimit } from "@/lib/rate-limiting"
 import { withTimeout, validateRAGQuery, TimeoutError } from "@/lib/rag/utils"
 import {
   RAGV2ActionSchema,
@@ -47,22 +47,6 @@ import {
 } from "@/lib/validations/api-schemas"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import type { CompanyId } from "@/lib/data/company-questions/types"
-
-// Rate limit: 30 requests per minute for RAG v2 operations
-const ragV2RateLimit = rateLimit({
-  interval: 60 * 1000,
-  uniqueTokenPerInterval: 500,
-  maxRequests: 30,
-  prefix: "rl:rag-v2",
-})
-
-// Stricter limit for embedding generation (expensive operation)
-const embeddingRateLimit = rateLimit({
-  interval: 60 * 1000,
-  uniqueTokenPerInterval: 500,
-  maxRequests: 20,
-  prefix: "rl:rag-embedding",
-})
 
 /**
  * POST /api/rag/v2 - Execute RAG operations

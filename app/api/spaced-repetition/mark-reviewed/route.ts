@@ -16,7 +16,7 @@ import { requireTierForUser } from "@/lib/quota-enforcement"
 import { getScenarioById, scenarios } from "@/lib/scenarios"
 import { logger } from "@/lib/logger"
 import { csrfProtection } from "@/lib/csrf"
-import { apiRateLimit } from "@/lib/rate-limit"
+import { apiRateLimit } from "@/lib/rate-limiting"
 import {
   updateProblemMastery,
   getAllUserProblems,

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { generateAIResponse } from "@/lib/ai-providers"
-import { chatRateLimit } from "@/lib/rate-limit"
-import { enforceQuota } from "@/lib/quota-enforcement"
+import { enforceMeteredAiRequest } from "@/lib/ai/metered-request"
 import { logger } from "@/lib/logger"
 
 // Bound the input we will forward to the LLM (prevents oversized prompts
@@ -73,22 +72,15 @@ Return ONLY valid JSON, no markdown code blocks.`
  * Uses an LLM to semantically analyze code instead of regex patterns.
  *
  * SECURITY: this is a cost-bearing (paid LLM) endpoint. It is protected by
- * IP rate limiting + auth requirement so signed-out callers cannot drive
+ * user-level rate limiting + auth so signed-out callers cannot drive
  * unbounded model spend, and usage is attributed to the verified user.
  */
 export async function POST(request: NextRequest) {
-  // Layer 1: IP-based rate limiting (uses the platform-trusted client IP).
-  const rateLimitResponse = await chatRateLimit(request)
-  if (rateLimitResponse) {
-    return rateLimitResponse
-  }
-
-  // Layer 2: require a signed-in user (rejects anonymous/guest with 401).
-  const quotaResult = await enforceQuota(request, { requireAuth: true })
-  if (!quotaResult.allowed && quotaResult.response) {
-    return quotaResult.response
-  }
-  const userId = quotaResult.userId
+  const metered = await enforceMeteredAiRequest(request, {
+    policy: "chat",
+  })
+  if (metered.response) return metered.response
+  const { userId } = metered
 
   try {
     const body = await request.json()

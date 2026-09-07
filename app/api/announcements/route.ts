@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
-import { apiRateLimit } from "@/lib/rate-limit"
+import { apiRateLimit } from "@/lib/rate-limiting"
 import { verifyToken } from "@/lib/admin/rbac"
 import { Timestamp, FieldValue } from "firebase-admin/firestore"
 import { logger } from "@/lib/logger"

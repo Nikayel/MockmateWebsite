@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { feedbackRateLimit } from "@/lib/rate-limit"
 import { enforceMeteredAiRequest } from "@/lib/ai/metered-request"
-import { endRequestTracking } from "@/lib/rate-limiter"
 import { generateFeedbackResponse } from "@/lib/ai-providers"
 import { trackFeedbackGenerationServer } from "@/lib/analytics-server"
 import { embedAndStoreSolution } from "@/lib/rag"
@@ -69,15 +67,14 @@ import {
 import { buildFeedbackSystemInstruction } from "@/lib/feedback/system-instructions"
 
 export async function POST(request: NextRequest) {
-  // Cost-metering preamble: IP limit -> quota + auth -> per-user tier limit + concurrent tracking.
+  // Authenticate and charge this submitted action once; provider calls meter their own work.
   const metered = await enforceMeteredAiRequest(request, {
-    estimatedTokens: 2000, // Feedback uses ~2000 tokens
-    ipLimiter: feedbackRateLimit,
+    policy: "feedback",
   })
   if (metered.response) {
     return metered.response
   }
-  const { userId: rateLimitUserId, trackingStarted } = metered
+  const { userId: rateLimitUserId } = metered
 
   const startTime = Date.now()
 
@@ -1328,9 +1325,5 @@ CRITICAL INSTRUCTIONS:
       { error: error instanceof Error ? error.message : "Failed to generate feedback" },
       { status: 500 }
     )
-  } finally {
-    if (trackingStarted) {
-      await endRequestTracking(rateLimitUserId).catch(() => {})
-    }
   }
 }

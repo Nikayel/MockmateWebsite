@@ -31,7 +31,7 @@ async function importRoute() {
   vi.doMock("@/lib/logger", () => ({
     logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
   }))
-  vi.doMock("@/lib/rate-limit", () => ({
+  vi.doMock("@/lib/rate-limiting", () => ({
     guestSessionRateLimit: vi.fn(() => Promise.resolve(null)),
     guestApiRateLimit: vi.fn(() => Promise.resolve(null)),
   }))

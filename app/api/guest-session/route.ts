@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
-import { guestApiRateLimit, guestSessionRateLimit } from "@/lib/rate-limit"
+import { guestApiRateLimit, guestSessionRateLimit } from "@/lib/rate-limiting"
 import { SESSION } from "@/lib/constants"
 import { PRICING_CONFIG } from "@/lib/config"
 import {

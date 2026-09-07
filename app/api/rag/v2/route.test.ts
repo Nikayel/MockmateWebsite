@@ -4,7 +4,9 @@ import type { NextRequest } from "next/server"
 const mocks = vi.hoisted(() => ({
   verifyAuth: vi.fn(),
   verifyAdminAccess: vi.fn(),
-  rateLimit: vi.fn(),
+  ragV2RateLimit: vi.fn(),
+  embeddingRateLimit: vi.fn(),
+  isGlobalCeilingExceeded: vi.fn(),
   generateEmbedding: vi.fn(),
   generateEmbeddings: vi.fn(),
   getActiveProvider: vi.fn(),
@@ -22,8 +24,13 @@ vi.mock("@/lib/admin/middleware", () => ({
   verifyAdminAccess: mocks.verifyAdminAccess,
 }))
 
-vi.mock("@/lib/rate-limit", () => ({
-  rateLimit: () => mocks.rateLimit,
+vi.mock("@/lib/rate-limiting", () => ({
+  ragV2RateLimit: mocks.ragV2RateLimit,
+  embeddingRateLimit: mocks.embeddingRateLimit,
+}))
+
+vi.mock("@/lib/global-spend-guard", () => ({
+  isGlobalCeilingExceeded: mocks.isGlobalCeilingExceeded,
 }))
 
 vi.mock("@/lib/rag/embeddings/hybrid-provider", () => ({
@@ -97,7 +104,9 @@ describe("/api/rag/v2", () => {
       authorized: true,
       context: { userId: "admin-1" },
     })
-    mocks.rateLimit.mockResolvedValue(null)
+    mocks.ragV2RateLimit.mockResolvedValue(null)
+    mocks.embeddingRateLimit.mockResolvedValue(null)
+    mocks.isGlobalCeilingExceeded.mockResolvedValue(false)
     mocks.generateEmbedding.mockResolvedValue([0.1, 0.2, 0.3])
     mocks.generateEmbeddings.mockResolvedValue([[0.1, 0.2, 0.3]])
     mocks.getActiveProvider.mockReturnValue("gemini")

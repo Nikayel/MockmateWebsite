@@ -13,7 +13,7 @@ import {
   handleStoreOnboarding,
   handleStoreSolution,
 } from "@/lib/rag/actions"
-import { rateLimit } from "@/lib/rate-limit"
+import { ragRateLimit, ragStorageRateLimit } from "@/lib/rate-limiting"
 
 /**
  * Legacy RAG API endpoint.
@@ -21,20 +21,6 @@ import { rateLimit } from "@/lib/rate-limit"
  * Keeps the existing action-based /api/rag contract for current callers while
  * delegating business logic to lib/rag/actions.
  */
-
-const ragRateLimit = rateLimit({
-  interval: 60 * 1000,
-  uniqueTokenPerInterval: 500,
-  maxRequests: 30,
-  prefix: "rl:rag",
-})
-
-const ragStorageRateLimit = rateLimit({
-  interval: 60 * 1000,
-  uniqueTokenPerInterval: 500,
-  maxRequests: 50,
-  prefix: "rl:rag-store",
-})
 
 export async function POST(request: NextRequest) {
   try {

@@ -24,7 +24,7 @@ import {
   buildRetrievalEvalResult,
   summarizeRetrievalEval,
 } from "@/lib/rag/evaluation/metrics"
-import { rateLimit } from "@/lib/rate-limit"
+import { adminRagJobRateLimit } from "@/lib/rate-limiting"
 import { logger } from "@/lib/logger"
 
 const QUICK_EVAL_K_VALUES = [1, 3, 5, 10]
@@ -37,13 +37,6 @@ const QUICK_EVAL_K_VALUES = [1, 3, 5, 10]
  * first is still running. Three per five minutes is far more than the page can
  * legitimately need and still bounds the spend an authorised admin can trigger.
  */
-const ragJobRateLimit = rateLimit({
-  interval: 5 * 60 * 1000,
-  uniqueTokenPerInterval: 100,
-  maxRequests: 3,
-  prefix: "rl:admin-rag-job",
-})
-
 /**
  * Reading RAG health is analytics. Running the quick eval is not: every fixture
  * case issues real embedding and retrieval calls, so it spends money and is
@@ -63,7 +56,7 @@ export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async (request, co
         )
       }
 
-      const limited = await ragJobRateLimit(request)
+      const limited = await adminRagJobRateLimit(request)
       if (limited) {
         logger.warn("Rate limit exceeded for RAG quick eval", { adminId: context.userId })
         return limited
@@ -176,7 +169,7 @@ export const POST = withPermission(PERMISSIONS.MANAGE_SETTINGS, async (request, 
     // get-status only reads; the other two walk the corpus through the
     // embedding provider, so they are the ones worth bounding.
     if (action === "seed-knowledge-base" || action === "vectorize-scenarios") {
-      const limited = await ragJobRateLimit(request)
+      const limited = await adminRagJobRateLimit(request)
       if (limited) {
         logger.warn("Rate limit exceeded for RAG job", { adminId: context.userId, action })
         return limited

@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { getUserReferralCode, getUserReferralStats, recordReferral } from "@/lib/referrals"
-import { promoCodeRateLimit } from "@/lib/rate-limit"
+import { promoCodeRateLimit } from "@/lib/rate-limiting"
 import { getAppBaseUrl } from "@/lib/site-url"
 import { logger } from "@/lib/logger"
 

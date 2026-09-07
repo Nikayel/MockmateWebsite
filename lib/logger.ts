@@ -356,8 +356,8 @@ function shouldReportToSentry(level: LogLevel, options?: ExternalDeliveryOptions
  * Fraction of `warn` events forwarded to Sentry. Errors are never sampled.
  *
  * There are ~113 warn call sites against ~293 error ones, and the loudest warns
- * are routine rather than exceptional: lib/rate-limit.ts warns on every rate-limit
- * hit and lib/auth-helpers.ts warns on every expired token. Unsampled, ordinary
+ * are routine rather than exceptional: request throttles and expired auth tokens
+ * can both be ordinary client events. Unsampled, ordinary
  * traffic burns the Sentry quota, and once the plan's ceiling is hit Sentry
  * answers 429 and every subsequent event is discarded — including the errors this
  * pipeline exists to deliver. Sampling the routine tier is what keeps room for the

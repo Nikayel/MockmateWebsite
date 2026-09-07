@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   sessionCount: { value: 3 },
 }))
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/lib/rate-limiting", () => ({
   apiRateLimit: mocks.apiRateLimit,
 }))
 

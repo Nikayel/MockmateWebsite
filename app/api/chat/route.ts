@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { chatRateLimit } from "@/lib/rate-limit"
 import { enforceMeteredAiRequest } from "@/lib/ai/metered-request"
-import { endRequestTracking } from "@/lib/rate-limiter"
 import {
   generateAIResponse,
   validateResponseRelevance,
@@ -146,15 +144,14 @@ function runConversationExtractionAfterResponse(job: ConversationExtractionJob |
 }
 
 export async function POST(request: NextRequest) {
-  // Cost-metering preamble: IP limit -> quota + auth -> per-user tier limit + concurrent tracking.
+  // Authenticate and charge this submitted action once; provider calls meter their own work.
   const metered = await enforceMeteredAiRequest(request, {
-    estimatedTokens: 1000, // ~1000 tokens per chat
-    ipLimiter: chatRateLimit,
+    policy: "chat",
   })
   if (metered.response) {
     return metered.response
   }
-  const { userId: rateLimitUserId, trackingStarted } = metered
+  const { userId: rateLimitUserId } = metered
 
   const startTime = Date.now()
 
@@ -702,9 +699,6 @@ GROUNDING RULES (prevent hallucination):
       sessionId,
       service: "interview-chat",
       eventType: "chat_message",
-      // PERF-S4: this route already ran checkRateLimit + startRequestTracking
-      // above, so skip the redundant per-user rate-limit read inside the provider.
-      skipRateLimit: true,
     })
 
     // Validate response relevance
@@ -805,8 +799,6 @@ Generate a compliant response NOW:`
             service: "interview-chat",
             eventType: "chat_message",
             skipCache: true, // Regeneration must bypass the response cache
-            // PERF-S4: same already-throttled request as the primary call above.
-            skipRateLimit: true,
           }
         )
 
@@ -940,9 +932,5 @@ Generate a compliant response NOW:`
       },
       { status: 500 }
     )
-  } finally {
-    if (trackingStarted) {
-      await endRequestTracking(rateLimitUserId).catch(() => {})
-    }
   }
 }

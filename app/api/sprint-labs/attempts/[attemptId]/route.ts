@@ -21,7 +21,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
-import { apiRateLimit } from "@/lib/rate-limit"
+import { apiRateLimit } from "@/lib/rate-limiting"
 import { getSprintLabRun } from "@/lib/sprint-labs/runs"
 import { requireSprintLabsEnabled, requireTierForSprint } from "@/lib/sprint-labs/route-guards"
 import { getFinalizedSprintLabAttempt } from "@/lib/sprint-labs/grading/attempts-service"

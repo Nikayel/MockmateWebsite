@@ -14,21 +14,13 @@ import type {
   HintApiRequestBody,
   HintTestResults,
 } from "@/lib/agents/hints/contracts"
-import { rateLimit } from "@/lib/rate-limit"
+import { hintRateLimit } from "@/lib/rate-limiting"
 import { validateProblemText, validateUserCode, withTimeout, TimeoutError } from "@/lib/rag/utils"
 import { embedAndStoreHint, getSimilarHintsFromRAG } from "@/lib/rag"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { isGlobalCeilingExceeded } from "@/lib/global-spend-guard"
 import { logger } from "@/lib/logger"
-
-// Rate limit: 15 requests per minute for hint generation (AI-intensive)
-const hintRateLimit = rateLimit({
-  interval: 60 * 1000,
-  uniqueTokenPerInterval: 500,
-  maxRequests: 15,
-  prefix: "rl:hints",
-})
 
 /**
  * Hint Agent API

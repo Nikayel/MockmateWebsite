@@ -14,7 +14,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { guestApiRateLimit } from "@/lib/rate-limit"
+import { guestApiRateLimit } from "@/lib/rate-limiting"
 import { trackEventServer } from "@/lib/analytics-server"
 
 const FUNNEL_EVENTS = new Set([

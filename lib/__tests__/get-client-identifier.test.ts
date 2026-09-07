@@ -1,5 +1,5 @@
 /**
- * Tests for getClientIdentifier (lib/rate-limit.ts)
+ * Tests for getClientIdentifier (lib/rate-limiting/identity.ts)
  *
  * SECURITY REGRESSION: the previous implementation trusted the LEFTMOST
  * x-forwarded-for entry and unconditionally trusted cf-connecting-ip, both of
@@ -8,6 +8,7 @@
  * trusted-source ordering and the no-spoof behavior.
  */
 
+import type { NextRequest } from "next/server"
 import { describe, it, expect, vi } from "vitest"
 
 vi.mock("../logger", () => ({
@@ -19,12 +20,12 @@ function makeRequest(headers: Record<string, string>) {
     headers: {
       get: vi.fn((name: string) => headers[name.toLowerCase()] ?? headers[name] ?? null),
     },
-  } as any
+  } as unknown as NextRequest
 }
 
 describe("getClientIdentifier (trusted client IP)", () => {
   it("prefers the Vercel-trusted x-vercel-forwarded-for header", async () => {
-    const { getClientIdentifier } = await import("../rate-limit")
+    const { getClientIdentifier } = await import("../rate-limiting")
     const id = getClientIdentifier(
       makeRequest({
         "x-vercel-forwarded-for": "203.0.113.7",
@@ -36,7 +37,7 @@ describe("getClientIdentifier (trusted client IP)", () => {
   })
 
   it("uses the first IP of x-vercel-forwarded-for if it is a list", async () => {
-    const { getClientIdentifier } = await import("../rate-limit")
+    const { getClientIdentifier } = await import("../rate-limiting")
     const id = getClientIdentifier(
       makeRequest({ "x-vercel-forwarded-for": "203.0.113.7, 70.41.3.18" })
     )
@@ -44,7 +45,7 @@ describe("getClientIdentifier (trusted client IP)", () => {
   })
 
   it("falls back to x-real-ip when no vercel header", async () => {
-    const { getClientIdentifier } = await import("../rate-limit")
+    const { getClientIdentifier } = await import("../rate-limiting")
     const id = getClientIdentifier(
       makeRequest({ "x-real-ip": "198.51.100.5", "x-forwarded-for": "1.2.3.4" })
     )
@@ -52,7 +53,7 @@ describe("getClientIdentifier (trusted client IP)", () => {
   })
 
   it("uses the RIGHTMOST x-forwarded-for entry (not the spoofable leftmost)", async () => {
-    const { getClientIdentifier } = await import("../rate-limit")
+    const { getClientIdentifier } = await import("../rate-limiting")
     // Attacker prepends a fake IP; the real nearest-proxy IP is rightmost.
     const id = getClientIdentifier(
       makeRequest({ "x-forwarded-for": "evil-spoof, 10.0.0.1, 203.0.113.99" })
@@ -61,8 +62,8 @@ describe("getClientIdentifier (trusted client IP)", () => {
     expect(id).not.toBe("evil-spoof")
   })
 
-  it("does NOT trust cf-connecting-ip (app is on Vercel, not Cloudflare)", async () => {
-    const { getClientIdentifier } = await import("../rate-limit")
+  it("does not trust cf-connecting-ip at the Vercel origin", async () => {
+    const { getClientIdentifier } = await import("../rate-limiting")
     const id = getClientIdentifier(
       makeRequest({ "cf-connecting-ip": "attacker-controlled", "x-real-ip": "198.51.100.5" })
     )
@@ -71,7 +72,7 @@ describe("getClientIdentifier (trusted client IP)", () => {
   })
 
   it('returns a shared "unknown" bucket when no trusted source is present', async () => {
-    const { getClientIdentifier } = await import("../rate-limit")
+    const { getClientIdentifier } = await import("../rate-limiting")
     expect(getClientIdentifier(makeRequest({}))).toBe("unknown")
   })
 })

@@ -23,9 +23,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { verifyAuth } from "@/lib/auth-helpers"
-import { chatRateLimit } from "@/lib/rate-limit"
 import { enforceMeteredAiRequest } from "@/lib/ai/metered-request"
-import { endRequestTracking } from "@/lib/rate-limiter"
 import { getFlagAsync } from "@/lib/feature-flags"
 import { logger } from "@/lib/logger"
 import { generateAIResponse } from "@/lib/ai-providers"
@@ -110,11 +108,10 @@ const postBodySchema = z.object({
  */
 export async function POST(request: NextRequest) {
   const metered = await enforceMeteredAiRequest(request, {
-    estimatedTokens: 1200,
-    ipLimiter: chatRateLimit,
+    policy: "chat",
   })
   if (metered.response) return metered.response
-  const { userId, trackingStarted } = metered
+  const { userId } = metered
 
   try {
     // Flag check needs `userId` for per-user rollout (lib/feature-flags.ts),
@@ -316,10 +313,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ reply: aiResponse.text })
   } catch (error) {
     return serviceErrorResponse(error, "Failed to send sprint lab chat message")
-  } finally {
-    if (trackingStarted) {
-      await endRequestTracking(userId).catch(() => {})
-    }
   }
 }
 

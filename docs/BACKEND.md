@@ -144,7 +144,8 @@ Cron routes are invoked by an external scheduler (cron-job.org — the Vercel Ho
 
 - **Authentication:** `Authorization: Bearer <Firebase ID token>` on protected routes; verification via Admin SDK.
 - **Authorization:** Subscription tier checks, admin RBAC (`lib/admin/`), Firestore rules for direct client reads/writes.
-- **Abuse prevention:** Sliding-window rate limits, per-tier quotas, input validation (Zod).
+- **Abuse prevention:** Named token-bucket/sliding-window policies in Upstash, per-tier quotas,
+  and input validation (Zod). See [rate limiting](./security/rate-limiting.md).
 - **Webhooks:** Stripe signature verification on `webhook/stripe`.
 - **Headers / CSP:** See [ARCHITECTURE.md](./ARCHITECTURE.md) security section and `next.config`.*
 
@@ -159,7 +160,9 @@ Cron routes are invoked by an external scheduler (cron-job.org — the Vercel Ho
 
 ## 9. Scaling notes
 
-Current design favors simplicity: many limits are enforced in-process; at higher scale, rate limiting and caches may move to Redis (e.g. Upstash) as noted in [ARCHITECTURE.md](./ARCHITECTURE.md). Vector workloads may lean more on Pinecone for retrieval-heavy traffic.
+HTTP request policies are distributed through Upstash Redis. Provider token/concurrency tracking
+has a development fallback, while production should configure Upstash. Vector workloads may lean
+more on Pinecone for retrieval-heavy traffic.
 
 ---
 

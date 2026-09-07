@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
   loggerError: vi.fn(),
 }))
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/lib/rate-limiting", () => ({
   apiRateLimit: mocks.apiRateLimit,
 }))
 

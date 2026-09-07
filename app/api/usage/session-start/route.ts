@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
-import { apiRateLimit } from "@/lib/rate-limit"
+import { apiRateLimit } from "@/lib/rate-limiting"
 import { recordSessionStartAdmin } from "@/lib/quota/session-start-admin"
 import { trackEventServer } from "@/lib/analytics-server"
 import { logger } from "@/lib/logger"

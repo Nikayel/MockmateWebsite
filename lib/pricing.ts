@@ -106,26 +106,26 @@ export const AI_BUDGET_CAPS = {
 // was refused, and the interviewer went dead mid-conversation for a minute.
 //
 // These are burst guards, not the cost control. Spend is bounded by budgetPerCycle above and
-// by the global daily ceiling; call rate is bounded by requestsPerMinute. Each tier is now
-// requestsPerMinute x ~6,000 tokens, which makes the request cap the binding constraint and
-// leaves this to catch only genuinely abnormal payloads.
+// by the global daily ceiling. lib/rate-limiting/policies.ts consumes requestsPerMinute for its
+// token buckets; this module uses tokensPerMinute and maxConcurrentRequests to guard provider
+// work. Each tier is sized so an ordinary interview does not trip either layer.
 export const RATE_LIMITS = {
   free: {
-    requestsPerMinute: 10,
-    tokensPerMinute: 60000,
-    maxConcurrentRequests: 2,
+    requestsPerMinute: 20,
+    tokensPerMinute: 240000,
+    maxConcurrentRequests: 3,
     budgetPerCycle: AI_BUDGET_CAPS.free,
   },
   pro: {
-    requestsPerMinute: 30,
-    tokensPerMinute: 180000,
-    maxConcurrentRequests: 5,
+    requestsPerMinute: 200,
+    tokensPerMinute: 2400000,
+    maxConcurrentRequests: 10,
     budgetPerCycle: AI_BUDGET_CAPS.pro,
   },
   enterprise: {
-    requestsPerMinute: 100,
-    tokensPerMinute: 600000,
-    maxConcurrentRequests: 20,
+    requestsPerMinute: 600,
+    tokensPerMinute: 7200000,
+    maxConcurrentRequests: 30,
     budgetPerCycle: AI_BUDGET_CAPS.enterprise,
   },
 } as const

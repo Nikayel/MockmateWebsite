@@ -1,41 +1,32 @@
 import type { NextRequest } from "next/server"
 import { enforceQuota } from "@/lib/quota-enforcement"
 import { SYSTEM_USER_ID } from "@/lib/usage/services"
-import {
-  checkRateLimit,
-  startRequestTracking,
-  buildRateLimitResponse,
-  type RateLimitTier,
-} from "@/lib/rate-limiter"
+import type { RateLimitTier } from "@/lib/pricing"
+import { enforceAiFeedbackRateLimit, enforceChatRateLimit } from "@/lib/rate-limiting"
 
-type IpRateLimiter = (request: NextRequest) => Promise<Response | null>
+export type MeteredAiPolicy = "chat" | "feedback"
 
 export type MeteredAiRequest =
   | { response: Response }
-  | { response: null; userId: string; tier: RateLimitTier; trackingStarted: boolean }
+  | { response: null; userId: string; tier: RateLimitTier }
 
 /**
  * Shared cost-metering preamble for the paid-LLM routes (chat, labs chat, labs feedback,
  * generate-feedback). Runs the three layers in order and returns either an early `response` to
- * send, or the resolved userId/tier plus whether concurrent-request tracking was started (the
- * caller is responsible for ending it):
+ * send, or the resolved userId and tier:
  *
- *   1. IP-based rate limit (raw abuse) — 429 before any auth work;
- *   2. quota + auth (requireAuth) — 401 / quota response for signed-out or over-limit callers;
- *   3. per-user tier rate limit + concurrent-request tracking (skipped for the anonymous fallback).
+ *   1. quota + auth (requireAuth) — 401 / quota response for signed-out or over-limit callers;
+ *   2. one user-level request-rate charge for the submitted action;
+ * Provider calls own token, budget and concurrency accounting because one submitted action may
+ * legitimately make several model calls. That separation keeps this request bucket at one charge.
  *
- * One owner so the four routes cannot drift on the order or shape of these checks. `estimatedTokens`
- * and `ipLimiter` are the only per-route differences.
+ * Raw-IP abuse belongs at the outer Cloudflare edge. Keeping it out of this helper prevents a
+ * shared campus NAT from silently reducing Pro's user-level allowance.
  */
 export async function enforceMeteredAiRequest(
   request: NextRequest,
-  opts: { estimatedTokens: number; ipLimiter: IpRateLimiter }
+  opts: { policy: MeteredAiPolicy }
 ): Promise<MeteredAiRequest> {
-  const rateLimitResponse = await opts.ipLimiter(request)
-  if (rateLimitResponse) {
-    return { response: rateLimitResponse }
-  }
-
   const quotaResult = await enforceQuota(request, { requireAuth: true })
   if (!quotaResult.allowed && quotaResult.response) {
     return { response: quotaResult.response }
@@ -47,16 +38,16 @@ export async function enforceMeteredAiRequest(
   // lands under the reserved system identity the ledger already understands
   // rather than a second invented one.
   const userId = quotaResult.userId || SYSTEM_USER_ID
-  let trackingStarted = false
 
   if (userId !== SYSTEM_USER_ID) {
-    const tierRateCheck = await checkRateLimit(userId, tier, opts.estimatedTokens)
-    if (!tierRateCheck.allowed) {
-      return { response: buildRateLimitResponse(tierRateCheck) }
+    const requestRateResponse =
+      opts.policy === "chat"
+        ? await enforceChatRateLimit(userId, tier)
+        : await enforceAiFeedbackRateLimit(userId)
+    if (requestRateResponse) {
+      return { response: requestRateResponse }
     }
-    await startRequestTracking(userId, opts.estimatedTokens)
-    trackingStarted = true
   }
 
-  return { response: null, userId, tier, trackingStarted }
+  return { response: null, userId, tier }
 }

@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/auth-helpers", () => ({ verifyAuth: mocks.verifyAuth }))
 vi.mock("@/lib/feature-flags", () => ({ getFlagAsync: mocks.getFlagAsync }))
-vi.mock("@/lib/rate-limit", () => ({ apiRateLimit: mocks.apiRateLimit }))
+vi.mock("@/lib/rate-limiting", () => ({ apiRateLimit: mocks.apiRateLimit }))
 vi.mock("@/lib/quota-enforcement", () => ({ requireTierForUser: mocks.requireTierForUser }))
 vi.mock("@/lib/logger", () => ({ logger: { error: mocks.loggerError } }))
 vi.mock("@/lib/sprint-labs/runs", async () => {

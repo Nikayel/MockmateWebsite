@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb, adminAuth } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
-import { apiRateLimit } from "@/lib/rate-limit"
+import { apiRateLimit } from "@/lib/rate-limiting"
 import { verifyAdminAccess } from "@/lib/admin/middleware"
 
 /**

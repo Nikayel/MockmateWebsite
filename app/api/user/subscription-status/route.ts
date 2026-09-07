@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { adminDb } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
-import { apiRateLimit } from "@/lib/rate-limit"
+import { apiRateLimit } from "@/lib/rate-limiting"
 
 export async function GET(request: NextRequest) {
   try {

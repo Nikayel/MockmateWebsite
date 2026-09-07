@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { verifyAuth } from "@/lib/auth-helpers"
-import { apiRateLimit } from "@/lib/rate-limit"
+import { apiRateLimit } from "@/lib/rate-limiting"
 import { logger } from "@/lib/logger"
 import {
   getSprintLabRun,

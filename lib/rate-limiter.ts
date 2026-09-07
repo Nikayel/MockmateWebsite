@@ -1,12 +1,14 @@
 /**
- * Rate Limiter
+ * AI Provider Usage Guard
  *
- * Per-user rate limiting with multiple strategies:
- * - Request rate limiting (requests per minute)
+ * Tracks the work performed by actual model calls:
  * - Token rate limiting (tokens per minute)
+ * - Concurrent provider calls
  * - Budget limiting (cost per billing cycle)
  *
- * Uses sliding window algorithm for smooth rate limiting.
+ * HTTP request shaping lives in lib/rate-limiting and uses the official
+ * Upstash rate-limit SDK. This module remains separate because it records
+ * measured model tokens and concurrency, not merely incoming requests.
  *
  * IMPORTANT: Production should use Upstash Redis for distributed rate limiting.
  * If Redis is unavailable, this module fails open to in-memory tracking and
@@ -401,26 +403,8 @@ export async function checkRateLimit(
     }
   }
 
-  // 2. Check request rate
-  if (state.requestCount >= limits.requestsPerMinute) {
-    const retryAfterMs = state.oldestTimestamp
-      ? Math.max(0, state.oldestTimestamp + WINDOW_SIZE_MS - now)
-      : 1000
-
-    return {
-      allowed: false,
-      reason: "rate_limit",
-      code: "REQUEST_RATE_LIMIT_EXCEEDED",
-      retryAfterMs,
-      retryAfterSeconds: Math.ceil(retryAfterMs / 1000),
-      message: `Rate limit exceeded. ${limits.requestsPerMinute} requests/minute for ${tier} tier.`,
-      tier,
-      limit: buildLimit(),
-      currentUsage: buildUsage(),
-    }
-  }
-
-  // 3. Check token rate
+  // 2. Check token rate. HTTP request pace is owned by lib/rate-limiting;
+  // this module measures actual provider work only.
   if (state.tokenCount + estimatedTokens > limits.tokensPerMinute) {
     const retryAfterMs = state.oldestTimestamp
       ? Math.max(0, state.oldestTimestamp + WINDOW_SIZE_MS - now)
@@ -439,7 +423,7 @@ export async function checkRateLimit(
     }
   }
 
-  // 4. Check budget (async - only for budget check)
+  // 3. Check budget (async - only for budget check)
   const usageSummary = await getUserUsageSummary(userId)
   if (usageSummary && usageSummary.budgetRemaining <= 0) {
     return {
@@ -611,7 +595,7 @@ export async function withRateLimit<T>(
 }
 
 /**
- * Helper to start tracking a request (exported for direct use in API routes)
+ * Start tracking an actual provider request.
  */
 export async function startRequestTracking(
   userId: string,
@@ -627,7 +611,7 @@ export async function startRequestTracking(
 }
 
 /**
- * Helper to end tracking a request (exported for direct use in API routes)
+ * Stop tracking an actual provider request.
  */
 export async function endRequestTracking(userId: string): Promise<void> {
   if (hasRedis) {

@@ -17,23 +17,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { verifyToken } from "@/lib/admin/rbac"
-import { rateLimit } from "@/lib/rate-limit"
+import { productFeedbackRateLimit } from "@/lib/rate-limiting"
 import { logger } from "@/lib/logger"
 import { userFeedbackSubmissionSchema } from "@/lib/feedback/user-feedback-schema"
 import { Timestamp } from "firebase-admin/firestore"
 
 export const dynamic = "force-dynamic"
-
-/**
- * Per-IP ceiling. Feedback is a human action measured in submissions per week, so ten an hour is
- * generous for a real user and useless to a script.
- */
-const submitRateLimit = rateLimit({
-  interval: 60 * 60 * 1000,
-  uniqueTokenPerInterval: 500,
-  maxRequests: 10,
-  prefix: "rl:product-feedback",
-})
 
 /** Second ceiling, tied to identity rather than IP, so one account cannot flood from many IPs. */
 const MAX_SUBMISSIONS_PER_DAY = 20
@@ -41,7 +30,7 @@ const MAX_SUBMISSIONS_PER_DAY = 20
 const DAY_MS = 24 * 60 * 60 * 1000
 
 export async function POST(request: NextRequest) {
-  const limited = await submitRateLimit(request)
+  const limited = await productFeedbackRateLimit(request)
   if (limited) return limited
 
   const authHeader = request.headers.get("Authorization")

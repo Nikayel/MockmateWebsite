@@ -14,7 +14,6 @@ const mocks = vi.hoisted(() => ({
   verifyAuth: vi.fn(),
   getFlagAsync: vi.fn(),
   enforceMeteredAiRequest: vi.fn(),
-  endRequestTracking: vi.fn(),
   loggerError: vi.fn(),
   loggerInfo: vi.fn(),
   generateAIResponse: vi.fn(),
@@ -33,8 +32,6 @@ vi.mock("@/lib/feature-flags", () => ({ getFlagAsync: mocks.getFlagAsync }))
 vi.mock("@/lib/ai/metered-request", () => ({
   enforceMeteredAiRequest: mocks.enforceMeteredAiRequest,
 }))
-vi.mock("@/lib/rate-limiter", () => ({ endRequestTracking: mocks.endRequestTracking }))
-vi.mock("@/lib/rate-limit", () => ({ chatRateLimit: vi.fn() }))
 vi.mock("@/lib/logger", () => ({ logger: { error: mocks.loggerError, info: mocks.loggerInfo } }))
 vi.mock("@/lib/ai-providers", () => ({ generateAIResponse: mocks.generateAIResponse }))
 vi.mock("@/lib/sprint-labs/content/registry", () => ({
@@ -99,9 +96,8 @@ beforeEach(() => {
   mocks.enforceMeteredAiRequest.mockResolvedValue({
     response: null,
     userId: USER,
-    trackingStarted: true,
+    tier: "pro",
   })
-  mocks.endRequestTracking.mockResolvedValue(undefined)
   mocks.getSprint.mockResolvedValue({
     number: 1,
     title: "Contracts",
@@ -354,11 +350,11 @@ describe("POST /api/sprint-labs/chat", () => {
     expect(turns[1].capabilities).toContain("concession")
   })
 
-  it("ends request tracking even when the handler throws", async () => {
+  it("charges the user action once even when the handler throws", async () => {
     mocks.generateAIResponse.mockRejectedValue(new Error("boom"))
     const { POST } = await import("./route")
     await POST(createRequest(VALID_BODY))
-    expect(mocks.endRequestTracking).toHaveBeenCalledWith(USER)
+    expect(mocks.enforceMeteredAiRequest).toHaveBeenCalledTimes(1)
   })
 
   it("maps an unrecognized error to a logged 500", async () => {

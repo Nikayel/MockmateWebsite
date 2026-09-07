@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   extractConversationEvidenceEdge: vi.fn(),
   analyzeTranscriptForMistakesEdge: vi.fn(),
   reportEdgeUsageInBackground: vi.fn(),
+  enforceFeedbackStreamRateLimit: vi.fn(),
   loggerWarn: vi.fn(),
 }))
 
@@ -35,6 +36,10 @@ vi.mock("@/lib/feedback/transcript-analysis-edge", () => ({
 
 vi.mock("@/lib/usage/edge-reporter", () => ({
   reportEdgeUsageInBackground: mocks.reportEdgeUsageInBackground,
+}))
+
+vi.mock("@/lib/rate-limiting", () => ({
+  enforceFeedbackStreamRateLimit: mocks.enforceFeedbackStreamRateLimit,
 }))
 
 vi.mock("@/lib/logger", () => ({
@@ -56,16 +61,25 @@ async function drain(response: Response): Promise<string> {
   return await new Response(response.body).text()
 }
 
+function installThreeRequestLimit() {
+  const requestsByUser = new Map<string, number>()
+  mocks.enforceFeedbackStreamRateLimit.mockImplementation(async (userId: string) => {
+    const nextCount = (requestsByUser.get(userId) ?? 0) + 1
+    requestsByUser.set(userId, nextCount)
+    if (nextCount <= 3) return null
+    return new Response(null, {
+      status: 429,
+      headers: { "Retry-After": "60" },
+    })
+  })
+}
+
 describe("/api/feedback/stream cost bounds", () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
-    // No Upstash in tests: the limiter falls back to its per-isolate counter,
-    // which is the degraded path worth exercising anyway.
-    vi.stubEnv("UPSTASH_REDIS_REST_URL", "")
-    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "")
-
     mocks.verifyAuthEdge.mockResolvedValue({ authenticated: true, userId: USER_ID })
+    mocks.enforceFeedbackStreamRateLimit.mockResolvedValue(null)
     mocks.validateConversationEdge.mockResolvedValue({
       isCoherent: true,
       responsesRelevant: true,
@@ -110,6 +124,7 @@ describe("/api/feedback/stream cost bounds", () => {
 
   describe("rate limiting", () => {
     it("rejects the fourth request in a minute with 429 and Retry-After", async () => {
+      installThreeRequestLimit()
       const { POST } = await import("./route")
 
       for (let i = 0; i < 3; i++) {
@@ -127,6 +142,7 @@ describe("/api/feedback/stream cost bounds", () => {
     })
 
     it("spends nothing on a rate-limited request", async () => {
+      installThreeRequestLimit()
       const { POST } = await import("./route")
 
       for (let i = 0; i < 3; i++) await drain(await POST(makeRequest()))
@@ -140,6 +156,7 @@ describe("/api/feedback/stream cost bounds", () => {
     })
 
     it("limits per account, so one user cannot exhaust another", async () => {
+      installThreeRequestLimit()
       const { POST } = await import("./route")
 
       for (let i = 0; i < 3; i++) await drain(await POST(makeRequest()))
@@ -307,6 +324,7 @@ describe("/api/feedback/stream cost bounds", () => {
     })
 
     it("labels a rate-limited caller", async () => {
+      installThreeRequestLimit()
       const { POST } = await import("./route")
 
       for (let i = 0; i < 3; i++) await drain(await POST(makeRequest()))

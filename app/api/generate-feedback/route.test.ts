@@ -1,23 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
 
-vi.mock("@/lib/rate-limit", () => ({
-  feedbackRateLimit: vi.fn(),
+vi.mock("@/lib/rate-limiting", () => ({
+  enforceAiFeedbackRateLimit: vi.fn(),
+  enforceChatRateLimit: vi.fn(),
 }))
 
 vi.mock("@/lib/quota-enforcement", () => ({
   enforceQuota: vi.fn(),
-}))
-
-vi.mock("@/lib/rate-limiter", () => ({
-  checkRateLimit: vi.fn(),
-  startRequestTracking: vi.fn(),
-  endRequestTracking: vi.fn(),
-  buildRateLimitResponse: vi.fn((result: { retryAfter?: number }) => ({
-    data: { error: "Rate limited", retryAfter: result.retryAfter },
-    status: 429,
-    headers: new Map(),
-  })),
 }))
 
 vi.mock("@/lib/ai-providers", () => ({
@@ -172,27 +162,17 @@ function createRequest(body: unknown) {
 }
 
 async function setupMocks() {
-  const { feedbackRateLimit } = await import("@/lib/rate-limit")
+  const { enforceAiFeedbackRateLimit } = await import("@/lib/rate-limiting")
   const { enforceQuota } = await import("@/lib/quota-enforcement")
-  const { checkRateLimit, startRequestTracking, endRequestTracking } =
-    await import("@/lib/rate-limiter")
   const { generateFeedbackResponse } = await import("@/lib/ai-providers")
   const { trackFeedbackGenerationServer } = await import("@/lib/analytics-server")
 
-  vi.mocked(feedbackRateLimit).mockResolvedValue(null)
+  vi.mocked(enforceAiFeedbackRateLimit).mockResolvedValue(null)
   vi.mocked(enforceQuota).mockResolvedValue({
     allowed: true,
     tier: "free",
     userId: "user-1",
   })
-  vi.mocked(checkRateLimit).mockResolvedValue({
-    allowed: true,
-    remaining: 9,
-    limit: 10,
-    resetTime: Date.now() + 60_000,
-  })
-  vi.mocked(startRequestTracking).mockResolvedValue(undefined)
-  vi.mocked(endRequestTracking).mockResolvedValue(undefined)
   vi.mocked(generateFeedbackResponse).mockResolvedValue({
     text: "Feedback text",
     provider: "gemini-lite",
@@ -205,7 +185,7 @@ async function setupMocks() {
 
   return {
     generateFeedbackResponse,
-    endRequestTracking,
+    enforceAiFeedbackRateLimit,
     trackFeedbackGenerationServer,
   }
 }
@@ -247,8 +227,8 @@ describe("/api/generate-feedback route", () => {
     vi.clearAllMocks()
   })
 
-  it("ends request tracking for validation errors after tracking starts", async () => {
-    const { generateFeedbackResponse, endRequestTracking } = await setupMocks()
+  it("charges one request-rate event even when validation fails", async () => {
+    const { generateFeedbackResponse, enforceAiFeedbackRateLimit } = await setupMocks()
     const { POST } = await import("./route")
 
     const response = await POST(createRequest({ scenarioTitle: "Two Sum" }))
@@ -256,11 +236,12 @@ describe("/api/generate-feedback route", () => {
     expect(response.status).toBe(400)
     expect(response.data).toEqual({ error: "Code and scenario title are required" })
     expect(generateFeedbackResponse).not.toHaveBeenCalled()
-    expect(endRequestTracking).toHaveBeenCalledWith("user-1")
+    expect(enforceAiFeedbackRateLimit).toHaveBeenCalledTimes(1)
+    expect(enforceAiFeedbackRateLimit).toHaveBeenCalledWith("user-1")
   })
 
-  it("ends request tracking for successful feedback generation", async () => {
-    const { generateFeedbackResponse, endRequestTracking } = await setupMocks()
+  it("charges one request-rate event for successful feedback generation", async () => {
+    const { generateFeedbackResponse, enforceAiFeedbackRateLimit } = await setupMocks()
     const { POST } = await import("./route")
 
     const response = await POST(createRequest(validFeedbackPayload))
@@ -274,7 +255,7 @@ describe("/api/generate-feedback route", () => {
       })
     )
     expect(generateFeedbackResponse).toHaveBeenCalledTimes(1)
-    expect(endRequestTracking).toHaveBeenCalledWith("user-1")
+    expect(enforceAiFeedbackRateLimit).toHaveBeenCalledTimes(1)
   })
 
   it("forwards provider-reported token usage to the feedback_generated event", async () => {
@@ -294,8 +275,8 @@ describe("/api/generate-feedback route", () => {
     )
   })
 
-  it("ends request tracking when feedback generation fails", async () => {
-    const { generateFeedbackResponse, endRequestTracking } = await setupMocks()
+  it("does not duplicate the request-rate charge when feedback generation fails", async () => {
+    const { generateFeedbackResponse, enforceAiFeedbackRateLimit } = await setupMocks()
     const { POST } = await import("./route")
 
     vi.mocked(generateFeedbackResponse).mockRejectedValueOnce(new Error("AI down"))
@@ -304,6 +285,6 @@ describe("/api/generate-feedback route", () => {
 
     expect(response.status).toBe(500)
     expect(response.data).toEqual({ error: "AI down" })
-    expect(endRequestTracking).toHaveBeenCalledWith("user-1")
+    expect(enforceAiFeedbackRateLimit).toHaveBeenCalledTimes(1)
   })
 })

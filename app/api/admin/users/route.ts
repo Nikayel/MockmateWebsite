@@ -21,18 +21,10 @@ import { logAdminAction } from "@/lib/admin/audit"
 import Stripe from "stripe"
 import { Pinecone } from "@pinecone-database/pinecone"
 import { logger } from "@/lib/logger"
-import { rateLimit } from "@/lib/rate-limit"
+import { adminDeletionRateLimit } from "@/lib/rate-limiting"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-12-15.clover" as any,
-})
-
-// Distributed rate limiting for admin deletions (works across serverless instances)
-const adminDeletionRateLimit = rateLimit({
-  interval: 60 * 1000, // 1 minute
-  uniqueTokenPerInterval: 100,
-  maxRequests: 5, // Max 5 deletions per minute per admin
-  prefix: "rl:admin-delete",
 })
 
 // Protected emails that cannot be deleted via API

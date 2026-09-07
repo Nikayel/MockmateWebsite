@@ -15,7 +15,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { apiRateLimit } from "@/lib/rate-limit"
+import { apiRateLimit } from "@/lib/rate-limiting"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { logger } from "@/lib/logger"
 

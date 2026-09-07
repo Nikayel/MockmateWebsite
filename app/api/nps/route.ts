@@ -13,7 +13,7 @@ import { z } from "zod"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { recordNPSResponse, shouldShowNPSSurvey } from "@/lib/nps"
 import { adminDb } from "@/lib/firebase-admin"
-import { apiRateLimit } from "@/lib/rate-limit"
+import { apiRateLimit } from "@/lib/rate-limiting"
 
 // Matches the survey payload exactly: score is a 0-10 number, feedback is an
 // optional free-text string (bounded so a forged payload cannot store megabytes).

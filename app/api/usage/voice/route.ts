@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { getAuth } from "firebase-admin/auth"
 import "@/lib/firebase-admin" // Initialize Firebase Admin
-import { apiRateLimit } from "@/lib/rate-limit"
+import { apiRateLimit } from "@/lib/rate-limiting"
 import { trackVoiceUsage, DEEPGRAM_COSTS } from "@/lib/usage-tracking"
 import { logger } from "@/lib/logger"
 

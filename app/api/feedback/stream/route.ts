@@ -54,7 +54,7 @@ import { reportEdgeUsageInBackground, type EdgeUsageReport } from "@/lib/usage/e
 // failure on the path that scores DSA, bugfix, optimization, security, and
 // add-functionality sessions landed in a short-retention Edge log and nowhere else.
 import { logger } from "@/lib/logger"
-import { checkEdgeRateLimit, type EdgeRateWindow } from "@/lib/rate-limit-edge"
+import { enforceFeedbackStreamRateLimit } from "@/lib/rate-limiting"
 import { summarizeBugfixEvidence } from "@/lib/bugfix/evidence"
 import { buildBugfixPostSessionReport } from "@/lib/bugfix/report"
 import {
@@ -88,30 +88,6 @@ export const runtime = "edge"
 // extraction, silent-notes analysis, bugfix semantic scoring, feedback
 // generation) at high reasoning effort.
 //
-// The limiter itself now lives in lib/rate-limit-edge.ts. lib/rate-limit.ts is
-// still unusable from here: its store selection prefers FirestoreRateLimitStore
-// in production, whose `increment` dynamically imports firebase-admin, which
-// does not exist in Edge. That import rejects, `increment` hits its fail-open
-// catch, and every request is allowed.
-
-/**
- * Two windows, because one cannot express both shapes of abuse.
- *
- * The burst window is what stops a runaway client loop: a completed interview
- * produces exactly one feedback request, so 3/minute already allows a user to
- * retry twice after a failed stream and is far above any human rate.
- *
- * The sustained window is what stops a patient script. A 60-second window alone
- * would permit 4,320 requests/day - up to ~21,600 AI calls - while never once
- * appearing to burst. 20/hour is roughly 6x the busiest plausible human
- * (interviews take 20-45 minutes) and caps a single account at ~480 feedback
- * runs a day rather than an unbounded number.
- */
-const FEEDBACK_RATE_WINDOWS: readonly EdgeRateWindow[] = [
-  { name: "burst", windowSeconds: 60, maxRequests: 3 },
-  { name: "sustained", windowSeconds: 60 * 60, maxRequests: 20 },
-]
-
 // ============================================================================
 // Global daily spend ceiling (Edge)
 // ============================================================================
@@ -351,37 +327,27 @@ export async function POST(request: NextRequest) {
   // Rate limit BEFORE the stream is opened. Once the SSE response is returned
   // the client renders a progress UI, so a refusal has to be an ordinary HTTP
   // error the caller can surface, not an `error` event mid-stream.
-  const rateVerdict = await checkEdgeRateLimit({
-    keyPrefix: "rl:fbstream",
-    identifier: authenticatedUserId,
-    windows: FEEDBACK_RATE_WINDOWS,
-  })
-  if (!rateVerdict.allowed) {
-    const retryAfterSeconds = rateVerdict.window?.windowSeconds ?? 60
-    logger.warn("[Streaming Feedback] Rate limit exceeded", {
-      userId: authenticatedUserId,
-      window: rateVerdict.window?.name,
-      limit: rateVerdict.window?.maxRequests,
-    })
+  const rateLimitResponse = await enforceFeedbackStreamRateLimit(authenticatedUserId)
+  if (rateLimitResponse) {
+    const unavailable = rateLimitResponse.status === 503
+    const message = unavailable
+      ? "Feedback protection is temporarily unavailable. Your session is saved; please retry shortly."
+      : "You requested feedback too quickly. Your session is saved; please wait a moment and retry."
+    const headers = new Headers(rateLimitResponse.headers)
+    headers.set("Content-Type", "application/json")
+    const retryAfter = Number(headers.get("Retry-After") ?? "60")
     return new Response(
       JSON.stringify({
-        error: "Too many feedback requests. Please wait a moment and try again.",
-        message:
-          "You have asked for feedback several times in a row. Your session is saved, so wait a moment and try again.",
-        code: "RATE_LIMITED",
-        retryAfter: retryAfterSeconds,
+        error: message,
+        message,
+        code: unavailable ? "RATE_LIMIT_UNAVAILABLE" : "RATE_LIMITED",
+        retryAfter,
       }),
-      {
-        status: 429,
-        headers: {
-          "Content-Type": "application/json",
-          "Retry-After": String(retryAfterSeconds),
-        },
-      }
+      { status: rateLimitResponse.status, headers }
     )
   }
 
-  // Aggregate kill-switch, after the (cheap, local) rate limit and before the
+  // Aggregate kill-switch, after the cheap rate-limit check and before the
   // (expensive, remote) AI calls. 503 rather than 429: this is not the caller's
   // fault and retrying with a different account will not help.
   if (await isGlobalSpendCeilingReached()) {

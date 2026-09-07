@@ -10,7 +10,7 @@ import { adminDb } from "@/lib/firebase-admin"
 import { PRICING_CONFIG } from "@/lib/config"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { logger } from "@/lib/logger"
-import { sensitiveOperationRateLimit } from "@/lib/rate-limit"
+import { sensitiveOperationRateLimit } from "@/lib/rate-limiting"
 // Stripe redirects the customer back here after payment. The old inline
 // `NEXT_PUBLIC_APP_URL || "http://localhost:3000"` fallback meant that if the var
 // was ever unset in production, every paying customer was sent to localhost and

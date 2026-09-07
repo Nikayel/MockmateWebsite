@@ -10,7 +10,7 @@ import { adminAuth, adminDb } from "@/lib/firebase-admin"
 import Stripe from "stripe"
 import { Pinecone } from "@pinecone-database/pinecone"
 import { logger } from "@/lib/logger"
-import { sensitiveOperationRateLimit } from "@/lib/rate-limit"
+import { sensitiveOperationRateLimit } from "@/lib/rate-limiting"
 import { csrfProtection } from "@/lib/csrf"
 import { deleteAllUserData } from "./delete-user-data"
 

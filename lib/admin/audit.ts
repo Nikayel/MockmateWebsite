@@ -23,7 +23,7 @@
 import type { NextRequest } from "next/server"
 import { adminDb } from "../firebase-admin"
 import { FieldValue } from "firebase-admin/firestore"
-import { getClientIdentifier } from "../rate-limit"
+import { getClientIdentifier } from "../rate-limiting"
 
 /** The one collection admin actions are written to. */
 export const AUDIT_COLLECTION = "admin_audit_log"

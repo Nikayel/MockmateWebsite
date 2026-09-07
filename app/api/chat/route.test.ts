@@ -1,23 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
 
-vi.mock("@/lib/rate-limit", () => ({
-  chatRateLimit: vi.fn(),
+vi.mock("@/lib/rate-limiting", () => ({
+  enforceChatRateLimit: vi.fn(),
+  enforceAiFeedbackRateLimit: vi.fn(),
 }))
 
 vi.mock("@/lib/quota-enforcement", () => ({
   enforceQuota: vi.fn(),
-}))
-
-vi.mock("@/lib/rate-limiter", () => ({
-  checkRateLimit: vi.fn(),
-  startRequestTracking: vi.fn(),
-  endRequestTracking: vi.fn(),
-  buildRateLimitResponse: vi.fn((result: { retryAfter?: number }) => ({
-    data: { error: "Rate limited", retryAfter: result.retryAfter },
-    status: 429,
-    headers: new Map(),
-  })),
 }))
 
 vi.mock("@/lib/ai-providers", () => ({
@@ -66,32 +56,21 @@ function createRequest(body: unknown) {
 }
 
 async function setupMocks() {
-  const { chatRateLimit } = await import("@/lib/rate-limit")
+  const { enforceChatRateLimit } = await import("@/lib/rate-limiting")
   const { enforceQuota } = await import("@/lib/quota-enforcement")
-  const { checkRateLimit, startRequestTracking, endRequestTracking } =
-    await import("@/lib/rate-limiter")
   const { generateAIResponse, validateResponseRelevance } = await import("@/lib/ai-providers")
   const { trackAIChatServer } = await import("@/lib/analytics-server")
   const { getFlag } = await import("@/lib/feature-flags")
   const { buildRAGContext } = await import("@/lib/interview/chat-rag-context")
-  const { validateWithRegexRetry, validateSemanticRules } = await import(
-    "@/lib/interview/response-validation"
-  )
+  const { validateWithRegexRetry, validateSemanticRules } =
+    await import("@/lib/interview/response-validation")
 
-  vi.mocked(chatRateLimit).mockResolvedValue(null)
+  vi.mocked(enforceChatRateLimit).mockResolvedValue(null)
   vi.mocked(enforceQuota).mockResolvedValue({
     allowed: true,
     tier: "free",
     userId: "user-1",
   })
-  vi.mocked(checkRateLimit).mockResolvedValue({
-    allowed: true,
-    remaining: 9,
-    limit: 10,
-    resetTime: Date.now() + 60_000,
-  })
-  vi.mocked(startRequestTracking).mockResolvedValue(undefined)
-  vi.mocked(endRequestTracking).mockResolvedValue(undefined)
   vi.mocked(generateAIResponse).mockResolvedValue({
     text: "Mocked assistant reply",
     provider: "gemini-lite",
@@ -120,8 +99,7 @@ async function setupMocks() {
     generateAIResponse,
     trackAIChatServer,
     buildRAGContext,
-    startRequestTracking,
-    endRequestTracking,
+    enforceChatRateLimit,
   }
 }
 
@@ -131,7 +109,7 @@ describe("/api/chat route", () => {
   })
 
   it("returns 400 for invalid request bodies", async () => {
-    const { endRequestTracking } = await setupMocks()
+    const { enforceChatRateLimit } = await setupMocks()
     const { POST } = await import("./route")
 
     const response = await POST(createRequest({ role: "narrator", message: "hello" }))
@@ -142,11 +120,11 @@ describe("/api/chat route", () => {
         error: "Invalid request body",
       })
     )
-    expect(endRequestTracking).toHaveBeenCalledWith("user-1")
+    expect(enforceChatRateLimit).toHaveBeenCalledWith("user-1", "free")
   })
 
   it("returns 400 when the context array exceeds the maximum length", async () => {
-    const { generateAIResponse, endRequestTracking } = await setupMocks()
+    const { generateAIResponse, enforceChatRateLimit } = await setupMocks()
     const { POST } = await import("./route")
 
     const oversizedContext = Array.from({ length: 61 }, (_, index) => ({
@@ -169,11 +147,11 @@ describe("/api/chat route", () => {
       })
     )
     expect(generateAIResponse).not.toHaveBeenCalled()
-    expect(endRequestTracking).toHaveBeenCalledWith("user-1")
+    expect(enforceChatRateLimit).toHaveBeenCalledWith("user-1", "free")
   })
 
   it("requires a message unless the request is proactive", async () => {
-    const { generateAIResponse, endRequestTracking } = await setupMocks()
+    const { generateAIResponse, enforceChatRateLimit } = await setupMocks()
     const { POST } = await import("./route")
 
     const response = await POST(createRequest({ role: "partner" }))
@@ -181,11 +159,11 @@ describe("/api/chat route", () => {
     expect(response.status).toBe(400)
     expect(response.data).toEqual({ error: "Message is required" })
     expect(generateAIResponse).not.toHaveBeenCalled()
-    expect(endRequestTracking).toHaveBeenCalledWith("user-1")
+    expect(enforceChatRateLimit).toHaveBeenCalledWith("user-1", "free")
   })
 
   it("skips proactive interviewer checks when there is little code and little silence", async () => {
-    const { generateAIResponse, endRequestTracking } = await setupMocks()
+    const { generateAIResponse, enforceChatRateLimit } = await setupMocks()
     const { POST } = await import("./route")
 
     const response = await POST(
@@ -204,11 +182,11 @@ describe("/api/chat route", () => {
       reason: "Not enough code to comment on yet and not silent long enough",
     })
     expect(generateAIResponse).not.toHaveBeenCalled()
-    expect(endRequestTracking).toHaveBeenCalledWith("user-1")
+    expect(enforceChatRateLimit).toHaveBeenCalledWith("user-1", "free")
   })
 
   it("continues proactive interviewer checks after enough silence", async () => {
-    const { generateAIResponse, endRequestTracking } = await setupMocks()
+    const { generateAIResponse } = await setupMocks()
     const { POST } = await import("./route")
 
     const response = await POST(
@@ -265,7 +243,7 @@ describe("/api/chat route", () => {
   })
 
   it("stays silent after the interviewer already ended the session", async () => {
-    const { generateAIResponse, endRequestTracking } = await setupMocks()
+    const { generateAIResponse, enforceChatRateLimit } = await setupMocks()
     const { POST } = await import("./route")
 
     const response = await POST(
@@ -284,11 +262,11 @@ describe("/api/chat route", () => {
         "The interview session has ended. Click 'See Full Interview Score' to see your score breakdown and detailed analysis.",
     })
     expect(generateAIResponse).not.toHaveBeenCalled()
-    expect(endRequestTracking).toHaveBeenCalledWith("user-1")
+    expect(enforceChatRateLimit).toHaveBeenCalledWith("user-1", "free")
   })
 
   it("returns the provider response and debug phase metadata for a normal partner message", async () => {
-    const { generateAIResponse, trackAIChatServer, buildRAGContext, endRequestTracking } =
+    const { generateAIResponse, trackAIChatServer, buildRAGContext, enforceChatRateLimit } =
       await setupMocks()
     const { POST } = await import("./route")
 
@@ -336,11 +314,11 @@ describe("/api/chat route", () => {
         tokensOut: 12,
       })
     )
-    expect(endRequestTracking).toHaveBeenCalledWith("user-1")
+    expect(enforceChatRateLimit).toHaveBeenCalledWith("user-1", "free")
   })
 
-  it("ends request tracking when AI generation fails", async () => {
-    const { generateAIResponse, endRequestTracking } = await setupMocks()
+  it("charges the request policy once when AI generation fails", async () => {
+    const { generateAIResponse, enforceChatRateLimit } = await setupMocks()
     const { POST } = await import("./route")
 
     vi.mocked(generateAIResponse).mockRejectedValueOnce(new Error("AI down"))
@@ -359,14 +337,14 @@ describe("/api/chat route", () => {
 
     expect(response.status).toBe(500)
     expect(response.data).toEqual({ error: "Failed to process chat message. Please try again." })
-    expect(endRequestTracking).toHaveBeenCalledWith("user-1")
+    expect(enforceChatRateLimit).toHaveBeenCalledTimes(1)
+    expect(enforceChatRateLimit).toHaveBeenCalledWith("user-1", "free")
   })
 
   it("returns the chat response without waiting on background conversation extraction", async () => {
     await setupMocks()
-    const { shouldRunExtraction, extractConversationState } = await import(
-      "@/lib/interview/conversation-extraction"
-    )
+    const { shouldRunExtraction, extractConversationState } =
+      await import("@/lib/interview/conversation-extraction")
 
     // Force the deferred extraction to actually run for this request...
     vi.mocked(shouldRunExtraction).mockReturnValue(true)

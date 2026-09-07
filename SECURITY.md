@@ -45,7 +45,8 @@ We take the security of CodeSparring seriously. If you believe you have found a 
 ### Current Implementation
 
 - **Authentication:** Firebase Authentication with OAuth 2.0
-- **Rate Limiting:** IP-based rate limiting on all API endpoints
+- **Rate Limiting:** Named Redis-backed policies for sensitive and costly routes; deploy the
+  documented Cloudflare `/api/*` rule for universal edge coverage ([details](./docs/security/rate-limiting.md))
 - **Input Validation:** Server-side validation on all user inputs
 - **HTTPS Only:** All production traffic uses TLS 1.3
 - **Content Security Policy:** Strict CSP headers on all responses
