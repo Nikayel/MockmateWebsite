@@ -11,6 +11,9 @@ const mockGuard = vi.hoisted(() => vi.fn(({ children }: { children: React.ReactN
 vi.mock("@/components/sprint-labs/ui/SprintLabAuthGuard", () => ({
   SprintLabAuthGuard: mockGuard,
 }))
+vi.mock("@/components/sprint-labs/SprintLabOnboardingRedirect", () => ({
+  SprintLabOnboardingRedirect: ({ children }: { children: React.ReactNode }) => children,
+}))
 
 import SprintLabRunLayout, { dynamic, metadata } from "../layout"
 
@@ -20,11 +23,12 @@ describe("Sprint Labs run layout", () => {
     expect(metadata.robots).toEqual({ index: false, follow: false })
   })
 
-  it("wraps children in SprintLabAuthGuard", () => {
+  it("wraps children in SprintLabAuthGuard", async () => {
     render(
-      <SprintLabRunLayout>
-        <p>a run screen</p>
-      </SprintLabRunLayout>
+      await SprintLabRunLayout({
+        children: <p>a run screen</p>,
+        params: Promise.resolve({ workbookId: "fixture-demo" }),
+      })
     )
     expect(mockGuard).toHaveBeenCalled()
     expect(screen.getByText("a run screen")).not.toBeNull()

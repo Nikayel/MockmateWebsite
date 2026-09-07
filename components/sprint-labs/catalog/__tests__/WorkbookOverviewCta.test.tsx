@@ -40,7 +40,7 @@ describe("WorkbookOverviewCta", () => {
     render(<WorkbookOverviewCta workbookId="fixture-demo" state={{ kind: "signed-out" }} />)
     const link = screen.getByRole("link", { name: "Sign in to start" })
     expect(link.getAttribute("href")).toBe(
-      `/login?redirect=${encodeURIComponent("/sprint-labs/fixture-demo/run/standup")}`
+      `/login?redirect=${encodeURIComponent("/sprint-labs/fixture-demo")}`
     )
   })
 
