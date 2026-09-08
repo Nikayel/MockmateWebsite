@@ -134,7 +134,7 @@ interface QuotaCheckResult {
   code?: string
 }
 
-interface UserQuota {
+export interface UserQuota {
   sessionsUsed: number
   sessionsLimit: number
   freeOpensRemaining: number
@@ -264,7 +264,7 @@ async function checkGuestQuota(guestId: string): Promise<{ allowed: boolean; rea
  * The actual usage increment happens in firestore-helpers.ts with proper transactions.
  * Small race windows here are acceptable since this is a soft limit check.
  */
-async function getUserQuota(
+export async function getUserQuota(
   userId: string,
   // PERF-S4: callers that already fetched the profile (e.g. checkQuota, which
   // reads it for the degraded-subscription gate) pass its billing fields so we
