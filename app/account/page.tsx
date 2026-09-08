@@ -27,7 +27,6 @@ import {
   Calendar,
   ExternalLink,
   AlertCircle,
-  XCircle,
   Shield,
   Download,
   Trash2,
@@ -36,7 +35,6 @@ import {
   RefreshCw,
   CreditCard,
   Receipt,
-  ChevronRight,
   ChevronDown,
   Check,
   Mail,
@@ -372,7 +370,7 @@ export default function AccountPage() {
       } else {
         throw new Error(data.error)
       }
-    } catch (error) {
+    } catch {
       toast.error("Sync failed")
     } finally {
       setIsSyncing(false)
@@ -384,11 +382,11 @@ export default function AccountPage() {
 
     setIsExporting(true)
     try {
-      const exportData: Record<string, any> = {
+      const exportData = {
         exportDate: new Date().toISOString(),
         profile: profile || {},
         usage: usage || {},
-        sessions: [],
+        sessions: [] as Array<Record<string, unknown>>,
       }
 
       const db = await getDbLazy()
@@ -440,7 +438,7 @@ export default function AccountPage() {
       } else {
         throw new Error(data.error)
       }
-    } catch (error) {
+    } catch {
       toast.error("Delete failed")
     } finally {
       setIsDeleting(false)
