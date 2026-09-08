@@ -20,7 +20,6 @@ import { reportFunnelEvent } from "@/lib/metrics/funnel-client"
 import { Profile } from "@/lib/types"
 import { toast } from "sonner"
 import { ErrorBoundary } from "@/components/error-boundary"
-import Link from "next/link"
 import { isPaidTier } from "@/lib/pricing"
 import { ROADMAP_FEATURE_COPY } from "@/lib/pricing-features"
 import type { SubscriptionTier } from "@/lib/config"
@@ -31,7 +30,6 @@ function UpgradePageContent() {
   const router = useRouter()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [profileLoading, setProfileLoading] = useState(true)
   const [loading, setLoading] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   // Honour the period the visitor already chose on /pricing. Without this the
@@ -70,12 +68,18 @@ function UpgradePageContent() {
 
         if (success === "true") {
           const sessionId = searchParams?.get("session_id")
-          toast.success("Payment successful! Syncing your account...")
-
           const currentUserId = user?.id
           const currentFirebaseUser = firebaseUser
 
-          if (sessionId && currentFirebaseUser && currentUserId) {
+          // Firebase Auth can resolve after the safety timeout on a slow mobile
+          // connection. Leaving this page intact preserves the verified checkout
+          // session id until identity is available; redirecting first strands the
+          // repair flow on Account, where it no longer knows which payment to redeem.
+          if (!currentFirebaseUser || !currentUserId) return
+
+          toast.success("Payment successful! Syncing your account...")
+
+          if (sessionId) {
             let syncSuccess = false
             let attempts = 0
             const maxAttempts = 5
@@ -154,7 +158,17 @@ function UpgradePageContent() {
     }
 
     handleStripeRedirect()
-  }, [authLoading, mounted, searchParams, router, user, firebaseUser, initialized])
+  }, [
+    authLoading,
+    mounted,
+    searchParams,
+    router,
+    user,
+    firebaseUser,
+    initialized,
+    proPricing.monthly.price,
+    proPricing.yearly.price,
+  ])
 
   useEffect(() => {
     if (authLoading || !initialized || !mounted) return
@@ -162,7 +176,6 @@ function UpgradePageContent() {
     const loadProfile = async () => {
       if (!firebaseUser) {
         setProfile(null)
-        setProfileLoading(false)
         return
       }
 
@@ -171,8 +184,6 @@ function UpgradePageContent() {
         setProfile(userProfile)
       } catch {
         // Error loading profile
-      } finally {
-        setProfileLoading(false)
       }
     }
 
@@ -225,7 +236,7 @@ function UpgradePageContent() {
       } else {
         throw new Error(data.error || "Failed to create checkout session")
       }
-    } catch (error) {
+    } catch {
       toast.error("Upgrade failed", {
         description: "Something went wrong. Please try again or contact support.",
         duration: 5000,

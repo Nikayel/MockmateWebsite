@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { useAuth } from "@/lib/auth-context"
-import { getUserProfile, checkUsageLimit } from "@/lib/firestore-helpers"
+import type { AccountOverviewResponse } from "@/lib/account/overview"
 import { Profile, InterviewSession } from "@/lib/types"
 import { getDbLazy } from "@/lib/firebase-lazy"
 import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore"
@@ -29,10 +29,10 @@ import {
   HelpCircle,
   ShieldCheck,
   FlaskConical,
+  AlertCircle,
 } from "lucide-react"
 import { SubscriptionStatusBanner } from "@/components/ui/subscription-status-banner"
 import Link from "next/link"
-import { toast } from "sonner"
 import { isPaidTier } from "@/lib/pricing"
 import { PRICING_CONFIG, type SubscriptionTier } from "@/lib/config"
 import { SparraLoader } from "@/components/brand/SparraLoader"
@@ -83,6 +83,12 @@ const ReferralWidget = dynamic(
 // distinguishable from a genuinely empty (first-time user) result.
 const SESSIONS_FETCH_ERROR = "sessions-fetch-error" as const
 
+function isReadyAccountOverview(
+  response: AccountOverviewResponse
+): response is Extract<AccountOverviewResponse, { status: "ready" }> {
+  return response.status === "ready"
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
@@ -121,6 +127,7 @@ export default function DashboardPage() {
   }, [])
   const [sessionsError, setSessionsError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  const [accountError, setAccountError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!initialized || authLoading) return
@@ -140,9 +147,21 @@ export default function DashboardPage() {
       }
 
       try {
-        const [fetchedProfile, usageData, sessionsSnap, dueData] = await Promise.all([
-          getUserProfile(firebaseUser.uid),
-          checkUsageLimit(firebaseUser.uid),
+        setAccountError(null)
+        const [overviewResponse, sessionsSnap, dueData] = await Promise.all([
+          (async () => {
+            const token = await firebaseUser.getIdToken()
+            const response = await fetch("/api/account/overview", {
+              headers: { Authorization: `Bearer ${token}` },
+              cache: "no-store",
+            })
+            const body = (await response.json()) as AccountOverviewResponse
+            if (!isReadyAccountOverview(body)) {
+              throw new Error(body.message || "Failed to load account overview")
+            }
+            if (!response.ok) throw new Error("Failed to load account overview")
+            return body.overview
+          })(),
           (async () => {
             try {
               const db = await getDbLazy()
@@ -176,27 +195,7 @@ export default function DashboardPage() {
           })(),
         ])
 
-        // Self-heal: a signed-in user with no profile doc means the one-shot
-        // profile write on the login/signup path failed and nothing retried
-        // (found in prod: a Feb-2026 Auth user with satellite docs but no
-        // profile). The dashboard is the post-login landing page, so recreate
-        // it here; createOrUpdateProfile is create-only-ish (it never
-        // overwrites an existing profile's subscription fields).
-        let userProfile = fetchedProfile
-        if (!userProfile) {
-          try {
-            const { createOrUpdateProfile } = await import("@/lib/firestore-helpers")
-            userProfile = await createOrUpdateProfile(
-              firebaseUser.uid,
-              firebaseUser.email || "",
-              firebaseUser.displayName,
-              firebaseUser.photoURL
-            )
-          } catch (healError) {
-            console.error("Profile self-heal failed:", healError)
-          }
-        }
-
+        const { profile: userProfile, usage: usageData } = overviewResponse
         setProfile(userProfile)
         setUsage(usageData)
 
@@ -264,45 +263,9 @@ export default function DashboardPage() {
             setCompletedSessions(completed.slice(0, 5))
           }
         }
-
-        if (
-          userProfile &&
-          (userProfile.stripe_subscription_id || userProfile.stripe_customer_id) &&
-          userProfile.subscription_tier === "free"
-        ) {
-          firebaseUser.getIdToken().then((token) => {
-            fetch("/api/sync-subscription", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ userId: firebaseUser.uid }),
-            })
-              .then((syncResponse) => {
-                if (syncResponse.ok) {
-                  return syncResponse.json()
-                }
-              })
-              .then((syncData) => {
-                if (syncData?.success && syncData.profile.subscription_tier === "pro") {
-                  Promise.all([
-                    getUserProfile(firebaseUser.uid),
-                    checkUsageLimit(firebaseUser.uid),
-                  ]).then(([updatedProfile, updatedUsage]) => {
-                    if (updatedProfile) setProfile(updatedProfile)
-                    setUsage(updatedUsage)
-                  })
-                }
-              })
-              .catch((error) => {
-                console.error("Subscription sync failed:", error)
-                toast.error("Could not sync subscription status. Please refresh the page.")
-              })
-          })
-        }
-      } catch {
-        toast.error("Failed to load dashboard")
+      } catch (error) {
+        console.error("Failed to load dashboard account overview:", error)
+        setAccountError("We couldn't load your plan or session allowance.")
       } finally {
         setDataLoading(false)
       }
@@ -328,6 +291,37 @@ export default function DashboardPage() {
 
   if (!user) {
     return null
+  }
+
+  if (accountError || !profile || !usage) {
+    return (
+      <main className="bg-background min-h-screen">
+        <Header />
+        <section className="mx-auto flex min-h-[calc(100dvh-5rem)] max-w-xl items-center px-4 py-12">
+          <div className="border-border/50 bg-card/50 w-full rounded-2xl border p-6 text-center shadow-sm sm:p-8">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10">
+              <AlertCircle className="h-6 w-6 text-amber-400" aria-hidden="true" />
+            </div>
+            <h1 className="text-foreground text-lg font-semibold">
+              Your dashboard is still loading
+            </h1>
+            <p className="text-muted-foreground mt-2 text-sm">
+              {accountError || "We're confirming your account details."}
+            </p>
+            <Button
+              className="mt-6"
+              onClick={() => {
+                setDataLoading(true)
+                setReloadKey((key) => key + 1)
+              }}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Try again
+            </Button>
+          </div>
+        </section>
+      </main>
+    )
   }
 
   // isPaidTier, not tier === "pro": enterprise is a paid tier and must not be
@@ -388,16 +382,7 @@ export default function DashboardPage() {
           if (takeTour) {
             setShowTour(true)
           }
-          if (firebaseUser) {
-            try {
-              const updatedProfile = await getUserProfile(firebaseUser.uid)
-              if (updatedProfile) {
-                setProfile(updatedProfile)
-              }
-            } catch (error) {
-              console.error("Error reloading profile after onboarding:", error)
-            }
-          }
+          setReloadKey((key) => key + 1)
         }}
       />
 
