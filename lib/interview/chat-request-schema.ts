@@ -5,6 +5,7 @@ import { z } from "zod"
 export const chatRequestSchema = z
   .object({
     message: z.string().max(10000).optional(),
+    responseMode: z.enum(["json", "validated-stream"]).optional(),
     context: z
       .array(
         z.object({

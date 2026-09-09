@@ -11,6 +11,7 @@ import type {
   UserContext,
 } from "@/lib/interview/chat-request-schema"
 import type { InterviewLevel } from "@/lib/rag/knowledge-base/interview-behavior-knowledge"
+import type { InterviewPhase } from "@/lib/interview/interview-phases"
 import { isHarnessError } from "@/lib/workspace-execution/harness-errors"
 import { buildPackStatePrompt } from "@/lib/bugfix/packs/prompt"
 import type { PackState } from "@/lib/bugfix/packs/machine"
@@ -175,12 +176,17 @@ ${patternMeta.interviewerFollowUps
 }
 
 export function buildEdgeCaseContext(
-  edgeCases: Array<{ description: string; input: unknown }> | undefined
+  edgeCases: Array<{ description: string; input: unknown }> | undefined,
+  phase: InterviewPhase
 ): string {
+  if (phase === "intro" || phase === "clarification") {
+    return ""
+  }
+
   return edgeCases && Array.isArray(edgeCases) && edgeCases.length > 0
     ? `
-EDGE CASES YOU MUST ASK ABOUT:
-These are specific edge cases for this problem.You MUST ask about at least ONE before they run tests:
+EDGE CASES TO PROBE (DO NOT ANSWER FOR THE CANDIDATE):
+These are specific edge cases for this problem. You MUST ask about at least ONE before they run tests:
 ${edgeCases
   .slice(0, 4)
   .map(
@@ -190,16 +196,15 @@ ${edgeCases
   .join("\n")}
 
 WHEN TO ASK ABOUT EDGE CASES(BE PROACTIVE):
-    1. AFTER they explain their approach: "Before you code - what happens if the input is empty?"
+    1. AFTER they explain their approach: ask them to identify an edge case
     2. AFTER they write code but BEFORE running tests: "Let's trace through an edge case - what if ${JSON.stringify(edgeCases[0]?.input)}?"
     3. If they don't mention edge cases at all, YOU bring it up: "Have you considered what happens with ${edgeCases[0]?.description}?"
 
 HOW TO ASK(sound natural):
     - "Quick sanity check - what does your code do if the input is ${JSON.stringify(edgeCases[0]?.input)}?"
-      - "Before you run tests, walk me through what happens with an empty array"
-      - "Edge case check: what if there's only one element?"
+    - "Before you run tests, what cases would you use to stress this approach?"
 
-DO NOT skip edge cases - real interviewers always ask about them.If they haven't mentioned any edge case handling, that's a gap you should probe.
+DO NOT skip edge cases, but NEVER enumerate them for the candidate. If they haven't mentioned any edge case handling, that's a gap you should probe.
 `
     : ""
 }

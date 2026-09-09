@@ -22,6 +22,7 @@ export interface ChatEdgeCase {
 
 export interface ChatRequestContext {
   message?: string
+  responseMode?: "json" | "validated-stream"
   context?: Array<{ type: string; message: string }>
   role?: "interviewer" | "partner"
   userContext?: UserContext
@@ -64,6 +65,7 @@ export function buildChatRequestContext(validatedData: ChatRequestData): ChatReq
 
   return {
     message: validatedData.message,
+    responseMode: validatedData.responseMode,
     context: validatedData.context,
     role: validatedData.role,
     userContext: validatedData.userContext as UserContext | undefined,

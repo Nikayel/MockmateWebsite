@@ -317,6 +317,37 @@ describe("/api/chat route", () => {
     expect(enforceChatRateLimit).toHaveBeenCalledWith("user-1", "free")
   })
 
+  it("reveals an interviewer reply as a stream only after the final response is ready", async () => {
+    const { generateAIResponse } = await setupMocks()
+    const { POST } = await import("./route")
+
+    const response = await POST(
+      createRequest({
+        role: "interviewer",
+        responseMode: "validated-stream",
+        message: "Can input be empty?",
+        scenarioTitle: "Two Sum",
+        scenarioType: "dsa",
+        sessionId: "session-1",
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get("content-type")).toContain("application/x-ndjson")
+    expect(generateAIResponse).toHaveBeenCalledTimes(1)
+
+    const events = (await response.text())
+      .trim()
+      .split("\n")
+      .map(
+        (line) => JSON.parse(line) as { type: string; text?: string; response?: { reply: string } }
+      )
+
+    expect(events.map((event) => event.type)).toEqual(["delta", "done"])
+    expect(events[0]?.text).toBe("Mocked assistant reply")
+    expect(events[1]?.response?.reply).toBe("Mocked assistant reply")
+  })
+
   it("charges the request policy once when AI generation fails", async () => {
     const { generateAIResponse, enforceChatRateLimit } = await setupMocks()
     const { POST } = await import("./route")

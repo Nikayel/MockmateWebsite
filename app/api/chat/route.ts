@@ -68,6 +68,7 @@ import {
 } from "@/lib/interview/chat/context-builders"
 import { buildChatRequestContext } from "@/lib/interview/chat/request-context"
 import { buildChatPromptFlow } from "@/lib/interview/chat/prompt-flow"
+import { createValidatedChatStream } from "@/lib/interview/chat/validated-response-stream"
 
 type ConversationTrackerWithExtraction = ConversationTracker & {
   lastExtractionAt?: number
@@ -176,6 +177,7 @@ export async function POST(request: NextRequest) {
     const requestContext = buildChatRequestContext(parseResult.data)
     const {
       message,
+      responseMode,
       context,
       role,
       userContext,
@@ -295,9 +297,6 @@ export async function POST(request: NextRequest) {
     // Get pattern-specific metadata for DSA problems
     const { patternMeta, patternContext } = buildPatternPromptContext(scenarioPattern)
 
-    // Build edge case context for interviewer to ask about specific scenarios
-    const edgeCaseContext = buildEdgeCaseContext(edgeCases)
-
     // Build console/test results context for interviewer awareness
     // TestResultItem and ConsoleLogItem interfaces defined at module level
     const testResultsArray = testResults
@@ -371,6 +370,11 @@ export async function POST(request: NextRequest) {
       messageCount,
       approachExplained: phaseContext.approachExplained,
     })
+
+    // Evaluation cases are useful once the candidate is discussing an approach,
+    // but exposing them while they are still clarifying turns grounding into an
+    // answer key. The builder owns that phase boundary.
+    const edgeCaseContext = buildEdgeCaseContext(edgeCases, currentPhase)
 
     // Build conversation tracking context if available
     // Use enhanced tracker (with LLM extraction) if available
@@ -903,7 +907,7 @@ Generate a compliant response NOW:`
 
     runConversationExtractionAfterResponse(extractionJob)
 
-    return NextResponse.json({
+    const finalizedResponse = {
       reply: aiResponse.text,
       provider: aiResponse.provider, // Include provider for debugging
       latencyMs: aiResponse.latencyMs,
@@ -916,7 +920,11 @@ Generate a compliant response NOW:`
         starterCodeLength: starterLen,
         codeWritten: currentCodeLen - starterLen,
       },
-    })
+    }
+
+    return responseMode === "validated-stream" && role === "interviewer"
+      ? createValidatedChatStream(finalizedResponse)
+      : NextResponse.json(finalizedResponse)
   } catch (error: unknown) {
     logger.error("Chat API error", {
       error,

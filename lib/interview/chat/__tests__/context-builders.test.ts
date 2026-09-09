@@ -3,6 +3,7 @@ import { MAX_FILE_SIZE } from "@/lib/interview/context-window"
 import {
   buildConsoleContext,
   buildCurrentCodeContext,
+  buildEdgeCaseContext,
   buildEnvironmentContext,
   buildProviderHistory,
   buildScenarioId,
@@ -125,6 +126,39 @@ describe("chat context builders", () => {
   it("derives stable dsa scenario ids from titles", () => {
     expect(buildScenarioId("Two Sum!")).toBe("dsa-two-sum")
     expect(buildScenarioId(undefined)).toBeUndefined()
+  })
+
+  it("withholds evaluation edge cases during clarification", () => {
+    const edgeCases = [
+      {
+        description: "fully contained intervals",
+        input: [
+          [1, 4],
+          [2, 3],
+        ],
+      },
+    ]
+
+    expect(buildEdgeCaseContext(edgeCases, "clarification")).toBe("")
+    expect(buildEdgeCaseContext(edgeCases, "discussion")).toContain("fully contained intervals")
+  })
+
+  it("does not invent generic empty or single-input cases", () => {
+    const result = buildEdgeCaseContext(
+      [
+        {
+          description: "touching intervals",
+          input: [
+            [1, 2],
+            [2, 3],
+          ],
+        },
+      ],
+      "discussion"
+    )
+
+    expect(result).not.toContain("empty")
+    expect(result).not.toContain("only one")
   })
 })
 

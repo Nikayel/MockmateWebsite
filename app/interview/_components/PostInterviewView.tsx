@@ -18,9 +18,8 @@ import {
   MessageSquare,
 } from "lucide-react"
 import { FormattedText } from "@/components/ui/FormattedText"
-import { Sparra } from "@/components/brand/Sparra"
-import { AnimatedEllipsis } from "@/components/brand/AnimatedEllipsis"
 import nextDynamic from "next/dynamic"
+import { SableWaitStatus } from "./SableWaitStatus"
 
 const VoiceModeToggle = nextDynamic(
   () => import("@/components/interview").then((mod) => ({ default: mod.VoiceModeToggle })),
@@ -107,8 +106,10 @@ function useSmartScroll(dependencies: unknown[]) {
 }
 
 interface ChatMessage {
+  id?: string
   type: "user" | "ai"
   message: string
+  isStreaming?: boolean
 }
 
 interface TestResult {
@@ -191,6 +192,7 @@ export function PostInterviewView({
     scrollToBottom,
     handleScroll,
   } = useSmartScroll([interviewerMessages, isLoadingInterviewer, isGeneratingDiscussion])
+  const isRevealingReply = interviewerMessages.at(-1)?.isStreaming === true
 
   // Auto-scroll when AI starts responding
   useEffect(() => {
@@ -389,7 +391,7 @@ export function PostInterviewView({
                 >
                   {interviewerMessages.map((msg, index) => (
                     <div
-                      key={`msg-${msg.type}-${index}`}
+                      key={msg.id || `msg-${msg.type}-${index}`}
                       className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
                     >
                       {/* Message bubble: max-w-[85%] on mobile for space efficiency,
@@ -407,23 +409,27 @@ export function PostInterviewView({
                             {msg.type === "user" ? "You" : "Interviewer"}
                           </span>
                         </div>
-                        <FormattedText className="text-[13px] leading-relaxed sm:text-sm">
-                          {msg.message}
-                        </FormattedText>
+                        {msg.isStreaming ? (
+                          <p className="text-[13px] leading-relaxed sm:text-sm">
+                            {msg.message}
+                            <span
+                              className="bg-accent ml-1 inline-block h-3 w-1 animate-pulse"
+                              aria-hidden="true"
+                            />
+                          </p>
+                        ) : (
+                          <FormattedText className="text-[13px] leading-relaxed sm:text-sm">
+                            {msg.message}
+                          </FormattedText>
+                        )}
                       </div>
                     </div>
                   ))}
                   {/* Typing Indicator */}
-                  {(isLoadingInterviewer || isGeneratingDiscussion) && (
+                  {(isLoadingInterviewer || isGeneratingDiscussion) && !isRevealingReply && (
                     <div className="flex justify-start">
                       <div className="bg-muted rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <Sparra state="thinking" size={20} />
-                          <span className="text-muted-foreground text-xs">
-                            CodeSparring AI is thinking
-                            <AnimatedEllipsis />
-                          </span>
-                        </div>
+                        <SableWaitStatus />
                       </div>
                     </div>
                   )}

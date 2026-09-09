@@ -13,6 +13,8 @@ describe("buildPreLLMInterviewerPolicy", () => {
     })
 
     expect(policy.rules.join(" ")).toContain("do not ask about approach")
+    expect(policy.rules.join(" ")).toContain("one specifically named requirement")
+    expect(policy.rules.join(" ")).toContain("ask the candidate to identify them")
     expect(policy.requiredAction).toContain("reading/clarification")
   })
 
@@ -83,5 +85,11 @@ describe("buildPreLLMInterviewerPolicy", () => {
 
   it("formats an empty policy as empty text", () => {
     expect(formatPreLLMInterviewerPolicy({ rules: [] })).toBe("")
+  })
+
+  it("describes generated policy text as guidance rather than hard enforcement", () => {
+    expect(formatPreLLMInterviewerPolicy({ rules: ["Stay in phase."] })).toContain(
+      "SERVER-COMPUTED INTERVIEW GUIDANCE"
+    )
   })
 })

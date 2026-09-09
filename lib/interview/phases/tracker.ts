@@ -1,5 +1,6 @@
 import {
   extractComplexityFromText,
+  extractCandidateEdgeCases,
   extractEdgeCases,
   normalizeComplexity,
 } from "../shared-patterns"
@@ -111,7 +112,10 @@ export function updateTrackerFromMessage(
       updated.complexityExplanationGiven = true
     }
 
-    const mentionedEdgeCases = extractEdgeCases(message)
+    // Generic phrases such as "any edge cases?" are not evidence. Only record
+    // concrete conditions the candidate actually named; semantic extraction can
+    // enrich this conservative client-side signal on a later turn.
+    const mentionedEdgeCases = extractCandidateEdgeCases(message)
     mentionedEdgeCases.forEach((keyword) => {
       if (!updated.edgeCasesMentioned.includes(keyword)) {
         updated.edgeCasesMentioned.push(keyword)

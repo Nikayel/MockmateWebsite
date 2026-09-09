@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react"
+import { useRef } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -20,6 +20,10 @@ import { trackEvent } from "@/lib/analytics"
 import { reportFunnelEvent } from "@/lib/metrics/funnel-client"
 import { computeElapsedSeconds } from "./useInterviewTimer"
 import { getGuidedChatState } from "@/lib/stores/guided-lab-store"
+import {
+  readValidatedChatStream,
+  VALIDATED_CHAT_STREAM_CONTENT_TYPE,
+} from "@/lib/interview/chat/validated-response-stream"
 import type { Scenario } from "@/lib/scenarios"
 import type { BugfixEvidenceEvent } from "@/lib/bugfix"
 import type { ChatMessage } from "../_types"
@@ -42,6 +46,18 @@ interface VoiceController {
 interface ChatUserProfile {
   full_name?: string
   subscription_tier?: string
+}
+
+interface ChatApiResponse {
+  reply?: string | null
+  provider?: string
+  latencyMs?: number
+  _debug?: Record<string, unknown>
+  conversationEnded?: boolean
+  endMessage?: string
+  code?: unknown
+  error?: unknown
+  message?: unknown
 }
 
 export interface UseInterviewChatOptions {
@@ -303,6 +319,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
     const userMessage = input.trim()
 
     if (userMessage) {
+      let streamingResponseId: string | null = null
       // One send at a time per lane. The UI disables the composer while a reply is pending,
       // but the voice path does not go through the UI: onUtteranceEnd calls handleAutoSend,
       // which calls straight in here past every `disabled` attribute. Two concurrent
@@ -483,6 +500,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             message: userMessage + additionalContext,
             context: messages,
             role: isInterviewer ? "interviewer" : "partner",
+            responseMode: isInterviewer ? "validated-stream" : "json",
             // Stamps every chat turn's usage_events row with the interview
             // session, so the admin per-session cost rows include chat spend.
             // Without it the monthly total accumulated while every session
@@ -519,8 +537,8 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
           }),
         })
 
-        const data = await response.json()
         if (!response.ok) {
+          const data = (await response.json().catch(() => null)) as ChatApiResponse | null
           console.warn("[API] Request failed:", response.status, response.url, data)
           // Deliberately NOT appended to the transcript. The raw error body used to be
           // pushed in as a `type: "ai"` message, which made the interviewer appear to say
@@ -530,6 +548,57 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
           // the interview.
           reportSendFailure(response.status, data, newUserMessage)
           return
+        }
+
+        let data: ChatApiResponse
+        let replyAlreadyRendered = false
+        if (
+          isInterviewer &&
+          response.headers.get("content-type")?.includes(VALIDATED_CHAT_STREAM_CONTENT_TYPE)
+        ) {
+          let revealedReply = ""
+          let hasStartedRevealing = false
+          streamingResponseId = `interviewer-stream-${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+          const streamResponse = await readValidatedChatStream(response, (delta) => {
+            revealedReply += delta
+
+            if (!hasStartedRevealing) {
+              hasStartedRevealing = true
+              setMessages((previous) => [
+                ...previous,
+                {
+                  id: streamingResponseId!,
+                  type: "ai",
+                  message: revealedReply,
+                  isStreaming: true,
+                },
+              ])
+              return
+            }
+
+            setMessages((previous) =>
+              previous.map((chatMessage) =>
+                chatMessage.id === streamingResponseId
+                  ? { ...chatMessage, message: revealedReply }
+                  : chatMessage
+              )
+            )
+          })
+
+          data = streamResponse
+          if (hasStartedRevealing) {
+            setMessages((previous) =>
+              previous.map((chatMessage) =>
+                chatMessage.id === streamingResponseId
+                  ? { ...chatMessage, message: streamResponse.reply, isStreaming: false }
+                  : chatMessage
+              )
+            )
+            replyAlreadyRendered = true
+          }
+        } else {
+          data = (await response.json()) as ChatApiResponse
         }
 
         // The model has now seen this code state; diff future sends against it.
@@ -558,12 +627,15 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
           return
         }
 
-        if (data.reply) {
-          setMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+        const reply = data.reply
+        if (reply) {
+          if (!replyAlreadyRendered) {
+            setMessages((prev) => [...prev, { type: "ai", message: reply }])
+          }
 
           // Track topics from interviewer messages to avoid repetitive questions
           if (isInterviewer) {
-            const newTopics = extractTopicsFromMessage(data.reply)
+            const newTopics = extractTopicsFromMessage(reply)
             if (newTopics.length > 0) {
               setRecentNudgeTopics((prev) => {
                 const updated = [...prev, ...newTopics]
@@ -572,7 +644,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
               })
             }
             // Track interviewer response for conversation context (phase tracking)
-            updateTrackerOnMessage(data.reply, "interviewer")
+            updateTrackerOnMessage(reply, "interviewer")
           }
 
           // Track AI response for scoring (fire-and-forget)
@@ -582,33 +654,12 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
               .then((token) => {
                 trackAIMessage(
                   currentSessionId,
-                  data.reply,
+                  reply,
                   isInterviewer ? "interviewer" : "partner",
                   token
                 )
               })
               .catch(() => {}) // Silently ignore tracking errors
-          }
-
-          // Check if this is the final farewell response
-          if (data.conversationEnded === true) {
-            // Show prompt to end session after the final message
-            setTimeout(() => {
-              toast.info(
-                "Click 'See Full Interview Score' to see your score breakdown and analysis.",
-                {
-                  id: SESSION_COMPLETE_TOAST_ID,
-                  duration: 8000,
-                  action: {
-                    label: "See Full Interview Score",
-                    onClick: () => {
-                      toast.dismiss(SESSION_COMPLETE_TOAST_ID)
-                      proceedToFinalFeedback()
-                    },
-                  },
-                }
-              )
-            }, 1500) // Wait for message to appear first
           }
 
           // For system design interviews, store design notes when session ends
@@ -639,6 +690,11 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
         }
       } catch (error) {
         console.error("Chat error:", error)
+        if (streamingResponseId) {
+          setMessages((previous) =>
+            previous.filter((chatMessage) => chatMessage.id !== streamingResponseId)
+          )
+        }
         // Status 0 means the request never got an answer at all. buildChatErrorToast treats
         // that as retryable, which is right: a dropped connection usually is.
         reportSendFailure(0, null, newUserMessage)
@@ -650,28 +706,25 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
   }
 
   // Auto-send handler for voice input - called when user pauses speaking
-  const handleAutoSend = useCallback(
-    async (isInterviewer: boolean, transcript: string) => {
-      const setInput = isInterviewer ? setInterviewerInput : setChatInput
-      // Only the interviewer panel records, so only it can auto-send from voice.
-      const voice = isInterviewer ? interviewerVoice : null
+  const handleAutoSend = async (isInterviewer: boolean, transcript: string) => {
+    const setInput = isInterviewer ? setInterviewerInput : setChatInput
+    // Only the interviewer panel records, so only it can auto-send from voice.
+    const voice = isInterviewer ? interviewerVoice : null
 
-      // Update input with final transcript
-      const userMessage = transcript.trim()
-      if (!userMessage) return
+    // Update input with final transcript
+    const userMessage = transcript.trim()
+    if (!userMessage) return
 
-      setInput(userMessage)
+    setInput(userMessage)
 
-      // Stop recording
-      if (voice?.isRecording) {
-        voice.stopRecording()
-      }
+    // Stop recording
+    if (voice?.isRecording) {
+      voice.stopRecording()
+    }
 
-      // Send the message
-      await handleSendMessage(isInterviewer, userMessage)
-    },
-    [interviewerVoice, handleSendMessage]
-  )
+    // Send the message
+    await handleSendMessage(isInterviewer, userMessage)
+  }
 
   return { handleSendMessage, handleAutoSend }
 }

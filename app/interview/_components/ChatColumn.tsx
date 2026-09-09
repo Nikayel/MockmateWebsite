@@ -2,14 +2,13 @@
 
 import { memo, type RefObject } from "react"
 import { MessageSquare, PanelRightClose, Send } from "lucide-react"
-import { Sparra } from "@/components/brand/Sparra"
-import { AnimatedEllipsis } from "@/components/brand/AnimatedEllipsis"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { VoiceModeToggle } from "@/components/interview"
-import type { ChatMessage } from "@/lib/stores"
+import type { ChatMessage } from "../_types"
+import { SableWaitStatus } from "./SableWaitStatus"
 
 interface ChatColumnProps {
   focusMode: boolean
@@ -56,6 +55,7 @@ export const ChatColumn = memo(function ChatColumn({
   onToggleCollapse,
 }: ChatColumnProps) {
   const isBusy = isLoadingInterviewer || isGeneratingDiscussion
+  const isRevealingReply = interviewerMessages.at(-1)?.isStreaming === true
 
   return (
     <Card
@@ -128,7 +128,7 @@ export const ChatColumn = memo(function ChatColumn({
             <>
               {interviewerMessages.map((msg, index) => (
                 <div
-                  key={`interviewer-${msg.type}-${index}`}
+                  key={msg.id || `interviewer-${msg.type}-${index}`}
                   className={`animate-in slide-in-from-bottom-2 flex duration-300 ${
                     msg.type === "user" ? "justify-end" : "justify-start"
                   }`}
@@ -140,20 +140,24 @@ export const ChatColumn = memo(function ChatColumn({
                         : "border-accent/20 bg-accent/10 text-foreground rounded-[14px_14px_14px_4px] border"
                     }`}
                   >
-                    <MarkdownRenderer content={msg.message} className="text-xs leading-relaxed" />
+                    {msg.isStreaming ? (
+                      <p className="text-xs leading-relaxed">
+                        {msg.message}
+                        <span
+                          className="bg-accent ml-1 inline-block h-3 w-1 animate-pulse"
+                          aria-hidden="true"
+                        />
+                      </p>
+                    ) : (
+                      <MarkdownRenderer content={msg.message} className="text-xs leading-relaxed" />
+                    )}
                   </div>
                 </div>
               ))}
-              {isBusy && (
+              {isBusy && !isRevealingReply && (
                 <div className="flex justify-start">
                   <div className="border-border/50 bg-muted/50 text-muted-foreground max-w-[90%] rounded-lg border p-2">
-                    <div className="flex items-center gap-2">
-                      <Sparra state="thinking" size={20} />
-                      <span className="text-xs">
-                        CodeSparring AI is thinking
-                        <AnimatedEllipsis />
-                      </span>
-                    </div>
+                    <SableWaitStatus />
                   </div>
                 </div>
               )}

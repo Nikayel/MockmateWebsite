@@ -24,8 +24,11 @@ export type WorkspaceContextFile = {
 }
 
 export type ChatMessage = {
+  id?: string
   type: "user" | "ai"
   message: string
+  /** A validated interviewer reply that is still being revealed to the candidate. */
+  isStreaming?: boolean
   timestamp?: number
   phase?: "post_interview"
 }

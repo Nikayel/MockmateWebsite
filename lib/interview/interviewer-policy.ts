@@ -1,9 +1,9 @@
 /**
- * Pre-LLM interviewer policy.
+ * Server-computed interviewer guidance injected before generation.
  *
- * These rules are state-machine constraints, so the server decides them before
- * the model generates wording. Post-generation guardrails still validate the
- * final text for phrasing/content violations.
+ * The server decides which guidance applies from interview state. The model
+ * still generates the response, so these are not deterministic enforcement;
+ * post-generation guardrails remain responsible for validation.
  */
 
 import type { ConversationTracker, InterviewPhase } from "./interview-phases"
@@ -79,7 +79,7 @@ export function buildPreLLMInterviewerPolicy(ctx: PreLLMPolicyContext): PreLLMIn
   if (ctx.phase === "clarification") {
     rules.push(
       "Clarification phase: do not ask about approach, plan, thinking, optimization, or coding.",
-      "Allowed clarification behavior: answer clarifying questions briefly, give the candidate time to read, or ask if they have questions about the problem."
+      "Answer one specifically named requirement using supplied facts. For broad discovery requests such as asking for all edge cases, ask the candidate to identify them instead of listing them."
     )
     requiredAction =
       "Stay in reading/clarification mode unless the candidate themselves brings up an approach."
@@ -139,7 +139,7 @@ export function formatPreLLMInterviewerPolicy(policy: PreLLMInterviewerPolicy): 
   const action = policy.requiredAction ? `\nREQUIRED NEXT ACTION:\n${policy.requiredAction}` : ""
 
   return `
-=== SERVER-ENFORCED INTERVIEW POLICY ===
+=== SERVER-COMPUTED INTERVIEW GUIDANCE ===
 These constraints were computed from interview state before this model call.
 Follow them over any more general phase guidance.
 ${rules}

@@ -296,7 +296,7 @@ function executeGetInterviewPhase(ctx: ToolContext): ToolResult {
   }
 }
 
-function executeAnalyzeUserResponse(userMessage: string, ctx: ToolContext): ToolResult {
+function executeAnalyzeUserResponse(userMessage: string, _ctx: ToolContext): ToolResult {
   const lower = userMessage.toLowerCase()
   const length = userMessage.length
 
@@ -332,7 +332,7 @@ function executeAnalyzeUserResponse(userMessage: string, ctx: ToolContext): Tool
       instruction: isVague
         ? "User gave a vague answer. Probe for specifics: 'How exactly would you do that?'"
         : isQuestion
-        ? "User asked a question. Answer it briefly, then redirect to the interview."
+        ? "Use the requirement-disclosure policy: answer one specifically named requirement, but ask the candidate to do broad discovery work."
         : "User gave a substantive response. Acknowledge and continue."
     }
   }

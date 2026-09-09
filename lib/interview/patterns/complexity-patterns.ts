@@ -351,6 +351,17 @@ export function extractEdgeCases(text: string): string[] {
   return EDGE_CASE_KEYWORDS.filter((keyword) => lower.includes(keyword))
 }
 
+const EDGE_CASE_CATEGORY_TERMS = new Set(["edge case", "corner case", "what if"])
+
+/**
+ * Conservative candidate evidence for interview state. Naming the category is
+ * not the same as identifying a case; concrete conditions such as empty input,
+ * duplicates, or a boundary are.
+ */
+export function extractCandidateEdgeCases(text: string): string[] {
+  return extractEdgeCases(text).filter((keyword) => !EDGE_CASE_CATEGORY_TERMS.has(keyword))
+}
+
 // =============================================================================
 // CODING TRANSITION PATTERNS
 // =============================================================================

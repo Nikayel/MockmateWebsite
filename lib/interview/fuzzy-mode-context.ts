@@ -25,9 +25,8 @@ export function buildFuzzyModeContext(
     return ""
   }
 
-  // Group by required vs optional
+  // Count the aspects the candidate is expected to clarify.
   const required = clarifyingQuestions.filter((q) => q.required)
-  const optional = clarifyingQuestions.filter((q) => !q.required)
 
   // Build vague aspects from clarifying questions (derive, don't duplicate!)
   const vagueAspects = clarifyingQuestions
@@ -44,11 +43,11 @@ ASPECTS THAT ARE INTENTIONALLY VAGUE (${required.length} required to clarify):
 ${vagueAspects}
 
 YOUR ROLE:
-1. When candidate asks about any of these aspects, answer naturally using the context above
-2. DO NOT volunteer this information - wait for them to ask
+1. When the candidate asks about ONE NAMED aspect, answer only that fact using the context above
+2. DO NOT volunteer neighboring facts or enumerate this list
 3. If they start coding without clarifying required aspects, note it internally but let them proceed
 4. Adapt your answer to how they phrase the question - match their terminology
-5. Be encouraging when they ask good questions - it's a positive signal
+5. A broad request for "the edge cases," "all constraints," or "tests to handle" does not authorize disclosure; ask the candidate to identify them
 
 CRITICAL - GIVE SPACE FOR CLARIFYING QUESTIONS:
 - After they ask one clarifying question, don't immediately push to "what's your approach?"
@@ -72,7 +71,6 @@ After clarifying questions are done, follow this sequence BEFORE saying "code it
 
 3. EDGE CASES (required):
    - "What edge cases should we consider?"
-   - "What happens if the input is empty?"
    - Let them think through corner cases
 
 4. ONLY THEN: "Alright, go ahead and code it up"
