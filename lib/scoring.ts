@@ -119,6 +119,16 @@ const WEIGHTS = {
   communication: SCORING.PERFORMANCE_WEIGHTS.COMMUNICATION, // 30%
 }
 
+/**
+ * Scoring inputs normally come from typed session metrics, but restored sessions
+ * and fallback paths can still supply missing or non-finite values at runtime.
+ * Keep that bad input from escaping as NaN, which JSON serializes as null.
+ */
+function finiteScore(value: number, fallback = 0): number {
+  if (!Number.isFinite(value)) return fallback
+  return Math.min(100, Math.max(0, Math.round(value)))
+}
+
 // =============================================================================
 // MAIN SCORING FUNCTION
 // =============================================================================
@@ -139,14 +149,11 @@ export function calculateUserScore(metrics: InteractionMetrics): ScoreBreakdown 
     metrics.testCasesTotal > 0 ? (metrics.testCasesPassed / metrics.testCasesTotal) * 100 : 0
 
   // Weighted components
-  const codeQualityScore = Math.min(
-    100,
-    Math.round(
-      testPassRate * 0.5 + // 50% - Tests must pass
-        (metrics.codeEfficiencyScore || 50) * 0.25 + // 25% - Efficiency matters
-        (metrics.codeReadability || 50) * 0.15 + // 15% - Readable code
-        (metrics.codeQualityScore || 50) * 0.1 // 10% - General quality
-    )
+  const codeQualityScore = finiteScore(
+    testPassRate * 0.5 + // 50% - Tests must pass
+      (metrics.codeEfficiencyScore || 50) * 0.25 + // 25% - Efficiency matters
+      (metrics.codeReadability || 50) * 0.15 + // 15% - Readable code
+      (metrics.codeQualityScore || 50) * 0.1 // 10% - General quality
   )
 
   // 2. PROBLEM-SOLVING SCORE (25%)
@@ -186,7 +193,7 @@ export function calculateUserScore(metrics: InteractionMetrics): ScoreBreakdown 
     if (metrics.workspaceContextUsed) problemSolvingScore += 20
   }
 
-  problemSolvingScore = Math.min(100, Math.round(problemSolvingScore))
+  problemSolvingScore = finiteScore(problemSolvingScore)
 
   // 3. UNDERSTANDING SCORE (25%)
   // Can you explain what you wrote? This is what real interviewers care about.
@@ -214,7 +221,7 @@ export function calculateUserScore(metrics: InteractionMetrics): ScoreBreakdown 
     }
   }
 
-  understandingScore = Math.min(100, Math.max(0, Math.round(understandingScore)))
+  understandingScore = finiteScore(understandingScore)
 
   // 4. COMMUNICATION SCORE (30%)
   // Did you share your thinking? Real interviews require this.
@@ -236,7 +243,7 @@ export function calculateUserScore(metrics: InteractionMetrics): ScoreBreakdown 
     communicationScore += 10
   }
 
-  communicationScore = Math.min(100, Math.round(communicationScore))
+  communicationScore = finiteScore(communicationScore)
 
   // 5. AI COLLABORATION INDICATOR (informational only)
   // This is NOT heavily weighted - just an indicator of AI usage quality
@@ -255,9 +262,10 @@ export function calculateUserScore(metrics: InteractionMetrics): ScoreBreakdown 
         15 // Base points for even trying
     )
   }
+  aiCollaborationIndicator = finiteScore(aiCollaborationIndicator, 50)
 
   // Calculate final weighted score
-  const overallScore = Math.round(
+  const overallScore = finiteScore(
     codeQualityScore * WEIGHTS.codeQuality +
       problemSolvingScore * WEIGHTS.problemSolving +
       understandingScore * WEIGHTS.understanding +
@@ -270,7 +278,7 @@ export function calculateUserScore(metrics: InteractionMetrics): ScoreBreakdown 
     understandingScore,
     communicationScore,
     aiCollaborationIndicator,
-    overallScore: Math.min(100, Math.max(0, overallScore)),
+    overallScore,
   }
 }
 

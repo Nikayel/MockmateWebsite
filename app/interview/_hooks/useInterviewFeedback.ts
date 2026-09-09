@@ -11,6 +11,7 @@ import type { Scenario } from "@/lib/scenarios"
 import type { ConversationTracker } from "@/lib/interview/interview-phases"
 import type { useStreamingFeedback } from "@/lib/hooks/use-streaming-feedback"
 import type { BugfixEvidenceEvent } from "@/lib/bugfix"
+import type { FeedbackFallbackRequest } from "./useFeedbackStreaming"
 import type {
   ChatMessage,
   ConsoleLogEntry,
@@ -88,8 +89,8 @@ export interface UseInterviewFeedbackOptions {
   addActualTime: (minutes: number) => void
 
   // Streaming-feedback plumbing (injected from useFeedbackStreaming)
-  applyFallbackFeedback: (request: any) => Promise<void>
-  lastFeedbackRequestRef: React.MutableRefObject<any>
+  applyFallbackFeedback: (request: FeedbackFallbackRequest) => Promise<void>
+  lastFeedbackRequestRef: React.MutableRefObject<FeedbackFallbackRequest | null>
 }
 
 export interface UseInterviewFeedbackResult {
@@ -216,32 +217,9 @@ export function useInterviewFeedback(
 
       const feedbackText = `Completed ${opts.selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
       let calculatedPerformanceScore = testSummary.passRate
-      const localTechnicalScore: number | undefined = undefined
-      let scoreBreakdownData: {
-        understanding?: number
-        problemSolving?: number
-        codeQuality?: number
-        communication?: number
-      } | null = null
-      let aiFeedbackSucceeded = false
-      const localConstitutionalAICritique: Record<string, unknown> | null = null
-      const localClarifyingQuestionsAssessment: {
-        score: number
-        totalExpected: number
-        totalAsked: number
-        requiredAsked: number
-        requiredTotal: number
-        results: Array<{
-          question: string
-          required: boolean
-          asked: boolean
-          matchedPhrase?: string
-        }>
-      } | null = null
-
       const efficiencyData = analyzeCodeEfficiency(
         opts.code,
-        (opts.selectedScenario as any)?.optimalComplexity
+        opts.selectedScenario.type === "dsa" ? opts.selectedScenario.optimalComplexity : undefined
       )
 
       // Guests build the same feedback request as signed-in users but never
@@ -304,7 +282,8 @@ export function useInterviewFeedback(
             scenarioTitle: opts.selectedScenario?.title,
             scenarioId: opts.selectedScenario?.id,
             scenarioDifficulty: opts.selectedScenario?.difficulty,
-            scenarioPattern: (opts.selectedScenario as any)?.pattern,
+            scenarioPattern:
+              opts.selectedScenario.type === "dsa" ? opts.selectedScenario.pattern : undefined,
             conversationTranscript,
             partnerMessages: opts.chatMessages.filter((m) => m.type === "ai").map((m) => m.message),
             phaseTracking,
@@ -332,14 +311,7 @@ export function useInterviewFeedback(
             opts.streamingFeedback.startStreaming({ ...feedbackRequest, userId: opts.user.id })
 
             // Set initial values while streaming
-            aiFeedbackSucceeded = true
             calculatedPerformanceScore = testSummary.passRate // Will be updated by stream
-            scoreBreakdownData = {
-              understanding: 50,
-              problemSolving: 50,
-              codeQuality: 50,
-              communication: 50,
-            }
           }
         } catch (feedbackError) {
           console.error("Error generating feedback:", feedbackError)
@@ -377,8 +349,6 @@ export function useInterviewFeedback(
             timeComplexity: efficiencyData?.estimatedTimeComplexity,
             spaceComplexity: efficiencyData?.estimatedSpaceComplexity,
             efficiencyScore: efficiencyData?.efficiencyScore,
-            // Mark as processing - persist endpoint will update to "complete"
-            feedbackStatus: "processing",
             bugfixEvidenceEvents: bugfixEvidencePayload,
           })
 

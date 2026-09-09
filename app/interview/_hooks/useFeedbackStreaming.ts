@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import { toast } from "sonner"
-import { computeFallbackScores } from "@/lib/interview/fallback-feedback"
+import {
+  computeFallbackScores,
+  type FallbackFeedbackRequest,
+} from "@/lib/interview/fallback-feedback"
 import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import type { useStreamingFeedback } from "@/lib/hooks/use-streaming-feedback"
 
@@ -37,8 +40,42 @@ export interface UseFeedbackStreamingOptions {
 }
 
 export interface UseFeedbackStreamingResult {
-  applyFallbackFeedback: (request: any) => Promise<void>
-  lastFeedbackRequestRef: React.MutableRefObject<any>
+  applyFallbackFeedback: (request: FeedbackFallbackRequest) => Promise<void>
+  lastFeedbackRequestRef: React.MutableRefObject<FeedbackFallbackRequest | null>
+}
+
+export interface FeedbackFallbackRequest extends FallbackFeedbackRequest {
+  sessionId: string
+  userId: string | null
+  scenarioTitle?: string
+  scenarioId?: string
+  scenarioPattern?: string
+}
+
+async function reportFallbackFailure(
+  request: FeedbackFallbackRequest,
+  errorMessage: string
+): Promise<void> {
+  if (!request.userId) return
+  const idToken = await getCurrentUserToken()
+  if (!idToken) return
+
+  const response = await fetch("/api/feedback/persist", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify({
+      outcome: "failed",
+      sessionId: request.sessionId,
+      userId: request.userId,
+      errorMessage,
+    }),
+  })
+  if (!response.ok) {
+    throw new Error(`Failure report was rejected with status ${response.status}`)
+  }
 }
 
 /**
@@ -54,30 +91,44 @@ export interface UseFeedbackStreamingResult {
 export function useFeedbackStreaming(
   opts: UseFeedbackStreamingOptions
 ): UseFeedbackStreamingResult {
+  const {
+    currentSessionId,
+    streamingFeedback,
+    setScoreBreakdown,
+    setPerformanceScore,
+    setTechnicalScore,
+    setComprehensiveFeedback,
+    setStructuredFeedback,
+    setIsGeneratingFeedback,
+  } = opts
+
   // Track the last feedback request for fallback scoring if streaming fails
-  const lastFeedbackRequestRef = useRef<any>(null)
+  const lastFeedbackRequestRef = useRef<FeedbackFallbackRequest | null>(null)
 
   // Track if we've already shown completion toast to prevent duplicates
   const feedbackCompletionToastShown = useRef(false)
 
   const applyFallbackFeedback = useCallback(
-    async (request: any) => {
+    async (request: FeedbackFallbackRequest) => {
       try {
         const { scoreBreakdown: mappedBreakdown, performanceScore } = computeFallbackScores(request)
 
-        opts.setScoreBreakdown(mappedBreakdown)
-        opts.setPerformanceScore(performanceScore)
+        setScoreBreakdown(mappedBreakdown)
+        setPerformanceScore(performanceScore)
 
         const fallbackText =
           "Automated scoring applied. Detailed AI feedback is unavailable due to a service error."
-        opts.setComprehensiveFeedback(fallbackText)
+        setComprehensiveFeedback(fallbackText)
 
-        if (opts.currentSessionId) {
+        if (currentSessionId) {
           const idToken = await getCurrentUserToken()
           if (!idToken) {
             throw new Error("You must be signed in to save feedback.")
           }
-          await fetch("/api/feedback/persist", {
+          if (!request.userId) {
+            throw new Error("A signed-in user is required to save fallback feedback.")
+          }
+          const response = await fetch("/api/feedback/persist", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -115,16 +166,30 @@ export function useFeedbackStreaming(
               source: "fallback",
             }),
           })
+          if (!response.ok) {
+            throw new Error(`Fallback persist was rejected with status ${response.status}`)
+          }
         }
       } catch (e) {
         console.error("Fallback logic failed", e)
+        try {
+          await reportFallbackFailure(
+            request,
+            e instanceof Error ? e.message.slice(0, 500) : "Fallback feedback failed"
+          )
+        } catch (reportError) {
+          console.error("Fallback failure report failed", reportError)
+        }
+        toast.warning("Your automated score could not be saved", {
+          description: "Your interview is saved. Open it from History to retry feedback.",
+        })
       }
     },
-    [opts.currentSessionId]
+    [currentSessionId, setComprehensiveFeedback, setPerformanceScore, setScoreBreakdown]
   )
 
   useEffect(() => {
-    const feedbackState = opts.streamingFeedback.state
+    const feedbackState = streamingFeedback.state
 
     // IMPORTANT: Only update scores/feedback when fully persisted to avoid showing partial data
     // During streaming, we just track progress via the phase message
@@ -135,23 +200,23 @@ export function useFeedbackStreaming(
       // Use the final scores from the feedback (which includes refined scores)
       const finalScores = feedbackState.feedback.scores
       if (finalScores) {
-        opts.setScoreBreakdown({
+        setScoreBreakdown({
           understandingScore: finalScores.understanding,
           problemSolvingScore: finalScores.problemSolving,
           codeQualityScore: finalScores.codeQuality,
           communicationScore: finalScores.communication,
         })
-        opts.setPerformanceScore(finalScores.overall)
+        setPerformanceScore(finalScores.overall)
       }
 
       // Use mastery/technical scores from persist endpoint (properly calculated)
       if (feedbackState.technicalScore !== null) {
-        opts.setTechnicalScore(feedbackState.technicalScore)
+        setTechnicalScore(feedbackState.technicalScore)
       }
 
       // Update feedback content
-      opts.setComprehensiveFeedback(feedbackState.feedback.raw || "")
-      opts.setStructuredFeedback({
+      setComprehensiveFeedback(feedbackState.feedback.raw || "")
+      setStructuredFeedback({
         whatWorked: feedbackState.feedback.whatWorked || [],
         fixNext: feedbackState.feedback.fixNext || [],
         actionPlan: feedbackState.feedback.actionPlan || [],
@@ -167,13 +232,13 @@ export function useFeedbackStreaming(
       !feedbackCompletionToastShown.current
     ) {
       feedbackCompletionToastShown.current = true
-      opts.setIsGeneratingFeedback(false)
+      setIsGeneratingFeedback(false)
       toast.success("Feedback ready!", {
         description: "Your personalized analysis is complete.",
       })
     } else if (feedbackState.error && !feedbackCompletionToastShown.current) {
       feedbackCompletionToastShown.current = true
-      opts.setIsGeneratingFeedback(false)
+      setIsGeneratingFeedback(false)
       // If we have feedback but persist failed, still show success (feedback is in UI)
       if (feedbackState.feedback) {
         toast.warning("Feedback generated", {
@@ -203,7 +268,16 @@ export function useFeedbackStreaming(
     if (feedbackState.phase === "idle") {
       feedbackCompletionToastShown.current = false
     }
-  }, [opts.streamingFeedback.state])
+  }, [
+    applyFallbackFeedback,
+    setComprehensiveFeedback,
+    setIsGeneratingFeedback,
+    setPerformanceScore,
+    setScoreBreakdown,
+    setStructuredFeedback,
+    setTechnicalScore,
+    streamingFeedback.state,
+  ])
 
   return { applyFallbackFeedback, lastFeedbackRequestRef }
 }

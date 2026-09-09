@@ -23,14 +23,18 @@ vi.mock("@/lib/analytics", () => ({
 
 const markFreeTrialUsed = vi.fn()
 const saveGuestSessionData = vi.fn()
+const firestoreMocks = vi.hoisted(() => ({
+  markSessionEvaluating: vi.fn(() => Promise.resolve()),
+  updateInterviewSession: vi.fn(() => Promise.resolve()),
+}))
 vi.mock("@/lib/guest-session", () => ({
   markFreeTrialUsed: () => markFreeTrialUsed(),
   saveGuestSessionData: (data: unknown) => saveGuestSessionData(data),
 }))
 
 vi.mock("@/lib/firestore-helpers", () => ({
-  markSessionEvaluating: vi.fn(() => Promise.resolve()),
-  updateInterviewSession: vi.fn(() => Promise.resolve()),
+  markSessionEvaluating: firestoreMocks.markSessionEvaluating,
+  updateInterviewSession: firestoreMocks.updateInterviewSession,
 }))
 
 vi.mock("@/lib/interview", () => ({
@@ -284,5 +288,22 @@ describe("proceedToFinalFeedback for a signed-in user", () => {
       .calls[0][0]
     expect(request.userId).toBe("user-1")
     expect(opts.setPerformanceScore).toHaveBeenCalledWith(100)
+  })
+
+  it("does not overwrite a fast feedback persist with a later processing status", async () => {
+    const opts = buildOpts({
+      user: { id: "user-1" },
+      isGuestMode: false,
+      guestId: null,
+      currentSessionId: "sess-user-1",
+    })
+    const { result } = renderHook(() => useInterviewFeedback(opts as never))
+
+    await act(async () => {
+      await result.current.proceedToFinalFeedback()
+    })
+
+    const completionData = firestoreMocks.updateInterviewSession.mock.calls[0]?.[3]
+    expect(completionData).not.toHaveProperty("feedbackStatus")
   })
 })

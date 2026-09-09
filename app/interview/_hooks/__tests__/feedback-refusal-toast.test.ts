@@ -10,8 +10,8 @@
  * spent 20 to 45 minutes on an interview.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest"
-import { renderHook } from "@testing-library/react"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { act, renderHook } from "@testing-library/react"
 
 const toastMocks = vi.hoisted(() => ({
   error: vi.fn(),
@@ -22,7 +22,15 @@ const toastMocks = vi.hoisted(() => ({
 vi.mock("sonner", () => ({ toast: toastMocks }))
 vi.mock("@/lib/firebase-lazy", () => ({ getCurrentUserToken: vi.fn(async () => "token") }))
 vi.mock("@/lib/interview/fallback-feedback", () => ({
-  computeFallbackScores: () => ({ scoreBreakdown: {}, performanceScore: 50 }),
+  computeFallbackScores: () => ({
+    scoreBreakdown: {
+      understandingScore: 20,
+      problemSolvingScore: 40,
+      codeQualityScore: 80,
+      communicationScore: 10,
+    },
+    performanceScore: 37,
+  }),
 }))
 
 import { useFeedbackStreaming } from "../useFeedbackStreaming"
@@ -68,6 +76,10 @@ describe("post-interview failure toast", () => {
     vi.clearAllMocks()
   })
 
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it("shows a named refusal in the user's own words", () => {
     renderWith(
       failedState({
@@ -108,5 +120,49 @@ describe("post-interview failure toast", () => {
     const [title, options] = toastMocks.error.mock.calls[0] as [string, { description: string }]
     expect(title).toBe("Feedback generation failed")
     expect(options.description).toBe("Applying automated fallback scoring.")
+  })
+
+  it("marks the session failed when fallback persistence is rejected", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 400 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+    vi.stubGlobal("fetch", fetchMock)
+    const { result } = renderHook(() =>
+      useFeedbackStreaming({
+        currentSessionId: "sess-1",
+        streamingFeedback: { state: failedState(null) } as never,
+        setScoreBreakdown: vi.fn(),
+        setPerformanceScore: vi.fn(),
+        setTechnicalScore: vi.fn(),
+        setComprehensiveFeedback: vi.fn(),
+        setStructuredFeedback: vi.fn(),
+        setIsGeneratingFeedback: vi.fn(),
+      })
+    )
+
+    await act(async () => {
+      await result.current.applyFallbackFeedback({
+        sessionId: "sess-1",
+        userId: "user-1",
+        scenarioType: "dsa",
+        testsPassed: 5,
+        testsTotal: 5,
+      })
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const failureBody = JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string)
+    expect(failureBody).toMatchObject({
+      outcome: "failed",
+      sessionId: "sess-1",
+      userId: "user-1",
+    })
+    expect(toastMocks.warning).toHaveBeenCalledWith(
+      "Your automated score could not be saved",
+      expect.objectContaining({ description: expect.stringContaining("History") })
+    )
+    consoleError.mockRestore()
   })
 })

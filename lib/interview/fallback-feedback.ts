@@ -13,7 +13,7 @@ import {
   mapBugfixBreakdownToCategoryScores,
   type BugfixEvidenceEvent,
 } from "@/lib/bugfix"
-import { calculateUserScore, type InteractionMetrics } from "@/lib/scoring"
+import { calculateUserScore, createDefaultMetrics } from "@/lib/scoring"
 
 export interface FallbackFeedbackRequest {
   scenarioType?: string
@@ -36,6 +36,10 @@ export interface FallbackScoreBreakdown {
 export interface FallbackScores {
   scoreBreakdown: FallbackScoreBreakdown
   performanceScore: number
+}
+
+function nonNegativeFinite(value: number | undefined): number {
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0
 }
 
 /**
@@ -89,19 +93,23 @@ export function computeFallbackScores(request: FallbackFeedbackRequest): Fallbac
     }
   }
 
-  // The previous inline logic passed only this partial set of fields (cast to
-  // `any`); `calculateUserScore` reads the remaining fields as undefined and
-  // applies its own defaults. Replicate exactly to preserve scoring behavior.
-  const interactionMetrics = {
-    hintsUsed: request.hintsUsed || 0,
-    timeSpent: request.elapsedTimeSeconds || 0,
-    testCasesPassed: request.testsPassed || 0,
-    testCasesTotal: request.testsTotal || 0,
-    problemDifficulty: request.scenarioDifficulty || "medium",
-    problemType: request.scenarioType || "dsa",
-  }
+  const difficulty =
+    request.scenarioDifficulty === "easy" ||
+    request.scenarioDifficulty === "medium" ||
+    request.scenarioDifficulty === "hard"
+      ? request.scenarioDifficulty
+      : "medium"
+  const scenarioType = request.scenarioType === "system-design" ? "system-design" : "dsa"
+  const interactionMetrics = createDefaultMetrics(difficulty, scenarioType)
+  interactionMetrics.timeSpent = nonNegativeFinite(request.elapsedTimeSeconds)
+  interactionMetrics.hintsRevealed = nonNegativeFinite(request.hintsUsed)
+  interactionMetrics.testCasesTotal = nonNegativeFinite(request.testsTotal)
+  interactionMetrics.testCasesPassed = Math.min(
+    nonNegativeFinite(request.testsPassed),
+    interactionMetrics.testCasesTotal
+  )
 
-  const dsaScores = calculateUserScore(interactionMetrics as unknown as InteractionMetrics)
+  const dsaScores = calculateUserScore(interactionMetrics)
   return {
     performanceScore: dsaScores.overallScore,
     scoreBreakdown: {
