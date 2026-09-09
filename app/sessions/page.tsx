@@ -9,26 +9,17 @@ import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { useAuth } from "@/lib/auth-context"
 import { getDbLazy } from "@/lib/firebase-lazy"
 import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore"
-import {
-  Clock,
-  Calendar,
-  ChevronRight,
-  Terminal,
-  ArrowRight,
-  Play,
-  FileText,
-  CheckCircle,
-} from "lucide-react"
+import { Clock, Calendar, ChevronRight, Terminal, Play, FileText, CheckCircle } from "lucide-react"
 import { InterviewSession } from "@/lib/types"
 import Link from "next/link"
 import { getScenarioById } from "@/lib/scenarios/index"
 import { clampPracticeMinutes, isTruncatedDuration } from "@/lib/session-duration"
-import { isFeedbackGenerationStalled } from "@/lib/feedback/generation-stalled"
+import { resolveFeedbackGenerationStatus } from "@/lib/feedback/generation-stalled"
 import { SparraLoader } from "@/components/brand/SparraLoader"
 
 export default function SessionsPage() {
   const router = useRouter()
-  const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
+  const { firebaseUser, loading: authLoading, initialized } = useAuth()
   const [sessions, setSessions] = useState<InterviewSession[]>([])
   const [loading, setLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
@@ -198,26 +189,23 @@ export default function SessionsPage() {
                   // A transit state that outlived the stall threshold will never
                   // resolve on its own; show it as failed (retryable), not as an
                   // eternal "scoring" badge.
-                  const feedbackStalled = isFeedbackGenerationStalled(
+                  const feedbackStatus = resolveFeedbackGenerationStatus(
                     session.feedback_status,
                     session.completed_at
                   )
                   const isFeedbackPending =
-                    !feedbackStalled &&
-                    (session.feedback_status === "pending" ||
-                      session.feedback_status === "processing" ||
-                      (session.completed_at &&
-                        !session.feedback &&
-                        session.feedback_status !== "failed" &&
-                        session.feedback_status !== "complete"))
-                  const isFeedbackFailed = session.feedback_status === "failed" || feedbackStalled
+                    feedbackStatus === "pending" ||
+                    feedbackStatus === "processing" ||
+                    (session.completed_at &&
+                      !session.feedback &&
+                      feedbackStatus !== "failed" &&
+                      feedbackStatus !== "complete")
+                  const isFeedbackFailed = feedbackStatus === "failed"
                   const hasFeedback =
-                    session.feedback &&
-                    session.completed_at &&
-                    session.feedback_status === "complete"
+                    session.feedback && session.completed_at && feedbackStatus === "complete"
                   // Only show score if feedback generation is complete
                   const score =
-                    session.feedback_status === "complete" && session.performance_score
+                    feedbackStatus === "complete" && typeof session.performance_score === "number"
                       ? Math.round(session.performance_score)
                       : null
 
@@ -229,7 +217,7 @@ export default function SessionsPage() {
                       {/* Score/Status indicator */}
                       <div
                         className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl font-mono text-sm ${
-                          score
+                          score !== null
                             ? getScoreColor(score)
                             : isFeedbackPending
                               ? "animate-pulse bg-blue-500/10 text-blue-400"

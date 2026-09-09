@@ -17,14 +17,14 @@ import { AnimatedEllipsis } from "@/components/brand/AnimatedEllipsis"
 import { InterviewSession } from "@/lib/types"
 import Link from "next/link"
 import { clampPracticeMinutes, isTruncatedDuration } from "@/lib/session-duration"
-import { isFeedbackGenerationStalled } from "@/lib/feedback/generation-stalled"
+import { resolveFeedbackGenerationStatus } from "@/lib/feedback/generation-stalled"
 import { SparraLoader } from "@/components/brand/SparraLoader"
 
 export default function SessionDetailPage() {
   const router = useRouter()
   const params = useParams()
   const sessionId = params.id as string
-  const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
+  const { firebaseUser, loading: authLoading, initialized } = useAuth()
   const [session, setSession] = useState<InterviewSession | null>(null)
   const [loading, setLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
@@ -109,11 +109,15 @@ export default function SessionDetailPage() {
   // Backoff + a hard cap: the old fixed 5s interval had no stop condition
   // other than the status changing, so a session stuck in "pending" polled 2
   // Firestore reads every 5 seconds for as long as the tab stayed open.
-  const isTransitStatus =
-    session?.feedback_status === "pending" || session?.feedback_status === "processing"
+  const feedbackStatus = resolveFeedbackGenerationStatus(
+    session?.feedback_status,
+    session?.completed_at
+  )
+  const isTransitStatus = feedbackStatus === "pending" || feedbackStatus === "processing"
+  const hasSession = session !== null
   useEffect(() => {
     // Only poll if session is evaluating
-    if (!session || !isTransitStatus) return
+    if (!hasSession || !isTransitStatus) return
 
     let cancelled = false
     let attempts = 0
@@ -131,11 +135,11 @@ export default function SessionDetailPage() {
         if (updatedSession) {
           setSession(updatedSession)
           // Stop polling once feedback is complete or failed
-          if (
-            updatedSession.feedback_status !== "pending" &&
-            updatedSession.feedback_status !== "processing"
+          const updatedStatus = resolveFeedbackGenerationStatus(
+            updatedSession.feedback_status,
+            updatedSession.completed_at
           )
-            return
+          if (updatedStatus !== "pending" && updatedStatus !== "processing") return
         }
       }
 
@@ -150,7 +154,7 @@ export default function SessionDetailPage() {
       cancelled = true
       if (timer) clearTimeout(timer)
     }
-  }, [session?.feedback_status, isTransitStatus, loadSession])
+  }, [hasSession, isTransitStatus, loadSession])
 
   // This screen resumes a wait that began elsewhere, so the ring is driven from
   // when scoring actually started (the session's completed_at), not from when this
@@ -162,7 +166,7 @@ export default function SessionDetailPage() {
     : undefined
   const scoring = useScoringProgress({
     active: isTransitStatus,
-    hasResult: session?.feedback_status === "complete",
+    hasResult: feedbackStatus === "complete",
     stepCount: 4,
     startedAtMs: Number.isFinite(scoringStartedAtMs) ? scoringStartedAtMs : undefined,
   })
@@ -276,7 +280,7 @@ export default function SessionDetailPage() {
           {/* Note: Legacy sessions may not have feedback_status, treat completed_at + feedback as complete */}
           {session.feedback &&
           session.completed_at &&
-          (session.feedback_status === "complete" || !session.feedback_status) ? (
+          (feedbackStatus === "complete" || !feedbackStatus) ? (
             <PracticeFeedback
               feedback={session.feedback}
               performanceScore={session.performance_score || 0}
@@ -286,7 +290,14 @@ export default function SessionDetailPage() {
               structuredFeedback={session.structured_feedback}
               testsPassed={
                 session.tests_passed ??
-                (session.test_results?.filter((t: any) => t.passed).length || 0)
+                (session.test_results?.filter(
+                  (test: unknown) =>
+                    typeof test === "object" &&
+                    test !== null &&
+                    "passed" in test &&
+                    test.passed === true
+                ).length ||
+                  0)
               }
               testsTotal={session.tests_total ?? (session.test_results?.length || 0)}
               timeComplexity={session.time_complexity}
@@ -308,8 +319,7 @@ export default function SessionDetailPage() {
               onNewProblem={() => router.push("/interview")}
               clarifyingQuestionsAssessment={session.clarifying_questions_assessment}
             />
-          ) : (session.feedback_status === "pending" || session.feedback_status === "processing") &&
-            !isFeedbackGenerationStalled(session.feedback_status, session.completed_at) ? (
+          ) : feedbackStatus === "pending" || feedbackStatus === "processing" ? (
             // Session is being evaluated - show evaluating state. "processing"
             // belongs here too: it was invisible before (fell through to the
             // "still in progress" branch below), which showed a completed,
@@ -344,8 +354,7 @@ export default function SessionDetailPage() {
                 Go to Dashboard
               </Button>
             </div>
-          ) : session.feedback_status === "failed" ||
-            isFeedbackGenerationStalled(session.feedback_status, session.completed_at) ? (
+          ) : feedbackStatus === "failed" ? (
             // Feedback generation failed - allow retry. Stalled transit states
             // (completed long ago, still pending/processing) are failures in
             // fact if not in name: nothing will ever finish them, so honesty +

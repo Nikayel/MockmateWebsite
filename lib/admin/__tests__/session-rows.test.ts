@@ -207,8 +207,22 @@ describe("deriveSessionStatus", () => {
 
   it("labels a round whose feedback is still running as scoring", () => {
     for (const feedback_status of ["pending", "processing"]) {
-      expect(deriveSessionStatus({ completed_at: "x", feedback_status }, NOW)).toBe("scoring")
+      expect(
+        deriveSessionStatus({ completed_at: "2026-08-08T11:59:00.000Z", feedback_status }, NOW)
+      ).toBe("scoring")
     }
+  })
+
+  it("labels a transit state older than the shared stall threshold as failed", () => {
+    expect(
+      deriveSessionStatus(
+        {
+          completed_at: "2026-08-08T11:50:00.000Z",
+          feedback_status: "processing",
+        },
+        NOW
+      )
+    ).toBe("failed")
   })
 
   it("labels a failed scoring run failed", () => {

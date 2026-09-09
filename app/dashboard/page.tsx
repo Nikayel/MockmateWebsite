@@ -36,6 +36,7 @@ import Link from "next/link"
 import { isPaidTier } from "@/lib/pricing"
 import { PRICING_CONFIG, type SubscriptionTier } from "@/lib/config"
 import { SparraLoader } from "@/components/brand/SparraLoader"
+import { resolveFeedbackGenerationStatus } from "@/lib/feedback/generation-stalled"
 
 const OnboardingModal = dynamic(
   () => import("@/components/OnboardingModal").then((mod) => mod.OnboardingModal),
@@ -649,17 +650,24 @@ export default function DashboardPage() {
                       // with a link that reopened the interview workspace instead of the
                       // scoring wait -- on the exact page the scoring screen's escape
                       // button sends people to.
+                      const feedbackStatus = resolveFeedbackGenerationStatus(
+                        session.feedback_status,
+                        session.completed_at
+                      )
                       const isEvaluating =
-                        session.feedback_status === "pending" ||
-                        session.feedback_status === "processing"
+                        feedbackStatus === "pending" || feedbackStatus === "processing"
+                      const isFeedbackFailed = feedbackStatus === "failed"
                       const isCompleted =
-                        session.completed_at &&
-                        (session.feedback_status === "complete" || !session.feedback_status)
+                        session.completed_at && (feedbackStatus === "complete" || !feedbackStatus)
                       const isInProgress = !session.completed_at && !isEvaluating
+                      const score =
+                        isCompleted && typeof session.performance_score === "number"
+                          ? Math.round(session.performance_score)
+                          : null
 
                       // Link to session detail if completed or evaluating, otherwise reopen interview
                       const href =
-                        isCompleted || isEvaluating
+                        isCompleted || isEvaluating || isFeedbackFailed
                           ? `/sessions/${session.id}`
                           : `/interview?session=${session.id}&scenario=${session.scenario_id}`
 
@@ -672,26 +680,30 @@ export default function DashboardPage() {
                           {/* Score indicator */}
                           <div
                             className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-mono text-sm sm:h-11 sm:w-11 ${
-                              session.performance_score
-                                ? session.performance_score >= 80
+                              score !== null
+                                ? score >= 80
                                   ? "bg-emerald-500/10 text-emerald-400"
-                                  : session.performance_score >= 60
+                                  : score >= 60
                                     ? "bg-amber-500/10 text-amber-400"
                                     : "bg-red-500/10 text-red-400"
                                 : isEvaluating
                                   ? "bg-blue-500/10 text-blue-400"
-                                  : isInProgress
-                                    ? "bg-amber-500/10 text-amber-400"
-                                    : "bg-muted text-muted-foreground"
+                                  : isFeedbackFailed
+                                    ? "bg-red-500/10 text-red-400"
+                                    : isInProgress
+                                      ? "bg-amber-500/10 text-amber-400"
+                                      : "bg-muted text-muted-foreground"
                             }`}
                           >
-                            {session.performance_score
-                              ? Math.round(session.performance_score)
+                            {score !== null
+                              ? score
                               : isEvaluating
                                 ? "⏳"
-                                : isInProgress
-                                  ? "..."
-                                  : "—"}
+                                : isFeedbackFailed
+                                  ? "!"
+                                  : isInProgress
+                                    ? "..."
+                                    : "—"}
                           </div>
 
                           {/* Content */}
@@ -716,6 +728,11 @@ export default function DashboardPage() {
                               {isEvaluating && (
                                 <Badge className="border-0 bg-blue-500/10 px-1.5 py-0 text-[10px] text-blue-400">
                                   Evaluating
+                                </Badge>
+                              )}
+                              {isFeedbackFailed && (
+                                <Badge className="border-0 bg-red-500/10 px-1.5 py-0 text-[10px] text-red-400">
+                                  Feedback failed
                                 </Badge>
                               )}
                               {isInProgress && (

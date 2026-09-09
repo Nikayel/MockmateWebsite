@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest"
-import { isFeedbackGenerationStalled, FEEDBACK_STALL_THRESHOLD_MS } from "../generation-stalled"
+import {
+  isFeedbackGenerationStalled,
+  resolveFeedbackGenerationStatus,
+  FEEDBACK_STALL_THRESHOLD_MS,
+} from "../generation-stalled"
 
 const NOW = Date.parse("2026-08-18T12:00:00.000Z")
 const minutesAgo = (m: number) => new Date(NOW - m * 60_000).toISOString()
@@ -35,5 +39,11 @@ describe("isFeedbackGenerationStalled", () => {
 
   it("exposes a sane threshold", () => {
     expect(FEEDBACK_STALL_THRESHOLD_MS).toBe(5 * 60_000)
+  })
+
+  it("resolves stale transit states consistently for every reader", () => {
+    expect(resolveFeedbackGenerationStatus("processing", minutesAgo(6), NOW)).toBe("failed")
+    expect(resolveFeedbackGenerationStatus("pending", minutesAgo(1), NOW)).toBe("pending")
+    expect(resolveFeedbackGenerationStatus("complete", minutesAgo(60), NOW)).toBe("complete")
   })
 })

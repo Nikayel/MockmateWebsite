@@ -29,3 +29,16 @@ export function isFeedbackGenerationStalled(
   if (completedMs === null) return false
   return nowMs - completedMs > FEEDBACK_STALL_THRESHOLD_MS
 }
+
+/**
+ * Present an orphaned transit state as the terminal state it effectively is.
+ * Writers keep the raw value for incident diagnosis; readers share this view
+ * so dashboards, history, detail pages, and admin do not disagree.
+ */
+export function resolveFeedbackGenerationStatus(
+  feedbackStatus: string | null | undefined,
+  completedAt: string | Date | null | undefined,
+  nowMs: number = Date.now()
+): string | null | undefined {
+  return isFeedbackGenerationStalled(feedbackStatus, completedAt, nowMs) ? "failed" : feedbackStatus
+}

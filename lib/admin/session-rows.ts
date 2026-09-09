@@ -16,6 +16,7 @@
 
 import { sessionTitle, sessionType, type SessionDocFields } from "./session-fields"
 import { ABANDONED_AFTER_HOURS, type SessionListStatus } from "./session-query"
+import { resolveFeedbackGenerationStatus } from "@/lib/feedback/generation-stalled"
 
 /** Coarse Vercel-geo location captured when a guest session was created. */
 export interface SessionGuestGeo {
@@ -156,7 +157,11 @@ export function deriveSessionStatus(
     return ageMs > ABANDONED_AFTER_HOURS * 60 * 60 * 1000 ? "abandoned" : "in_progress"
   }
 
-  const feedbackStatus = toOptionalString(session.feedback_status)
+  const feedbackStatus = resolveFeedbackGenerationStatus(
+    toOptionalString(session.feedback_status),
+    toIsoString(session.completed_at),
+    now.getTime()
+  )
   if (feedbackStatus === "complete") return "completed"
   if (feedbackStatus === "pending" || feedbackStatus === "processing") return "scoring"
   if (feedbackStatus === "failed") return "failed"
