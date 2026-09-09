@@ -52,27 +52,36 @@ describe("rate-limit enforcement", () => {
     })
   })
 
-  it("fails closed for costly policies when Redis times out", async () => {
+  it("fails open for an interview policy when Redis times out", async () => {
     getUpstashRateLimiter.mockReturnValue(
       limiterResult({ success: true, limit: 20, remaining: 20, reset: 0, reason: "timeout" })
     )
     const { enforceRateLimitPolicy } = await import("../enforce")
 
-    const response = await enforceRateLimitPolicy("chatFree", "user:one")
-    expect(response?.status).toBe(503)
-    expect((response as unknown as { data: unknown }).data).toMatchObject({
-      code: "RATE_LIMIT_UNAVAILABLE",
+    await expect(enforceRateLimitPolicy("chatFree", "user:one")).resolves.toBeNull()
+    expect(loggerError).toHaveBeenCalledWith("Rate-limit store timed out", {
+      policyName: "chatFree",
     })
   })
 
-  it("fails closed for costly policies when Redis is not configured in production", async () => {
+  it("fails open for an interview policy when Redis is not configured in production", async () => {
     getUpstashRateLimiter.mockReturnValue(null)
     const { enforceRateLimitPolicy } = await import("../enforce")
 
-    const response = await enforceRateLimitPolicy("chatFree", "user:one")
-    expect(response?.status).toBe(503)
+    await expect(enforceRateLimitPolicy("chatFree", "user:one")).resolves.toBeNull()
     expect(loggerError).toHaveBeenCalledWith("Rate-limit store is not configured", {
       policyName: "chatFree",
+    })
+  })
+
+  it("fails closed for a destructive policy when Redis is unavailable", async () => {
+    getUpstashRateLimiter.mockReturnValue(null)
+    const { enforceRateLimitPolicy } = await import("../enforce")
+
+    const response = await enforceRateLimitPolicy("accountDeletion", "user:one")
+    expect(response?.status).toBe(503)
+    expect((response as unknown as { data: unknown }).data).toMatchObject({
+      code: "RATE_LIMIT_UNAVAILABLE",
     })
   })
 

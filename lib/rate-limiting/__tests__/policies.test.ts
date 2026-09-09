@@ -30,10 +30,30 @@ describe("rate-limit policies", () => {
     expect(new Set(prefixes).size).toBe(prefixes.length)
   })
 
-  it("keeps expensive AI paths fail-closed", () => {
-    expect(RATE_LIMIT_POLICIES.chatFree.failureMode).toBe("deny")
-    expect(RATE_LIMIT_POLICIES.feedback.failureMode).toBe("deny")
-    expect(RATE_LIMIT_POLICIES.ragEmbedding.failureMode).toBe("deny")
+  it("keeps the interview journey available during a rate-limit store outage", () => {
+    const userJourneyPolicies = [
+      "execute",
+      "feedback",
+      "chatFree",
+      "chatPro",
+      "chatEnterprise",
+      "guestSession",
+      "guestWrite",
+      "hint",
+      "ragEmbedding",
+      "feedbackStreamBurst",
+      "feedbackStreamSustained",
+    ] as const
+
+    for (const policyName of userJourneyPolicies) {
+      expect(RATE_LIMIT_POLICIES[policyName].failureMode).toBe("allow")
+    }
+  })
+
+  it("keeps destructive and privileged operations fail-closed", () => {
+    expect(RATE_LIMIT_POLICIES.accountDeletion.failureMode).toBe("deny")
+    expect(RATE_LIMIT_POLICIES.adminDeletion.failureMode).toBe("deny")
+    expect(RATE_LIMIT_POLICIES.adminRagJob.failureMode).toBe("deny")
   })
 
   it("validates guest event overrides", () => {

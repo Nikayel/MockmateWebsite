@@ -27,12 +27,12 @@ export const RATE_LIMIT_POLICIES = {
   },
   execute: {
     algorithm: { kind: "sliding-window", limit: 10, window: ONE_MINUTE },
-    failureMode: "deny",
+    failureMode: "allow",
     prefix: "execute",
   },
   feedback: {
     algorithm: { kind: "sliding-window", limit: 5, window: ONE_MINUTE },
-    failureMode: "deny",
+    failureMode: "allow",
     prefix: "feedback",
   },
   chatFree: {
@@ -42,7 +42,7 @@ export const RATE_LIMIT_POLICIES = {
       refillInterval: ONE_MINUTE,
       capacity: RATE_LIMITS.free.requestsPerMinute,
     },
-    failureMode: "deny",
+    failureMode: "allow",
     prefix: "chat:free",
   },
   chatPro: {
@@ -52,7 +52,7 @@ export const RATE_LIMIT_POLICIES = {
       refillInterval: ONE_MINUTE,
       capacity: RATE_LIMITS.pro.requestsPerMinute,
     },
-    failureMode: "deny",
+    failureMode: "allow",
     prefix: "chat:pro",
   },
   chatEnterprise: {
@@ -62,7 +62,7 @@ export const RATE_LIMIT_POLICIES = {
       refillInterval: ONE_MINUTE,
       capacity: RATE_LIMITS.enterprise.requestsPerMinute,
     },
-    failureMode: "deny",
+    failureMode: "allow",
     prefix: "chat:enterprise",
   },
   checkout: {
@@ -86,7 +86,7 @@ export const RATE_LIMIT_POLICIES = {
       limit: envLimit(process.env.GUEST_SESSION_LIMIT_PER_HOUR, 3),
       window: ONE_HOUR,
     },
-    failureMode: "deny",
+    failureMode: "allow",
     prefix: "guest-session",
   },
   guestWrite: {
@@ -96,7 +96,7 @@ export const RATE_LIMIT_POLICIES = {
       refillInterval: ONE_MINUTE,
       capacity: envLimit(process.env.GUEST_API_LIMIT_PER_MINUTE, 15),
     },
-    failureMode: "deny",
+    failureMode: "allow",
     prefix: "guest-write",
   },
   promoCode: {
@@ -106,7 +106,7 @@ export const RATE_LIMIT_POLICIES = {
   },
   hint: {
     algorithm: { kind: "sliding-window", limit: 15, window: ONE_MINUTE },
-    failureMode: "deny",
+    failureMode: "allow",
     prefix: "hint",
   },
   rag: {
@@ -126,7 +126,7 @@ export const RATE_LIMIT_POLICIES = {
   },
   ragEmbedding: {
     algorithm: { kind: "sliding-window", limit: 20, window: ONE_MINUTE },
-    failureMode: "deny",
+    failureMode: "allow",
     prefix: "rag-embedding",
   },
   adminDeletion: {
@@ -146,12 +146,12 @@ export const RATE_LIMIT_POLICIES = {
   },
   feedbackStreamBurst: {
     algorithm: { kind: "sliding-window", limit: 3, window: ONE_MINUTE },
-    failureMode: "deny",
+    failureMode: "allow",
     prefix: "feedback-stream:burst",
   },
   feedbackStreamSustained: {
     algorithm: { kind: "sliding-window", limit: 20, window: ONE_HOUR },
-    failureMode: "deny",
+    failureMode: "allow",
     prefix: "feedback-stream:sustained",
   },
 } as const satisfies Record<string, RateLimitPolicy>
