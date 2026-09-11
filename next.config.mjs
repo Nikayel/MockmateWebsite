@@ -1,4 +1,5 @@
 import bundleAnalyzer from '@next/bundle-analyzer'
+import { withPostHogConfig } from '@posthog/nextjs-config'
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
@@ -214,4 +215,31 @@ const nextConfig = {
   },
 }
 
-export default withBundleAnalyzer(nextConfig)
+// Upload browser source maps to PostHog at build time so captured exceptions
+// symbolicate to real files, functions, and lines instead of "line 1 column
+// 12843". withPostHogConfig turns on productionBrowserSourceMaps, injects a
+// chunk id into each JS chunk, uploads the maps, and — with deleteAfterUpload —
+// strips them from the build output so they are never served to visitors.
+//
+// It must be the OUTERMOST wrapper, or another wrapper drops its build hooks.
+//
+// Upload is enabled only when both build secrets are present, so a build without
+// them (local `pnpm build`, a preview build with no secret) ships normally
+// rather than failing: withPostHogConfig throws when upload is enabled without a
+// personal API key or project id. Both are build-time only, never exposed to the
+// browser (no NEXT_PUBLIC_ prefix). Host defaults to PostHog US cloud, which is
+// this project's region.
+const withAnalyzer = withBundleAnalyzer(nextConfig)
+
+const posthogPersonalApiKey = process.env.POSTHOG_PERSONAL_API_KEY
+const posthogProjectId = process.env.POSTHOG_PROJECT_ID
+
+export default posthogPersonalApiKey && posthogProjectId
+  ? withPostHogConfig(withAnalyzer, {
+      personalApiKey: posthogPersonalApiKey,
+      projectId: posthogProjectId,
+      sourcemaps: {
+        deleteAfterUpload: true,
+      },
+    })
+  : withAnalyzer
