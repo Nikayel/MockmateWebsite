@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { requireTierForUser } from "@/lib/quota-enforcement"
+import { getFlagAsync } from "@/lib/feature-flags"
 import { generatePersonalizedRoadmap } from "@/lib/roadmap/prioritization-algorithm"
 import { generateRAGEnhancedRoadmap, type RAGEnhancedRoadmap } from "@/lib/rag/roadmap-rag"
 import { scenarios } from "@/lib/scenarios"
@@ -16,6 +17,11 @@ import {
   type FirestoreRoadmapData,
   type RoadmapDocumentSnapshot,
 } from "@/lib/roadmap/roadmap-serialization"
+import {
+  confirmFirstFreeRoadmap,
+  releaseFirstFreeRoadmapReservation,
+  reserveFirstFreeRoadmap,
+} from "@/lib/roadmap/free-roadmap-entitlement"
 
 const COLLECTION = "user_roadmaps"
 
@@ -55,10 +61,6 @@ export async function GET(request: NextRequest) {
 
     const userId = authResult.userId
 
-    // Server-side tier gate: roadmap is a Pro feature
-    // (token already verified by verifyAuth above)
-    const tierCheck = await requireTierForUser(userId, "pro")
-    if (tierCheck.response) return tierCheck.response
     logger.info("[Roadmap API] GET request for user:", { userId })
 
     const { searchParams } = new URL(request.url)
@@ -218,9 +220,13 @@ export async function GET(request: NextRequest) {
  * Query params:
  *   - rag=true: Enable RAG-enhanced generation with personalized insights
  *
- * Note: Roadmap creation is a Pro-only feature
+ * A Pro subscription can create roadmaps normally. When FIRST_ROADMAP_FREE is
+ * enabled, a free user may create one full roadmap; the server reserves that
+ * offer before generation so it cannot be duplicated by concurrent requests.
  */
 export async function POST(request: NextRequest) {
+  let freeReservation: { userId: string; roadmapId: string } | null = null
+
   try {
     const authResult = await verifyAuth(request)
     if (!authResult.authenticated || !authResult.userId) {
@@ -229,17 +235,64 @@ export async function POST(request: NextRequest) {
 
     const userId = authResult.userId
 
-    // Check subscription tier - roadmap is a Pro-only feature.
+    // Check subscription tier first. A valid Pro subscription keeps its normal
+    // unlimited creation path; only genuine free accounts may use the offer.
     // Uses requireTierForUser like the GET and PATCH handlers below. This used to
     // hand-roll `subscription_tier === "free"`, which ignored subscription_status
     // entirely, so a pro account in past_due could still create roadmaps here
     // while being blocked from reading or updating them.
     const tierCheck = await requireTierForUser(userId, "pro")
+    let usesFreeRoadmapOffer = false
+    let reservedRoadmapId: string | null = null
     if (!tierCheck.allowed) {
       // Genuine free users keep the roadmap-specific upsell; a degraded paid
       // subscription gets the standard inactive-subscription response instead,
       // since telling them to "upgrade to Pro" would be wrong.
-      if (tierCheck.tier === "free") {
+      if (tierCheck.tier === "free" && (await getFlagAsync("FIRST_ROADMAP_FREE", userId))) {
+        const existingRoadmaps = await adminDb
+          .collection(COLLECTION)
+          .where("userId", "==", userId)
+          .limit(1)
+          .get()
+
+        if (!existingRoadmaps.empty) {
+          return NextResponse.json(
+            {
+              error: "Your free roadmap has already been used",
+              code: "FREE_ROADMAP_ALREADY_USED",
+              upgradeUrl: "/upgrade",
+            },
+            { status: 403 }
+          )
+        }
+
+        const candidateRoadmapId = adminDb.collection(COLLECTION).doc().id
+        const reservation = await reserveFirstFreeRoadmap(userId, candidateRoadmapId)
+        if (reservation.status === "claimed") {
+          return NextResponse.json(
+            {
+              error: "Your free roadmap has already been used",
+              code: "FREE_ROADMAP_ALREADY_USED",
+              roadmapId: reservation.roadmapId,
+              upgradeUrl: "/upgrade",
+            },
+            { status: 403 }
+          )
+        }
+        if (reservation.status === "in_progress") {
+          return NextResponse.json(
+            {
+              error: "Your roadmap is already being created. Please wait a moment.",
+              code: "FREE_ROADMAP_IN_PROGRESS",
+            },
+            { status: 409 }
+          )
+        }
+
+        usesFreeRoadmapOffer = true
+        reservedRoadmapId = candidateRoadmapId
+        freeReservation = { userId, roadmapId: candidateRoadmapId }
+      } else if (tierCheck.tier === "free") {
         return NextResponse.json(
           {
             error: "Pro feature required",
@@ -281,7 +334,10 @@ export async function POST(request: NextRequest) {
     } = validation.data
 
     const { searchParams } = new URL(request.url)
-    const enableRAG = searchParams.get("rag") !== "false" // RAG enabled by default
+    // The free first roadmap is still fully personalized, but uses the
+    // deterministic generator. This makes the offer predictable in cost and
+    // avoids an unbounded AI/RAG path during a controlled rollout.
+    const enableRAG = !usesFreeRoadmapOffer && searchParams.get("rag") !== "false"
 
     // Calculate days remaining
     const now = new Date()
@@ -352,8 +408,11 @@ export async function POST(request: NextRequest) {
 
     // Prepare roadmap for Firestore (convert dates)
     const ragEnhancements = "ragEnhancements" in roadmap ? roadmap.ragEnhancements : null
+    const roadmapId = reservedRoadmapId || roadmap.id
     const roadmapDoc = {
       ...roadmap,
+      id: roadmapId,
+      is_first_free_roadmap: usesFreeRoadmapOffer,
       // Explicitly set status to 'active' (ensure it's always present)
       status: "active",
       userId,
@@ -377,19 +436,32 @@ export async function POST(request: NextRequest) {
     }
 
     // Save new roadmap
-    const docRef = adminDb.collection(COLLECTION).doc(roadmap.id)
+    const docRef = adminDb.collection(COLLECTION).doc(roadmapId)
     batch.set(docRef, roadmapDoc)
 
     await batch.commit()
 
+    if (usesFreeRoadmapOffer) {
+      await confirmFirstFreeRoadmap(userId, roadmapId)
+      freeReservation = null
+    }
+
     return NextResponse.json({
       roadmap: {
         ...roadmap,
+        id: roadmapId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
     })
   } catch (error) {
+    if (freeReservation) {
+      try {
+        await releaseFirstFreeRoadmapReservation(freeReservation.userId, freeReservation.roadmapId)
+      } catch (releaseError) {
+        logger.error("Failed to release free roadmap reservation:", { releaseError })
+      }
+    }
     logger.error("Error creating roadmap:", { error })
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create roadmap" },

@@ -1,7 +1,7 @@
 "use client"
 
 import { memo, useState, useRef, useEffect } from "react"
-import { Check, X, ChevronDown, Building2 } from "lucide-react"
+import { Check, X, ChevronDown, Building2, SlidersHorizontal } from "lucide-react"
 import { scenarios, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { EXERCISE_TYPES } from "./scenario-display"
@@ -102,6 +102,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
   availableTypes,
 }: ScenarioFiltersProps) {
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false)
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [companyQuery, setCompanyQuery] = useState("")
   const companyTriggerRef = useRef<HTMLButtonElement>(null)
   const companyMenuRef = useRef<HTMLDivElement>(null)
@@ -161,11 +162,9 @@ export const ScenarioFilters = memo(function ScenarioFilters({
   }
 
   return (
-    <div className="border-border bg-card mb-6 space-y-4 rounded-2xl border p-4 shadow-xs">
-      {/* Search & Actions Row */}
-      <div className="border-border flex flex-col gap-4 border-b pb-4 lg:flex-row lg:items-center lg:justify-between">
-        {/* Left side: Search input + Stats */}
-        <div className="max-w-xl flex-1">
+    <div className="border-border bg-card mb-4 rounded-2xl border p-3 shadow-xs">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="min-w-0 flex-1">
           <ScenarioSearchBar
             searchQuery={searchQuery}
             onSearchChange={onSearchChange}
@@ -175,8 +174,23 @@ export const ScenarioFilters = memo(function ScenarioFilters({
           />
         </div>
 
-        {/* Right side: Difficulty + Company Selectors */}
-        <div className="flex flex-wrap items-center gap-4">
+        <button
+          type="button"
+          onClick={() => setShowAdvancedFilters((visible) => !visible)}
+          aria-expanded={showAdvancedFilters}
+          className={`focus-visible:ring-accent/50 flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full border px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none ${
+            hasActiveFilters
+              ? "border-accent/50 bg-accent/10 text-accent-strong"
+              : "border-border bg-muted/50 text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+          Filters{hasActiveFilters ? " active" : ""}
+        </button>
+      </div>
+
+      {showAdvancedFilters && (
+        <div className="border-border mt-3 flex flex-wrap items-center gap-3 border-t pt-3">
           {/* Difficulty Selection */}
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
@@ -300,11 +314,11 @@ export const ScenarioFilters = memo(function ScenarioFilters({
             )}
           </div>
         </div>
-      </div>
+      )}
 
       {/* Type Filter - Horizontal Pills (Second Row) */}
       {visibleTypes.length > 0 && (
-        <div className="flex flex-wrap gap-2 pt-1">
+        <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
           {visibleTypes.map((type) => {
             const Icon = type.icon
             const isActive = filterType.includes(type.id as ScenarioType)
@@ -333,7 +347,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
 
       {/* Active Filters Summary */}
       {hasActiveFilters && (
-        <div className="border-border flex flex-wrap items-center gap-2 border-t pt-3">
+        <div className="border-border mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
           <span className="text-muted-foreground text-xs">Active:</span>
           {filterType.map((t) => {
             const type = EXERCISE_TYPES.find((et) => et.id === t)

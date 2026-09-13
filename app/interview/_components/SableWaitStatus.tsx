@@ -5,13 +5,12 @@ import { Sparra } from "@/components/brand/Sparra"
 import { AnimatedEllipsis } from "@/components/brand/AnimatedEllipsis"
 
 const SABLE_WAIT_MESSAGES = [
-  "Contemplating the trade-offs",
-  "Evaluating the invariants",
-  "Reading between the loops",
-  "Checking the sneaky edge cases",
-  "Low-key, that reasoning has structure",
-  "Making sure the hash map isn't doing all the talking",
-  "Verifying before I commit to the record",
+  "Reviewing",
+  "Checking details",
+  "Considering it",
+  "Verifying",
+  "Reading closely",
+  "One moment",
 ]
 
 export function SableWaitStatus() {

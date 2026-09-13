@@ -30,9 +30,11 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Server-side tier gate: roadmap is a Pro feature
+    // Pro users can update any roadmap. A free user may update the one
+    // roadmap that was explicitly granted by the first-roadmap offer.
     const tierCheck = await requireTierForUser(authResult.userId, "pro")
-    if (tierCheck.response) return tierCheck.response
+    const canManageAllRoadmaps = tierCheck.allowed
+    if (!canManageAllRoadmaps && tierCheck.tier !== "free") return tierCheck.response!
 
     const userId = authResult.userId
     const body = (await request.json()) as RoadmapProgressRequestBody
@@ -65,6 +67,9 @@ export async function PATCH(request: NextRequest) {
       // Verify ownership
       if (roadmapData?.userId !== userId) {
         throw new Error("UNAUTHORIZED")
+      }
+      if (!canManageAllRoadmaps && roadmapData?.is_first_free_roadmap !== true) {
+        throw new Error("PRO_REQUIRED")
       }
 
       // Update the question status in dailyPlans
@@ -147,6 +152,12 @@ export async function PATCH(request: NextRequest) {
       }
       if (error.message === "UNAUTHORIZED") {
         return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+      }
+      if (error.message === "PRO_REQUIRED") {
+        return NextResponse.json(
+          { error: "Pro feature required", code: "PRO_REQUIRED", upgradeUrl: "/upgrade" },
+          { status: 403 }
+        )
       }
       if (error.message === "QUESTION_NOT_FOUND") {
         return NextResponse.json({ error: "Question not found in roadmap" }, { status: 404 })

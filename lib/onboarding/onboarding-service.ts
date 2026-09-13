@@ -73,10 +73,7 @@ export async function storeOnboardingEmbedding(
  * @param userId - User ID
  * @param dailyGoal - Daily goal count
  */
-export async function updateDailyGoal(
-  userId: string,
-  dailyGoal: number
-): Promise<void> {
+export async function updateDailyGoal(userId: string, dailyGoal: number): Promise<void> {
   try {
     await fetch("/api/spaced-repetition/stats", {
       method: "PATCH",
@@ -98,10 +95,7 @@ export async function updateDailyGoal(
  * @param data - Onboarding data
  * @returns Promise that resolves when all operations complete
  */
-export async function completeOnboarding(
-  userId: string,
-  data: OnboardingData
-): Promise<void> {
+export async function completeOnboarding(userId: string, data: OnboardingData): Promise<void> {
   // Save to Firestore (blocking)
   await saveOnboardingPreferences(userId, data)
 
@@ -110,4 +104,21 @@ export async function completeOnboarding(
     storeOnboardingEmbedding(userId, data),
     updateDailyGoal(userId, data.dailyGoal),
   ])
+}
+
+/**
+ * Record the lightweight first-run arrival without starting an embedding or
+ * spaced-repetition write. Those systems need real preference data, not a
+ * guessed answer from a welcome screen.
+ */
+export async function completeInitialOnboarding(userId: string): Promise<void> {
+  await setDoc(
+    doc(db, "profiles", userId),
+    {
+      onboarding_completed: true,
+      onboarding_completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    { merge: true }
+  )
 }

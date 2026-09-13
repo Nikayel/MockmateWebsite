@@ -9,6 +9,7 @@ import {
   getLabOnboardingCompletion,
 } from "@/lib/labs/onboarding/client"
 import type { OnboardingConfig } from "@/lib/labs/onboarding/config"
+import type { LabOnboardingId } from "@/lib/labs/onboarding/ids"
 
 const LabOnboarding = dynamic(
   () => import("./LabOnboarding").then((module) => module.LabOnboarding),
@@ -24,7 +25,7 @@ type GateState = "loading" | "hidden" | "showing"
  * walkthrough belongs to the person who will enter the Lab, so it waits until
  * Firebase resolves an account rather than leaving browser-wide state behind.
  */
-export function LabOnboardingGate({ config }: { config: OnboardingConfig }) {
+export function LabOnboardingGate({ config }: { config: OnboardingConfig<LabOnboardingId> }) {
   const { firebaseUser, initialized } = useAuth()
   const [state, setState] = useState<GateState>("loading")
 
