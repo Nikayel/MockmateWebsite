@@ -62,6 +62,8 @@ export interface SystemMapBeat extends BeatBase {
 export interface PairBeat extends BeatBase {
   kind: "pair"
   partnerName: string
+  /** Render the established Sparra mascot instead of the generic partner orb. */
+  mascot?: "sparra"
   lines: string[]
 }
 

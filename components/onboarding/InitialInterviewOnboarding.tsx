@@ -26,6 +26,7 @@ const INITIAL_INTERVIEW_CONFIG = {
       kind: "pair" as const,
       chapter: "Your guide",
       partnerName: "Sparra",
+      mascot: "sparra" as const,
       lines: ["Your interviewer keeps the round moving. You do the thinking and the coding."],
     },
     {

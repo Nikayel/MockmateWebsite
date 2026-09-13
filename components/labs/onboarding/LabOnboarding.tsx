@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import dynamic from "next/dynamic"
 import { AnimatePresence, MotionConfig, motion } from "framer-motion"
 
+import { Sparra } from "@/components/brand/Sparra"
 import type { OnboardingBeat, OnboardingConfig } from "@/lib/labs/onboarding/config"
 
 /**
@@ -122,6 +123,16 @@ const OVERLAY_CSS = `
   border-radius: 999px;
   background: radial-gradient(circle at 35% 30%, #f3c37e, #E8A13C 55%, #b9781f);
   box-shadow: 0 0 34px rgba(232, 161, 60, 0.5);
+}
+.lab-onb-sparra {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 28px;
+  background: rgba(232, 161, 60, 0.08);
+  box-shadow: 0 0 44px rgba(232, 161, 60, 0.2), inset 0 0 0 1px rgba(232, 161, 60, 0.18);
 }
 .lab-onb-map { width: 100%; display: flex; flex-direction: column; gap: 14px; align-items: center; }
 .lab-onb-map-canvas {
@@ -296,7 +307,13 @@ function BeatContent({ beat }: { beat: OnboardingBeat }) {
     case "pair":
       return (
         <div className="lab-onb-beat">
-          <div className="lab-onb-pair-orb" aria-hidden />
+          {beat.mascot === "sparra" ? (
+            <div className="lab-onb-sparra">
+              <Sparra state="thinking" size={76} label="Sparra is thinking" />
+            </div>
+          ) : (
+            <div className="lab-onb-pair-orb" aria-hidden />
+          )}
           <span className="lab-onb-eyebrow">{beat.partnerName}</span>
           {beat.lines.map((line, i) => (
             <motion.p
