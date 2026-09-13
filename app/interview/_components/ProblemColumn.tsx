@@ -273,27 +273,6 @@ export const ProblemColumn = memo(function ProblemColumn({
                       </div>
                     )}
 
-                    {/* Debugging signals - shown independently, right after description */}
-                    {/* Only show hints when user has written meaningful code beyond starter code */}
-                    {/* Always rendered once the interview starts: hints generate on
-                        intent only now, so the section's empty state IS the request
-                        affordance. Gating on fetch status would hide it forever. */}
-                    {isInterviewStarted && (
-                      <ProblemHintSection
-                        isBugfix={isBugfix}
-                        ragHints={ragHints}
-                        hintFetchStatus={hintFetchStatus}
-                        hintFeedback={hintFeedback}
-                        revealedAIHintIndices={revealedAIHintIndices}
-                        selectedScenarioId={selectedScenario?.id}
-                        hintAgent={hintAgent}
-                        hintsStale={hintsStale}
-                        fetchRAGHints={fetchRAGHints}
-                        submitHintFeedback={submitHintFeedback}
-                        setRevealedAIHintIndices={setRevealedAIHintIndices}
-                      />
-                    )}
-
                     {/* IMPROVED: Examples with better visual hierarchy */}
                     {selectedScenario.type === "dsa" &&
                       selectedScenario.examples &&
@@ -396,6 +375,24 @@ export const ProblemColumn = memo(function ProblemColumn({
                           </div>
                         )}
                       </div>
+                    )}
+
+                    {/* Signals belong after the question material, so this optional
+                        action does not interrupt a candidate's first read. */}
+                    {isInterviewStarted && (
+                      <ProblemHintSection
+                        isBugfix={isBugfix}
+                        ragHints={ragHints}
+                        hintFetchStatus={hintFetchStatus}
+                        hintFeedback={hintFeedback}
+                        revealedAIHintIndices={revealedAIHintIndices}
+                        selectedScenarioId={selectedScenario?.id}
+                        hintAgent={hintAgent}
+                        hintsStale={hintsStale}
+                        fetchRAGHints={fetchRAGHints}
+                        submitHintFeedback={submitHintFeedback}
+                        setRevealedAIHintIndices={setRevealedAIHintIndices}
+                      />
                     )}
 
                     {/* Legacy static hints are kept hidden during interviews so generated insights are the single hint surface. */}

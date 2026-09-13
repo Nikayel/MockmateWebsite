@@ -426,7 +426,7 @@ export async function validateConversationEdge(
     communicationEffort: 0,
   }
 
-  if (!genAI || transcript.length === 0) {
+  if (transcript.length === 0) {
     return defaultResult
   }
 
@@ -543,7 +543,7 @@ export async function extractConversationEvidenceEdge(
   timeComplexity: { mentioned: boolean; value?: string; isCorrect?: boolean }
   edgeCases: { mentionedByCandidate: string[] }
 } | null> {
-  if (!genAI || transcript.length === 0) {
+  if (transcript.length === 0) {
     return null
   }
 

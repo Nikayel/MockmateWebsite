@@ -23,3 +23,17 @@ describe("candidate edge-case tracking", () => {
     expect(tracker.edgeCasesMentioned).toContain("empty")
   })
 })
+
+describe("candidate complexity tracking", () => {
+  it("leaves free-form complexity claims to semantic transcript evaluation", () => {
+    const tracker = updateTrackerFromMessage(
+      createEmptyTracker(),
+      "Sorting is O(n log n), and for the space we may store every interval, so O(n).",
+      "user"
+    )
+
+    expect(tracker.timeComplexityMentioned).toBe(false)
+    expect(tracker.spaceComplexityMentioned).toBe(false)
+    expect(tracker.complexityExplanationGiven).toBe(false)
+  })
+})

@@ -2,6 +2,7 @@
 
 import { type Dispatch, type SetStateAction } from "react"
 import { Eye, Lightbulb, RefreshCw, ThumbsDown, ThumbsUp } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 interface ProblemHintSectionProps {
   isBugfix: boolean
@@ -32,41 +33,36 @@ export function ProblemHintSection({
   setRevealedAIHintIndices,
 }: ProblemHintSectionProps) {
   return (
-    <div className="space-y-2">
-      <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-amber-200 uppercase">
-        <span className="h-4 w-1 rounded-full bg-amber-300"></span>
-        <Lightbulb className="h-4 w-4" aria-hidden="true" />
-        {isBugfix ? "Debugging Signals" : "Interview Signals"}
-        {ragHints.length > 0 && (
-          <span className="text-muted-foreground text-xs font-normal">
-            ({revealedAIHintIndices.size}/{ragHints.length} revealed)
-          </span>
-        )}
-      </h3>
+    <div className="space-y-2 pt-1">
       {hintFetchStatus === "loading" ? (
-        <div className="text-muted-foreground flex items-center gap-2 rounded-lg border border-amber-400/20 bg-amber-500/5 p-3 text-sm">
-          <div className="h-3 w-3 animate-spin rounded-full border-2 border-amber-300 border-t-transparent" />
-          Reading your session signal...
+        <div className="text-muted-foreground flex items-center gap-2 px-1 py-2 text-sm">
+          <div className="border-muted-foreground h-3 w-3 animate-spin rounded-full border-2 border-t-transparent" />
+          Generating a signal…
         </div>
       ) : hintFetchStatus === "error" || ragHints.length === 0 ? (
-        <div className="border-border/30 bg-muted/30 rounded-lg border p-3">
-          <p className="text-muted-foreground text-sm">
-            Stuck? Ask for a signal when you want one. Nothing is generated until you do.
-          </p>
-          <button
-            onClick={fetchRAGHints}
-            className="mt-2 flex items-center gap-1.5 text-xs text-amber-300 transition-colors hover:text-amber-200"
-          >
-            <Lightbulb className="h-3 w-3" aria-hidden="true" />
-            Request a signal
-          </button>
-        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={fetchRAGHints}
+          className="border-border/60 bg-background/50 text-muted-foreground hover:bg-muted hover:text-foreground h-9"
+        >
+          <Lightbulb className="h-3.5 w-3.5" aria-hidden="true" />
+          Request a signal
+        </Button>
       ) : (
         <div className="space-y-2">
+          <h3 className="text-muted-foreground flex items-center gap-2 text-xs font-medium tracking-wide uppercase">
+            <Lightbulb className="h-3.5 w-3.5" aria-hidden="true" />
+            {isBugfix ? "Debugging signals" : "Interview signals"}
+            <span className="font-normal">
+              ({revealedAIHintIndices.size}/{ragHints.length})
+            </span>
+          </h3>
           {hintsStale && (
             <button
               onClick={fetchRAGHints}
-              className="flex w-full items-center gap-1.5 rounded-lg border border-amber-400/30 bg-amber-500/10 p-2 text-left text-xs text-amber-200 transition-colors hover:bg-amber-500/20"
+              className="border-border/60 bg-muted/30 text-muted-foreground hover:bg-muted flex w-full items-center gap-1.5 rounded-lg border p-2 text-left text-xs transition-colors"
             >
               <RefreshCw className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
               Your test results changed since these signals. Refresh them?
@@ -84,15 +80,17 @@ export function ProblemHintSection({
                   key={`ai-hint-${i}`}
                   className={`rounded-lg border transition-all ${
                     isRevealed
-                      ? "border-amber-400/30 bg-amber-500/10"
-                      : "cursor-pointer border-amber-400/20 bg-amber-500/5 hover:bg-amber-500/10"
+                      ? "border-border/70 bg-muted/30"
+                      : "border-border/60 bg-background/50 hover:bg-muted/50 cursor-pointer"
                   }`}
                 >
                   {isRevealed ? (
                     <div className="p-3">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="flex-1 text-sm leading-relaxed text-amber-50">
-                          <span className="font-medium text-amber-200">Level {hint.level}:</span>{" "}
+                        <p className="text-foreground flex-1 text-sm leading-relaxed">
+                          <span className="text-accent-strong font-medium">
+                            Level {hint.level}:
+                          </span>{" "}
                           {hint.hint}
                         </p>
                         {/* Feedback buttons */}
@@ -125,7 +123,7 @@ export function ProblemHintSection({
                   ) : (
                     <button
                       type="button"
-                      className="relative w-full p-3 text-left focus:ring-2 focus:ring-amber-300 focus:outline-none"
+                      className="focus:ring-ring relative w-full p-3 text-left focus:ring-2 focus:outline-none"
                       onClick={() => {
                         if (hint.id) {
                           hintAgent.revealHint(hint.id)
@@ -133,12 +131,12 @@ export function ProblemHintSection({
                         setRevealedAIHintIndices((prev) => new Set([...prev, i]))
                       }}
                     >
-                      <p className="pointer-events-none text-sm leading-relaxed text-amber-200/20 blur-sm select-none">
+                      <p className="text-muted-foreground/20 pointer-events-none text-sm leading-relaxed blur-sm select-none">
                         <span className="font-medium">Level {hint.level}:</span>{" "}
                         {hint.hint.substring(0, 60)}...
                       </p>
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/20 px-3 py-1.5 text-xs font-medium text-amber-200">
+                        <div className="border-border/70 bg-background/90 text-foreground flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm">
                           <Eye className="h-3.5 w-3.5" />
                           Reveal signal {i + 1}
                         </div>
