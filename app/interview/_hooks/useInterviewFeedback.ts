@@ -251,9 +251,6 @@ export function useInterviewFeedback(
             conversationTracker: {
               approachExplained: opts.conversationTracker.approachExplained,
               approachType: opts.conversationTracker.approachType,
-              timeComplexityMentioned: opts.conversationTracker.timeComplexityMentioned,
-              spaceComplexityMentioned: opts.conversationTracker.spaceComplexityMentioned,
-              complexityExplanationGiven: opts.conversationTracker.complexityExplanationGiven,
               edgeCasesMentioned: opts.conversationTracker.edgeCasesMentioned,
               hintsGiven: opts.conversationTracker.hintsGiven,
             },

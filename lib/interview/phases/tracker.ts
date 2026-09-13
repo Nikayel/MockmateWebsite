@@ -1,9 +1,4 @@
-import {
-  extractComplexityFromText,
-  extractCandidateEdgeCases,
-  extractEdgeCases,
-  normalizeComplexity,
-} from "../shared-patterns"
+import { extractCandidateEdgeCases, extractEdgeCases } from "../shared-patterns"
 import type { ConversationTracker, SilentNote, SilentNoteType } from "./types"
 
 export function createEmptyTracker(): ConversationTracker {
@@ -76,41 +71,10 @@ export function updateTrackerFromMessage(
       updated.approachExplained = true
     }
 
-    const extractedComplexity = extractComplexityFromText(message)
-
-    if (extractedComplexity) {
-      if (lowerMessage.includes("space") || lowerMessage.includes("memory")) {
-        updated.spaceComplexityMentioned = true
-        updated.spaceComplexityValue = extractedComplexity
-      } else {
-        updated.timeComplexityMentioned = true
-        updated.timeComplexityValue = extractedComplexity
-      }
-    }
-
-    if (
-      !extractedComplexity &&
-      (lowerMessage.includes("linear") ||
-        lowerMessage.includes("constant") ||
-        lowerMessage.includes("quadratic") ||
-        lowerMessage.includes("logarithmic") ||
-        lowerMessage.includes("exponential"))
-    ) {
-      updated.timeComplexityMentioned = true
-      updated.timeComplexityValue = normalizeComplexity(lowerMessage)
-    }
-
-    if (
-      updated.timeComplexityMentioned &&
-      (lowerMessage.includes("because") ||
-        lowerMessage.includes("since") ||
-        lowerMessage.includes("due to") ||
-        lowerMessage.includes("loop") ||
-        lowerMessage.includes("iterate") ||
-        lowerMessage.includes("through"))
-    ) {
-      updated.complexityExplanationGiven = true
-    }
+    // Complexity claims are intentionally not inferred from words or regexes here.
+    // Natural speech often discusses time and space in one turn, and ordinary words
+    // such as "space" are not proof of a complexity claim. Final scoring evaluates
+    // the complete transcript semantically instead.
 
     // Generic phrases such as "any edge cases?" are not evidence. Only record
     // concrete conditions the candidate actually named; semantic extraction can
