@@ -38,8 +38,11 @@ import { PRICING_CONFIG, type SubscriptionTier } from "@/lib/config"
 import { SparraLoader } from "@/components/brand/SparraLoader"
 import { resolveFeedbackGenerationStatus } from "@/lib/feedback/generation-stalled"
 
-const OnboardingModal = dynamic(
-  () => import("@/components/OnboardingModal").then((mod) => mod.OnboardingModal),
+const InitialInterviewOnboarding = dynamic(
+  () =>
+    import("@/components/onboarding/InitialInterviewOnboarding").then(
+      (mod) => mod.InitialInterviewOnboarding
+    ),
   {
     ssr: false,
   }
@@ -373,17 +376,13 @@ export default function DashboardPage() {
 
   return (
     <main className="bg-background min-h-screen">
-      <OnboardingModal
+      <InitialInterviewOnboarding
         isOpen={showOnboarding}
         userId={firebaseUser?.uid || ""}
-        userName={userName}
-        onSkip={() => setShowOnboarding(false)}
-        onComplete={async (takeTour: boolean) => {
+        onDone={() => {
           setShowOnboarding(false)
-          if (takeTour) {
-            setShowTour(true)
-          }
           setReloadKey((key) => key + 1)
+          router.push("/interview?onboarding=1")
         }}
       />
 

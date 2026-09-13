@@ -29,6 +29,8 @@ export type FirestoreRoadmapData = Omit<
   "createdAt" | "updatedAt" | "interviewDate" | "dailyPlans" | "milestones"
 > & {
   userId?: string
+  /** True only for the single roadmap granted through FIRST_ROADMAP_FREE. */
+  is_first_free_roadmap?: boolean
   createdAt?: unknown
   updatedAt?: unknown
   interviewDate?: unknown

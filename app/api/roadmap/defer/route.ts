@@ -29,9 +29,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Server-side tier gate: roadmap is a Pro feature.
+    // A free learner may manage only their explicitly granted first roadmap.
     const tierCheck = await requireTierForUser(authResult.userId, "pro")
-    if (tierCheck.response) return tierCheck.response
+    const canManageAllRoadmaps = tierCheck.allowed
+    if (!canManageAllRoadmaps && tierCheck.tier !== "free") return tierCheck.response!
 
     const userId = authResult.userId
     const { roadmapId, scenarioId } = (await request.json()) as DeferRequestBody
@@ -54,6 +55,9 @@ export async function POST(request: NextRequest) {
       const roadmapData = doc.data() as FirestoreRoadmapData | undefined
       if (roadmapData?.userId !== userId) {
         throw new Error("UNAUTHORIZED")
+      }
+      if (!canManageAllRoadmaps && roadmapData?.is_first_free_roadmap !== true) {
+        throw new Error("PRO_REQUIRED")
       }
 
       const dailyPlans = roadmapData.dailyPlans ?? []
@@ -92,6 +96,12 @@ export async function POST(request: NextRequest) {
       }
       if (error.message === "UNAUTHORIZED") {
         return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
+      }
+      if (error.message === "PRO_REQUIRED") {
+        return NextResponse.json(
+          { error: "Pro feature required", code: "PRO_REQUIRED", upgradeUrl: "/upgrade" },
+          { status: 403 }
+        )
       }
       if (error.message === "QUESTION_NOT_FOUND") {
         return NextResponse.json({ error: "Question not found in roadmap" }, { status: 404 })

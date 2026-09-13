@@ -325,7 +325,7 @@ export function LabOnboarding({
   config,
   onDone,
 }: {
-  config: OnboardingConfig
+  config: OnboardingConfig<string>
   /** Called once the cinematic is finished or skipped; may persist completion. */
   onDone: () => void | Promise<void>
 }) {

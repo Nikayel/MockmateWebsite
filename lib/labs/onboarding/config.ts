@@ -16,8 +16,6 @@
  * next screen, it does not belong in the list.
  */
 
-import type { LabOnboardingId } from "./ids"
-
 /** The kinds of beat the overlay knows how to render, in their natural order. */
 export type OnboardingBeatKind = "offer" | "company" | "system-map" | "pair" | "handoff"
 
@@ -78,12 +76,12 @@ export interface HandoffBeat extends BeatBase {
 
 export type OnboardingBeat = OfferBeat | CompanyBeat | SystemMapBeat | PairBeat | HandoffBeat
 
-export interface OnboardingConfig {
+export interface OnboardingConfig<Id extends string = LabOnboardingId> {
   /**
    * Stable database id, scoped per company/lab (for example, `meridian`).
    * Changing the version in `state.ts` re-shows the cinematic.
    */
-  id: LabOnboardingId
+  id: Id
   /** Company name, for the resume card and the accessible label. */
   company: string
   /** The beats, in order. Four or five; see the two configs that build these. */
@@ -94,3 +92,4 @@ export interface OnboardingConfig {
 export function findSystemMapBeat(config: OnboardingConfig): SystemMapBeat | null {
   return (config.beats.find((beat) => beat.kind === "system-map") as SystemMapBeat) ?? null
 }
+import type { LabOnboardingId } from "./ids"

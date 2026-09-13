@@ -87,6 +87,11 @@ export const FLAGS = {
   // main, per the owner's ship-behind-a-flag decision in
   // docs/sprint-labs/EXECUTION-STATE.md.
   SPRINT_LABS_ENABLED: false,
+
+  // Lets a signed-in free learner create exactly one full roadmap. The claim is
+  // reserved server-side before generation, so this is an entitlement rather
+  // than a client-side promotion that can be clicked twice.
+  FIRST_ROADMAP_FREE: false,
 } as const
 
 export type FlagName = keyof typeof FLAGS
