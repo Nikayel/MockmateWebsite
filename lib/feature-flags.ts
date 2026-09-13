@@ -91,7 +91,7 @@ export const FLAGS = {
   // Lets a signed-in free learner create exactly one full roadmap. The claim is
   // reserved server-side before generation, so this is an entitlement rather
   // than a client-side promotion that can be clicked twice.
-  FIRST_ROADMAP_FREE: false,
+  FIRST_ROADMAP_FREE: true,
 } as const
 
 export type FlagName = keyof typeof FLAGS
