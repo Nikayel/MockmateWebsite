@@ -33,7 +33,7 @@ const INITIAL_INTERVIEW_CONFIG = {
       kind: "handoff" as const,
       chapter: "Start",
       heading: "Choose your first practice lane.",
-      body: "Start with DSA or debugging. When you are ready, your first personalized roadmap is free.",
+      body: "Start with DSA or debugging. Your first personalized roadmap is free. Labs and decomposition practice are currently in beta.",
       ctaLabel: "Choose a practice lane",
     },
   ],
