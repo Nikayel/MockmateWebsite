@@ -40,6 +40,7 @@
 import posthog from "posthog-js"
 import { hasAnalyticsConsent } from "@/components/CookieConsent"
 import { COOKIELESS_UNTIL_CONSENT, applyPostHogConsent } from "@/lib/posthog-consent"
+import { dropUnattributableExceptions } from "@/lib/posthog-exception-filter"
 
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY
 
@@ -56,6 +57,10 @@ if (POSTHOG_KEY) {
     // Second line of defence behind the route exclusion: on the pages that do
     // record, rrweb masks every input value before the recording is sent.
     session_recording: { maskAllInputs: true },
+    // Autocapture reports every uncaught browser error. Extensions and injected
+    // third-party scripts throw on our pages too, so drop exceptions whose
+    // frames we cannot attribute to our own code before they reach the inbox.
+    before_send: dropUnattributableExceptions,
     ...COOKIELESS_UNTIL_CONSENT,
   })
 
