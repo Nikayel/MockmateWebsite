@@ -61,6 +61,17 @@ async function drain(response: Response): Promise<string> {
   return await new Response(response.body).text()
 }
 
+function readSseEvent<T>(stream: string, eventName: string): T {
+  const frame = stream
+    .split("\n\n")
+    .find((candidate) => candidate.startsWith(`event: ${eventName}\n`))
+  if (!frame) throw new Error(`Missing SSE event: ${eventName}`)
+
+  const dataLine = frame.split("\n").find((line) => line.startsWith("data: "))
+  if (!dataLine) throw new Error(`Missing data for SSE event: ${eventName}`)
+  return JSON.parse(dataLine.slice("data: ".length)) as T
+}
+
 function installThreeRequestLimit() {
   const requestsByUser = new Map<string, number>()
   mocks.enforceFeedbackStreamRateLimit.mockImplementation(async (userId: string) => {
@@ -437,6 +448,107 @@ describe("/api/feedback/stream cost bounds", () => {
         expect.stringContaining("Transcript exceeded"),
         expect.anything()
       )
+    })
+  })
+
+  describe("semantic scoring integration", () => {
+    it("credits the Merge Intervals approach and complexity from the final transcript", async () => {
+      mocks.validateConversationEdge.mockResolvedValue({
+        isCoherent: true,
+        responsesRelevant: true,
+        approachExplained: true,
+        approachQuality: "good",
+        complexityDiscussed: true,
+        complexityAccurate: true,
+        statedComplexity: "O(n log n) time and O(n) space",
+        questionsAsked: 4,
+        questionsAnswered: 4,
+        edgeCasesConsidered: false,
+        alternativesDiscussed: false,
+        communicationScore: 75,
+      })
+      mocks.extractConversationEvidenceEdge.mockResolvedValue({
+        approach: {
+          explained: true,
+          quote:
+            "So I'm thinking first, I'll sort the items or intervals. And then I wanna have two case.",
+        },
+        timeComplexity: {
+          mentioned: true,
+          value: "O(n log n)",
+          isCorrect: true,
+        },
+        edgeCases: { mentionedByCandidate: [] },
+      })
+
+      const transcript = [
+        {
+          role: "interviewer",
+          content:
+            "Walk me through the full approach you have in mind, step by step, from input to output.",
+        },
+        {
+          role: "candidate",
+          content:
+            "So I'm thinking first, I'll sort the items or intervals. And then I wanna have two case. One case where there is overlap, one case where there is not an overlap. And when there is an overlap, I update the previous intervals.",
+        },
+        {
+          role: "interviewer",
+          content: "What time and space complexity are you targeting with this approach?",
+        },
+        {
+          role: "candidate",
+          content:
+            "That would be o n log n and, also, n is the total intervals. And for the space, we end up adding everything potentially. Well yes. And that would make it o n space.",
+        },
+      ]
+
+      const { POST } = await import("./route")
+      const stream = await drain(
+        await POST(
+          makeRequest({
+            scenarioTitle: "Merge Intervals",
+            conversationTranscript: transcript,
+            code: "def merge(intervals):\n    intervals.sort()\n    return intervals",
+            language: "python",
+            testsPassed: 5,
+            testsTotal: 5,
+            testsRanBeforeSubmit: true,
+            submittedFromPhase: "testing",
+            efficiencyMetrics: {
+              efficiencyScore: 98,
+              estimatedTimeComplexity: "O(n log n)",
+              estimatedSpaceComplexity: "O(n)",
+            },
+          })
+        )
+      )
+
+      const scores = readSseEvent<{
+        understanding: number
+        problemSolving: number
+        codeQuality: number
+        communication: number
+        overall: number
+      }>(stream, "refined_scores")
+
+      expect(scores).toEqual({
+        understanding: 99,
+        problemSolving: 79,
+        codeQuality: 99,
+        communication: 80,
+        overall: 88,
+      })
+
+      const [transcriptSeen] = mocks.validateConversationEdge.mock.calls[0] as [
+        Array<{ role: string; content: string }>,
+      ]
+      expect(transcriptSeen.filter((message) => message.role === "user")).toHaveLength(2)
+      expect(transcriptSeen[3].content).toContain("o n log n")
+
+      const feedbackPrompt = mocks.generateFeedbackResponseEdge.mock.calls[0][1] as string
+      expect(feedbackPrompt).toContain("Approach explained: YES")
+      expect(feedbackPrompt).toContain("Complexity discussed: YES")
     })
   })
 })
