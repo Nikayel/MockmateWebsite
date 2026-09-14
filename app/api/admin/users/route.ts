@@ -5,8 +5,7 @@
  * DELETE: Delete a user and all their data (with rate limiting and idempotency)
  */
 
-import { NextRequest, NextResponse } from "next/server"
-import { FieldPath } from "firebase-admin/firestore"
+import { NextRequest } from "next/server"
 import { adminDb, adminAuth } from "@/lib/firebase-admin"
 import {
   withPermission,
@@ -22,6 +21,8 @@ import Stripe from "stripe"
 import { Pinecone } from "@pinecone-database/pinecone"
 import { logger } from "@/lib/logger"
 import { adminDeletionRateLimit } from "@/lib/rate-limiting"
+import { filterAndSortUsers, parseUserListQuery } from "@/lib/admin/user-list-query"
+import { invalidateUserDirectory, loadUserDirectory } from "@/lib/admin/user-directory"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-12-15.clover" as any,
@@ -59,16 +60,6 @@ const collectionsToDelete = [
  * Fetches from Firebase Auth (source of truth for all sign-ups) and merges with
  * Firestore profiles for subscription/onboarding data.
  */
-const MAX_AUTH_USERS = 5000 // Cap to prevent timeout on listUsers
-const AUTH_BATCH_SIZE = 1000 // Firebase listUsers max per call
-
-function getAuthProvider(authUser: import("firebase-admin/auth").UserRecord): string {
-  const provider = authUser.providerData?.[0]?.providerId
-  if (provider === "google.com") return "google"
-  if (provider === "github.com") return "github"
-  return provider || "unknown"
-}
-
 export const GET = withPermission(PERMISSIONS.VIEW_USERS, async (request) => {
   try {
     if (!adminDb) {
@@ -94,81 +85,32 @@ export const GET = withPermission(PERMISSIONS.VIEW_USERS, async (request) => {
     }
     const page = pageParam.value
     const limit = limitParam.value
-    const search = (searchParams.get("search") || "").toLowerCase()
+    const parsedQuery = parseUserListQuery(searchParams)
+    if (!parsedQuery.ok) return errorResponse(parsedQuery.error, 400)
 
-    // 1. Fetch all users from Firebase Auth (Google, GitHub, etc.)
-    const authUsers: import("firebase-admin/auth").UserRecord[] = []
-    let pageToken: string | undefined
-
-    do {
-      const result = await adminAuth.listUsers(AUTH_BATCH_SIZE, pageToken)
-      authUsers.push(...result.users)
-      pageToken = result.pageToken
-      if (authUsers.length >= MAX_AUTH_USERS) break
-    } while (pageToken)
-
-    // 2. Batch fetch profiles for these users (Firestore 'in' supports up to 30)
-    const profileMap = new Map<string, FirebaseFirestore.DocumentData>()
-    const PROFILE_BATCH = 30
-    for (let i = 0; i < authUsers.length; i += PROFILE_BATCH) {
-      const batch = authUsers.slice(i, i + PROFILE_BATCH)
-      const ids = batch.map((u) => u.uid)
-      const profilesSnap = await adminDb
-        .collection("profiles")
-        .where(FieldPath.documentId(), "in", ids)
-        .get()
-      profilesSnap.docs.forEach((doc) => profileMap.set(doc.id, doc.data()))
-    }
-
-    // 3. Merge auth + profile, sort by creation (newest first)
-    let users = authUsers.map((authUser) => {
-      const profile = profileMap.get(authUser.uid)
-      const createdAt =
-        authUser.metadata?.creationTime || profile?.created_at || new Date().toISOString()
-      const email = authUser.email || profile?.email || ""
-      return {
-        id: authUser.uid,
-        email,
-        // Computed server-side from the non-public ADMIN_PROTECTED_EMAILS so
-        // the client never ships the protected-admin list (DISCLOSE-1).
-        is_protected: !!email && PROTECTED_EMAILS.includes(email.toLowerCase()),
-        full_name: authUser.displayName || profile?.full_name || "",
-        auth_provider: getAuthProvider(authUser),
-        subscription_tier: profile?.subscription_tier || "free",
-        subscription_status: profile?.subscription_status || "none",
-        created_at: createdAt,
-        updated_at: profile?.updated_at || "",
-        onboarding_completed: profile?.onboarding_completed || false,
-        stripe_customer_id: profile?.stripe_customer_id || null,
-      }
-    })
-
-    users.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
-
-    // 4. Apply search filter
-    if (search) {
-      users = users.filter(
-        (user) =>
-          user.email.toLowerCase().includes(search) ||
-          (user.full_name || "").toLowerCase().includes(search) ||
-          user.id.toLowerCase().includes(search) ||
-          (user.auth_provider || "").toLowerCase().includes(search)
-      )
-    }
+    const directory = await loadUserDirectory(PROTECTED_EMAILS, searchParams.get("refresh") === "1")
+    const users = filterAndSortUsers(directory.users, parsedQuery.value)
 
     const total = users.length
-    const startIndex = (page - 1) * limit
+    const totalPages = Math.max(1, Math.ceil(total / limit))
+    const resolvedPage = Math.min(page, totalPages)
+    const startIndex = (resolvedPage - 1) * limit
     const paginatedUsers = users.slice(startIndex, startIndex + limit)
 
     return successResponse({
       users: paginatedUsers,
       pagination: {
-        page,
+        page: resolvedPage,
         limit,
         total,
-        totalPages: Math.ceil(total / limit),
-        isSearchResult: !!search,
-        searchCapped: authUsers.length >= MAX_AUTH_USERS,
+        totalPages,
+        isFiltered:
+          !!parsedQuery.value.search ||
+          parsedQuery.value.tier !== "all" ||
+          parsedQuery.value.provider !== "all" ||
+          !!parsedQuery.value.signedUpFrom ||
+          !!parsedQuery.value.signedUpTo,
+        searchCapped: directory.capped,
       },
     })
   } catch (error: unknown) {
@@ -286,6 +228,7 @@ export async function DELETE(request: NextRequest) {
 
     // Commit the batch delete
     await batch.commit()
+    invalidateUserDirectory()
 
     // 4. Delete user vectors from Pinecone (if configured)
     if (process.env.PINECONE_API_KEY) {

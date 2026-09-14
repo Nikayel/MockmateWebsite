@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -24,22 +24,23 @@ import {
   UserListSkeleton,
 } from "@/components/admin/shared"
 import { UserProfileDrawer } from "@/components/admin/UserProfileDrawer"
-import { Users, UserPlus, Crown, Search, RefreshCw, Trash2, X, Eye, Loader2 } from "lucide-react"
+import {
+  UserListFilters,
+  type UserListFiltersValue,
+} from "@/components/admin/users/UserListFilters"
+import { Users, UserPlus, Crown, Search, RefreshCw, Trash2, Eye, ArrowUpDown } from "lucide-react"
 import { logger } from "@/lib/logger"
+import type { AdminUserListItem } from "@/lib/admin/user-list-query"
 
-interface UserProfile {
-  id: string
-  email: string
-  full_name?: string
-  auth_provider?: string
-  subscription_tier: string
-  subscription_status?: string
-  created_at: string
-  updated_at?: string
-  onboarding_completed?: boolean
-  stripe_customer_id?: string | null
-  // Computed server-side from the non-public protected-admin list (DISCLOSE-1).
-  is_protected?: boolean
+type UserProfile = AdminUserListItem
+
+const DEFAULT_USER_FILTERS: UserListFiltersValue = {
+  tier: "all",
+  provider: "all",
+  signedUpFrom: "",
+  signedUpTo: "",
+  sortOrder: "desc",
+  limit: 25,
 }
 
 export default function UsersPage() {
@@ -71,6 +72,8 @@ export default function UsersPage() {
   const [usersError, setUsersError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [totalUsers, setTotalUsers] = useState(0)
+  const [filters, setFilters] = useState<UserListFiltersValue>(DEFAULT_USER_FILTERS)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -78,6 +81,7 @@ export default function UsersPage() {
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [authToken, setAuthToken] = useState<string | null>(null)
+  const usersRequestId = useRef(0)
 
   const loadData = useCallback(async () => {
     if (!firebaseUser) return
@@ -102,49 +106,65 @@ export default function UsersPage() {
     }
   }, [firebaseUser, timeRange])
 
-  const loadUsers = useCallback(async () => {
-    if (!firebaseUser) return
+  const loadUsers = useCallback(
+    async (forceRefresh = false) => {
+      if (!firebaseUser) return
 
-    setUsersLoading(true)
-    try {
-      const token = await firebaseUser.getIdToken()
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: "50",
-      })
-      if (searchQuery) {
-        params.append("search", searchQuery)
+      const requestId = ++usersRequestId.current
+      setUsersLoading(true)
+      try {
+        const token = await firebaseUser.getIdToken()
+        const params = new URLSearchParams({
+          page: page.toString(),
+          limit: filters.limit.toString(),
+          tier: filters.tier,
+          provider: filters.provider,
+          sortOrder: filters.sortOrder,
+        })
+        if (searchQuery) {
+          params.append("search", searchQuery)
+        }
+        if (filters.signedUpFrom) params.set("signedUpFrom", filters.signedUpFrom)
+        if (filters.signedUpTo) params.set("signedUpTo", filters.signedUpTo)
+        if (forceRefresh) params.set("refresh", "1")
+
+        const response = await fetch(`/api/admin/users?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+
+        if (!response.ok) {
+          if (requestId !== usersRequestId.current) return
+          setUsersError(
+            response.status === 403
+              ? "Your role does not have permission to list users."
+              : `The users service returned ${response.status}.`
+          )
+          return
+        }
+
+        const data = await response.json()
+        if (requestId !== usersRequestId.current) return
+        if (!data.success) {
+          setUsersError("The users service returned a response this page could not read.")
+          return
+        }
+
+        setUsers(data.users)
+        setTotalPages(Math.max(1, data.pagination.totalPages))
+        setTotalUsers(data.pagination.total)
+        if (data.pagination.page !== page) setPage(data.pagination.page)
+        setUsersError(null)
+      } catch (error) {
+        logger.error("Error loading users list", { error, search: searchQuery })
+        if (requestId === usersRequestId.current) {
+          setUsersError("Could not reach the users service. Check your connection and try again.")
+        }
+      } finally {
+        if (requestId === usersRequestId.current) setUsersLoading(false)
       }
-
-      const response = await fetch(`/api/admin/users?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!response.ok) {
-        setUsersError(
-          response.status === 403
-            ? "Your role does not have permission to list users."
-            : `The users service returned ${response.status}.`
-        )
-        return
-      }
-
-      const data = await response.json()
-      if (!data.success) {
-        setUsersError("The users service returned a response this page could not read.")
-        return
-      }
-
-      setUsers(data.users)
-      setTotalPages(data.pagination.totalPages)
-      setUsersError(null)
-    } catch (error) {
-      logger.error("Error loading users list", { error, search: searchQuery })
-      setUsersError("Could not reach the users service. Check your connection and try again.")
-    } finally {
-      setUsersLoading(false)
-    }
-  }, [firebaseUser, page, searchQuery])
+    },
+    [firebaseUser, filters, page, searchQuery]
+  )
 
   // Settle the search term before asking the server for it. 350ms is below the
   // threshold where a pause feels like lag and above a fast typist's gap between
@@ -162,8 +182,20 @@ export default function UsersPage() {
   }, [loadData])
 
   useEffect(() => {
-    loadUsers()
+    void loadUsers()
   }, [loadUsers])
+
+  const handleFiltersChange = (nextFilters: UserListFiltersValue) => {
+    setFilters(nextFilters)
+    setPage(1)
+  }
+
+  const hasActiveFilters =
+    !!searchQuery ||
+    filters.tier !== "all" ||
+    filters.provider !== "all" ||
+    !!filters.signedUpFrom ||
+    !!filters.signedUpTo
 
   const handleDelete = async () => {
     if (!userToDelete || !firebaseUser) return
@@ -182,7 +214,7 @@ export default function UsersPage() {
 
       if (response.ok) {
         // Reload users and metrics
-        await loadUsers()
+        await loadUsers(true)
         await loadData()
         setDeleteDialogOpen(false)
         setUserToDelete(null)
@@ -353,32 +385,32 @@ export default function UsersPage() {
       {/* User List */}
       <Card className="border-gray-800 bg-gray-900/50">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-white">All Users</CardTitle>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400" />
-                <Input
-                  placeholder="Search users..."
-                  aria-label="Search users by email or ID"
-                  value={searchInput}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    setSearchInput(e.target.value)
-                  }}
-                  className="w-64 border-gray-700 bg-gray-800 pl-10 text-white"
-                />
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <CardTitle className="text-white">All Users</CardTitle>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="relative min-w-0 sm:w-80">
+                  <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400" />
+                  <Input
+                    placeholder="Search email, name, provider, or ID"
+                    aria-label="Search users by email, name, provider, or ID"
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    className="min-h-11 w-full border-gray-700 bg-gray-800 pl-10 text-white"
+                  />
+                </div>
+                <Button
+                  onClick={() => loadUsers(true)}
+                  variant="outline"
+                  className="min-h-11 border-gray-700 text-gray-400 hover:text-white"
+                  disabled={usersLoading}
+                >
+                  <RefreshCw className={`mr-2 h-4 w-4 ${usersLoading ? "animate-spin" : ""}`} />
+                  Refresh
+                </Button>
               </div>
-              <Button
-                onClick={loadUsers}
-                variant="outline"
-                size="sm"
-                className="border-gray-700 text-gray-400 hover:text-white"
-                disabled={usersLoading}
-              >
-                <RefreshCw className={`mr-2 h-4 w-4 ${usersLoading ? "animate-spin" : ""}`} />
-                Refresh
-              </Button>
             </div>
+            <UserListFilters value={filters} onChange={handleFiltersChange} />
           </div>
         </CardHeader>
         <CardContent>
@@ -391,7 +423,7 @@ export default function UsersPage() {
               <p className="font-medium text-yellow-400">Could not load users</p>
               <p className="mx-auto mt-1 max-w-md text-sm text-gray-400">{usersError}</p>
               <Button
-                onClick={loadUsers}
+                onClick={() => loadUsers(true)}
                 variant="outline"
                 size="sm"
                 className="mt-4 border-gray-700 text-gray-300"
@@ -401,7 +433,7 @@ export default function UsersPage() {
             </div>
           ) : users.length === 0 ? (
             <div className="py-12 text-center text-gray-400">
-              {searchQuery ? `No users match "${searchQuery}"` : "No users found"}
+              {hasActiveFilters ? "No users match the current filters" : "No users found"}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -414,8 +446,23 @@ export default function UsersPage() {
                       Provider
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">Tier</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">
-                      Created
+                    <th
+                      className="px-4 py-3 text-left text-sm font-medium text-gray-400"
+                      aria-sort={filters.sortOrder === "asc" ? "ascending" : "descending"}
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleFiltersChange({
+                            ...filters,
+                            sortOrder: filters.sortOrder === "asc" ? "desc" : "asc",
+                          })
+                        }
+                        className="flex min-h-11 items-center gap-2 rounded-sm text-left hover:text-white focus-visible:ring-2 focus-visible:ring-[#c4703f] focus-visible:outline-none"
+                      >
+                        Signed up
+                        <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
+                      </button>
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-400">
                       Status
@@ -519,27 +566,30 @@ export default function UsersPage() {
               </table>
 
               {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="mt-4 flex items-center justify-between border-t border-gray-800 pt-4">
-                  <div className="text-sm text-gray-400">
-                    Page {page} of {totalPages}
+              {totalUsers > 0 && (
+                <div className="mt-4 flex flex-col gap-3 border-t border-gray-800 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-sm text-gray-400" aria-live="polite">
+                    Showing {(page - 1) * filters.limit + 1}–
+                    {Math.min(page * filters.limit, totalUsers)} of {totalUsers.toLocaleString()}{" "}
+                    users
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
-                      size="sm"
                       onClick={() => setPage((p: number) => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      className="border-gray-700 text-gray-400 hover:text-white"
+                      disabled={page === 1 || usersLoading}
+                      className="min-h-11 border-gray-700 text-gray-400 hover:text-white"
                     >
                       Previous
                     </Button>
+                    <span className="px-2 text-sm text-gray-400">
+                      Page {page} of {totalPages}
+                    </span>
                     <Button
                       variant="outline"
-                      size="sm"
                       onClick={() => setPage((p: number) => Math.min(totalPages, p + 1))}
-                      disabled={page === totalPages}
-                      className="border-gray-700 text-gray-400 hover:text-white"
+                      disabled={page === totalPages || usersLoading}
+                      className="min-h-11 border-gray-700 text-gray-400 hover:text-white"
                     >
                       Next
                     </Button>
