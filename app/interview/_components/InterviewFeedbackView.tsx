@@ -5,6 +5,8 @@ import nextDynamic from "next/dynamic"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ErrorBoundary } from "@/components/error-boundary"
+import type { ProfilePersonalizationData } from "@/lib/onboarding/profile-personalization"
+import type { Profile } from "@/lib/types"
 import { PostInterviewView, type PostInterviewViewProps } from "./PostInterviewView"
 import { FeedbackLoadingState, type FeedbackLoadingStateProps } from "./FeedbackLoadingState"
 
@@ -16,6 +18,14 @@ const PracticeFeedback = nextDynamic(() => import("@/components/PracticeFeedback
     </div>
   ),
 })
+
+const ProfilePersonalizationPrompt = nextDynamic(
+  () =>
+    import("@/components/onboarding/profile-personalization/ProfilePersonalizationPrompt").then(
+      (module) => module.ProfilePersonalizationPrompt
+    ),
+  { ssr: false }
+)
 
 type PracticeFeedbackProps = ComponentProps<typeof PracticeFeedback>
 
@@ -78,6 +88,9 @@ interface InterviewFeedbackViewProps {
   language: PracticeFeedbackProps["language"]
   onNewProblem: PracticeFeedbackProps["onNewProblem"]
   clarifyingQuestionsAssessment: PracticeFeedbackProps["clarifyingQuestionsAssessment"]
+  showProfilePersonalization: boolean
+  personalizationProfile: Profile | null
+  onProfilePersonalizationCompleted: (data: ProfilePersonalizationData) => void
 }
 
 /**
@@ -139,6 +152,9 @@ export function InterviewFeedbackView({
   language,
   onNewProblem,
   clarifyingQuestionsAssessment,
+  showProfilePersonalization,
+  personalizationProfile,
+  onProfilePersonalizationCompleted,
 }: InterviewFeedbackViewProps) {
   return showPostInterviewDiscussion ? (
     <PostInterviewView
@@ -201,6 +217,16 @@ export function InterviewFeedbackView({
           onNewProblem={onNewProblem}
           onClose={onGoToDashboard}
           clarifyingQuestionsAssessment={clarifyingQuestionsAssessment}
+          afterScore={
+            showProfilePersonalization && userId ? (
+              <ProfilePersonalizationPrompt
+                userId={userId}
+                source="feedback"
+                profile={personalizationProfile}
+                onCompleted={onProfilePersonalizationCompleted}
+              />
+            ) : undefined
+          }
         />
       </ErrorBoundary>
       {isFromRoadmap && activeRoadmap && (

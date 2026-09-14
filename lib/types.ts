@@ -35,8 +35,12 @@ export interface Profile {
   goal?: "faang" | "startup" | "general" | "promotion"
   target_company?: string // Target company for FAANG goal (Google, Meta, etc.)
   daily_goal?: number // Daily practice goal (1, 3, 5 problems)
+  weekly_goal?: number // Target interview practice sessions per week
+  interview_timeline?: "interviewing_now" | "within_month" | "within_quarter" | "exploring"
   onboarding_completed?: boolean
   onboarding_completed_at?: string
+  profile_calibration_completed?: boolean
+  profile_calibration_completed_at?: string
   // Product tour fields
   tour_completed?: boolean
   tour_skipped?: boolean

@@ -15,7 +15,6 @@ import { getUserProfile, saveSessionState } from "@/lib/firestore-helpers"
 import { SignupPrompt } from "@/components/SignupPrompt"
 import { upgradeGuestSession } from "@/lib/interview/guest-upgrade"
 import type { User as FirebaseAuthUser } from "firebase/auth"
-import { OnboardingModal } from "@/components/OnboardingModal"
 import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
 import type { CompanyId } from "@/lib/data/company-questions/types"
@@ -87,6 +86,7 @@ import { useSystemDesignSubmit } from "./_hooks/useSystemDesignSubmit"
 import { SparraLoader } from "@/components/brand/SparraLoader"
 import { guestDebriefResumePath } from "@/lib/interview/guest-debrief-resume"
 import { usePostInterviewResumeKickoff } from "./_hooks/usePostInterviewResumeKickoff"
+import { needsProfilePersonalization } from "@/lib/onboarding/profile-personalization"
 
 // Dynamic imports for heavy components to reduce initial bundle size
 const ScenarioBrowser = nextDynamic(
@@ -511,6 +511,7 @@ function InterviewPageContent() {
   useEffect(() => {
     setCachedUserProfile(null)
     userProfileRequestRef.current = null
+    setShowProfilePersonalization(false)
   }, [user?.id])
 
   const getCachedUserProfile = useCallback(async (): Promise<Profile | null> => {
@@ -541,34 +542,22 @@ function InterviewPageContent() {
     void getCachedUserProfile()
   }, [cachedUserProfile, getCachedUserProfile, selectedScenario?.type, user])
 
-  // Post-submit onboarding. New accounts that go straight into a session
-  // (above all guest-trial converts, who signed in mid-session specifically to
-  // continue it) must never be interrupted by the preference wizard; the
-  // natural pause is right after they submit and their feedback renders. Offer
-  // it once per mount, a beat after the score lands so the score gets read
-  // first. Signed-in only: guests get SignupPrompt in this slot instead.
-  const [showPostSubmitOnboarding, setShowPostSubmitOnboarding] = useState(false)
-  const postSubmitOnboardingOfferedRef = useRef(false)
+  // The score remains the earned reward. Once it exists, offer a persistent
+  // next-step card directly below it instead of opening a modal over the
+  // report. Closing its dialog never marks it complete; the prompt returns on
+  // later feedback and dashboard visits until preferences are actually saved.
+  const [showProfilePersonalization, setShowProfilePersonalization] = useState(false)
   useEffect(() => {
-    if (
-      isGuestMode ||
-      !user ||
-      !showFeedback ||
-      performanceScore === null ||
-      postSubmitOnboardingOfferedRef.current
-    ) {
+    if (isGuestMode || !user || !showFeedback || performanceScore === null) {
       return
     }
-    let timer: ReturnType<typeof setTimeout> | undefined
     let cancelled = false
     void getCachedUserProfile().then((profile) => {
-      if (cancelled || !profile || profile.onboarding_completed) return
-      postSubmitOnboardingOfferedRef.current = true
-      timer = setTimeout(() => setShowPostSubmitOnboarding(true), 4000)
+      if (cancelled || !profile) return
+      setShowProfilePersonalization(needsProfilePersonalization(profile))
     })
     return () => {
       cancelled = true
-      if (timer) clearTimeout(timer)
     }
   }, [isGuestMode, user, showFeedback, performanceScore, getCachedUserProfile])
 
@@ -2292,6 +2281,26 @@ function InterviewPageContent() {
                   language={selectedLanguage}
                   onNewProblem={resetInterview}
                   clarifyingQuestionsAssessment={clarifyingQuestionsAssessment}
+                  showProfilePersonalization={showProfilePersonalization}
+                  personalizationProfile={cachedUserProfile}
+                  onProfilePersonalizationCompleted={(data) => {
+                    setShowProfilePersonalization(false)
+                    setCachedUserProfile((current) =>
+                      current
+                        ? {
+                            ...current,
+                            role: data.role,
+                            goal: data.goal,
+                            target_company: data.targetCompany || undefined,
+                            interview_timeline: data.interviewTimeline,
+                            weekly_goal: data.weeklyGoal,
+                            onboarding_completed: true,
+                            profile_calibration_completed: true,
+                            profile_calibration_completed_at: new Date().toISOString(),
+                          }
+                        : current
+                    )
+                  }}
                 />
               )}
             </div>
@@ -2333,25 +2342,6 @@ function InterviewPageContent() {
             }}
           />
         )}
-
-      {/* Post-submit onboarding for signed-in users who haven't completed it
-          (see the offer effect above). Completing here means the dashboard
-          never has to interrupt them; "take the tour" hands off to the
-          dashboard, where the tour's targets live. */}
-      {user && (
-        <OnboardingModal
-          isOpen={showPostSubmitOnboarding}
-          userId={user.id}
-          onComplete={(takeTour: boolean) => {
-            setShowPostSubmitOnboarding(false)
-            setCachedUserProfile((prev) => (prev ? { ...prev, onboarding_completed: true } : prev))
-            if (takeTour) {
-              router.push("/dashboard?tour=1")
-            }
-          }}
-          onSkip={() => setShowPostSubmitOnboarding(false)}
-        />
-      )}
 
       <InterviewDialogs
         selectedFile={selectedFile}

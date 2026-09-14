@@ -37,6 +37,7 @@ import { isPaidTier } from "@/lib/pricing"
 import { PRICING_CONFIG, type SubscriptionTier } from "@/lib/config"
 import { SparraLoader } from "@/components/brand/SparraLoader"
 import { resolveFeedbackGenerationStatus } from "@/lib/feedback/generation-stalled"
+import { shouldShowProfilePersonalization } from "@/lib/onboarding/profile-personalization"
 
 const InitialInterviewOnboarding = dynamic(
   () =>
@@ -46,6 +47,13 @@ const InitialInterviewOnboarding = dynamic(
   {
     ssr: false,
   }
+)
+const ProfilePersonalizationPrompt = dynamic(
+  () =>
+    import("@/components/onboarding/profile-personalization/ProfilePersonalizationPrompt").then(
+      (mod) => mod.ProfilePersonalizationPrompt
+    ),
+  { ssr: false }
 )
 const InteractiveTour = dynamic(
   () => import("@/components/InteractiveTour").then((mod) => mod.InteractiveTour),
@@ -426,6 +434,33 @@ export default function DashboardPage() {
               </Button>
             </Link>
           </div>
+
+          {shouldShowProfilePersonalization(profile, completedSessions.length) && (
+            <div className="mb-6 sm:mb-8">
+              <ProfilePersonalizationPrompt
+                userId={firebaseUser?.uid || ""}
+                source="dashboard"
+                profile={profile}
+                onCompleted={(data) => {
+                  setProfile((current) =>
+                    current
+                      ? {
+                          ...current,
+                          role: data.role,
+                          goal: data.goal,
+                          target_company: data.targetCompany || undefined,
+                          interview_timeline: data.interviewTimeline,
+                          weekly_goal: data.weeklyGoal,
+                          onboarding_completed: true,
+                          profile_calibration_completed: true,
+                          profile_calibration_completed_at: new Date().toISOString(),
+                        }
+                      : current
+                  )
+                }}
+              />
+            </div>
+          )}
 
           {/* Stats Row - Responsive grid */}
           <div className="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:gap-4 lg:grid-cols-4">

@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { parseFeedback } from "@/lib/feedback/parsers"
 import { getLetterGrade } from "@/lib/constants"
 import { ScoreDisplay, FeedbackSections } from "@/components/practice"
@@ -67,6 +68,8 @@ interface PracticeFeedbackProps {
       matchedPhrase?: string
     }>
   } | null
+  /** A high-priority next action rendered after the score and before detail. */
+  afterScore?: ReactNode
 }
 
 export default function PracticeFeedback({
@@ -96,6 +99,7 @@ export default function PracticeFeedback({
   complexityAnalysis,
   alternativeApproaches,
   clarifyingQuestionsAssessment,
+  afterScore,
 }: PracticeFeedbackProps) {
   // Parse feedback text, then override with structured data if available from API
   const parsedSections = parseFeedback(feedback)
@@ -222,6 +226,8 @@ export default function PracticeFeedback({
         grade={grade}
         scores={scores}
       />
+
+      {afterScore}
 
       <FeedbackSections
         sections={sections}
