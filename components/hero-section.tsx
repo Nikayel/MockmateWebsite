@@ -1,6 +1,5 @@
 "use client"
 
-import { ChevronRight, ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { motion, useReducedMotion } from "framer-motion"
 import { staggerContainer, staggerItem } from "@/lib/motion"
@@ -10,14 +9,14 @@ import { DynamicThreeOrb } from "@/components/three/DynamicThreeOrb"
 /**
  * Hero Section — theme-aware, premium minimal.
  *
- * One focal column (mono headline → one-line subhead → asymmetric primary CTA +
- * ghost link) over a cursor-sensitive 3D orb. Every surface is driven by the
+ * One focal column (headline → focused subhead with an editorial link → one
+ * primary CTA) over a cursor-sensitive 3D orb. Every surface is driven by the
  * theme tokens (var(--bg)/foreground/accent) so the hero crossfades with the
  * rest of the page when the theme flips. A radial scrim keeps the centered copy
  * readable over the orb; a barely-there dot texture carries depth.
  *
  * The "two rounds" product mockup that used to live here now has its own home
- * at /rounds (linked below the CTAs).
+ * at /rounds, outside this focused first-screen choice.
  */
 export function HeroSection() {
   const reduceMotion = useReducedMotion()
@@ -73,86 +72,42 @@ export function HeroSection() {
             Practice the interview rounds LeetCode skips.
           </motion.h1>
 
-          {/* One subhead, two sentences: the mechanic, then the audience. No filler. */}
+          {/* The linked phrase opens the decomposition labs; the button below
+              opens the lower-friction debugging trial. Only the latter is a CTA. */}
           <motion.p
             variants={staggerItem}
-            style={{ textShadow: "0 1px 20px var(--bg)" }}
-            className="text-muted-foreground mx-auto mb-9 max-w-xl text-base leading-7 sm:text-lg md:text-xl md:leading-8"
+            style={{ textShadow: "0 1px 8px var(--bg), 0 0 28px var(--bg), 0 0 48px var(--bg)" }}
+            className="text-foreground/90 mx-auto mb-9 max-w-xl text-base leading-7 sm:text-lg md:text-xl md:leading-8"
           >
-            Carry a case from clarify to build, with an AI interviewer that reacts as you work.
-            Built for intern and new-grad SWE and DE loops.
-          </motion.p>
-
-          {/* Asymmetric CTA: one solid primary (foreground), one inline ghost link. */}
-          <motion.div
-            variants={staggerItem}
-            className="flex flex-col items-center gap-x-6 gap-y-4 sm:flex-row sm:justify-center"
-          >
-            <div className="flex flex-col items-center">
-              <Link
-                href="/interview"
-                onClick={() =>
-                  trackEvent("cta_click", { location: "hero_primary", destination: "/interview" })
-                }
-                className="bg-foreground text-background hover:bg-foreground/90 inline-flex rounded-[8px] px-8 py-3.5 text-base font-semibold transition-colors duration-200"
-              >
-                Start free
-              </Link>
-              {/* Microcopy lives directly under the primary button. The second
-                  line quietly surfaces the free courses without adding a
-                  section: they are the no-session-cost on-ramp for free users. */}
-              <span className="text-muted-foreground mt-2.5 text-[12px]">
-                No credit card required.
-              </span>
-              <span className="text-muted-foreground/80 mt-1 text-[12px]">
-                Free{" "}
-                <Link
-                  href="/learn/python"
-                  className="hover:text-foreground underline-offset-2 hover:underline"
-                >
-                  Python
-                </Link>
-                ,{" "}
-                <Link
-                  href="/learn/data-engineering"
-                  className="hover:text-foreground underline-offset-2 hover:underline"
-                >
-                  Data Engineering
-                </Link>
-                , and{" "}
-                <Link
-                  href="/learn/system-design"
-                  className="hover:text-foreground underline-offset-2 hover:underline"
-                >
-                  System Design
-                </Link>{" "}
-                courses included.
-              </span>
-            </div>
+            Practice technical interviews for the{" "}
             <Link
               href="/labs"
               onClick={() =>
-                trackEvent("cta_click", { location: "hero_secondary", destination: "/labs" })
+                trackEvent("cta_click", { location: "hero_age_of_ai", destination: "/labs" })
               }
-              className="text-foreground/80 hover:text-accent inline-flex items-center gap-1 text-base font-medium transition-colors duration-200"
+              className="text-foreground decoration-accent focus-visible:ring-accent/60 hover:text-accent-strong rounded-sm underline decoration-2 underline-offset-4 transition-colors focus-visible:ring-2 focus-visible:outline-none"
             >
-              Explore Case Labs
-              <ChevronRight className="h-4 w-4" />
+              age of AI
             </Link>
-          </motion.div>
+            : scope ambiguous work, defend your decisions, and ship code that holds up.
+          </motion.p>
 
-          {/* Pointer to the relocated "two rounds" mockup. */}
-          <motion.div variants={staggerItem} className="mt-10">
+          <motion.div variants={staggerItem} className="flex flex-col items-center">
             <Link
-              href="/rounds"
+              href="/interview?track=debugging"
               onClick={() =>
-                trackEvent("cta_click", { location: "hero_rounds", destination: "/rounds" })
+                trackEvent("cta_click", {
+                  location: "hero_primary",
+                  destination: "/interview?track=debugging",
+                })
               }
-              className="text-muted-foreground hover:text-foreground group inline-flex items-center gap-1.5 text-sm font-medium tracking-[0.02em] transition-colors duration-200"
+              className="bg-foreground text-background hover:bg-foreground/90 focus-visible:ring-accent/60 inline-flex min-h-12 items-center rounded-[8px] px-8 text-base font-semibold transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
             >
-              See the two rounds, one session
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              Start free
             </Link>
+            <span className="text-muted-foreground mt-2.5 text-[12px]">
+              No credit card required.
+            </span>
           </motion.div>
         </motion.div>
       </motion.div>
