@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest"
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/labs/choose" }))
 vi.mock("@/components/header", () => ({ Header: () => null }))
-vi.mock("@/components/footer", () => ({ Footer: () => null }))
 
 const mocks = vi.hoisted(() => ({ getFlagAsync: vi.fn() }))
 vi.mock("@/lib/feature-flags", () => ({ getFlagAsync: mocks.getFlagAsync }))
@@ -11,16 +10,18 @@ vi.mock("@/lib/feature-flags", () => ({ getFlagAsync: mocks.getFlagAsync }))
 import LabsChooserPage, { metadata } from "./page"
 
 describe("Labs chooser", () => {
-  it("offers both live paths and explains their account requirements", async () => {
+  it("offers both live assignments with real case and first-sprint artifacts", async () => {
     mocks.getFlagAsync.mockResolvedValue(true)
     const html = renderToStaticMarkup(await LabsChooserPage())
 
-    expect(html).toContain("Labs · Beta")
-    expect(html).toContain("actively improving them")
+    expect(html).toContain("CodeSparring Labs")
+    expect(html).toContain("Choose your next round")
     expect(html).toContain('href="/labs"')
     expect(html).toContain('href="/sprint-labs/meridian"')
-    expect(html).toContain("Try a lab without an account")
-    expect(html).toContain("Sign in to start sprint 1 free")
+    expect(html).toContain("911 Dispatch Optimization")
+    expect(html).toContain("POST /claims returns 500 on Northwind")
+    expect(html).toContain("page 340 takes 9s")
+    expect(html).toContain("actively improving the experience")
     expect(metadata.robots).toEqual({ index: false, follow: true })
   })
 
@@ -30,6 +31,7 @@ describe("Labs chooser", () => {
 
     expect(html).toContain('href="/labs"')
     expect(html).not.toContain('href="/sprint-labs/meridian"')
-    expect(html).toContain("Decomposition Case Labs are live in beta")
+    expect(html).toContain("Take on one real-world case")
+    expect(html).toContain("911 Dispatch Optimization")
   })
 })

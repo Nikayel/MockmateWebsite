@@ -28,11 +28,11 @@ export function LabsTrackDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[min(44rem,calc(100vw-2rem))]">
         <DialogHeader>
-          <DialogTitle>Practice on a real codebase</DialogTitle>
+          <DialogTitle>Choose your next round</DialogTitle>
           <DialogDescription>
             {tracks.length > 1
-              ? "Two ways in. One problem in a single sitting, or one system across ten sprints."
-              : "Scope an underspecified problem, then build it on a real multi-file codebase."}
+              ? "Take on a case today, or join a codebase that changes across ten sprints."
+              : "Take on one real-world case and build until the tests pass."}
           </DialogDescription>
         </DialogHeader>
         <LabsTrackCards onSelect={() => onOpenChange(false)} tracks={tracks} className="mt-1" />

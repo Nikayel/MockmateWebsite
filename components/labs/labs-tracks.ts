@@ -21,6 +21,8 @@ export interface LabsTrack {
   id: LabsTrackId
   /** Full name, shown on the picker card. */
   label: string
+  /** Candidate-facing assignment name for the compact header picker. */
+  assignmentTitle: string
   /** Quiet lifecycle label shown beside the track name. */
   statusLabel: "Beta"
   /** What this lab family actually is, in a candidate's words. */
@@ -44,6 +46,7 @@ export const LABS_TRACKS: LabsTrack[] = [
   {
     id: "decomposition",
     label: "Decomposition",
+    assignmentTitle: "Solve one ambiguous case",
     statusLabel: "Beta",
     blurb:
       "One ambiguous problem in one sitting. Clarify, design, and build on a real codebase until the tests pass.",
@@ -56,6 +59,7 @@ export const LABS_TRACKS: LabsTrack[] = [
   {
     id: "sprint",
     label: "Sprint",
+    assignmentTitle: "Join Meridian for ten sprints",
     statusLabel: "Beta",
     blurb:
       "One evolving codebase across ten sprints. Ship tickets, then live with your earlier decisions.",

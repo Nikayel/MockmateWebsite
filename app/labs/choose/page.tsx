@@ -1,15 +1,14 @@
 import type { Metadata } from "next"
 
 import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
-import { LabsTrackCards } from "@/components/labs/LabsTrackCards"
+import { LabsAssignmentCards } from "@/components/labs/LabsAssignmentCards"
 import { visibleLabsTracks } from "@/components/labs/labs-tracks"
 import { getFlagAsync } from "@/lib/feature-flags"
 
 /** Shareable Labs front door; the existing /labs URL remains the indexable Case Labs catalog. */
 export const metadata: Metadata = {
-  title: "Choose your lab",
-  description: "Choose a Decomposition Case Lab or a longer Sprint Lab on a real codebase.",
+  title: "Choose your next round",
+  description: "Solve an ambiguous Case Lab or join Meridian for ten engineering sprints.",
   robots: { index: false, follow: true },
 }
 
@@ -22,27 +21,33 @@ export default async function LabsChooserPage() {
   return (
     <>
       <Header />
-      <main className="bg-background text-foreground min-h-[100svh]">
-        <div className="mx-auto flex max-w-4xl flex-col gap-8 px-4 pt-28 pb-20 sm:px-6 sm:pt-36">
-          <header className="flex max-w-2xl flex-col gap-4">
-            <span className="text-accent-strong text-xs font-semibold tracking-[0.14em] uppercase">
-              Labs · Beta
+      <main className="relative min-h-[100svh] overflow-hidden bg-[#171613] text-[#f6f2ea]">
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-[45rem] bg-[radial-gradient(ellipse_at_50%_0%,rgba(138,92,64,0.22),transparent_65%)]"
+          aria-hidden="true"
+        />
+        <div className="relative mx-auto flex max-w-6xl flex-col gap-10 px-4 pt-28 pb-20 sm:px-6 sm:pt-36 lg:px-8">
+          <header className="flex max-w-3xl flex-col gap-4">
+            <span className="text-[11px] font-semibold tracking-[0.18em] text-[#e7bca0] uppercase">
+              CodeSparring Labs <span className="mx-2 text-[#746e64]">/</span> Beta
             </span>
-            <h1 className="text-3xl leading-tight font-semibold tracking-[-0.03em] sm:text-5xl">
-              Choose the work you want to practice.
+            <h1 className="font-serif text-[42px] leading-[1.02] tracking-[-0.045em] sm:text-[58px] lg:text-[68px]">
+              Choose your next round.
             </h1>
-            <p className="text-muted-foreground text-base leading-relaxed sm:text-lg">
+            <p className="max-w-xl text-base leading-relaxed text-[#c9c1b5] sm:text-lg">
               {tracks.length > 1
-                ? "One problem in a single sitting, or one evolving codebase across ten sprints. Both paths are live in beta, and we’re actively improving them."
-                : "Decomposition Case Labs are live in beta, and we’re actively improving them."}
+                ? "One case to solve today, or one codebase to grow into. Pick the work that matches your next interview."
+                : "Take on one real-world case. Scope the ambiguity, then build until the tests pass."}
             </p>
           </header>
           <nav aria-label="Choose a lab path">
-            <LabsTrackCards tracks={tracks} />
+            <LabsAssignmentCards tracks={tracks} />
           </nav>
+          <p className="text-[12px] leading-relaxed text-[#aaa397]">
+            Labs are live in beta. We’re actively improving the experience as you practice.
+          </p>
         </div>
       </main>
-      <Footer />
     </>
   )
 }
