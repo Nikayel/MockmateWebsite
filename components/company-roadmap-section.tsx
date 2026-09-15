@@ -2,8 +2,33 @@
 
 import { ScrollReveal } from "@/lib/motion"
 import { ArrowRight } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { trackEvent } from "@/lib/analytics"
+
+// Each company is selectable in the roadmap wizard; this is roadmap coverage,
+// not a claim that every company has a live Case Lab.
+const ROADMAP_COMPANIES = [
+  { name: "Palantir", logo: "/company-logos/palantir.svg" },
+  { name: "Stripe", logo: "/company-logos/stripe.svg" },
+  { name: "Meta", logo: "/company-logos/meta.svg" },
+  { name: "Amazon", logo: "/company-logos/amazon.svg" },
+  { name: "Google", logo: "/company-logos/google.svg" },
+  { name: "Microsoft", logo: "/company-logos/microsoft.svg" },
+] as const
+
+function CompanyLogoList({ duplicate = false }: { duplicate?: boolean }) {
+  return (
+    <ul className="roadmap-logo-list" aria-hidden={duplicate || undefined}>
+      {ROADMAP_COMPANIES.map(({ name, logo }) => (
+        <li key={name} className="roadmap-logo-item">
+          <Image src={logo} alt="" width={30} height={30} unoptimized aria-hidden="true" />
+          <span>{name}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 /** A short homepage invitation; the company selection happens in the roadmap wizard. */
 export function CompanyRoadmapSection() {
@@ -42,6 +67,20 @@ export function CompanyRoadmapSection() {
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </ScrollReveal>
+      </div>
+
+      <div className="relative mx-auto mt-14 max-w-5xl px-6 md:mt-16">
+        <div className="border-border/70 mb-5 border-t pt-5 text-center">
+          <p className="text-muted-foreground text-xs font-medium tracking-[0.12em] uppercase">
+            Roadmaps for your target company
+          </p>
+        </div>
+        <div className="roadmap-logo-viewport" aria-label="Roadmap companies">
+          <div className="roadmap-logo-track">
+            <CompanyLogoList />
+            <CompanyLogoList duplicate />
+          </div>
+        </div>
       </div>
     </section>
   )
