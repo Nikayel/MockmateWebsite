@@ -1136,6 +1136,63 @@
   animation: new-message-pulse 2s ease-in-out infinite;
 }
 
+/* A compact echo of the onboarding cinematic: one dark world, a serif lead,
+   an amber handoff, and a quiet wash from below. This surface intentionally
+   keeps its own palette in both app themes, like LabOnboarding. */
+.company-roadmap-panel {
+  --roadmap-ink: #e6e9ef;
+  --roadmap-copy: #c4cbd8;
+  --roadmap-muted: #9ea7b8;
+  --roadmap-amber: #e8a13c;
+  background: #0b0e14;
+  border: 1px solid rgb(255 255 255 / 10%);
+  color: var(--roadmap-ink);
+}
+
+.company-roadmap-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(110% 75% at 50% 114%, rgb(232 161 60 / 13%), transparent 66%);
+  pointer-events: none;
+}
+
+.company-roadmap-chapter {
+  border: 1px solid rgb(232 161 60 / 35%);
+  color: var(--roadmap-amber);
+}
+
+.company-roadmap-serif {
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+}
+
+.company-roadmap-copy,
+.company-roadmap-panel .roadmap-logo-item {
+  color: var(--roadmap-copy);
+}
+
+.company-roadmap-cta {
+  background: var(--roadmap-amber);
+  color: #0b0e14;
+  outline-color: var(--roadmap-amber);
+}
+
+.company-roadmap-cta:hover {
+  background: #f0b45a;
+}
+
+.company-roadmap-cta:active {
+  transform: translateY(1px);
+}
+
+.company-roadmap-footer {
+  border-color: rgb(255 255 255 / 12%);
+}
+
+.company-roadmap-footer-label {
+  color: var(--roadmap-muted);
+}
+
 /* Homepage roadmap coverage: one slow, seamless logo pass, with a complete
    static list when motion is reduced. Only transforms animate, so layout stays fixed. */
 .roadmap-logo-viewport {

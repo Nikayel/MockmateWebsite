@@ -6,9 +6,10 @@ describe("CompanyRoadmapSection", () => {
   const html = renderToStaticMarkup(<CompanyRoadmapSection />)
 
   it("keeps the homepage invitation focused on the roadmap wizard", () => {
-    expect(html).toContain("Prep for the company you&#x27;re interviewing with.")
+    expect(html).toContain("A plan for the company on your calendar.")
     expect(html).toContain('href="/roadmap/new"')
-    expect(html).toContain("Choose your company")
+    expect(html).toContain("Set your target")
+    expect(html).toContain("company-roadmap-serif")
     expect(html).not.toContain("Your 4-week plan")
     expect(html).not.toContain("soon")
   })
