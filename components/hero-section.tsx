@@ -72,7 +72,7 @@ export function HeroSection() {
             Practice the interview rounds LeetCode skips.
           </motion.h1>
 
-          {/* The linked phrase opens the decomposition labs; the button below
+          {/* The linked phrase opens the Labs chooser; the button below
               opens the lower-friction debugging trial. Only the latter is a CTA. */}
           <motion.p
             variants={staggerItem}
@@ -81,9 +81,9 @@ export function HeroSection() {
           >
             Practice technical interviews for the{" "}
             <Link
-              href="/labs"
+              href="/labs/choose"
               onClick={() =>
-                trackEvent("cta_click", { location: "hero_age_of_ai", destination: "/labs" })
+                trackEvent("cta_click", { location: "hero_age_of_ai", destination: "/labs/choose" })
               }
               className="text-foreground decoration-accent focus-visible:ring-accent/60 hover:text-accent-strong rounded-sm underline decoration-2 underline-offset-4 transition-colors focus-visible:ring-2 focus-visible:outline-none"
             >

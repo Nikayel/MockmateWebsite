@@ -27,6 +27,8 @@ export interface LabsTrack {
   blurb: string
   /** The shape of the work, shown as chips on the card. */
   loop: string[]
+  /** What a visitor can do before signing in. */
+  accessNote: string
   /** Where the card goes. A real address, so middle-click and cmd-click work. */
   href: string
   Icon: LucideIcon
@@ -44,9 +46,10 @@ export const LABS_TRACKS: LabsTrack[] = [
     label: "Decomposition",
     statusLabel: "Beta",
     blurb:
-      "One underspecified problem, one sitting. Scope it, commit to a design, then build on a real multi-file codebase until the tests pass. The round Palantir FDSE and Stripe interviews actually run.",
+      "One ambiguous problem in one sitting. Clarify, design, and build on a real codebase until the tests pass.",
     // The five milestones, pinned by lib/labs/__tests__/case-labs-registry.test.ts.
     loop: ["Clarify", "Decompose", "Design", "Build", "Review"],
+    accessNote: "Try a lab without an account. Sign in for the AI interviewer and saved progress.",
     href: "/labs",
     Icon: Layers,
   },
@@ -55,8 +58,9 @@ export const LABS_TRACKS: LabsTrack[] = [
     label: "Sprint",
     statusLabel: "Beta",
     blurb:
-      "Ten sprints on one growing codebase. The repo remembers what you did, and sprint 9 breaks the code you wrote in sprint 4. The long game on one system.",
+      "One evolving codebase across ten sprints. Ship tickets, then live with your earlier decisions.",
     loop: ["Ten sprints", "One codebase", "It remembers"],
+    accessNote: "Sign in to start sprint 1 free. Sprints 2–10 require Pro.",
     // The flagship Meridian workbook. Its overview page is where the onboarding cinematic mounts, so
     // this row is the front door to "you're hired." fixture-demo stays reachable via /labs#sprint-labs.
     href: "/sprint-labs/meridian",

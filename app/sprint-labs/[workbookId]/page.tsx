@@ -102,11 +102,18 @@ export default async function SprintLabWorkbookOverviewPage({
 
           <header className="flex flex-col gap-4">
             <div className="flex flex-col gap-3">
+              <span className="text-xs font-semibold tracking-[0.12em] text-[var(--wb-accent-strong)] uppercase">
+                Sprint Labs · Beta
+              </span>
               <h1 className="text-2xl leading-tight font-bold text-[var(--wb-text)] sm:text-4xl">
                 {summary.title}
               </h1>
               <p className="max-w-[70ch] text-sm leading-relaxed text-[var(--wb-text-secondary)] sm:text-base">
                 {summary.pitch}
+              </p>
+              <p className="text-xs text-[var(--wb-text-secondary)]">
+                Live in beta; we&apos;re actively improving the experience.
+                {!locked && " Sign in to start sprint 1 free."}
               </p>
             </div>
 

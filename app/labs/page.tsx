@@ -3,7 +3,7 @@
  *
  * ## Above the fold there are exactly three things
  *
- * An `<h1>`, one line, one button. Everything else is below the labs. The page previously opened
+ * A Beta label, an `<h1>`, one short explanation, and one button. Everything else is below the labs. The page previously opened
  * with two intro paragraphs, a five-card milestone explainer, a round-type essay and three rows of
  * filter chips: about 650 words and roughly two and a half screens before the first lab was on
  * screen, on a page whose only job is to get someone into a lab.
@@ -126,16 +126,20 @@ export default async function CaseLabsGalleryPage() {
         <div className="container mx-auto flex max-w-[1120px] flex-col gap-10 px-4 pt-20 pb-16 sm:pt-24">
           <header className="flex flex-col gap-5">
             <div className="flex flex-col gap-3">
+              <span className="text-xs font-semibold tracking-[0.12em] text-[var(--wb-accent-strong)] uppercase">
+                Case Labs · Beta
+              </span>
               <h1 className="max-w-[760px] text-2xl leading-tight font-bold text-[var(--wb-text)] sm:text-4xl">
                 Decomposition interview practice, on a real codebase
               </h1>
-              {/* One line, and the same 760px measure as the h1 so the hero reads as one aligned
+              {/* One compact explanation, and the same 760px measure as the h1 so the hero reads as one aligned
                   block. It used to be 27 words over two lines, 165px of a 390x844 first screen, and
                   its second half listed the process. The band below shows the process better, so
                   that half is gone; both entity terms, which are the page's highest-intent query
                   words, stay. */}
               <p className="max-w-[760px] text-sm leading-relaxed text-[var(--wb-text-secondary)] sm:text-base">
-                The round Palantir FDSE and Stripe engineering interviews actually run.
+                The round Palantir FDSE and Stripe engineering interviews actually run. Live in
+                beta; we&apos;re actively improving the experience.
               </p>
             </div>
             {starter && (

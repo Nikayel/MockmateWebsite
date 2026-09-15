@@ -15,6 +15,7 @@ describe("labs-tracks registry", () => {
       expect(track.label.length).toBeGreaterThan(0)
       expect(track.blurb.length).toBeGreaterThan(0)
       expect(track.loop.length).toBeGreaterThan(0)
+      expect(track.accessNote.length).toBeGreaterThan(0)
       expect(track.href.startsWith("/")).toBe(true)
     }
   })

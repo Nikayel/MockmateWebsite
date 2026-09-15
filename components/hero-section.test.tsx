@@ -9,10 +9,10 @@ import { HeroSection } from "./hero-section"
 describe("HeroSection", () => {
   const html = renderToStaticMarkup(<HeroSection />)
 
-  it("keeps the headline and links the age-of-AI explanation to decomposition labs", () => {
+  it("keeps the headline and links the age-of-AI explanation to the Labs chooser", () => {
     expect(html).toContain("Practice the interview rounds LeetCode skips.")
     expect(html).toContain("Practice technical interviews for the")
-    expect(html).toContain('href="/labs"')
+    expect(html).toContain('href="/labs/choose"')
     expect(html).toContain(">age of AI</a>: scope ambiguous work")
   })
 

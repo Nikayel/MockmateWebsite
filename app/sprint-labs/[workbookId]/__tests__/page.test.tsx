@@ -67,6 +67,8 @@ describe("Sprint Labs workbook overview page", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Fixture Demo: Contracts Sprint" })
     ).not.toBeNull()
+    expect(screen.getByText("Sprint Labs · Beta")).not.toBeNull()
+    expect(screen.getByText(/Sign in to start sprint 1 free/)).not.toBeNull()
     expect(screen.getByText("How it is graded")).not.toBeNull()
     expect(screen.getByText("Sprint 1: Foundations")).not.toBeNull()
     // The CTA repeats at the top and after the arc (UX-SPEC.md §3's "repeat CTA"), so both copies
@@ -90,6 +92,7 @@ describe("Sprint Labs workbook overview page", () => {
     render(element)
 
     expect(screen.queryByRole("link", { name: "Sign in to start" })).toBeNull()
+    expect(screen.queryByText(/Sign in to start sprint 1 free/)).toBeNull()
     expect(
       screen.getByText(/Server-side isolated grading and additional languages land/)
     ).not.toBeNull()

@@ -1,5 +1,5 @@
 /**
- * The `/labs` chooser must stay byte-identical to its Case-Labs-only shape when
+ * The `/labs` catalog must stay byte-identical to its Case-Labs-only shape when
  * `SPRINT_LABS_ENABLED` is off (UX-SPEC.md §1.2/§12.7) — with one deliberate exception, per fix
  * round 1: `CaseLabGallery`'s own section always carries `id="case-labs"` (the jump strip's scroll
  * target), flag or no flag, since it costs nothing when unused and needs no prop threading. Flag on
@@ -31,6 +31,8 @@ describe("/labs Sprint Labs flag gating", () => {
     expect(html).not.toContain("Prove It")
     // The page underneath is untouched: the hero and the gallery still render.
     expect(html).toContain("Decomposition interview practice, on a real codebase")
+    expect(html).toContain("Case Labs · Beta")
+    expect(html).toContain("actively improving the experience")
     expect(html).toContain("Pick a case lab")
     // `CaseLabGallery`'s own scroll-target id is unconditional (fix round 1, C1) and is the one
     // deliberate exception to "byte-identical when off" — present here too, unused.
