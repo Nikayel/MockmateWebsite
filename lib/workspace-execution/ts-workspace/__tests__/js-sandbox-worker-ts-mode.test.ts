@@ -32,6 +32,7 @@ interface WorkerMessage {
   success?: boolean
   logs?: Array<{ type: string; message: string; timestamp: number }>
   error?: string
+  workerStartFailed?: boolean
 }
 
 interface FakeWorkerScope {
@@ -57,8 +58,12 @@ interface FakeWorkerScope {
  * instead, so that path is used here and the result is attached to `scope.ts` by hand — replicating
  * the OUTCOME a real worker's importScripts produces, not its literal mechanism.
  */
-function fakeImportScripts(scope: FakeWorkerScope, ...paths: string[]) {
+function fakeImportScripts(scope: FakeWorkerScope, failPaths: Set<string>, ...paths: string[]) {
   for (const requested of paths) {
+    if (failPaths.has(requested)) {
+      // Reproduces a real Worker's importScripts failure (e.g. a NetworkError fetching the file).
+      throw new Error(`NetworkError fetching ${requested}`)
+    }
     if (requested === "/vendor/typescript/typescript.js") {
       scope.ts = nodeRequire(VENDOR_TS_PATH)
       continue
@@ -79,7 +84,8 @@ function fakeImportScripts(scope: FakeWorkerScope, ...paths: string[]) {
  * other tests.
  */
 async function runWorkerMessage(
-  data: unknown
+  data: unknown,
+  options: { failImportScripts?: string[] } = {}
 ): Promise<{ final: WorkerMessage; phases: string[] }> {
   const phases: string[] = []
   let resolveFinal!: (message: WorkerMessage) => void
@@ -98,9 +104,10 @@ async function runWorkerMessage(
     },
   }
 
+  const failPaths = new Set(options.failImportScripts ?? [])
   const globalScope = globalThis as unknown as { importScripts?: (...paths: string[]) => void }
   const previousImportScripts = globalScope.importScripts
-  globalScope.importScripts = (...paths: string[]) => fakeImportScripts(scope, ...paths)
+  globalScope.importScripts = (...paths: string[]) => fakeImportScripts(scope, failPaths, ...paths)
 
   try {
     const source = readFileSync(WORKER_PATH, "utf8")
@@ -306,5 +313,78 @@ describe.skip("Skipped", () => {
       passed: boolean
     }>
     expect(results[0].passed).toBe(true)
+  })
+
+  it("runs a plain-JS workspace even when the TypeScript loader and compiler cannot be fetched (blast radius shrinks to TS only)", async () => {
+    const { phases, final } = await runWorkerMessage(
+      {
+        files: [
+          { path: "src/math.js", content: "exports.add = function(a, b) { return a + b }" },
+          {
+            path: "tests/visible/math.test.js",
+            content:
+              'const { describe, it, expect } = require("vitest"); const { add } = require("../../src/math"); describe("math", () => { it("adds", () => { expect(add(1, 2)).toBe(3) }) })',
+          },
+        ],
+        testPaths: ["tests/visible/math.test.js"],
+        hiddenTestPaths: [],
+      },
+      {
+        failImportScripts: ["/workers/ts-transpiler-loader.js", "/vendor/typescript/typescript.js"],
+      }
+    )
+
+    // No .ts/.tsx file, so ensureTypeScriptCompiler() is never reached: the failing TypeScript
+    // loader and compiler are irrelevant to a plain-JS run.
+    expect(phases).toEqual(["exec-start"])
+    expect(final.success).toBe(true)
+    const markerLog = (final.logs || []).find((log) =>
+      log.message.startsWith("__WORKSPACE_TEST_RESULTS__:")
+    )
+    const results = JSON.parse(
+      markerLog!.message.slice("__WORKSPACE_TEST_RESULTS__:".length)
+    ) as Array<{ passed: boolean }>
+    expect(results).toEqual([expect.objectContaining({ passed: true })])
+  })
+
+  it("tags a failed TypeScript-support load as a retriable worker-start failure (not a raw throw)", async () => {
+    const { final } = await runWorkerMessage(
+      {
+        files: FIVE_FILE_WORKSPACE,
+        testPaths: FIVE_FILE_TEST_PATHS,
+        hiddenTestPaths: FIVE_FILE_HIDDEN_TEST_PATHS,
+      },
+      { failImportScripts: ["/workers/ts-transpiler-loader.js"] }
+    )
+
+    expect(final.success).toBe(false)
+    expect(final.workerStartFailed).toBe(true)
+    expect(final.error).toMatch(/TypeScript support/i)
+  })
+
+  it("keeps single-file JS working when a shim fails to load, but tags a shim-dependent run as retriable", async () => {
+    const singleFile = await runWorkerMessage(
+      { code: "return 1 + 1" },
+      { failImportScripts: ["/workers/assert-shim.js"] }
+    )
+    // Single-file mode needs neither shim, so a failed shim load does not affect it.
+    expect(singleFile.final.success).toBe(true)
+
+    const workspace = await runWorkerMessage(
+      {
+        files: [
+          { path: "src/index.js", content: "module.exports = function() { return 42 }" },
+          {
+            path: "tests/runner.js",
+            content: 'const run = require("../src/index"); run()',
+          },
+        ],
+        entrypoint: "tests/runner.js",
+      },
+      { failImportScripts: ["/workers/assert-shim.js"] }
+    )
+    // A workspace run needs the shims: the boot failure is reported as retriable, not thrown raw.
+    expect(workspace.final.success).toBe(false)
+    expect(workspace.final.workerStartFailed).toBe(true)
   })
 })
