@@ -137,4 +137,44 @@ describe("runTsInWorker", () => {
     instances[1].onmessage?.({ data: { success: true, logs: [] } })
     await secondRun
   })
+
+  it("retries once with a fresh worker on a worker-start error, then reports a plain message when the retry also fails", async () => {
+    const { runTsInWorker } = await import("../worker-runner")
+
+    const runPromise = runTsInWorker({ files: [], testPaths: [], hiddenTestPaths: [] }, 5000, 5000)
+    await yieldToMicrotasksAndOneMacrotask()
+
+    // First worker fails to start (a dependency script could not be fetched).
+    instances[0].onerror?.({ message: "NetworkError" })
+    await yieldToMicrotasksAndOneMacrotask()
+
+    // A fresh worker was spawned for the retry.
+    expect(instances).toHaveLength(2)
+    expect(instances[0].terminated).toBe(true)
+
+    // The retry also fails to start.
+    instances[1].onerror?.({ message: "NetworkError" })
+
+    const result = await runPromise
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/couldn't start the code runner/i)
+  })
+
+  it("recovers when the retry succeeds after a tagged worker-start failure message", async () => {
+    const { runTsInWorker } = await import("../worker-runner")
+
+    const runPromise = runTsInWorker({ files: [], testPaths: [], hiddenTestPaths: [] }, 5000, 5000)
+    await yieldToMicrotasksAndOneMacrotask()
+
+    // The worker reports a retriable start failure (e.g. the TypeScript compiler failed to load).
+    instances[0].onmessage?.({ data: { workerStartFailed: true, error: "boom" } })
+    await yieldToMicrotasksAndOneMacrotask()
+
+    // The retry spawned a fresh worker and this time the run succeeds.
+    expect(instances).toHaveLength(2)
+    instances[1].onmessage?.({ data: { success: true, logs: [] } })
+
+    const result = await runPromise
+    expect(result.success).toBe(true)
+  })
 })
