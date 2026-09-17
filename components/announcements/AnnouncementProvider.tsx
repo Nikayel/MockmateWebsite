@@ -28,7 +28,6 @@ const AnnouncementContext = createContext<AnnouncementContextValue | null>(null)
 
 const STORAGE_KEY = "dismissed_announcements"
 const SEEN_STORAGE_KEY = "seen_announcements"
-const FETCH_INTERVAL = 5 * 60 * 1000 // 5 minutes
 
 export function useAnnouncements() {
   const context = useContext(AnnouncementContext)
@@ -90,8 +89,8 @@ export function AnnouncementProvider({ children }: AnnouncementProviderProps) {
       }
 
       // Tell the server which announcements this browser has already been
-      // counted as viewing, so the 5-minute poll doesn't inflate view counts
-      // (and burn a write per announcement) on every tick.
+      // counted as viewing, so refreshes do not inflate view counts or burn a
+      // write per announcement.
       let seenIds: string[] = []
       try {
         const storedSeen = sessionStorage.getItem(SEEN_STORAGE_KEY)
@@ -125,17 +124,22 @@ export function AnnouncementProvider({ children }: AnnouncementProviderProps) {
     }
   }, [firebaseUser])
 
-  // Initial fetch and periodic refresh. Waits for auth to initialize so the
-  // first fetch already carries the user's credentials: an anonymous pre-fetch
-  // does not know about server-side dismissals and briefly showed banners the
-  // user had dismissed on another device.
+  // Fetch once when auth is ready, then only when the visitor returns to the
+  // window. A global timer made every open tab invoke the Vercel Function 288
+  // times per day even when nobody was looking at it. Focus-based refresh keeps
+  // announcements current at the moment they can be seen without background
+  // polling.
   useEffect(() => {
     if (!initialized) return
 
-    fetchAnnouncements()
+    const refreshAnnouncements = () => {
+      void fetchAnnouncements()
+    }
 
-    const interval = setInterval(fetchAnnouncements, FETCH_INTERVAL)
-    return () => clearInterval(interval)
+    refreshAnnouncements()
+    window.addEventListener("focus", refreshAnnouncements)
+
+    return () => window.removeEventListener("focus", refreshAnnouncements)
   }, [fetchAnnouncements, initialized])
 
   // Everything downstream works from the visible list: filtering at render
