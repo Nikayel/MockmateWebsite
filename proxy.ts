@@ -109,17 +109,9 @@ export function proxy(request: NextRequest) {
   return NextResponse.next()
 }
 
-// Configure which routes use this proxy
+// Matcher scope is also a cost boundary: unmatched requests never invoke the
+// Vercel Function. Keep this list aligned with isProtectedRoute() so public
+// pages, assets, API routes, and bot probes bypass the proxy entirely.
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (images, etc.)
-     */
-    "/((?!api|_next/static|_next/image|favicon.ico|.*\\..*|_next).*)",
-  ],
+  matcher: ["/admin/:path*", "/learn/:track/:levelSlug/:lessonId/workspace/:path*"],
 }
