@@ -5,12 +5,9 @@
  * to two objective chips, and `ai_policy_reason` when unassisted." No drag/drop (§5): this is a plain
  * link, status changes only through ticket actions elsewhere.
  *
- * Stretched-link structure copied verbatim from `WorkbookCard`'s fix-round shape (I1): the whole card
- * is the click target via an `absolute inset-0` anchor with an sr-only accessible name, and ONLY the
- * objective-chip row gets `relative` so it paints above the stretched link and stays independently
- * clickable — §5's own instruction ("render the chip row outside the `<Link>` in the DOM... so a
- * nested interactive element never sits inside an anchor") is satisfied the same way WorkbookCard
- * satisfies it, not by a new mechanism.
+ * The whole card is clickable through an `absolute inset-0` anchor with an sr-only accessible name.
+ * The objective-chip row is a `relative` sibling, so its buttons remain independently clickable
+ * without nesting interactive elements inside the anchor.
  *
  * `playable === false` (a compiled content stub — no `reference.diff`/`rubric.yaml` yet, see
  * `TicketPublic.playable`'s own doc comment): the card stays a normal link to the ticket screen — a

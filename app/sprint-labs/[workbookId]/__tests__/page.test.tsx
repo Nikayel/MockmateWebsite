@@ -8,7 +8,7 @@
  *
  * Assertions are plain DOM reads because this repo does not carry @testing-library/jest-dom.
  */
-import { render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/sprint-labs/fixture-demo" }))
@@ -54,7 +54,7 @@ const ONE_SPRINT = [
 ]
 
 describe("Sprint Labs workbook overview page", () => {
-  it("renders the title, grading panel, objectives-by-sprint and the arc for a runnable workbook", async () => {
+  it("renders the title, grading panel and an arc that discloses objectives on demand", async () => {
     registry.getWorkbookSummary.mockReturnValue(RUNNABLE_SUMMARY)
     registry.getWorkbookSprints.mockResolvedValue(ONE_SPRINT)
     mockAuth.value = { user: null, initialized: true }
@@ -67,10 +67,13 @@ describe("Sprint Labs workbook overview page", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Fixture Demo: Contracts Sprint" })
     ).not.toBeNull()
-    expect(screen.getByText("Sprint Labs · Beta")).not.toBeNull()
+    expect(screen.getByText("Sprint Labs · Coming soon")).not.toBeNull()
     expect(screen.getByText(/Sign in to start sprint 1 free/)).not.toBeNull()
     expect(screen.getByText("How it is graded")).not.toBeNull()
-    expect(screen.getByText("Sprint 1: Foundations")).not.toBeNull()
+    expect(screen.getByText("Foundations")).not.toBeNull()
+    expect(screen.queryByText("Typed boundaries")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: /Foundations/ }))
+    expect(screen.getByText("Typed boundaries")).not.toBeNull()
     // The CTA repeats at the top and after the arc (UX-SPEC.md §3's "repeat CTA"), so both copies
     // are expected here rather than exactly one.
     await waitFor(() => {
@@ -93,6 +96,7 @@ describe("Sprint Labs workbook overview page", () => {
 
     expect(screen.queryByRole("link", { name: "Sign in to start" })).toBeNull()
     expect(screen.queryByText(/Sign in to start sprint 1 free/)).toBeNull()
+    expect(screen.getByText("This workbook is coming soon.")).not.toBeNull()
     expect(
       screen.getByText(/Server-side isolated grading and additional languages land/)
     ).not.toBeNull()

@@ -61,50 +61,25 @@ Status colors, fixed for the whole surface:
 | pending / locked | `--wb-disabled` on `--wb-track` |
 | failing | `text-destructive` is the one deliberate global-token exception, because `--wb-*` has no failure hue. Always paired with an icon and a word, never color alone. |
 
-### 1.2 Routing: Pattern B, and Sprint Labs owns its own path
+### 1.2 Routing: separate the practice paths
 
-`/labs` stays the shared chooser page. The Sprint Labs surface lives under `/sprint-labs/**` rather
-than nesting into `app/labs/[labId]`, whose `dynamicParams = false` + `generateStaticParams` contract
-must not be perturbed.
+`/labs/choose` is the short Labs chooser. Its Decomposition card links directly to the authored
+911 Dispatch case; its Sprint card links directly to Meridian's overview. The chooser is public,
+server-rendered, `noindex`, and revalidates every 300 seconds for the Sprint flag. A secondary
+"Browse all Case Labs" link remains available for people who want a different case.
 
-```
-app/labs/page.tsx                                    Server, static (ISR 300s). CHOOSER. Screen 1.
-app/sprint-labs/[workbookId]/layout.tsx              Server, metadata + BreadcrumbJsonLd + Course JsonLd,
-                                                     generateStaticParams, dynamicParams = false.
-app/sprint-labs/[workbookId]/page.tsx                Server, static (ISR 300s), INDEXABLE. Screen 2.
-app/sprint-labs/[workbookId]/run/layout.tsx          "use client" guard + force-dynamic + noindex.
-                                                     Wraps screens 3-10. Auth-gated (two layers).
-app/sprint-labs/[workbookId]/run/standup/page.tsx    Screen 3
-app/sprint-labs/[workbookId]/run/board/page.tsx      Screen 4
-app/sprint-labs/[workbookId]/run/ticket/[key]/page.tsx            Screen 5
-app/sprint-labs/[workbookId]/run/ticket/[key]/workspace/page.tsx  Screen 6
-app/sprint-labs/[workbookId]/run/ticket/[key]/submit/page.tsx     Screen 7
-app/sprint-labs/[workbookId]/run/ticket/[key]/review/page.tsx     Screen 8
-app/sprint-labs/[workbookId]/run/ticket/[key]/retro/page.tsx      Screen 9
-app/sprint-labs/[workbookId]/run/summary/page.tsx                 Screen 10
-app/sprint-labs/loading.tsx                          <SparraLoader fullPage label="Loading Sprint Labs…" />
-```
+`/labs` stays the indexable Case Labs catalog and contains only Case Labs. The Sprint workbook
+grid and its jump links are retired. Direct links to `/labs/[labId]` remain valid. Meridian owns
+`/sprint-labs/meridian`; other compiled workbook URLs remain valid for existing direct links.
 
-The `run/` layout carries `export const dynamic = "force-dynamic"` and
-`export const metadata = { robots: { index: false, follow: false } }`, mirroring
-`app/learn/python/[levelSlug]/[lessonId]/workspace/`. Add `isSprintLabRunPath` to `proxy.ts` beside
-`isLessonWorkspacePath` so anonymous requests bounce before render. Screens 3-10 serialize ticket
-bodies, visible tests and gate results; none of it may ever be static or indexed.
+The signed-in header's Labs link goes to `/labs/choose`. The home page also links to that chooser.
+A choice leads directly to the selected experience, without a second catalog step. The Meridian
+overview's back link and breadcrumb lead to the chooser.
 
-**Why real segments and not one client page that switches.** Resume, the back button, and
-"score finalizes at first submit" all need a URL. Each phase route runs one guard: resolve the
-learner's furthest legal phase for that ticket and `router.replace` if the URL is ahead of it, so
-`/retro` cannot be reached before finalization by typing it.
-
-**Flag gating.** The flag is **`SPRINT_LABS_ENABLED`** in `lib/feature-flags.ts` `FLAGS` (default
-`false`) (S5). Use that exact name everywhere; earlier drafts of this spec said `SPRINT_LABS`, which
-does not exist. It needs real readers so it never joins the orphan list: (a) `app/labs/page.tsx`
-(`await getFlagAsync("SPRINT_LABS_ENABLED")`, page is `revalidate = 300` so the owner's flip lands
-within five minutes on a page that must stay static and indexable), (b)
-`app/sprint-labs/[workbookId]/layout.tsx` (`notFound()` when off, checked **before** the id lookup so
-an unknown id and a flag-off id fail the same way), (c) the sitemap and any JsonLd emitter. When off,
-`/labs` renders byte-identically to today. Assert that with a test, and assert the JsonLd omission in
-the same test: the section, the strip and the emitted `Course` entries all disappear together.
+`SPRINT_LABS_ENABLED` gates the Sprint choice on the chooser and the workbook routes. When the flag
+is off, the chooser offers the Decomposition path only, and workbook routes return 404. The `/labs`
+Case Labs catalog is independent of that flag. Sprint run routes remain authenticated, dynamic,
+and non-indexable; the public overview remains indexable when enabled.
 
 ### 1.3 Chrome
 
@@ -143,14 +118,9 @@ interface ObjectiveListProps {
 }
 ```
 
-**`headingLevel` is required whenever the list sits inside a card (S9).** A hard-coded `<h3>` inside
-a card whose own title is an `<h4>` outranks the thing it belongs to and breaks the document
-outline. Rule: a list rendered as a section of a page passes the level below that section's heading;
-a list rendered *inside* a card passes `"none"`. Concretely, `WorkbookCard`'s "What you'll learn"
-passes `headingLevel="none"`, and the overview's per-sprint lists pass `"h3"` under the section's
-`<h2>`. In the same spirit, a card title inside a `<h2>` section is an `<h3>`, never an `<h4>`: do
-not skip a level to match `CaseLabCard`, whose `<h4>` is correct only because it sits under the
-gallery's round-group `<h3>`.
+**`headingLevel` is required whenever a list supplies a heading.** A list inside a card uses
+`"none"` so it does not outrank the card title. The overview's sprint map reveals objective lists
+without adding another heading to the page outline.
 
 Render the chip group as a `<ul>` with one `<li>` per chip so the count is announced. `aria-labelledby`
 on a role-less `<div>` is not exposed and does nothing.
@@ -165,8 +135,8 @@ State dot colors: `not_started` = `--wb-track`, `practicing` = `--wb-accent`,
 `demonstrated` = `--wb-success`, `escaped` = `text-destructive` ring. The word is always in the
 `title`/`aria-label`, never color alone.
 
-Densities by screen: `full` on overview, standup, retro. `chip` on the board card (at most two, then
-`+N`), ticket header, workspace side rail, summary grid.
+Densities by screen: `full` on standup and retro. `chip` on the overview arc, board card (at most
+two, then `+N`), ticket header, workspace side rail, and summary grid.
 
 ### 1.5 Sable and Sparra
 
@@ -248,8 +218,6 @@ covers it. Contracts are one line; props beyond these are an implementation choi
 |---|---|
 | `ObjectiveChip` | One objective as an expandable chip with a state dot. |
 | `ObjectiveList` | A group of chips with "Expand all"; `density="chip" \| "full"`, `headingLevel="h2" \| "h3" \| "h4" \| "none"` (default `h3`). |
-| `WorkbookCard` | One workbook in a catalog grid; `variant="playable" \| "locked"`; whole card is the link when playable, non-link when locked. |
-| `SprintLabsSection` | The `/labs` section wrapper for the workbook grid: icon, heading, count pill, one-line definition. Mirrors `CaseLabGallery`'s group-header shape. |
 | `SprintMap` | The ten-sprint list: number, title, topic, ticket and point counts, lock/current/done state, objective count. |
 | `SlackQuote` | An in-fiction chat message block: channel, timestamp, body. Reused in standup and in ticket linked artifacts. |
 | `ArchMapDelta` | Three labelled lists (added / changed / broke) rendered from `SprintView.archMapDelta`. |
@@ -284,232 +252,54 @@ Reused as-is: `Header`, `Footer`, `ThemeToggle`, `Button`, `Badge`, `Card*`, `Co
 
 ---
 
-## 2. Screen 1 — `/labs` chooser
+## 2. Screen 1 — Labs chooser (`/labs/choose`)
 
-**Purpose.** Send a visitor to the right surface in one screen: a one-sitting Case Lab or a
-ten-sprint workbook. Case Labs' ranking, hero and SEO sections must come through untouched.
+**Purpose.** Let visitors choose between one interview case and sustained work on Meridian by
+comparing the commitment and access terms. The choice cards link to their destinations directly.
 
-**Layout.** The existing page spine is preserved. **Two insertions only, and neither of them wraps
-the Case Labs grid:** a 44px jump strip below the hero, and one new catalog section after the Case
-Labs grid.
+**Layout.** Two concise cards appear together on desktop and early in the mobile scroll. Each card
+shows the kind of practice, a one-sentence description, time commitment, access terms, and a named
+action. The Decomposition card opens `/labs/palantir-911-dispatch`; the Sprint card opens
+`/sprint-labs/meridian`. A quiet "Browse all Case Labs" link opens `/labs` for visitors who want
+another case. There is no mixed catalog, tab set, or second chooser.
 
-```
-+----------------------------------------------------------------------+
-|  <Header/>  (global dark chrome)                                      |
-+----------------------------------------------------------------------+
-|  h1  Decomposition interview practice, on a real codebase   [UNCHANGED]
-|  p   The round Palantir FDSE and Stripe engineering interviews run.    |
-|  [ Start with <starter lab> ]  [ How a lab works v ]                   |
-|  Easiest lab - 45 min - no account needed                              |
-|                                                                        |
-|  ( Case labs )  ( Sprint labs )        <- jump strip, anchors, 44px    |
-|                                                                        |
-|  h2 Pick a case lab            [filters]   <- CaseLabGallery UNCHANGED |
-|     id="case-labs" goes on THIS existing section. No new frame,        |
-|     no new heading, no new definition line.                            |
-|  +-- h3 round group ------------+  +-- h3 round group ------------+    |
-|  |  [CaseLabCard] [CaseLabCard] |  |  [CaseLabCard] [CaseLabCard] |    |
-|  +------------------------------+  +------------------------------+    |
-|                                                                        |
-|  +-- SPRINT LABS ------------------------------ 2 workbooks +          |
-|  |  Ten sprints on one codebase. The repo remembers.        |          |
-|  |  +--------------------+  +--------------------+          |          |
-|  |  |  Meridian          |  |  Prove It (sbx)    |  LOCKED  |          |
-|  |  |  [WorkbookCard]    |  |  [WorkbookCard]    |          |          |
-|  |  +--------------------+  +--------------------+          |          |
-|  +----------------------------------------------------------+          |
-|                                                                        |
-|  ---- border-t ----                                                    |
-|  HowACaseLabWorks / CaseLabsExplainer / CaseLabsFaq / NextSteps  [UNCHANGED]
-+----------------------------------------------------------------------+
-|  <Footer/>                                                            |
-+----------------------------------------------------------------------+
-```
+**States.** `SPRINT_LABS_ENABLED` controls whether the Sprint card appears. Both cards use the
+"Coming soon" status copy while their available previews remain linked and clearly described as
+available now. Unknown flag state hides Sprint.
 
-**The Case Labs region gets an anchor id and nothing else (C1).** An earlier draft of this section
-drew a bordered "CASE LABS" box around `CaseLabGallery` and asked for a "matching section header".
-Built literally, that produced a `rounded-2xl` frame inside a `rounded-2xl` frame (the gallery's own
-round groups carry the identical class string), two `<h2>`s four lines apart ("Case labs" then the
-gallery's own "Pick a case lab"), a definition line directly above a heading that already defines
-the same thing, and roughly 170px of new chrome above the first lab card on the one page that was
-rebuilt to lift that card above the 800px fold. Symmetry does not require a second frame:
-`SprintLabsSection` already renders at exactly the round-group box's weight, so the two catalogs read
-as siblings on their own. Put `id="case-labs"` on `CaseLabGallery`'s existing `<section>` and stop.
-Resulting outline: `h1` → `h2` "Pick a case lab" → `h3` round groups → `h2` "Sprint labs".
+**Accessibility.** Cards are ordinary links with visible focus states and descriptive action text.
+They work without client JavaScript and support opening the destination in a new tab.
 
-**Why not tabs, and why not a two-card band.** Tabs hide one catalog from the initial DOM and put the
-Case Labs SEO prose behind an interaction. A "choose a surface" card band pushes the first lab card
-down roughly 200px on a page rebuilt specifically to lift it above 800px. The jump strip costs one
-row, both catalogs stay in the static HTML, and the section headers do the choosing.
-
-**Component map.**
-- Existing: `Header`, `Footer`, `Button`, `CaseLabGallery`, `HowACaseLabWorks`, `CaseLabsExplainer`,
-  `CaseLabsFaq`, `CaseLabNextSteps`, `BreadcrumbJsonLd`, `CourseListJsonLd`.
-- NEW: `SprintLabsSection`, `WorkbookCard`. The jump strip is two anchors styled like
-  `CaseLabGallery`'s `FilterChip` (44px min height, `aria-current` on neither, they are links).
-- The only edit to `CaseLabGallery` is `id="case-labs"` on its existing `<section>` (C1). No header,
-  no frame, no definition line, no change to the round-group headings underneath.
-
-**`WorkbookCard` content**, in order, from `workbook.yaml`:
-
-1. Title and one-line pitch. Meridian: *"Multi-tenant AI claims intake. You join at sprint 1 as the
-   third engineer."*
-2. Meter row: `10 sprints - 50 tickets - ~58 h - Mid to senior`. Level and hours are content, not
-   code. sbx reads `7 sprints - 18 tickets - 12 to 16 h - Senior to staff`. **On a playable card the
-   row ends with `First sprint free` (S8).** `/labs` is where the decision to click is made, so the
-   card cannot be the one surface that stays silent about the paywall while the overview's CTA
-   qualifier states it. Omit it on a locked card, which has no sprint to give away.
-3. Topic list as middot-separated text, exactly the demoted-keywords treatment `CaseLabCard` uses:
-   *"TypeScript - API contracts - Serialization - Postgres and RLS - Concurrency - Containers - AWS -
-   Observability - AI in production - Verifying AI"*.
-4. **What you'll learn**: `ObjectiveList density="chip"`, six chips maximum, drawn from sprint 1 and
-   2 objectives, then `+N more` linking to the overview page. This is the objectives-first-class
-   requirement at the top of the funnel.
-5. Escaped-defect framing, one line: *"Graded on escaped defect rate: the share of hidden checks that
-   get past you. It goes down over ten sprints, and that curve is the artifact."*
-6. Footer: `Open` affordance (playable) or the lock state (below).
-
-**States.**
-- `playable`: the whole card is the click target for `/sprint-labs/meridian`, matching `CaseLabCard`.
-  Because the objective chips must expand without navigating, this is a stretched link (an
-  `absolute inset-0` `<Link>` carrying an sr-only accessible name) with the chip row as a `relative`
-  sibling, not a `<Link>` wrapping everything. **Give `relative` to the chip row only.** A `relative`
-  footer paints above the stretched link and swallows its own clicks, which makes the strip that says
-  "Open" the one part of the card that does not open it. Pin it with a test.
-- `locked`: rendered as a `<div>`, not a link, `aria-disabled` is not used (there is no control to
-  disable). A `Lock` glyph sits beside the title, the card gets `--wb-panel` fill instead of
-  `--wb-card`, and the footer carries `SANDBOX_NOTICE`. No hover lift, no accent border on hover. A
-  quiet ghost link, *"What runs today"*, opens a `Dialog` explaining the browser runner and what the
-  server sandbox adds. Never a dead "Open" affordance.
-- `enrolled`: the Meridian card's footer swaps `Open` for `Resume: sprint 3, MER-303` plus a 3px
-  progress bar using the `MilestoneRail` progress-bar markup (`--wb-track` under `--wb-accent`) and
-  the label `12 of 50 tickets shipped`. Fetched by one authenticated call for the whole section, not
-  per card. `CaseLabCard`'s own header comment explains why per-card resume fetches were removed;
-  do not reintroduce that shape.
-- `flag off`: `SprintLabsSection` and the jump strip do not render and `CourseListJsonLd` does not
-  include workbooks. The `id="case-labs"` anchor is inert and may stay unconditional. The page is
-  byte-identical to today apart from that one attribute.
-- `signed out`: identical to signed in. The overview page is public; the wall is at `run/`.
-
-**Interactions.** Jump strip anchors scroll to `#case-labs` / `#sprint-labs` (smooth scrolling and
-its reduced-motion override are already global). Cards are whole-card links. No filters on the
-Sprint Labs grid: two workbooks do not need narrowing, and URL filters on a small catalog were
-already rejected on this page as a doorway-page generator.
-
-**Objectives surfacing.** Six chips per card, expandable in place to the full "can do" sentence.
-This is the first place a visitor meets the pattern, so the chips must expand without navigating.
-
-**Copy notes.** The Sprint Labs section carries one definition line, in **sentence case** (S7),
-because the sibling convention it sits beside is sentence case (`lib/labs/case-lab-rounds.ts`'s round
-blurbs) and a lowercase word after a full stop reads as a typo:
-
-> Sprint labs: *"Ten sprints on one codebase. The repo remembers what you did, and sprint 9 breaks
-> the code you wrote in sprint 4."*
-
-Case Labs keeps `CaseLabGallery`'s existing heading and needs no definition line of its own (C1). If
-one is ever wanted, it is *"One scenario, one sitting."*, sentence case, and it replaces nothing.
+**Case Labs catalog.** `/labs` retains its indexable decomposition content, case cards, and
+case-only `CourseListJsonLd`. It no longer includes workbooks or jump links between catalogs.
 
 ---
 
 ## 3. Screen 2 — Workbook overview (`/sprint-labs/[workbookId]`)
 
-**Purpose.** The join-the-team moment: what Meridian is, what you inherit, the ten-sprint arc, what
-you will be able to do afterwards, and one button that starts or resumes.
+**Purpose.** Explain the workbook and its commitment, then let the learner start or resume. The
+page is public and indexable when `SPRINT_LABS_ENABLED` is on.
 
-**Layout.** Single column, `max-w-[900px]`, public page with global chrome.
+**Layout.** A single column, `max-w-[900px]`, with global header and footer. "All labs" returns to
+`/labs/choose`. The opening region shows the workbook title, pitch, availability, access terms, and
+a resume-aware action. It is marked "Coming soon" while the available workbook remains playable.
+The authored meter line names sprint count, ticket count, approximate hours, and level.
 
-```
-+----------------------------------------------------------------------+
-| <Header/>                                                             |
-| < Back to labs                                                        |
-| h1  Meridian                                                          |
-| p   Multi-tenant API for AI claims intake. You join at sprint 1 as     |
-|     the third engineer. The code you inherit is plausible and wrong.   |
-| [ Start sprint 1 ]   10 sprints - 50 tickets - ~58 h - free first sprint
-|                                                                       |
-| +-- WHAT YOU INHERIT ----------------+  +-- HOW IT IS GRADED --------+ |
-| | 61 files - 1,708 lines - 19 tests  |  | visible / hidden /         | |
-| | strict:false, money as float,      |  | regression / adversary     | |
-| | tenant filter one query forgets    |  | escaped defect rate        | |
-| +------------------------------------+  +----------------------------+ |
-|                                                                       |
-| WHAT YOU'LL BE ABLE TO DO      [Expand all]                           |
-| [ObjectiveList density="full", grouped by sprint, collapsed to label] |
-|                                                                       |
-| THE ARC                                                               |
-| [SprintMap: 10 rows]                                                  |
-|  1 Contracts        TypeScript, API contracts   5 tk  26 pt  FREE     |
-|  2 Money & Time     Serialization               5 tk  26 pt  PRO      |
-|  ...                                                                  |
-| 10 The Agent's PR   Verifying AI                5 tk  24 pt  PRO      |
-|                                                                       |
-| [ Start sprint 1 ]  (repeat CTA)                                      |
-| <Footer/>                                                             |
-+----------------------------------------------------------------------+
-```
+The middle contains the grading explanation. The arc follows as a `SprintMap` of sprints, with
+number, title, state, objective count, and Free or Pro status. A sprint row expands to show its goal
+and objectives. The former separate list of every objective above the arc is retired; it duplicated
+the map and put dozens of labels before the learner could see the path. The primary action repeats
+after the arc for visitors who read to the bottom.
 
-**Component map.** Existing: `Header`, `Footer`, `Button`, `Collapsible*`, `MarkdownRenderer`
-(pitch prose), `BreadcrumbJsonLd`, **`CourseJsonLd`** (S3) — singular, one `Course` for this
-workbook, `workloadMinutes` from authored hours. `CourseListJsonLd` is the hub-page component and
-belongs on `/labs`, not here; an earlier draft named it in both places. NEW: `SprintMap`,
-`ObjectiveList`, `WorkbookOverviewCta`, `GradingOverviewPanel`.
+**Actions and states.** `WorkbookOverviewShell` fetches the active run once and supplies it to both
+CTA positions and the map. Signed-out visitors see "Sign in to start" and return to the overview
+after login so onboarding can run. Enrolled learners see the current ticket or standup action;
+completed learners see their summary. The loading state displays one loader. A workbook that needs
+unavailable server execution has no start action and shows its capability notice instead.
 
-**"What you inherit" renders only when the content carries it (S1).** The panel's facts (61 files,
-1,708 lines, 19 test cases, and the named planted defects) are per-workbook authored content, and
-the first draft of this spec specified the panel without specifying where the data lives. Add to the
-workbook content schema, both optional:
-
-```ts
-seedStats?: { files: number; nonTestLines: number; testCases: number }
-inheritedDefects?: string[]   // short, concrete, in the product's voice
-```
-
-When either is absent the panel is omitted entirely and "How it is graded" spans the row on its own.
-**Never synthesize these numbers**, and never soften them into adjectives: "plausible and wrong" is
-the thesis, the file count is the evidence.
-
-**`SprintMap` row (S2).** Number, title, topic, ticket count, point count, and one state marker:
-`done` (check, `--wb-success`), `current` (accent left border and `--wb-accent-soft` fill, exactly
-the `MilestoneRail` active-row treatment), `available`, `pro` (small `Pro` pill), `locked by
-sequence` (dim, `--wb-disabled`). Each row expands to the sprint goal plus its objective chips. Rows
-are buttons only when they are navigable; a Pro row's whole surface is not a link, its `Pro` pill is.
-
-`topic`, `ticketCount` and `points` are **required on the sprint record of any workbook that is
-playable**, and the row renders them. They were missing from the first compiled shape, so the row
-shipped as title plus objective count; the data comes from content authoring plus a small compiler
-addition, and is owned by the stubs task. Until a given workbook carries them, degrade per field
-(drop the missing one, keep the rest) rather than dropping the row or printing a zero. A points
-column that reads `0 pt` is worse than no column: points are the unit the standup speaks in, and the
-arc should agree with it.
-
-**States.**
-- `not enrolled`: primary CTA reads `Start sprint 1`, qualifier `Free for signed in users. Sprints 2
-  to 10 need Pro.`
-- `signed out`: same page, CTA reads `Sign in to start` and links `/login?redirect=/sprint-labs/
-  meridian/run/standup`. The page stays fully readable and indexable.
-- `enrolled, mid sprint`: CTA becomes `Resume: MER-303` and a secondary ghost link `Go to board`.
-  Sprint map shows done, current and locked correctly. The CTA appears twice on this page (top and
-  after the arc) and the map needs the same run, so all three read from **one** lookup owned by a
-  single client wrapper (§16b). Three mounts each fetching for themselves means three authenticated
-  round trips per page view, three Sparras during the wait, and three slots that can disagree.
-- `enrolled, sprint complete`: CTA reads `Start sprint 4 standup`.
-- `workbook complete`: CTA reads `See your summary`, links screen 10.
-- `locked workbook (sbx)`: no CTA. A single `--wb-panel` panel with `SANDBOX_NOTICE` and a
-  `Notify me` action only if a real notify endpoint exists; if it does not, omit it rather than ship
-  a button that does nothing.
-- `flag off`: `notFound()` from the layout.
-
-**Interactions.** CTA is the only primary action on the page. Sprint rows expand in place; they never
-navigate into a sprint the learner has not reached. Objectives expand in place.
-
-**Objectives surfacing.** This screen is the objectives' home. `density="full"`, grouped under a
-sprint heading, collapsed to labels with the full sentence one click away, plus one `Expand all`.
-Every objective in the workbook is listed here and nowhere else in full.
-
-**Copy notes.** The pitch is `WORKBOOK-SPEC.md` §3 in the product's voice, not the learner's. Say
-what is wrong with the seed concretely (`strict: false`, money as a float rounded half-up, a webhook
-row written as delivered before the HTTP call). Concrete beats adjectives, and it is the honest
-description of what they are inheriting.
+**Accessibility.** Sprint rows are buttons with expanded state and reveal content in place. The Pro
+pill is its own link; no link nests inside a button. The first action and repeat action keep clear
+names and visible focus states.
 
 ---
 
@@ -1356,26 +1146,21 @@ Recorded rather than silently resolved, per `EXECUTION-STATE.md`'s standing rule
    wherever content authors one, and the header states whether it is scored. Screen 8 carries both
    states. No content change requested.
 2. **Nine screens in the brief, ten sections here.** `WORKBOOK-SPEC.md` §4 draws seven boxes
-   (standup, board, ticket, work, submit, review, retro); the brief adds the `/labs` chooser, the
+   (standup, board, ticket, work, submit, review, retro); the brief adds the `/labs/choose` chooser, the
    overview and the summary. This spec covers all ten and treats the chooser as screen 1.
-3. **Level and hours for Meridian are not stated anywhere in the doc set.** `SPRINT-PLAN.md` gives
-   ~58 h; sbx gives its own level. The catalog card reads both from `workbook.yaml`; `Mid to senior`
-   is a placeholder for the owner to confirm and is content, not code.
+3. **Level and hours for Meridian are authored workbook content.** The overview reads the meter from
+   the compiled workbook summary; the chooser gives the approximate 58-hour commitment.
 4. **The shareable artifact has no route in any spec.** Screen 10 renders the card either way and
    hides `Copy link` until a public artifact route exists. Flagging rather than inventing a URL.
-5. **`/labs` must stay static and indexable, but the flag's authoritative layer is Firestore.** ISR at
-   300 seconds is the compromise: the owner's flip lands within five minutes on the public page and
-   instantly on the dynamic `run/` branch. If instant is required on `/labs`, the flag has to be an
-   env var there, which means a redeploy to flip.
+5. **The Sprint flag's authoritative layer is Firestore.** The chooser revalidates every 300 seconds,
+   so a flag flip lands there within five minutes. The `/labs` Case Labs catalog is flag-independent.
 6. **`BuildStation.tsx` mixes global tokens into the workbook surface.** Sprint Labs reuses its
    structure and not its class names (§1.1). Fixing Case Labs' copy is out of scope here and is worth
    a separate ticket.
-7. **The sitemap does not list workbook pages yet.** §1.2(c) names it as the third flag reader;
-   `app/sitemap.ts` still enumerates Case Labs only. Owned by whoever next touches that file.
-8. **`components/header.tsx`'s `Labs` nav entry is still `pathname.startsWith("/labs")`.** §12.2 asks
-   it to match `/sprint-labs` too, so the nav is unhighlighted on the workbook pages today. One line,
-   deliberately deferred to whichever task lands the `run/` surface, because a shared file with
-   several agents in flight is exactly the contamination hazard `CLAUDE.md` warns about.
+7. **The sitemap lists Meridian when Sprint Labs is enabled.** The compiler fixture and run routes
+   are excluded from search discovery.
+8. **The Labs nav now covers both route families.** The signed-in link opens `/labs/choose` and its
+   active state includes `/labs` and `/sprint-labs`.
 
 ---
 
@@ -1386,6 +1171,8 @@ Recorded rather than silently resolved, per `EXECUTION-STATE.md`'s standing rule
 Every item below came out of the screen review of the first implementation (screens 1 and 2). Where
 the label reads **spec defect**, the implementer was right and this document was wrong; those are
 corrected in place above, and recorded here so a reader of an earlier copy can tell what moved.
+Catalog-specific amendments C1, S7, S8, and I1 are historical after the separate-path navigation
+change in §1.2 and §2.
 
 | # | Amendment | Where |
 |---|---|---|

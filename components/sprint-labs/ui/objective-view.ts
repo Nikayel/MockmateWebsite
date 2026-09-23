@@ -3,8 +3,7 @@
  * signal yet" adapter, split out of ObjectiveChip.tsx on purpose.
  *
  * ObjectiveChip.tsx is "use client" (it renders a stateful chip), which marks
- * every one of its exports as a client reference. Several Server Components
- * (app/sprint-labs/[workbookId]/page.tsx, WorkbookCard.tsx, TicketView.tsx)
+ * every one of its exports as a client reference. Server Components previously
  * called `toNotStartedObjectiveView` during static generation and crashed the
  * build: "Attempted to call toNotStartedObjectiveView() from the server but
  * toNotStartedObjectiveView is on the client." A type-only import doesn't hit
@@ -24,8 +23,8 @@ export interface ObjectiveView {
 }
 
 /**
- * Adapter for screens that show a workbook's authored objectives with no per-learner mastery signal
- * (the catalog card, the public overview): every objective renders `not_started`, which is the
+ * Adapter for screens that show a workbook's authored objectives with no per-learner mastery signal:
+ * every objective renders `not_started`, which is the
  * honest state for a visitor who has not attempted anything yet. Screens with real mastery data
  * (retro, summary) build their own `ObjectiveView[]` instead of using this.
  */

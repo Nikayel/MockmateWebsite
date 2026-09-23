@@ -39,6 +39,7 @@
 import type { MetadataRoute } from "next"
 import { getAllBlogPosts } from "@/lib/mdx"
 import { listCaseLabs } from "@/lib/labs/case-labs"
+import { getFlagAsync } from "@/lib/feature-flags"
 import { absoluteUrl } from "@/lib/seo/site"
 import {
   COURSE_IDS,
@@ -100,7 +101,10 @@ function buildLearnPages(): MetadataRoute.Sitemap {
   return [...hub, ...tracks, ...levels, ...lessons]
 }
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export const revalidate = 300
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const sprintLabsEnabled = await getFlagAsync("SPRINT_LABS_ENABLED")
   // Core marketing pages - high priority
   const marketingPages: MetadataRoute.Sitemap = [
     {
@@ -224,6 +228,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }))
 
+  // Meridian is the public Sprint Labs entry point. Fixture content stays out of search results.
+  const sprintLabPages: MetadataRoute.Sitemap = sprintLabsEnabled
+    ? [
+        {
+          url: absoluteUrl("/sprint-labs/meridian"),
+          changeFrequency: "monthly",
+          priority: 0.8,
+        },
+      ]
+    : []
+
   // Roadmap preview page. Also where the retired /interview-prep family 308s (next.config.mjs).
   const roadmapPages: MetadataRoute.Sitemap = [
     {
@@ -308,6 +323,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...blogPostPages,
     ...samplePages,
     ...caseLabPages,
+    ...sprintLabPages,
     ...secondaryPages,
     ...buildLearnPages(),
   ]
