@@ -18,7 +18,11 @@
  * time. `app/sitemap.ts` does read the filesystem through `lib/mdx`, which is fine under the `node`
  * test environment.
  */
-import { describe, expect, it } from "vitest"
+import { beforeAll, describe, expect, it, vi } from "vitest"
+
+const flag = vi.hoisted(() => ({ getFlagAsync: vi.fn().mockResolvedValue(true) }))
+vi.mock("@/lib/feature-flags", () => ({ getFlagAsync: flag.getFlagAsync }))
+
 import sitemap from "../sitemap"
 import robots from "../robots"
 import { SITE_ORIGIN } from "@/lib/seo/site"
@@ -67,8 +71,13 @@ function expectedLearnUrls(): string[] {
 }
 
 describe("sitemap", () => {
-  const entries = sitemap()
-  const urls = entries.map((entry) => entry.url)
+  let entries: Awaited<ReturnType<typeof sitemap>>
+  let urls: string[]
+
+  beforeAll(async () => {
+    entries = await sitemap()
+    urls = entries.map((entry) => entry.url)
+  })
 
   it("emits every URL against the canonical origin", () => {
     const offOrigin = urls.filter(
@@ -142,7 +151,7 @@ describe("sitemap", () => {
     // 2 = the hub plus the flat /learn/all lesson index.
     const expectedLearn = 2 + COURSE_IDS.length + listAllCourseLevels().length
     const expectedLessons = listAllCatalogEntries().length
-    const expectedStatic = STATIC_PAGE_COUNT + getAllBlogPosts().length + listCaseLabs().length
+    const expectedStatic = STATIC_PAGE_COUNT + getAllBlogPosts().length + listCaseLabs().length + 1
 
     expect(urls.length).toBe(expectedLearn + expectedLessons + expectedStatic)
   })
@@ -167,6 +176,15 @@ describe("sitemap", () => {
       .map((lab) => `${SITE_ORIGIN}/labs/${lab.id}`)
       .filter((url) => !present.has(url))
     expect(missing).toEqual([])
+  })
+
+  it("lists Meridian only when Sprint Labs is enabled", async () => {
+    expect(urls).toContain(`${SITE_ORIGIN}/sprint-labs/meridian`)
+    expect(urls).not.toContain(`${SITE_ORIGIN}/sprint-labs/fixture-demo`)
+
+    flag.getFlagAsync.mockResolvedValueOnce(false)
+    const hiddenUrls = (await sitemap()).map((entry) => entry.url)
+    expect(hiddenUrls).not.toContain(`${SITE_ORIGIN}/sprint-labs/meridian`)
   })
 
   it("actually loaded the Case Lab registry", () => {
