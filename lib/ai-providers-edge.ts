@@ -20,7 +20,13 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai"
-import { DEEPSEEK_MODELS, GEMINI_MODELS, OPENAI_MODELS } from "./ai/model-ids"
+import {
+  DEEPSEEK_MODELS,
+  GEMINI_MODELS,
+  OPENAI_MODELS,
+  type OpenAIReasoningEffort,
+} from "./ai/model-ids"
+import { getOpenAIChatSamplingParameters } from "./ai/openai-chat-options"
 
 export interface EdgeAIResponse {
   text: string
@@ -84,6 +90,7 @@ export type EdgeUsageSink = (record: EdgeAICallRecord) => void
 export interface EdgeAIOptions {
   maxTokens?: number
   temperature?: number
+  reasoningEffort?: Extract<OpenAIReasoningEffort, "medium" | "high">
   /** Invoked once, after a successful call, with what that call actually cost. */
   onUsage?: EdgeUsageSink
 }
@@ -101,7 +108,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ""
  * session against a user already waiting on a results screen, so thinking is
  * affordable here in a way it is not on the interview path.
  */
-const EDGE_REASONING_EFFORT = "high"
+const DEFAULT_EDGE_REASONING_EFFORT = "high"
 
 // Second rung. V4 Pro, matching the `deepseek` provider that backs `complex`.
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || ""
@@ -172,9 +179,11 @@ async function generateOpenAIResponseEdge(
   options?: {
     maxTokens?: number
     temperature?: number
+    reasoningEffort?: Extract<OpenAIReasoningEffort, "medium" | "high">
   }
 ): Promise<EdgeAIResponse> {
   const startTime = Date.now()
+  const reasoningEffort = options?.reasoningEffort ?? DEFAULT_EDGE_REASONING_EFFORT
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -189,8 +198,12 @@ async function generateOpenAIResponseEdge(
         { role: "user", content: userMessage },
       ],
       max_completion_tokens: options?.maxTokens ?? 2048,
-      temperature: options?.temperature ?? 0.3,
-      reasoning_effort: EDGE_REASONING_EFFORT,
+      ...getOpenAIChatSamplingParameters({
+        model: OPENAI_MODELS.luna,
+        reasoningEffort,
+        temperature: options?.temperature ?? 0.3,
+      }),
+      reasoning_effort: reasoningEffort,
       stream: false,
     }),
   })
@@ -376,6 +389,7 @@ export async function generateFeedbackResponseEdge(
   return generateAIResponseEdge(systemPrompt, userMessage, {
     maxTokens: 2048,
     temperature: 0.3,
+    reasoningEffort: "high",
     onUsage,
   })
 }
@@ -494,7 +508,7 @@ Return JSON only:
     const response = await generateAIResponseEdge(
       "You analyze interview transcripts. Return ONLY valid JSON, no markdown.",
       prompt,
-      { maxTokens: 512, temperature: 0, onUsage }
+      { maxTokens: 512, temperature: 0, reasoningEffort: "medium", onUsage }
     )
 
     const jsonMatch = response.text.match(/\{[\s\S]*\}/)
@@ -592,7 +606,7 @@ Return JSON only:
     const response = await generateAIResponseEdge(
       "Extract interview evidence. Return ONLY valid JSON.",
       prompt,
-      { maxTokens: 512, temperature: 0, onUsage }
+      { maxTokens: 512, temperature: 0, reasoningEffort: "medium", onUsage }
     )
 
     const jsonMatch = response.text.match(/\{[\s\S]*\}/)

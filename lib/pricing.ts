@@ -221,7 +221,7 @@ export function getAllPricingTiers(): Array<{
  * that can be written onto a usage event must have a row here: an unknown key
  * falls back to the Gemini rate, which is the most expensive row in the table.
  *
- * Verified 2026-08-01/2026-08-07 against the model pins in lib/ai/model-ids.ts.
+ * Verified 2026-08-01/2026-09-23 against the model pins in lib/ai/model-ids.ts.
  * Rows marked UNVERIFIED are pre-existing figures for providers we do not
  * currently route to; they are carried forward unchanged and need human
  * confirmation before anything starts calling them.
@@ -245,24 +245,23 @@ export interface AIProviderRate {
  * its only consumer; that function's docstring records how to restore both.
  */
 export const AI_PROVIDER_RATES = {
-  // --- GPT-5.6 Luna, one key per reasoning effort ---
-  // The RATE is identical across all four: effort changes how many output tokens
+  // --- GPT-6 Luna, one key per active reasoning effort ---
+  // The RATE is identical across all three: effort changes how many output tokens
   // come back, not their price. Keeping them separate is what lets the admin
   // tables attribute spend to an effort level.
-  "openai-none": { inputPer1M: 0.2, outputPer1M: 1.2 },
-  "openai-low": { inputPer1M: 0.2, outputPer1M: 1.2 },
-  "openai-high": { inputPer1M: 0.2, outputPer1M: 1.2 },
-  "openai-xhigh": { inputPer1M: 0.2, outputPer1M: 1.2 },
+  "openai-none": { inputPer1M: 0.1, outputPer1M: 0.5 },
+  "openai-medium": { inputPer1M: 0.1, outputPer1M: 0.5 },
+  "openai-high": { inputPer1M: 0.1, outputPer1M: 0.5 },
   // Bare "openai" is what the EDGE runtime reports: lib/ai-providers-edge.ts
   // returns provider: "openai" with no effort suffix, because its effort is a
   // module constant rather than part of the provider identity. Same Luna rate as
-  // the four keys above.
+  // the three active keys above.
   //
   // This row existed in usage-tracking's PROVIDER_COSTS but NOT here, and this
   // table is the one that prices calls. Every OpenAI-served Edge feedback
   // generation would have missed the lookup and billed at the gemini fallback,
   // which is the exact 6.4x mispricing the effort keys were added to end.
-  openai: { inputPer1M: 0.2, outputPer1M: 1.2 },
+  openai: { inputPer1M: 0.1, outputPer1M: 0.5 },
   // --- Gemini, matching the live pins in lib/ai/model-ids.ts ---
   gemini: { inputPer1M: 1.5, outputPer1M: 7.5 }, // Gemini 3.6 Flash
   "gemini-lite": { inputPer1M: 0.3, outputPer1M: 2.5 }, // Gemini 3.5 Flash-Lite
@@ -278,6 +277,8 @@ export const AI_PROVIDER_RATES = {
   "claude-sonnet": { inputPer1M: 3.0, outputPer1M: 15.0 }, // Claude Sonnet 4 (UNVERIFIED)
   "gpt-4o": { inputPer1M: 2.5, outputPer1M: 10.0 }, // (UNVERIFIED)
   "gpt-4o-mini": { inputPer1M: 0.15, outputPer1M: 0.6 }, // (UNVERIFIED)
+  "openai-low": { inputPer1M: 0.2, outputPer1M: 1.2 }, // GPT-5.6 Luna historical slot
+  "openai-xhigh": { inputPer1M: 0.2, outputPer1M: 1.2 }, // GPT-5.6 Luna historical slot
 } as const satisfies Record<string, AIProviderRate>
 
 export type AIProvider = keyof typeof AI_PROVIDER_RATES
@@ -372,11 +373,10 @@ export function calculateAICost(
  * spend actually wants to see.
  */
 const PROVIDER_DISPLAY_NAMES: Record<AIProvider, string> = {
-  "openai-none": "GPT-5.6 Luna (effort: none)",
-  "openai-low": "GPT-5.6 Luna (effort: low)",
-  "openai-high": "GPT-5.6 Luna (effort: high)",
-  "openai-xhigh": "GPT-5.6 Luna (effort: xhigh)",
-  openai: "GPT-5.6 Luna (Edge runtime)",
+  "openai-none": "GPT-6 Luna (effort: none)",
+  "openai-medium": "GPT-6 Luna (effort: medium)",
+  "openai-high": "GPT-6 Luna (effort: high)",
+  openai: "GPT-6 Luna (Edge runtime)",
   gemini: "Gemini 3.6 Flash",
   "gemini-lite": "Gemini 3.5 Flash-Lite",
   "gemini-pro": "Gemini 2.5 Pro",
@@ -388,6 +388,8 @@ const PROVIDER_DISPLAY_NAMES: Record<AIProvider, string> = {
   "claude-sonnet": "Claude Sonnet 4",
   "gpt-4o": "GPT-4o",
   "gpt-4o-mini": "GPT-4o Mini",
+  "openai-low": "GPT-5.6 Luna (legacy effort: low)",
+  "openai-xhigh": "GPT-5.6 Luna (legacy effort: xhigh)",
 }
 
 /**

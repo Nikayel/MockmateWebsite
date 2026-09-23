@@ -41,11 +41,11 @@ beforeAll(async () => {
  */
 const EXPECTED_EFFORT: Record<string, string> = {
   simple: "none",
-  standard: "low",
-  dialogue: "low",
-  code: "low",
+  standard: "none",
+  dialogue: "none",
+  code: "none",
   complex: "high",
-  critique: "xhigh",
+  critique: "medium",
 }
 
 describe("provider routing", () => {
@@ -55,9 +55,8 @@ describe("provider routing", () => {
     const status = getProviderStatus()
     for (const provider of [
       "openai-none",
-      "openai-low",
+      "openai-medium",
       "openai-high",
-      "openai-xhigh",
       "gemini",
       "gemini-lite",
       "deepseek",
@@ -104,7 +103,7 @@ describe("provider routing", () => {
         .filter(([p]) => p.startsWith("openai-"))
         .map(([, c]) => c.model)
     )
-    expect(models.size, `expected one model, got ${[...models].join(", ")}`).toBe(1)
+    expect([...models]).toEqual(["gpt-6-luna"])
   })
 
   it("covers each capability's intended effort with a provider that exists", () => {
@@ -116,29 +115,19 @@ describe("provider routing", () => {
     }
   })
 
-  it("buys the most thinking on the scoring path", () => {
-    // `critique` backs constitutional AI, structured extraction and transcript
-    // analysis: its output becomes a number on a real user's session.
-    const EFFORT_RANK = ["none", "low", "medium", "high", "xhigh", "max"]
-    const critique = EXPECTED_EFFORT.critique
-    for (const [capability, effort] of Object.entries(EXPECTED_EFFORT)) {
-      if (capability === "critique") continue
-      expect(
-        EFFORT_RANK.indexOf(critique),
-        `${capability} should not out-think critique`
-      ).toBeGreaterThanOrEqual(EFFORT_RANK.indexOf(effort))
+  it("reserves reasoning for scoring and final feedback", () => {
+    for (const capability of ["simple", "standard", "dialogue", "code"]) {
+      expect(EXPECTED_EFFORT[capability], capability).toBe("none")
     }
+    expect(EXPECTED_EFFORT.critique).toBe("medium")
+    expect(EXPECTED_EFFORT.complex).toBe("high")
   })
 
-  it("keeps the conversational paths at low effort or below", () => {
+  it("keeps the conversational paths at no reasoning", () => {
     // dialogue runs ~20 turns a session. Reasoning tokens there are dead air,
     // and this is the regression that a well-meaning "raise quality" edit makes.
-    const EFFORT_RANK = ["none", "low", "medium", "high", "xhigh", "max"]
     for (const capability of ["dialogue", "code", "simple"]) {
-      expect(
-        EFFORT_RANK.indexOf(EXPECTED_EFFORT[capability]),
-        `${capability} must stay latency-first`
-      ).toBeLessThanOrEqual(EFFORT_RANK.indexOf("low"))
+      expect(EXPECTED_EFFORT[capability], `${capability} must stay latency-first`).toBe("none")
     }
   })
 

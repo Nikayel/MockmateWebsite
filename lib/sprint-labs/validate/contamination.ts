@@ -97,8 +97,8 @@ export type ContaminationModelCaller = (input: {
 
 /** Real production caller: `generateAIResponse` pinned to `service: "sprint-labs-validate"` (R9,
  *  registered in lib/usage/services.ts alongside this call site) at `complexity: "critique"` --
- *  deliberately the HIGHEST-reasoning-effort chain in `FALLBACK_ORDER`
- *  (`["openai-xhigh", "deepseek", "gemini"]`), not `"code"`'s low-effort chain. The gate's entire
+ *  deliberately the score-sensitive chain in `FALLBACK_ORDER`
+ *  (`["openai-medium", "deepseek", "gemini"]`), not `"code"`'s no-reasoning chain. The gate's entire
  *  purpose is bounding what a STRONG solver can guess cold (WORKBOOK-SPEC.md §5: "A strong model
  *  ... will pass a large fraction of the hidden tests cold"); calling a cheap/low-effort model
  *  would understate real contamination risk, which is the one direction this gate must never be
@@ -191,7 +191,7 @@ export function parseModelSolution(rawText: string): Array<{ path: string; conte
 /**
  * The exact pinned model that produced a verdict. Two fields because "pinned" has two parts that
  * change independently (PLAN.md Task 9: "record the exact pinned model id+version ... a 2026 score
- * isn't a 2028 score"): `modelId` is the STABLE provider slot (`"gemini"`, `"openai-xhigh"`, ...) --
+ * isn't a 2028 score"): `modelId` is the STABLE provider slot (`"gemini"`, `"openai-medium"`, ...) --
  * the identity `FALLBACK_ORDER` routes to; `modelVersion` is the exact pinned model STRING that
  * slot resolved to at call time (`"gemini-3.6-flash"`, via `lib/ai/model-ids.ts`'s pins). The slot
  * can stay `"gemini"` across a model-ids.ts migration while `modelVersion` changes underneath it

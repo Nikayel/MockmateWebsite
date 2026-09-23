@@ -458,7 +458,7 @@ async function detectMistakesSemanticallyEdge(
     const response = await generateAIResponseEdge(
       "You are a technical interview analyst. Return only valid JSON array.",
       prompt,
-      { maxTokens: 512, temperature: 0.1, onUsage }
+      { maxTokens: 512, temperature: 0.1, reasoningEffort: "medium", onUsage }
     )
     return parseSemanticAnalysisResponse(response.text, Date.now())
   } catch (error) {

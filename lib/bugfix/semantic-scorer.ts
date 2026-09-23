@@ -82,7 +82,7 @@ export async function scoreBugfixSemantics(
     const response = await generateAIResponseEdge(
       "You score debugging interviews. Return ONLY valid JSON matching the specified schema. No prose, no markdown.",
       prompt,
-      { maxTokens: 256, temperature: 0, onUsage }
+      { maxTokens: 256, temperature: 0, reasoningEffort: "medium", onUsage }
     )
 
     const jsonMatch = response.text.match(/\{[\s\S]*\}/)

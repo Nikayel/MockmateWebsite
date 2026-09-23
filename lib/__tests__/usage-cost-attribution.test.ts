@@ -134,8 +134,8 @@ describe("calculateCost provider attribution", () => {
     expect(PROVIDER_COSTS).toHaveProperty("openai")
     expect(PROVIDER_COSTS.openai).toBe(PROVIDER_COSTS["openai-high"])
 
-    // 8000 x $0.20/1M + 300 x $1.20/1M = $0.001960
-    expect(calculateCost(8000, 300, "openai")).toBeCloseTo(0.00196, 10)
+    // 8000 x $0.10/1M + 300 x $0.50/1M = $0.000950
+    expect(calculateCost(8000, 300, "openai")).toBeCloseTo(0.00095, 10)
     // Not the gemini rate it used to silently inherit ($0.014250 here).
     expect(calculateCost(8000, 300, "openai")).not.toBeCloseTo(0.01425, 10)
   })

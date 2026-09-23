@@ -46,13 +46,15 @@ describe("AI cost constants", () => {
   // moved without a single test objecting as long as the average held.
   it("pins the per-direction rates that price every live call", () => {
     const expected: Record<string, { inputPer1M: number; outputPer1M: number }> = {
-      // GPT-5.6 Luna. Identical across every effort key and the bare Edge key:
+      // GPT-6 Luna. Identical across every active effort key and bare Edge key:
       // effort changes how many output tokens come back, not their price.
-      "openai-none": { inputPer1M: 0.2, outputPer1M: 1.2 },
+      "openai-none": { inputPer1M: 0.1, outputPer1M: 0.5 },
+      "openai-medium": { inputPer1M: 0.1, outputPer1M: 0.5 },
+      "openai-high": { inputPer1M: 0.1, outputPer1M: 0.5 },
+      openai: { inputPer1M: 0.1, outputPer1M: 0.5 },
+      // Historical provider ids no longer receive traffic.
       "openai-low": { inputPer1M: 0.2, outputPer1M: 1.2 },
-      "openai-high": { inputPer1M: 0.2, outputPer1M: 1.2 },
       "openai-xhigh": { inputPer1M: 0.2, outputPer1M: 1.2 },
-      openai: { inputPer1M: 0.2, outputPer1M: 1.2 },
       gemini: { inputPer1M: 1.5, outputPer1M: 7.5 },
       "gemini-lite": { inputPer1M: 0.3, outputPer1M: 2.5 },
       deepseek: { inputPer1M: 0.435, outputPer1M: 0.87 },

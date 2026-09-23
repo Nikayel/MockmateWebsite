@@ -24,6 +24,7 @@ import {
   OPENAI_MODELS,
   type OpenAIReasoningEffort,
 } from "./ai/model-ids"
+import { getOpenAIChatSamplingParameters } from "./ai/openai-chat-options"
 import { generateCacheKey, getCachedResponse, setCachedResponse } from "./ai-cache"
 import { trackUsageEvent, calculateCost } from "./usage-tracking"
 import { SYSTEM_USER_ID, type UsageServiceId } from "./usage/services"
@@ -39,12 +40,12 @@ import { logger } from "./logger"
 
 // Provider types
 //
-// The four `openai-*` entries are all GPT-5.6 Luna; the suffix is the REASONING
+// The three `openai-*` entries are all GPT-6 Luna; the suffix is the REASONING
 // EFFORT, not a model tier. Effort is encoded in the provider identity for the
 // same reason `gemini-lite` is its own provider rather than a flag: FALLBACK_ORDER
 // stays the single routing authority, no call signature has to carry it, and the
-// usage events record which effort actually ran, so the admin tables can show what
-// `xhigh` costs against `none`.
+// usage events record which effort actually ran, so the admin tables can compare
+// scoring spend against the `none` conversational baseline.
 //
 // `deepseek` and `deepseek-chat` keep their historical names on purpose. They are
 // written into `ai_usage` events as the provider field, and `calculateCost` keys
@@ -52,9 +53,8 @@ import { logger } from "./logger"
 // behind them moved to V4 (see DEEPSEEK_MODELS); the names did not.
 export type AIProvider =
   | "openai-none"
-  | "openai-low"
+  | "openai-medium"
   | "openai-high"
-  | "openai-xhigh"
   | "gemini"
   | "gemini-lite"
   | "deepseek"
@@ -118,7 +118,7 @@ interface ProviderConfig {
   temperature: number
   thinkingLevel?: "minimal" | "low" | "medium" | "high" // For Gemini 3.0 thinking mode
   /**
-   * GPT-5.6 `reasoning_effort`. Always set explicitly on an OpenAI config: the
+   * OpenAI `reasoning_effort`. Always set explicitly on an OpenAI config: the
    * API defaults to `medium` when omitted, which on a 20-turn interview is both
    * slower and dearer than anything we would choose deliberately.
    */
@@ -128,14 +128,14 @@ interface ProviderConfig {
 /**
  * Provider configurations.
  *
- * Strategy (2026-08-06): GPT-5.6 Luna is primary on every capability, varied by
- * reasoning effort rather than by model tier, then DeepSeek V4, then Gemini.
+ * Strategy (updated 2026-09-23): GPT-6 Luna is primary on every capability,
+ * varied by reasoning effort rather than model tier, then DeepSeek V4, then
+ * Gemini.
  *
  * The reason quality is bought with effort instead of a bigger model is purely
  * arithmetic. Reasoning tokens bill as OUTPUT tokens, so effort raises the token
- * count while the rate stays Luna's $1.20/1M. Sol charges $30/1M output before it
- * thinks at all. Luna at `xhigh` therefore lands well under Sol at the default
- * effort, which is why Sol and Terra are pinned in model-ids but unused here.
+ * count while the rate stays Luna's $0.50/1M. Routine work disables reasoning;
+ * bounded scoring uses `medium`; only final feedback uses `high`.
  *
  * These configs carry NO cost figures. Rates live in exactly one place,
  * AI_PROVIDER_RATES in lib/pricing.ts, keyed by these same provider names.
@@ -143,7 +143,7 @@ interface ProviderConfig {
 const OPENAI_BASE_URL = "https://api.openai.com/v1"
 
 const PROVIDERS: Record<AIProvider, ProviderConfig> = {
-  // --- OpenAI GPT-5.6 Luna, one entry per reasoning effort ---
+  // --- OpenAI GPT-6 Luna, one entry per active reasoning effort ---
   "openai-none": {
     name: "openai-none",
     enabled: !!process.env.OPENAI_API_KEY,
@@ -156,18 +156,17 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     // user's critical path. Thinking here buys nothing and costs latency.
     reasoningEffort: "none",
   },
-  "openai-low": {
-    name: "openai-low",
+  "openai-medium": {
+    name: "openai-medium",
     enabled: !!process.env.OPENAI_API_KEY,
     apiKey: process.env.OPENAI_API_KEY,
     baseUrl: OPENAI_BASE_URL,
     model: OPENAI_MODELS.luna,
     maxTokens: 4096,
     temperature: 0.7,
-    // The live interviewer runs ~20 turns per session. Reasoning tokens are
-    // dead air on a conversational path, so this is deliberately the floor that
-    // still reasons at all.
-    reasoningEffort: "low",
+    // Structured scoring and transcript analysis need judgment, but `high`
+    // adds latency without enough value for these bounded rubric prompts.
+    reasoningEffort: "medium",
   },
   "openai-high": {
     name: "openai-high",
@@ -175,41 +174,12 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     apiKey: process.env.OPENAI_API_KEY,
     baseUrl: OPENAI_BASE_URL,
     model: OPENAI_MODELS.luna,
-    // 8192, not 4096. See the note on openai-xhigh: this is a CAP, not a
-    // reservation, so headroom is free until it is used.
+    // This is a CAP, not a reservation, so headroom is free until it is used.
     maxTokens: 8192,
     temperature: 0.7,
     // Feedback generation: one call per session, the user is already waiting on
     // a results screen, and the output is the most visible artefact we produce.
     reasoningEffort: "high",
-  },
-  "openai-xhigh": {
-    name: "openai-xhigh",
-    enabled: !!process.env.OPENAI_API_KEY,
-    apiKey: process.env.OPENAI_API_KEY,
-    baseUrl: OPENAI_BASE_URL,
-    model: OPENAI_MODELS.luna,
-    /**
-     * 8192 because reasoning tokens are drawn from THIS budget before any
-     * visible text is produced. Measured live 2026-08-06 against gpt-5.6-luna:
-     *
-     *   bounded grading prompt (1164 in, clear rubric)   67-186 reasoning, ~2.7s
-     *   open-ended algorithms question (short prompt)    2157 reasoning, 16.6s
-     *
-     * The model calibrates to the task, so the realistic critique shape is
-     * cheap. But the spread is 30x, and the failure mode at the top of it is
-     * nasty: if reasoning exhausts the budget the call returns an EMPTY message
-     * with finish_reason "length", which callOpenAI correctly treats as a
-     * failure and degrades to DeepSeek. That path bills the exhausted OpenAI
-     * reasoning AND the DeepSeek retry, so the cheap fix is headroom. A cap is
-     * only charged when spent.
-     */
-    maxTokens: 8192,
-    temperature: 0.7,
-    // The scoring path. A wrong answer here becomes a wrong score on a real
-    // user's session, so this is the one place we buy the most thinking
-    // available below a tier change.
-    reasoningEffort: "xhigh",
   },
   gemini: {
     name: "gemini",
@@ -269,18 +239,16 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
  * `openai-*` provider is the same Luna model. Read the table as an effort dial:
  *
  *   simple    none    hints, diagnosis, complexity analysis
- *   dialogue  low     the live interviewer, ~20 turns a session
- *   code      low     code chat turns
- *   standard  low     case-lab chat, conversation validation
- *   complex   high    feedback generation, one call a session
- *   critique  xhigh   constitutional AI, structured extraction, transcript analysis
+ *   dialogue  none    the live interviewer, ~20 turns a session
+ *   code      none    code chat turns
+ *   standard  none    case-lab chat, conversation validation
+ *   complex   high    final feedback generation, one call a session
+ *   critique  medium  scoring, structured extraction, transcript analysis
  *
- * `critique` gets the most thinking because it is the scoring path: its output
- * becomes a number attached to a real user's session. It stays on Luna rather
- * than escalating to Terra or Sol on OpenAI's own guidance, which is to escalate
- * measured failures instead of raising the tier for a whole workload. If a
- * scoring regression pass ever shows it degrading, promoting just this row to a
- * Terra-backed provider is a one-line change.
+ * `critique` gets bounded `medium` reasoning because its output becomes a score
+ * attached to a real user's session. `complex` uses `high` only for the final,
+ * once-per-session feedback artifact. Both stay on Luna rather than escalating
+ * model tier without measured evidence.
  *
  * The DeepSeek rung mirrors the same quality split: V4 Pro (`deepseek`) backs
  * the two paths that produce scores, V4 Flash (`deepseek-chat`) backs the rest.
@@ -293,11 +261,11 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
  */
 export const FALLBACK_ORDER: Record<TaskComplexity, AIProvider[]> = {
   simple: ["openai-none", "deepseek-chat", "gemini-lite"],
-  standard: ["openai-low", "deepseek-chat", "gemini"],
+  standard: ["openai-none", "deepseek-chat", "gemini"],
   complex: ["openai-high", "deepseek", "gemini"],
-  dialogue: ["openai-low", "deepseek-chat", "gemini"],
-  code: ["openai-low", "deepseek-chat", "gemini"],
-  critique: ["openai-xhigh", "deepseek", "gemini"],
+  dialogue: ["openai-none", "deepseek-chat", "gemini"],
+  code: ["openai-none", "deepseek-chat", "gemini"],
+  critique: ["openai-medium", "deepseek", "gemini"],
 }
 
 /**
@@ -309,9 +277,8 @@ export const FALLBACK_ORDER: Record<TaskComplexity, AIProvider[]> = {
  */
 const ENV_KEY_FOR_PROVIDER: Record<AIProvider, string> = {
   "openai-none": "OPENAI_API_KEY",
-  "openai-low": "OPENAI_API_KEY",
+  "openai-medium": "OPENAI_API_KEY",
   "openai-high": "OPENAI_API_KEY",
-  "openai-xhigh": "OPENAI_API_KEY",
   gemini: "GEMINI_API_KEY",
   "gemini-lite": "GEMINI_API_KEY",
   deepseek: "DEEPSEEK_API_KEY",
@@ -589,7 +556,7 @@ async function callDeepseek(
  * 2. Reasoning tokens are billed as output but are NOT part of the returned
  *    text, so `completion_tokens` (which includes them) is the only honest
  *    output count. The 4-chars-per-token estimate that the legacy path falls
- *    back to cannot see thinking at all and would understate `xhigh` badly,
+ *    back to cannot see thinking at all and would understate reasoning calls,
  *    which is the whole reason provider-reported usage is preferred downstream.
  */
 async function callOpenAI(
@@ -627,7 +594,11 @@ async function callOpenAI(
       model: config.model,
       messages,
       max_completion_tokens: config.maxTokens,
-      temperature: config.temperature,
+      ...getOpenAIChatSamplingParameters({
+        model: config.model,
+        reasoningEffort: config.reasoningEffort,
+        temperature: config.temperature,
+      }),
       reasoning_effort: config.reasoningEffort,
     }),
   })
@@ -761,9 +732,8 @@ async function callProvider(
 
   switch (provider) {
     case "openai-none":
-    case "openai-low":
+    case "openai-medium":
     case "openai-high":
-    case "openai-xhigh":
       return callOpenAI(systemPrompt, userMessage, history, config)
     case "gemini":
     case "gemini-lite":

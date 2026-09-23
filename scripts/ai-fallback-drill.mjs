@@ -84,9 +84,8 @@ const repeat = Math.max(1, Number(arg("--repeat") ?? 1) || 1)
 /** The efforts the routing table actually uses, cheapest first. */
 const PROBED_EFFORTS = [
   ["none", "simple: hints, diagnosis"],
-  ["low", "dialogue: the live interviewer"],
+  ["medium", "critique: scoring and transcript analysis"],
   ["high", "complex: feedback generation"],
-  ["xhigh", "critique: the scoring path"],
 ]
 
 async function checkOpenAI(model, effort) {

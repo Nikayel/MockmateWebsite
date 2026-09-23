@@ -17,11 +17,9 @@ import type { InterviewPhase } from "./types"
  * provider is disabled and filtered out, and the chain proceeds as if this
  * module did not exist.
  *
- * Measured live 2026-08-06 against gpt-5.6-luna: on bounded, well-scoped prompts
- * (which interview turns are) `high` costs roughly 300ms over `low`. On
- * open-ended prompts the same effort can cost ten times that, so the ceiling
- * here is deliberately `high` anywhere the candidate is mid-flow, and `xhigh`
- * only after they have submitted and are no longer waiting to type.
+ * Since 2026-09-23, every live interview turn is latency-first and uses `none`.
+ * Post-interview judgment uses `medium`; final feedback generation is the only
+ * path that uses `high`, through the feedback capability rather than this map.
  */
 export const PHASE_PROVIDER: Record<InterviewPhase, AIProvider> = {
   // Scripted. There is nothing here to reason about.
@@ -29,24 +27,24 @@ export const PHASE_PROVIDER: Record<InterviewPhase, AIProvider> = {
 
   // Answering questions about the problem statement. Latency-first: the
   // candidate is still orienting and a pause reads as the interviewer stalling.
-  clarification: "openai-low",
+  clarification: "openai-none",
 
   // The candidate has explained an approach and the interviewer has to decide
   // whether it is correct, optimal, and whether its stated complexity holds.
   // This is the most under-served phase in the old flat mapping.
-  discussion: "openai-high",
+  discussion: "openai-none",
 
   // Reacting to code as it is written: spotting a bug forming, questioning a
-  // complexity claim. Mid-flow, so capped at `high`.
-  coding: "openai-high",
+  // complexity claim. Mid-flow, so reasoning remains disabled.
+  coding: "openai-none",
 
   // Judging test reasoning and which edge cases went unconsidered.
-  testing: "openai-high",
+  testing: "openai-none",
 
-  // The debrief. Evaluative, and the candidate has already submitted, so the
-  // latency `xhigh` can cost is no longer blocking anyone's typing.
-  post_interview: "openai-xhigh",
-  complete: "openai-xhigh",
+  // The debrief is evaluative and happens after submission, so bounded
+  // `medium` reasoning is appropriate without the long-tail latency of xhigh.
+  post_interview: "openai-medium",
+  complete: "openai-medium",
 }
 
 /**

@@ -14,7 +14,6 @@ import type { InterviewPhase } from "../types"
 
 const EFFORT_RANK = ["none", "low", "medium", "high", "xhigh", "max"]
 const effortOf = (provider: string) => provider.replace("openai-", "")
-const rank = (provider: string) => EFFORT_RANK.indexOf(effortOf(provider))
 
 /** Every phase in the union, so a new one cannot slip through untested. */
 const ALL_PHASES: InterviewPhase[] = [
@@ -46,37 +45,15 @@ describe("phase reasoning effort", () => {
     }
   })
 
-  it("caps the phases where the candidate is mid-flow", () => {
-    // Measured 2026-08-06: on bounded interview turns `high` costs ~300ms over
-    // `low`, but the same effort on an OPEN-ENDED prompt ran to 16.6s. A
-    // candidate can ask an open-ended question at any point while coding, so
-    // the tail risk is real and `xhigh` stays out of the phases where someone
-    // is waiting to keep typing.
+  it("disables reasoning while the candidate is mid-flow", () => {
     for (const phase of ["intro", "clarification", "discussion", "coding", "testing"] as const) {
-      expect(
-        rank(PHASE_PROVIDER[phase]),
-        `${phase} must stay at or below high`
-      ).toBeLessThanOrEqual(EFFORT_RANK.indexOf("high"))
+      expect(PHASE_PROVIDER[phase], phase).toBe("openai-none")
     }
   })
 
-  it("spends the most thinking only after the candidate has submitted", () => {
+  it("uses bounded reasoning only after the candidate has submitted", () => {
     for (const phase of ["post_interview", "complete"] as const) {
-      expect(PHASE_PROVIDER[phase], phase).toBe("openai-xhigh")
-    }
-  })
-
-  it("raises effort for the phases that require judgement", () => {
-    // discussion, coding and testing all ask the interviewer to decide whether
-    // something is CORRECT. intro and clarification do not.
-    const judgement = ["discussion", "coding", "testing"] as const
-    const conversational = ["intro", "clarification"] as const
-    for (const j of judgement) {
-      for (const c of conversational) {
-        expect(rank(PHASE_PROVIDER[j]), `${j} should out-think ${c}`).toBeGreaterThan(
-          rank(PHASE_PROVIDER[c])
-        )
-      }
+      expect(PHASE_PROVIDER[phase], phase).toBe("openai-medium")
     }
   })
 

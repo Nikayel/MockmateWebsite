@@ -89,10 +89,26 @@ describe("ai-providers-edge OpenAI -> DeepSeek -> Gemini chain", () => {
     expect(url).toContain("api.openai.com")
     const body = JSON.parse(init.body)
     expect(body.reasoning_effort).toBe("high")
-    expect(body.model).toBe("gpt-5.6-luna")
+    expect(body.model).toBe("gpt-6-luna")
+    expect(body).not.toHaveProperty("temperature")
     expect(body.messages[0]).toEqual({ role: "system", content: "sys prompt" })
     expect(body.messages[1]).toEqual({ role: "user", content: "user msg" })
     expect(init.headers.Authorization).toBe("Bearer openai-test-key")
+  })
+
+  it("uses medium reasoning without temperature for bounded scoring calls", async () => {
+    mockFetchByHost({ openai: () => okBody("ok") })
+    const { generateAIResponseEdge } = await import("../ai-providers-edge")
+
+    await generateAIResponseEdge("sys", "user", {
+      reasoningEffort: "medium",
+      temperature: 0,
+    })
+
+    const [, init] = (fetch as unknown as FetchMock).mock.calls[0] as [string, { body: string }]
+    const body = JSON.parse(init.body)
+    expect(body.reasoning_effort).toBe("medium")
+    expect(body).not.toHaveProperty("temperature")
   })
 
   it("falls back to DeepSeek V4 Pro when OpenAI fails", async () => {
