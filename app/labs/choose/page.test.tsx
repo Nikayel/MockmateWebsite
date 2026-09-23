@@ -10,14 +10,16 @@ vi.mock("@/lib/feature-flags", () => ({ getFlagAsync: mocks.getFlagAsync }))
 import LabsChooserPage, { metadata } from "./page"
 
 describe("Labs chooser", () => {
-  it("offers direct links to the decomposition case and Meridian", async () => {
+  it("shows the available paths as visibly locked while they are coming soon", async () => {
     mocks.getFlagAsync.mockResolvedValue(true)
     const html = renderToStaticMarkup(await LabsChooserPage())
 
     expect(html).toContain("CodeSparring Labs")
     expect(html).toContain("Choose your next round")
-    expect(html).toContain('href="/labs/palantir-911-dispatch"')
-    expect(html).toContain('href="/sprint-labs/meridian"')
+    expect(html).not.toContain('href="/labs/palantir-911-dispatch"')
+    expect(html).not.toContain('href="/sprint-labs/meridian"')
+    expect(html).toContain('disabled=""')
+    expect(html.match(/disabled=""/g)).toHaveLength(2)
     expect(html).toContain("60 minutes")
     expect(html).toContain("10 sprints · about 58 hours")
     expect(html).toContain("Browse all Case Labs")
@@ -29,9 +31,10 @@ describe("Labs chooser", () => {
     mocks.getFlagAsync.mockResolvedValue(false)
     const html = renderToStaticMarkup(await LabsChooserPage())
 
-    expect(html).toContain('href="/labs/palantir-911-dispatch"')
+    expect(html).not.toContain('href="/labs/palantir-911-dispatch"')
     expect(html).not.toContain('href="/sprint-labs/meridian"')
-    expect(html).toContain("Take on one real-world case")
+    expect(html).toContain("The 911 Dispatch round is being prepared")
     expect(html).toContain("Solve the 911 Dispatch case")
+    expect(html).toContain('disabled=""')
   })
 })

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   LABS_TRACKS,
+  isLabsPathComingSoon,
   labsNavIsActive,
   visibleLabsTracks,
   type LabsTrackId,
@@ -16,8 +17,6 @@ describe("labs-tracks registry", () => {
       expect(track.label.length).toBeGreaterThan(0)
       expect(track.blurb.length).toBeGreaterThan(0)
       expect(track.commitment.length).toBeGreaterThan(0)
-      expect(track.actionLabel.length).toBeGreaterThan(0)
-      expect(track.accessNote.length).toBeGreaterThan(0)
       expect(track.href.startsWith("/")).toBe(true)
     }
   })
@@ -50,6 +49,13 @@ describe("labs-tracks registry", () => {
     expect(idsFor(null)).toEqual(["decomposition"])
     expect(idsFor(false)).toEqual(["decomposition"])
     expect(idsFor(true)).toEqual(["decomposition", "sprint"])
+  })
+
+  it("locks both track destinations, including nested experience routes", () => {
+    expect(isLabsPathComingSoon("/labs/palantir-911-dispatch")).toBe(true)
+    expect(isLabsPathComingSoon("/sprint-labs/meridian")).toBe(true)
+    expect(isLabsPathComingSoon("/sprint-labs/meridian/run/board")).toBe(true)
+    expect(isLabsPathComingSoon("/labs/palantir-ontology-learning")).toBe(false)
   })
 
   it("marks the Labs nav active across both catalogs and their children", () => {
