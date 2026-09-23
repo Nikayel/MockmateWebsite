@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 import { notFound } from "next/navigation"
 
 import { BreadcrumbJsonLd } from "@/components/seo/JsonLd"
+import { isLabsPathComingSoon } from "@/components/labs/labs-tracks"
 import { getCaseLabById, listCaseLabs } from "@/lib/labs/case-labs"
 import { truncateForDescription } from "@/lib/seo/learn-metadata"
 import { canonicalPageMetadata } from "@/lib/seo/page-metadata"
@@ -45,7 +46,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // Unreachable while `dynamicParams` is false, and deliberately non-indexable rather than a second
   // copy of the gallery's head: the one thing this must never do again is hand a crawler an
   // indexable, self-canonical head for a lab that does not exist.
-  if (!lab) {
+  if (!lab || isLabsPathComingSoon(`/labs/${lab.id}`)) {
     return { title: "Case Lab", robots: { index: false, follow: false } }
   }
 
@@ -71,7 +72,7 @@ export default async function CaseLabDetailLayout({
 
   // The explicit guard. `dynamicParams = false` already rejects unknown ids at the router, but that
   // is a config flag one refactor away from being lost, and the failure it prevents is silent.
-  if (!lab) notFound()
+  if (!lab || isLabsPathComingSoon(`/labs/${lab.id}`)) notFound()
 
   return (
     <>

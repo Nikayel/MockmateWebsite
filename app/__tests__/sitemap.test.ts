@@ -40,6 +40,7 @@ import {
 } from "@/lib/tutorials/lesson-routes"
 import { getAllBlogPosts } from "@/lib/mdx"
 import { listCaseLabs } from "@/lib/labs/case-labs"
+import { isLabsPathComingSoon } from "@/components/labs/labs-tracks"
 
 /**
  * Hand-listed non-Learn pages in `app/sitemap.ts`: marketing, guides, comparisons, the roadmap
@@ -151,7 +152,10 @@ describe("sitemap", () => {
     // 2 = the hub plus the flat /learn/all lesson index.
     const expectedLearn = 2 + COURSE_IDS.length + listAllCourseLevels().length
     const expectedLessons = listAllCatalogEntries().length
-    const expectedStatic = STATIC_PAGE_COUNT + getAllBlogPosts().length + listCaseLabs().length + 1
+    const availableCaseLabs = listCaseLabs().filter(
+      (lab) => !isLabsPathComingSoon(`/labs/${lab.id}`)
+    )
+    const expectedStatic = STATIC_PAGE_COUNT + getAllBlogPosts().length + availableCaseLabs.length
 
     expect(urls.length).toBe(expectedLearn + expectedLessons + expectedStatic)
   })
@@ -168,18 +172,20 @@ describe("sitemap", () => {
     expect(missing).toEqual([])
   })
 
-  it("lists every Case Lab detail page, derived from the registry", () => {
+  it("lists available Case Lab detail pages and omits locked destinations", () => {
     // Derived, not hand-listed: authoring a lab must be enough to get it submitted. A literal list
     // here would be stale the first time someone adds a fifth lab.
     const present = new Set(urls)
     const missing = listCaseLabs()
+      .filter((lab) => !isLabsPathComingSoon(`/labs/${lab.id}`))
       .map((lab) => `${SITE_ORIGIN}/labs/${lab.id}`)
       .filter((url) => !present.has(url))
     expect(missing).toEqual([])
+    expect(present).not.toContain(`${SITE_ORIGIN}/labs/palantir-911-dispatch`)
   })
 
-  it("lists Meridian only when Sprint Labs is enabled", async () => {
-    expect(urls).toContain(`${SITE_ORIGIN}/sprint-labs/meridian`)
+  it("omits Meridian while the track is marked Coming soon", async () => {
+    expect(urls).not.toContain(`${SITE_ORIGIN}/sprint-labs/meridian`)
     expect(urls).not.toContain(`${SITE_ORIGIN}/sprint-labs/fixture-demo`)
 
     flag.getFlagAsync.mockResolvedValueOnce(false)

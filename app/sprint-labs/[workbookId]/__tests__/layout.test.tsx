@@ -37,6 +37,16 @@ describe("Sprint Labs workbook layout", () => {
     ).rejects.toThrow("NEXT_NOT_FOUND")
   })
 
+  it("404s Meridian while its chooser status is Coming soon", async () => {
+    mocks.getFlagAsync.mockResolvedValue(true)
+    await expect(
+      SprintLabWorkbookLayout({
+        children: <div />,
+        params: Promise.resolve({ workbookId: "meridian" }),
+      })
+    ).rejects.toThrow("NEXT_NOT_FOUND")
+  })
+
   it("lists every registry workbook id as a static param", () => {
     expect(generateStaticParams()).toEqual(expect.arrayContaining([{ workbookId: "fixture-demo" }]))
   })
@@ -65,5 +75,13 @@ describe("Sprint Labs workbook layout", () => {
       params: Promise.resolve({ workbookId: "fixture-demo" }),
     })
     expect(metadata.title).toContain("Fixture Demo")
+  })
+
+  it("keeps Coming soon Meridian metadata out of search results", async () => {
+    mocks.getFlagAsync.mockResolvedValue(true)
+    const metadata = await generateMetadata({
+      params: Promise.resolve({ workbookId: "meridian" }),
+    })
+    expect(metadata.robots).toEqual({ index: false, follow: false })
   })
 })

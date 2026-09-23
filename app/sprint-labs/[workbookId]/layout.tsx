@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 import { notFound } from "next/navigation"
 
 import { BreadcrumbJsonLd, CourseJsonLd } from "@/components/seo/JsonLd"
+import { isLabsPathComingSoon } from "@/components/labs/labs-tracks"
 import { getFlagAsync } from "@/lib/feature-flags"
 import { getWorkbookSummary, workbookIds } from "@/lib/sprint-labs/content/registry"
 import { canonicalPageMetadata } from "@/lib/seo/page-metadata"
@@ -35,7 +36,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   // Unreachable while `dynamicParams` is false; deliberately non-indexable rather than a second
   // copy of the catalog's head, per the `/labs/[labId]` precedent.
-  if (!summary) {
+  if (!summary || isLabsPathComingSoon(`/sprint-labs/${summary.id}`)) {
     return { title: "Sprint Lab", robots: { index: false, follow: false } }
   }
 
@@ -64,7 +65,7 @@ export default async function SprintLabWorkbookLayout({
 
   // The explicit guard. `dynamicParams = false` already rejects unknown ids at the router, but that
   // is a config flag one refactor away from being lost, and the failure it prevents is silent.
-  if (!summary) notFound()
+  if (!summary || isLabsPathComingSoon(`/sprint-labs/${summary.id}`)) notFound()
 
   return (
     <>
