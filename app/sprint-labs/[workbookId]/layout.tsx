@@ -13,9 +13,7 @@ type Props = { params: Promise<{ workbookId: string }> }
  * The public/secret content registry (lib/sprint-labs/content/registry.ts) is the complete,
  * compile-time list of valid workbook ids, so it is also the complete list of URLs this segment may
  * answer. Mirrors `app/labs/[labId]/layout.tsx`'s `dynamicParams = false` precedent: every other
- * `/sprint-labs/<anything>` is a routing-layer 404 before metadata or the page component runs. The
- * `sbx` catalog placeholder (components/sprint-labs/catalog/sbx-placeholder.ts) is deliberately NOT
- * in this list — it is not compiled content and has no page.
+ * `/sprint-labs/<anything>` is a routing-layer 404 before metadata or the page component runs.
  */
 export function generateStaticParams() {
   return workbookIds().map((workbookId) => ({ workbookId }))
@@ -73,7 +71,7 @@ export default async function SprintLabWorkbookLayout({
       <BreadcrumbJsonLd
         items={[
           { name: "Home", url: "/" },
-          { name: "Labs", url: "/labs" },
+          { name: "Labs", url: "/labs/choose" },
           { name: summary.title, url: `/sprint-labs/${summary.id}` },
         ]}
       />

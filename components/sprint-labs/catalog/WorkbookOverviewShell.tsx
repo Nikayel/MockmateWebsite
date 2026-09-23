@@ -10,7 +10,7 @@
  * `currentSprint` at all (its done/current markers were dead code). This component is the single
  * client boundary that owns the fetch once and threads its result to three render sites: the top
  * CTA, `SprintMap`'s `currentSprint`, and the repeat CTA. `children` is the static,
- * run-independent middle of the page (the grading panel and the objectives-by-sprint list),
+ * run-independent middle of the page (the grading panel),
  * rendered by the server and passed straight through — it needs no client state at all.
  *
  * Not used for a capability-locked workbook (`!workbookIsRunnable(summary)`): that branch has no

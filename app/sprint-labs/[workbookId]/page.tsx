@@ -7,9 +7,9 @@
  * Fix round 1 (I2+I3): the resume-aware region (top CTA, the arc's `currentSprint`, the repeat CTA)
  * is `WorkbookOverviewShell`, which owns the one client-side run fetch and threads its result to all
  * three render sites — the previous two independent `WorkbookOverviewCta` instances made two
- * authenticated calls for one fact and could show two `SparraLoader`s at once. The grading panel and
- * the objectives-by-sprint list are static and run-independent, so they render on the server and
- * pass straight through the shell as `children`. A capability-locked workbook
+ * authenticated calls for one fact and could show two `SparraLoader`s at once. The grading panel is
+ * static and run-independent, so it renders on the server and passes through the shell as `children`.
+ * The sprint map discloses each sprint's objectives when requested. A capability-locked workbook
  * (`!workbookIsRunnable`) has no CTA and no run at all, so it skips the shell entirely: a plain
  * `SprintMap` with no `currentSprint`, and a static sandbox notice instead of a CTA.
  */
@@ -29,8 +29,6 @@ import {
 import { GradingOverviewPanel } from "@/components/sprint-labs/catalog/GradingOverviewPanel"
 import { SprintMap } from "@/components/sprint-labs/catalog/SprintMap"
 import { WorkbookOverviewShell } from "@/components/sprint-labs/catalog/WorkbookOverviewShell"
-import { ObjectiveList } from "@/components/sprint-labs/ui/ObjectiveList"
-import { toNotStartedObjectiveView } from "@/components/sprint-labs/ui/objective-view"
 import { formatWorkbookMeterLine } from "@/components/sprint-labs/catalog/format-meter-line"
 
 // UX-SPEC.md §1.2/§15.5: static and indexable, with the owner's flag flip landing within five
@@ -50,38 +48,7 @@ export default async function SprintLabWorkbookOverviewPage({
   const sprints = (await getWorkbookSprints(workbookId)) ?? []
   const locked = !workbookIsRunnable(summary)
 
-  // Run-independent middle of the page: identical whether the workbook is locked or not, so it is
-  // built once and either wrapped by the shell (unlocked) or rendered plain (locked).
-  const staticMiddle = (
-    <>
-      <GradingOverviewPanel />
-
-      <section aria-labelledby="workbook-objectives-heading" className="flex flex-col gap-4">
-        <h2
-          id="workbook-objectives-heading"
-          className="text-lg font-semibold text-[var(--wb-text)] sm:text-xl"
-        >
-          What you&apos;ll be able to do
-        </h2>
-        {sprints.length === 0 ? (
-          <p className="text-sm text-[var(--wb-faint)]">
-            Objectives are not published for this workbook yet.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-5">
-            {sprints.map((sprint) => (
-              <ObjectiveList
-                key={sprint.number}
-                heading={`Sprint ${sprint.number}: ${sprint.title}`}
-                density="full"
-                objectives={sprint.objectives.map(toNotStartedObjectiveView)}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-    </>
-  )
+  const gradingOverview = <GradingOverviewPanel />
 
   return (
     <>
@@ -93,17 +60,17 @@ export default async function SprintLabWorkbookOverviewPage({
       <main className="workbook-surface min-h-screen bg-[var(--wb-page)] text-[var(--wb-text)]">
         <div className="container mx-auto flex max-w-[900px] flex-col gap-10 px-4 pt-20 pb-16 sm:pt-24">
           <Link
-            href="/labs#sprint-labs"
+            href="/labs/choose"
             className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-[var(--wb-text-secondary)] hover:text-[var(--wb-accent-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wb-accent)]"
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-            Back to labs
+            All labs
           </Link>
 
           <header className="flex flex-col gap-4">
             <div className="flex flex-col gap-3">
               <span className="text-xs font-semibold tracking-[0.12em] text-[var(--wb-accent-strong)] uppercase">
-                Sprint Labs · Beta
+                Sprint Labs · Coming soon
               </span>
               <h1 className="text-2xl leading-tight font-bold text-[var(--wb-text)] sm:text-4xl">
                 {summary.title}
@@ -112,8 +79,9 @@ export default async function SprintLabWorkbookOverviewPage({
                 {summary.pitch}
               </p>
               <p className="text-xs text-[var(--wb-text-secondary)]">
-                Live in beta; we&apos;re actively improving the experience.
-                {!locked && " Sign in to start sprint 1 free."}
+                {locked
+                  ? "This workbook is coming soon."
+                  : "This workbook is available now. More Sprint Labs content is coming soon. Sign in to start sprint 1 free."}
               </p>
             </div>
 
@@ -129,7 +97,7 @@ export default async function SprintLabWorkbookOverviewPage({
 
           {locked ? (
             <>
-              {staticMiddle}
+              {gradingOverview}
               <section aria-labelledby="workbook-arc-heading" className="flex flex-col gap-4">
                 <h2
                   id="workbook-arc-heading"
@@ -152,7 +120,7 @@ export default async function SprintLabWorkbookOverviewPage({
               sprints={sprints}
               meterLine={formatWorkbookMeterLine(summary)}
             >
-              {staticMiddle}
+              {gradingOverview}
             </WorkbookOverviewShell>
           )}
         </div>

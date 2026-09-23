@@ -1,12 +1,8 @@
 /**
- * Shared "meter row" formatter for a workbook: `WorkbookCard` and the workbook overview page both
- * render the same `N sprints - M tickets - ~H h - Level` line (UX-SPEC.md §2/§3), so the format
- * lives once here rather than being retyped at each call site.
+ * Meter row formatter for the workbook overview's
+ * `N sprints - M tickets - ~H h - Level` line.
  *
- * The hyphen separator is deliberate and literal, matching every meter-row example in UX-SPEC.md
- * (screens 1, 2 and the Pro-wall copy in §12.6) — topics lists use a middot instead (`· `), which is
- * the other demoted-keywords convention `CaseLabCard` already uses. The two are visually distinct on
- * purpose so a meter fact never reads like a keyword.
+ * The hyphen separator distinguishes meter facts from topic lists, which use middots.
  */
 
 export interface WorkbookMeterFacts {
