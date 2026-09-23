@@ -21,7 +21,6 @@ import { usePathname } from "next/navigation"
 import { signOut } from "@/lib/auth"
 import { useAuth } from "@/lib/auth-context"
 import { InterviewTrackDialog } from "@/components/interview/InterviewTrackPicker"
-import { LabsTrackDialog } from "@/components/labs/LabsTrackPicker"
 import { labsNavIsActive } from "@/components/labs/labs-tracks"
 import { isLearnPath } from "@/components/learn/learn-tracks"
 import { LearnTrackDialog } from "@/components/learn/LearnTrackPicker"
@@ -46,7 +45,7 @@ type MarketingNavItem = {
 }
 
 // Which picker window a "picker" nav entry opens.
-type AppNavPickerId = "interview" | "labs" | "learn"
+type AppNavPickerId = "interview" | "learn"
 
 // Two kinds of nav entry, told apart by `kind` so the render has one branch instead
 // of a hand-written exception per hub. Interview and Learn are multi-track hubs
@@ -93,13 +92,10 @@ const APP_NAV: AppNavItem[] = [
     isActive: (pathname) => pathname.startsWith("/interview"),
   },
   {
-    // Labs is two different things wearing one word — a decomposition lab (one problem, one sitting)
-    // and a Sprint workbook (one codebase, ten sprints) — so the entry offers the choice instead of
-    // routing straight to the Case Labs gallery. The Sprint row inside the picker is flag-gated, so
-    // with Sprint Labs off the window shows only the Decomposition catalog that /labs already is.
-    kind: "picker",
+    // The public Labs chooser offers both paths with their commitment and access terms.
+    kind: "link",
     label: "Labs",
-    picker: "labs",
+    href: "/labs/choose",
     icon: FlaskConical,
     isActive: labsNavIsActive,
   },
@@ -158,6 +154,11 @@ const MARKETING_NAV: MarketingNavItem[] = [
     isActive: isLearnPath,
   },
   {
+    label: "Labs",
+    href: "/labs/choose",
+    isActive: labsNavIsActive,
+  },
+  {
     label: "Pricing",
     href: "/pricing",
     isActive: (pathname) => pathname.startsWith("/pricing"),
@@ -169,7 +170,6 @@ export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   // One picker window per hub drives both the desktop nav button and the mobile menu row.
   const [isInterviewPickerOpen, setIsInterviewPickerOpen] = useState(false)
-  const [isLabsPickerOpen, setIsLabsPickerOpen] = useState(false)
   const [isLearnPickerOpen, setIsLearnPickerOpen] = useState(false)
   // False on the server and on the first client render, true only after mount. It
   // gates every auth-dependent branch so the first client render matches the server
@@ -183,7 +183,6 @@ export function Header() {
   // map over APP_NAV instead of growing a branch per hub.
   const navPickers: Record<AppNavPickerId, { open: boolean; setOpen: (open: boolean) => void }> = {
     interview: { open: isInterviewPickerOpen, setOpen: setIsInterviewPickerOpen },
-    labs: { open: isLabsPickerOpen, setOpen: setIsLabsPickerOpen },
     learn: { open: isLearnPickerOpen, setOpen: setIsLearnPickerOpen },
   }
 
@@ -514,7 +513,6 @@ export function Header() {
       </div>
 
       <InterviewTrackDialog open={isInterviewPickerOpen} onOpenChange={setIsInterviewPickerOpen} />
-      <LabsTrackDialog open={isLabsPickerOpen} onOpenChange={setIsLabsPickerOpen} />
       <LearnTrackDialog open={isLearnPickerOpen} onOpenChange={setIsLearnPickerOpen} />
     </header>
   )

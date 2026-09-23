@@ -6,6 +6,7 @@ import {
   visibleLabsTracks,
   type LabsTrackId,
 } from "@/components/labs/labs-tracks"
+import { palantir911Dispatch } from "@/lib/labs/case-labs/palantir-911-dispatch"
 
 describe("labs-tracks registry", () => {
   it("has unique ids and non-empty content per track", () => {
@@ -14,22 +15,23 @@ describe("labs-tracks registry", () => {
     for (const track of LABS_TRACKS) {
       expect(track.label.length).toBeGreaterThan(0)
       expect(track.blurb.length).toBeGreaterThan(0)
-      expect(track.loop.length).toBeGreaterThan(0)
+      expect(track.commitment.length).toBeGreaterThan(0)
+      expect(track.actionLabel.length).toBeGreaterThan(0)
       expect(track.accessNote.length).toBeGreaterThan(0)
       expect(track.href.startsWith("/")).toBe(true)
     }
   })
 
-  it("marks both Labs tracks as beta", () => {
+  it("marks both Labs tracks as coming soon", () => {
     expect(LABS_TRACKS.map(({ id, statusLabel }) => [id, statusLabel])).toEqual([
-      ["decomposition", "Beta"],
-      ["sprint", "Beta"],
+      ["decomposition", "Coming soon"],
+      ["sprint", "Coming soon"],
     ])
   })
 
-  it("routes Decomposition at the live /labs catalog, ungated", () => {
+  it("routes Decomposition directly to the authored decomposition case, ungated", () => {
     const decomposition = LABS_TRACKS.find((t) => t.id === "decomposition")
-    expect(decomposition?.href).toBe("/labs")
+    expect(decomposition?.href).toBe(`/labs/${palantir911Dispatch.id}`)
     expect(decomposition?.requiresSprintLabs).toBeUndefined()
   })
 

@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import Link from "next/link"
 
 import { Header } from "@/components/header"
 import { LabsAssignmentCards } from "@/components/labs/LabsAssignmentCards"
@@ -26,10 +27,10 @@ export default async function LabsChooserPage() {
           className="pointer-events-none absolute inset-x-0 top-0 h-[45rem] bg-[radial-gradient(ellipse_at_50%_0%,rgba(138,92,64,0.22),transparent_65%)]"
           aria-hidden="true"
         />
-        <div className="relative mx-auto flex max-w-6xl flex-col gap-10 px-4 pt-28 pb-20 sm:px-6 sm:pt-36 lg:px-8">
+        <div className="relative mx-auto flex max-w-6xl flex-col gap-8 px-4 pt-24 pb-16 sm:px-6 sm:pt-32 lg:px-8">
           <header className="flex max-w-3xl flex-col gap-4">
             <span className="text-[11px] font-semibold tracking-[0.18em] text-[#e7bca0] uppercase">
-              CodeSparring Labs <span className="mx-2 text-[#746e64]">/</span> Beta
+              CodeSparring Labs <span className="mx-2 text-[#746e64]">/</span> Coming soon
             </span>
             <h1 className="font-serif text-[42px] leading-[1.02] tracking-[-0.045em] sm:text-[58px] lg:text-[68px]">
               Choose your next round.
@@ -43,8 +44,14 @@ export default async function LabsChooserPage() {
           <nav aria-label="Choose a lab path">
             <LabsAssignmentCards tracks={tracks} />
           </nav>
+          <Link
+            href="/labs"
+            className="w-fit rounded-sm text-sm text-[#c9c1b5] underline underline-offset-4 hover:text-[#f6f2ea] focus-visible:ring-2 focus-visible:ring-[#dca47b] focus-visible:outline-none"
+          >
+            Browse all Case Labs
+          </Link>
           <p className="text-[12px] leading-relaxed text-[#aaa397]">
-            Labs are live in beta. We’re actively improving the experience as you practice.
+            Try the available labs now. More are coming soon.
           </p>
         </div>
       </main>
