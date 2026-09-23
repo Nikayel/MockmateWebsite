@@ -45,7 +45,7 @@ const OPENAI_KEY = process.env.OPENAI_API_KEY || ""
 const GEMINI_KEY = process.env.GEMINI_API_KEY || ""
 const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || ""
 
-const PINNED_LUNA = process.env.OPENAI_MODEL_LUNA || "gpt-5.6-luna"
+const PINNED_LUNA = process.env.OPENAI_MODEL_LUNA || "gpt-6-luna"
 const PINNED_FLASH = process.env.GEMINI_MODEL_FLASH || "gemini-3.6-flash"
 const PINNED_DS_FLASH = process.env.DEEPSEEK_MODEL_FLASH || "deepseek-v4-flash"
 const PINNED_DS_PRO = process.env.DEEPSEEK_MODEL_PRO || "deepseek-v4-pro"

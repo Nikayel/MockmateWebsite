@@ -48,8 +48,9 @@ function getEncoder(model?: string): Tiktoken {
  * Model families and their token counting approach
  */
 export const MODEL_FAMILIES = {
-  // GPT-5.6 family - o200k_base is their real encoding, not an approximation.
-  // All three are pinned in lib/ai/model-ids; luna is the one actually called.
+  // GPT-6 Luna is the active OpenAI model. Keep the GPT-5.6 mappings for
+  // historical records and explicit environment overrides.
+  "gpt-6-luna": "o200k_base",
   "gpt-5.6-luna": "o200k_base",
   "gpt-5.6-terra": "o200k_base",
   "gpt-5.6-sol": "o200k_base",
@@ -281,13 +282,14 @@ export const MODEL_CONTEXT_LIMITS = {
   "gemini-3.5-flash": 1000000,
   "gemini-3.5-flash-lite": 1000000,
   "gemini-3.6-flash": 1000000,
-  // GPT-5.6: 1,050,000 total (922K input + 128K output).
+  // GPT-6 Luna: 1,050,000 total (922K input + 128K output).
   //
   // BILLING CLIFF, not a hard cap: above 272K INPUT tokens OpenAI charges 2x
   // input and 1.5x output for the whole session. Nothing here enforces that,
   // and no caller currently consults these limits, so treat it as documentation
   // until something does. A runaway prompt would not fail, it would just cost
   // double, which is the failure mode the global spend guard exists to catch.
+  "gpt-6-luna": 1050000,
   "gpt-5.6-luna": 1050000,
   "gpt-5.6-terra": 1050000,
   "gpt-5.6-sol": 1050000,

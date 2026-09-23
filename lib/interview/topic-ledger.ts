@@ -14,8 +14,8 @@
  *      sanctioned, so the model ignoring its instructions is caught rather than
  *      trusted.
  *   3. The ledger is injected AFTER the conversation history in the prompt,
- *      never before. Cached input is 10x cheaper than fresh on GPT-5.6 Luna
- *      ($0.02 vs $0.20 per 1M) and caching needs a byte-stable prefix; a ledger
+ *      never before. Cached input is 10x cheaper than fresh on GPT-6 Luna
+ *      ($0.01 vs $0.10 per 1M) and caching needs a byte-stable prefix; a ledger
  *      ahead of the history invalidates the cache every single turn.
  *
  * WHY THIS EXISTS

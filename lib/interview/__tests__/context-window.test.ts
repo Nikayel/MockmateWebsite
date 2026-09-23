@@ -5,7 +5,7 @@
  * produced the 2026-08-22 session where the interviewer probed one thread seven
  * times: a 43-message conversation lost its first 13, so the earlier probes on
  * that thread were no longer visible to the model being asked not to repeat
- * itself. Message count is not a safety valve here - GPT-5.6 Luna carries a
+ * itself. Message count is not a safety valve here - GPT-6 Luna carries a
  * 1,050,000-token context and an interview is 20-30K - so the only bound left is
  * on the size of a single message.
  *

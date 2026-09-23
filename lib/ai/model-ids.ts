@@ -30,23 +30,19 @@ export const GEMINI_MODELS = {
 /**
  * OpenAI pins. `OPENAI_MODEL_*` override them, same migration lever as Gemini.
  *
- * The GPT-5.6 family is Sol (flagship), Terra (balanced) and Luna (high volume),
- * priced $5/$30, $2/$12 and $0.20/$1.20 per 1M input/output tokens. Luna is the
- * primary because quality here is bought with REASONING EFFORT rather than tier:
- * thinking tokens bill as output, so Luna at `xhigh` still costs a fraction of
- * Sol at the default effort. Sol and Terra are pinned but unused — they exist so
- * escalating one capability is a one-line change in FALLBACK_ORDER rather than a
- * migration.
+ * GPT-6 Luna replaced GPT-5.6 Luna on 2026-09-23. It keeps the high-volume role
+ * while reducing standard pricing from $0.20/$1.20 to $0.10/$0.50 per 1M
+ * input/output tokens. The older Terra and Sol pins remain available as explicit
+ * environment overrides, but no active route uses them.
  */
 export const OPENAI_MODELS = {
-  luna: process.env.OPENAI_MODEL_LUNA || "gpt-5.6-luna",
+  luna: process.env.OPENAI_MODEL_LUNA || "gpt-6-luna",
   terra: process.env.OPENAI_MODEL_TERRA || "gpt-5.6-terra",
   sol: process.env.OPENAI_MODEL_SOL || "gpt-5.6-sol",
 } as const
 
 /**
- * Reasoning effort levels, cheapest first. Every GPT-5.6 model accepts all six,
- * which is what makes tier and effort independent dials.
+ * Reasoning effort levels, cheapest first.
  *
  * OpenAI's own guidance: start low, measure, and escalate the DIFFICULT CASES
  * rather than raising the setting for a whole workload. `medium` is the API

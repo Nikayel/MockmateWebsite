@@ -1,6 +1,6 @@
 import { truncateFileContent, truncateText } from "@/lib/utils"
 
-// Conversation history is NOT capped by message count. GPT-5.6 Luna, which is
+// Conversation history is NOT capped by message count. GPT-6 Luna, which is
 // first in FALLBACK_ORDER for every task class, has a 1,050,000-token context
 // window; a long interview is 20-30K tokens, so the cap never bought headroom
 // we needed and it cost us correctness.
@@ -15,7 +15,7 @@ import { truncateFileContent, truncateText } from "@/lib/utils"
 // dominate a turn. That is a shape guard, not a memory limit.
 //
 // Two cost notes if this is ever revisited. Cached input is 10x cheaper than
-// fresh ($0.02 vs $0.20 per 1M), and an append-only history is the ideal cache
+// fresh ($0.01 vs $0.10 per 1M), and an append-only history is the ideal cache
 // shape because each turn's prefix is byte-identical to the last, so growing
 // history is close to free as long as nothing volatile is injected AHEAD of it.
 // And there is a cliff at 272K input tokens, where the whole request reprices at
