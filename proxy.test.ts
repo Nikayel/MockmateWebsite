@@ -16,6 +16,9 @@ describe("proxy matcher", () => {
     "/admin/users",
     "/learn/javascript/beginner/two-sum/workspace",
     "/learn/javascript/beginner/two-sum/workspace/hints",
+    "/labs/palantir-911-dispatch",
+    "/sprint-labs/meridian",
+    "/sprint-labs/meridian/run/board",
   ])("runs for protected path %s", (pathname) => {
     expect(matchesProxy(pathname)).toBe(true)
   })
