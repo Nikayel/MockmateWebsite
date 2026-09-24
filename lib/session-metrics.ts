@@ -126,7 +126,13 @@ export interface SessionSummary {
   pattern: string
   difficulty: "easy" | "medium" | "hard"
   durationMinutes: number
-  performanceScore: number // Interview score (includes communication)
+  /**
+   * @deprecated For user-facing interview performance. This interaction-derived
+   * score is kept in session_summaries for historical analytics. The final
+   * feedback score is interview_sessions.performance_score when feedback_status
+   * is "complete"; dashboard trends must read that final score instead.
+   */
+  performanceScore: number
   masteryScore: number // Code-focused score for SR algorithm
   masteryScoreDetails: MasteryScoreResult // Breakdown for analytics
   scoreBreakdown: ScoreBreakdown
@@ -790,7 +796,9 @@ async function storeSessionSummary(summary: SessionSummary): Promise<void> {
     // Technical score is now the same as mastery score (objective metrics)
     const technicalScore = summary.masteryScore
 
-    // Store in user's session history
+    // Legacy analytics summary: performanceScore is calculated from interaction
+    // metrics before final feedback. Do not use it for user-facing score trends.
+    // Final feedback writes the canonical score to interview_sessions.
     await adminDb
       .collection("users")
       .doc(summary.userId)
