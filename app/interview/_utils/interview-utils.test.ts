@@ -130,11 +130,15 @@ describe("interview page helpers", () => {
   })
 
   it("builds an AI partner message for non-DSA scenarios", () => {
-    expect(getInitialPartnerMessage({ type: "bugfix", title: "Rate Limiter" })).toContain(
-      "AI coding partner for Rate Limiter"
-    )
-    expect(getInitialPartnerMessage({ type: "add-functionality", title: "Search" })).toContain(
-      "hints for Search"
-    )
+    const bugfixMessage = getInitialPartnerMessage({ type: "bugfix", title: "Rate Limiter" })
+    expect(bugfixMessage).toContain("Sparra")
+    expect(bugfixMessage).toContain("AI debugging partner for Rate Limiter")
+
+    const featureMessage = getInitialPartnerMessage({
+      type: "add-functionality",
+      title: "Search",
+    })
+    expect(featureMessage).toContain("Sparra")
+    expect(featureMessage).toContain("next step")
   })
 })

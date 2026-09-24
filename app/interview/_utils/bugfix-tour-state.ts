@@ -53,8 +53,8 @@ export const TOUR_STEPS: BugfixTourStep[] = [
     id: "ai-partner",
     target: "ai-partner",
     panel: "editor",
-    title: "Use AI like a debugging partner",
-    body: "Ask for help interpreting files or test output. Talk through your hypothesis and root cause with your interviewer as you go, the way you would in a real round. That conversation is part of what gets assessed.",
+    title: "Debug with Sparra",
+    body: "Ask Sparra for help interpreting files or test output. Talk through your hypothesis and root cause as you go, the way you would with a teammate in a real debugging round.",
     action: "Ask a debugging question or finish the tour.",
   },
 ]

@@ -47,6 +47,7 @@ export type {
   DifficultyLevel,
   Company,
   RoleTag,
+  WorkspaceScenarioLanguage,
   BaseScenario,
   DSAScenario,
   BugFixScenario,
@@ -54,9 +55,20 @@ export type {
   AddFunctionalityScenario,
   Scenario,
 } from "./scenarios/types"
+export type { ScenarioLanguage } from "./scenarios/languages"
+export {
+  getScenarioLanguages,
+  SCENARIO_LANGUAGES,
+  SCENARIO_LANGUAGE_LABELS,
+} from "./scenarios/languages"
 
 // Import types for use in this file
 import type { Scenario, ScenarioType, DifficultyLevel, Company } from "./scenarios/types"
+import {
+  getScenarioLanguages,
+  scenarioSupportsAnyLanguage,
+  type ScenarioLanguage,
+} from "./scenarios/languages"
 
 // ============================================================================
 // Combined Scenarios Array
@@ -101,6 +113,7 @@ export function filterScenarios(filters: {
   type?: ScenarioType[]
   difficulty?: DifficultyLevel[]
   companies?: Company[]
+  languages?: ScenarioLanguage[]
   searchQuery?: string
 }): Scenario[] {
   return scenarios.filter((scenario) => {
@@ -120,12 +133,18 @@ export function filterScenarios(filters: {
       )
       if (!hasMatchingCompany) return false
     }
+    if (filters.languages && !scenarioSupportsAnyLanguage(scenario, filters.languages)) {
+      return false
+    }
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase()
       const matchesTitle = scenario.title.toLowerCase().includes(query)
       const matchesDescription = scenario.description.toLowerCase().includes(query)
       const matchesTags = scenario.tags.some((tag) => tag.toLowerCase().includes(query))
-      if (!matchesTitle && !matchesDescription && !matchesTags) return false
+      const matchesLanguage = getScenarioLanguages(scenario).some((language) =>
+        language.includes(query)
+      )
+      if (!matchesTitle && !matchesDescription && !matchesTags && !matchesLanguage) return false
     }
     return true
   })

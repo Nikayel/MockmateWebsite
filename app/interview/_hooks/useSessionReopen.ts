@@ -17,7 +17,10 @@ import {
   toWorkspaceContextFiles,
   toWorkspaceScenarioFiles,
 } from "../_utils/workspace"
-import { getInitialInterviewerMessage } from "../_utils/interview-messages"
+import {
+  getInitialInterviewerMessage,
+  getInitialPartnerMessage,
+} from "../_utils/interview-messages"
 import type {
   ChatMessage,
   ConsoleLogEntry,
@@ -460,12 +463,8 @@ Let's continue!`
                 savedState.chatMessages as Array<{ type: "ai" | "user"; message: string }>
               )
             } else {
-              opts.setChatMessages([
-                {
-                  type: "ai",
-                  message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
-                },
-              ])
+              const partnerMessage = getInitialPartnerMessage(scenario)
+              opts.setChatMessages(partnerMessage ? [{ type: "ai", message: partnerMessage }] : [])
             }
             // Restore elapsed time and test results
             if (savedState?.elapsedTime) {
@@ -504,7 +503,6 @@ Let's continue!`
             }
           } else {
             // Fresh start - no previous progress
-            const isDSAScenario = scenario.type === "dsa"
             initialMessage = getInitialInterviewerMessage(
               scenario.title,
               scenario.difficulty,
@@ -520,16 +518,8 @@ Let's continue!`
             }
 
             opts.setInterviewerMessages([{ type: "ai", message: initialMessage }])
-            if (!isDSAScenario) {
-              opts.setChatMessages([
-                {
-                  type: "ai",
-                  message: `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`,
-                },
-              ])
-            } else {
-              opts.setChatMessages([]) // No AI partner for DSA
-            }
+            const partnerMessage = getInitialPartnerMessage(scenario)
+            opts.setChatMessages(partnerMessage ? [{ type: "ai", message: partnerMessage }] : [])
           }
         } else {
           toast.error("Scenario not found")

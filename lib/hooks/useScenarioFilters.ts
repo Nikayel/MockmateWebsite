@@ -7,6 +7,7 @@ import {
   type ScenarioType,
   type DifficultyLevel,
   type Company,
+  type ScenarioLanguage,
 } from "@/lib/scenarios"
 
 const SCENARIO_TYPE_PRIORITY: Record<ScenarioType, number> = {
@@ -24,6 +25,8 @@ export function useScenarioFilters() {
     setFilterDifficulty,
     filterCompanies,
     setFilterCompanies,
+    filterLanguages,
+    setFilterLanguages,
     searchQuery,
     setSearchQuery,
   } = useInterviewStore(
@@ -34,6 +37,8 @@ export function useScenarioFilters() {
       setFilterDifficulty: state.setFilterDifficulty,
       filterCompanies: state.filterCompanies,
       setFilterCompanies: state.setFilterCompanies,
+      filterLanguages: state.filterLanguages,
+      setFilterLanguages: state.setFilterLanguages,
       searchQuery: state.searchQuery,
       setSearchQuery: state.setSearchQuery,
     }))
@@ -45,18 +50,20 @@ export function useScenarioFilters() {
       type: filterType.length > 0 ? filterType : undefined,
       difficulty: filterDifficulty.length > 0 ? filterDifficulty : undefined,
       companies: filterCompanies.length > 0 ? filterCompanies : undefined,
+      languages: filterLanguages.length > 0 ? filterLanguages : undefined,
       searchQuery: searchQuery || undefined,
     }).sort((a, b) => {
       const typeDelta = SCENARIO_TYPE_PRIORITY[a.type] - SCENARIO_TYPE_PRIORITY[b.type]
       if (typeDelta !== 0) return typeDelta
       return b.estimatedTime - a.estimatedTime
     })
-  }, [filterType, filterDifficulty, filterCompanies, searchQuery])
+  }, [filterType, filterDifficulty, filterCompanies, filterLanguages, searchQuery])
 
   const hasActiveFilters = Boolean(
     filterType.length > 0 ||
     filterDifficulty.length > 0 ||
     filterCompanies.length > 0 ||
+    filterLanguages.length > 0 ||
     searchQuery
   )
 
@@ -64,6 +71,7 @@ export function useScenarioFilters() {
     setFilterType([])
     setFilterDifficulty([])
     setFilterCompanies([])
+    setFilterLanguages([])
     setSearchQuery("")
   }
 
@@ -91,6 +99,14 @@ export function useScenarioFilters() {
     }
   }
 
+  const toggleLanguageFilter = (language: ScenarioLanguage) => {
+    if (filterLanguages.includes(language)) {
+      setFilterLanguages(filterLanguages.filter((value) => value !== language))
+    } else {
+      setFilterLanguages([...filterLanguages, language])
+    }
+  }
+
   const removeTypeFilter = (type: ScenarioType) => {
     setFilterType(filterType.filter((t) => t !== type))
   }
@@ -103,11 +119,16 @@ export function useScenarioFilters() {
     setFilterCompanies(filterCompanies.filter((c) => c !== company))
   }
 
+  const removeLanguageFilter = (language: ScenarioLanguage) => {
+    setFilterLanguages(filterLanguages.filter((value) => value !== language))
+  }
+
   return {
     // State
     filterType,
     filterDifficulty,
     filterCompanies,
+    filterLanguages,
     searchQuery,
     filteredScenarios,
     hasActiveFilters,
@@ -119,9 +140,11 @@ export function useScenarioFilters() {
     toggleTypeFilter,
     toggleDifficultyFilter,
     toggleCompanyFilter,
+    toggleLanguageFilter,
     removeTypeFilter,
     removeDifficultyFilter,
     removeCompanyFilter,
+    removeLanguageFilter,
     clearCompanyFilters: () => setFilterCompanies([]),
   }
 }

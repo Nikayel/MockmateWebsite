@@ -1,8 +1,15 @@
 "use client"
 
 import { memo, useState, useRef, useEffect } from "react"
-import { Check, X, ChevronDown, Building2, SlidersHorizontal } from "lucide-react"
-import { scenarios, type ScenarioType, type DifficultyLevel, type Company } from "@/lib/scenarios"
+import { Check, X, ChevronDown, Building2, Code2, SlidersHorizontal } from "lucide-react"
+import {
+  SCENARIO_LANGUAGE_LABELS,
+  scenarios,
+  type ScenarioType,
+  type DifficultyLevel,
+  type Company,
+  type ScenarioLanguage,
+} from "@/lib/scenarios"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { EXERCISE_TYPES } from "./scenario-display"
 import { ScenarioSearchBar } from "./ScenarioSearchBar"
@@ -30,6 +37,12 @@ interface ScenarioFiltersProps {
   onToggleCompany: (company: Company) => void
   onRemoveCompany: (company: Company) => void
   onClearCompanies: () => void
+
+  // Language filters (debugging track only)
+  availableLanguages?: readonly ScenarioLanguage[]
+  filterLanguages: ScenarioLanguage[]
+  onToggleLanguage: (language: ScenarioLanguage) => void
+  onRemoveLanguage: (language: ScenarioLanguage) => void
 
   /** Restrict which type pills are shown (per tab). Empty array hides the row. */
   availableTypes?: ScenarioType[]
@@ -100,6 +113,10 @@ export const ScenarioFilters = memo(function ScenarioFilters({
   onRemoveCompany,
   onClearCompanies,
   availableTypes,
+  availableLanguages = [],
+  filterLanguages,
+  onToggleLanguage,
+  onRemoveLanguage,
 }: ScenarioFiltersProps) {
   const [showCompanyDropdown, setShowCompanyDropdown] = useState(false)
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
@@ -216,6 +233,37 @@ export const ScenarioFilters = memo(function ScenarioFilters({
               })}
             </div>
           </div>
+
+          {availableLanguages.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                Language
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {availableLanguages.map((language) => {
+                  const isActive = filterLanguages.includes(language)
+                  const label = SCENARIO_LANGUAGE_LABELS[language]
+                  return (
+                    <button
+                      key={language}
+                      type="button"
+                      onClick={() => onToggleLanguage(language)}
+                      className={`focus-visible:ring-accent/50 inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none ${
+                        isActive
+                          ? "border-accent/50 bg-accent/10 text-accent-strong"
+                          : "border-border bg-muted/50 text-muted-foreground hover:text-foreground"
+                      }`}
+                      aria-pressed={isActive}
+                    >
+                      <Code2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      {label}
+                      {isActive && <Check className="h-3 w-3" aria-hidden="true" />}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Company Dropdown */}
           <div className="relative">
@@ -394,6 +442,23 @@ export const ScenarioFilters = memo(function ScenarioFilters({
               <button
                 onClick={() => onRemoveCompany(c)}
                 aria-label={`Remove ${c} filter`}
+                className="focus-visible:ring-ring rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:outline-none"
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
+            </span>
+          ))}
+          {filterLanguages.map((language) => (
+            <span
+              key={language}
+              className="bg-muted text-muted-foreground inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs"
+            >
+              <Code2 className="h-3 w-3" aria-hidden="true" />
+              {SCENARIO_LANGUAGE_LABELS[language]}
+              <button
+                type="button"
+                onClick={() => onRemoveLanguage(language)}
+                aria-label={`Remove ${SCENARIO_LANGUAGE_LABELS[language]} filter`}
                 className="focus-visible:ring-ring rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:outline-none"
               >
                 <X className="h-3 w-3" aria-hidden="true" />

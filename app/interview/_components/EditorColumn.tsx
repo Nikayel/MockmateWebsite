@@ -1,11 +1,10 @@
 "use client"
 
 import { memo, type RefObject } from "react"
-import { Bot, ChevronDown, ChevronUp, Code, PlayCircle, RotateCcw, Send } from "lucide-react"
+import { Code, PlayCircle, RotateCcw } from "lucide-react"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ErrorBoundary } from "@/components/error-boundary"
-import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { type CodeMirrorEditorRef } from "@/components/editor"
 import {
   type ConsoleOutput,
@@ -30,11 +29,7 @@ import {
 import { LazyCodeMirrorEditor } from "./LazyCodeMirrorEditor"
 import { ConsoleOutput as ConsoleOutputPanel } from "./_sub/ConsoleOutput"
 import { TestResultsPanel } from "./_sub/TestResultsPanel"
-
-interface MiniChatMessage {
-  type: "user" | "ai"
-  message: string
-}
+import { SparraPartnerWidget, type PartnerChatMessage } from "./SparraPartnerWidget"
 
 interface EditorColumnProps {
   activePanel: "problem" | "editor" | "chat"
@@ -65,7 +60,7 @@ interface EditorColumnProps {
   onResetWorkspace?: () => void
   isAIPartnerExpanded: boolean
   onAIPartnerExpandedChange: (expanded: boolean) => void
-  chatMessages: MiniChatMessage[]
+  chatMessages: PartnerChatMessage[]
   chatEndRef: RefObject<HTMLDivElement | null>
   chatInput: string
   onChatInputChange: (value: string) => void
@@ -214,7 +209,7 @@ export const EditorColumn = memo(function EditorColumn({
 
   return (
     <Card
-      className={`editor-panel-card glass-effect border-border bg-card/50 order-2 h-full flex-col gap-0 overflow-hidden py-0 ${
+      className={`editor-panel-card glass-effect border-border bg-card/50 relative order-2 h-full flex-col gap-0 overflow-hidden py-0 ${
         activePanel === "editor" ? "flex" : "hidden lg:flex"
       }`}
     >
@@ -350,117 +345,21 @@ export const EditorColumn = memo(function EditorColumn({
           onSelectedLanguageChange={onSelectedLanguageChange}
           guidedLabBlocksSubmit={guidedLabBlocksSubmit}
         />
-
-        {selectedScenario && selectedScenario.type !== "dsa" && (
-          <div className="border-border flex-shrink-0 border-t pt-2">
-            {!isAIPartnerExpanded ? (
-              <button
-                type="button"
-                className="focus:ring-accent/60 bg-muted/50 hover:bg-muted flex w-full cursor-pointer items-center justify-between rounded-md px-3 py-2 text-left transition-colors focus:ring-2 focus:outline-none"
-                onClick={() => onAIPartnerExpandedChange(true)}
-                data-bugfix-tour={selectedScenario?.type === "bugfix" ? "ai-partner" : undefined}
-              >
-                <div className="flex items-center gap-2">
-                  <Bot className="text-accent h-4 w-4" />
-                  <span className="text-muted-foreground text-xs">
-                    {selectedScenario.type === "bugfix" ? "Debugging Partner" : "Interview Partner"}
-                  </span>
-                  <span className="text-muted-foreground text-xs">· optional</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {chatMessages.length > 0 && (
-                    <span className="text-muted-foreground text-xs">{chatMessages.length} msg</span>
-                  )}
-                  <ChevronUp className="text-muted-foreground h-3 w-3" />
-                </div>
-              </button>
-            ) : (
-              <div
-                className="border-border/60 bg-muted/30 rounded-md border p-3"
-                data-bugfix-tour={selectedScenario?.type === "bugfix" ? "ai-partner" : undefined}
-              >
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Bot className="text-accent h-4 w-4" />
-                    <span className="text-foreground text-xs font-medium">
-                      {selectedScenario.type === "bugfix"
-                        ? "Debugging Partner"
-                        : "Interview Partner"}
-                    </span>
-                    <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[11px]">
-                      optional
-                    </span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onAIPartnerExpandedChange(false)}
-                    className="text-muted-foreground hover:text-foreground h-8 w-8 p-0"
-                    aria-label="Collapse debugging partner"
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <div className="mb-2 max-h-[120px] space-y-1 overflow-y-auto">
-                  {chatMessages.length === 0 ? (
-                    <p className="text-muted-foreground py-2 text-center text-xs">
-                      {selectedScenario.type === "bugfix"
-                        ? "Ask for a debugging nudge after you inspect the files"
-                        : "Ask for hints, not solutions"}
-                    </p>
-                  ) : (
-                    chatMessages.slice(-4).map((msg, index) => (
-                      <div
-                        key={`inline-chat-${msg.type}-${index}`}
-                        className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
-                      >
-                        <div
-                          className={`max-w-[85%] rounded px-2 py-1 text-xs ${msg.type === "user" ? "text-foreground bg-cyan-700/80" : "bg-muted text-foreground"}`}
-                        >
-                          <MarkdownRenderer content={msg.message} className="text-xs break-words" />
-                        </div>
-                      </div>
-                    ))
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
-
-                <div className="flex gap-1">
-                  <input
-                    value={chatInput}
-                    onChange={(event) => onChatInputChange(event.target.value)}
-                    placeholder={
-                      selectedScenario.type === "bugfix"
-                        ? "Ask for a debugging nudge..."
-                        : "Quick question..."
-                    }
-                    className="border-border bg-card text-foreground placeholder:text-muted-foreground h-8 flex-1 rounded-md border px-3 py-1 text-xs focus:ring-2 focus:ring-cyan-300 focus:outline-none"
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !isLoadingChat) {
-                        onSendPartnerMessage()
-                      }
-                    }}
-                    disabled={isLoadingChat}
-                  />
-                  <Button
-                    onClick={onSendPartnerMessage}
-                    disabled={!chatInput.trim() || isLoadingChat}
-                    className="bg-accent hover:bg-accent/80 h-8 w-8 p-0"
-                    aria-label="Send debugging partner message"
-                  >
-                    {isLoadingChat ? (
-                      <div className="border-border h-3 w-3 animate-spin rounded-full border border-t-white" />
-                    ) : (
-                      <Send className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
+
+      {selectedScenario && selectedScenario.type !== "dsa" && (
+        <SparraPartnerWidget
+          expanded={isAIPartnerExpanded}
+          onExpandedChange={onAIPartnerExpandedChange}
+          messages={chatMessages}
+          messagesEndRef={chatEndRef}
+          input={chatInput}
+          onInputChange={onChatInputChange}
+          isLoading={isLoadingChat}
+          onSendMessage={onSendPartnerMessage}
+          isDebuggingScenario={selectedScenario.type === "bugfix"}
+        />
+      )}
     </Card>
   )
 })

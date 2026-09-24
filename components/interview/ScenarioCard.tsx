@@ -11,6 +11,7 @@ import type { UsageLimit } from "@/lib/stores"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { getScenarioLabLink } from "@/lib/labs/lab-links"
 import { getScenarioCardContext, STARTER_SCENARIO_ID } from "./scenario-card-meta"
+import { ScenarioLanguageTags } from "./ScenarioLanguageTags"
 
 interface ScenarioCardProps {
   scenario: Scenario
@@ -70,7 +71,7 @@ export const ScenarioCard = memo(function ScenarioCard({
     >
       {/* Top row: type marker + difficulty (left), status (right) */}
       <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs font-medium">
             <TypeIcon className="h-3.5 w-3.5" aria-hidden="true" />
             {typeLabel}
@@ -80,6 +81,7 @@ export const ScenarioCard = memo(function ScenarioCard({
           >
             {scenario.difficulty}
           </span>
+          <ScenarioLanguageTags scenario={scenario} />
           {/* The designed first rep gets a quiet invitation; once solved, the
               Solved chip carries the story instead. */}
           {scenario.id === STARTER_SCENARIO_ID && !isCompleted && (

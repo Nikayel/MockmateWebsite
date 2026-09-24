@@ -6,7 +6,7 @@ import { LayoutGrid, List, Target } from "lucide-react"
 import { useShallow } from "zustand/react/shallow"
 
 import { useScenarioFilters } from "@/lib/hooks/useScenarioFilters"
-import { scenarios, type Scenario } from "@/lib/scenarios"
+import { getScenarioLanguages, SCENARIO_LANGUAGES, scenarios, type Scenario } from "@/lib/scenarios"
 import { STARTER_SCENARIO_ID } from "./scenario-card-meta"
 import { useInterviewStore, type UsageLimit } from "@/lib/stores"
 
@@ -85,6 +85,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
     filterType,
     filterDifficulty,
     filterCompanies,
+    filterLanguages,
     searchQuery,
     filteredScenarios,
     hasActiveFilters,
@@ -93,9 +94,11 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
     toggleTypeFilter,
     toggleDifficultyFilter,
     toggleCompanyFilter,
+    toggleLanguageFilter,
     removeTypeFilter,
     removeDifficultyFilter,
     removeCompanyFilter,
+    removeLanguageFilter,
     clearCompanyFilters,
   } = useScenarioFilters()
 
@@ -133,6 +136,14 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
     [track, completedProblems]
   )
 
+  const availableLanguages = useMemo(() => {
+    if (!track || track.id !== "debugging") return []
+    const supported = new Set(
+      scenariosInTrack(track, scenarios).flatMap((scenario) => getScenarioLanguages(scenario))
+    )
+    return SCENARIO_LANGUAGES.filter((language) => supported.has(language))
+  }, [track])
+
   // Dynamic padding: clear the floating navbar (64px) plus comfortable breathing room below it;
   // extra when the guest banner (~40px) is also shown.
   const topPadding = hasGuestBanner ? "pt-40" : "pt-32"
@@ -160,6 +171,10 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
         onToggleCompany={toggleCompanyFilter}
         onRemoveCompany={removeCompanyFilter}
         onClearCompanies={clearCompanyFilters}
+        availableLanguages={availableLanguages}
+        filterLanguages={filterLanguages}
+        onToggleLanguage={toggleLanguageFilter}
+        onRemoveLanguage={removeLanguageFilter}
       />
       <ScenarioList
         scenarios={trackScenarios}

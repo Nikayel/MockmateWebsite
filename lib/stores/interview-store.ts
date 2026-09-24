@@ -1,6 +1,12 @@
 import { create } from "zustand"
 import { devtools } from "zustand/middleware"
-import type { Scenario, ScenarioType, DifficultyLevel, Company } from "@/lib/scenarios"
+import type {
+  Scenario,
+  ScenarioType,
+  DifficultyLevel,
+  Company,
+  ScenarioLanguage,
+} from "@/lib/scenarios"
 import type { CompanyId } from "@/lib/data/company-questions/types"
 import type { ProtectedCodeElements } from "@/lib/code-protection"
 
@@ -69,6 +75,7 @@ interface InterviewState {
   filterType: ScenarioType[]
   filterDifficulty: DifficultyLevel[]
   filterCompanies: Company[]
+  filterLanguages: ScenarioLanguage[]
   searchQuery: string
 
   // Interview Status
@@ -145,6 +152,7 @@ interface InterviewActions {
   setFilterType: (types: ScenarioType[]) => void
   setFilterDifficulty: (difficulties: DifficultyLevel[]) => void
   setFilterCompanies: (companies: Company[]) => void
+  setFilterLanguages: (languages: ScenarioLanguage[]) => void
   setSearchQuery: (query: string) => void
   clearFilters: () => void
 
@@ -234,6 +242,7 @@ const initialState: InterviewState = {
   filterType: [],
   filterDifficulty: [],
   filterCompanies: [],
+  filterLanguages: [],
   searchQuery: "",
 
   // Interview Status
@@ -324,12 +333,14 @@ export const useInterviewStore = create<InterviewState & InterviewActions>()(
       setFilterType: (types) => set({ filterType: types }),
       setFilterDifficulty: (difficulties) => set({ filterDifficulty: difficulties }),
       setFilterCompanies: (companies) => set({ filterCompanies: companies }),
+      setFilterLanguages: (languages) => set({ filterLanguages: languages }),
       setSearchQuery: (query) => set({ searchQuery: query }),
       clearFilters: () =>
         set({
           filterType: [],
           filterDifficulty: [],
           filterCompanies: [],
+          filterLanguages: [],
           searchQuery: "",
         }),
 

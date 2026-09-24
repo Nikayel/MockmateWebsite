@@ -3,7 +3,7 @@
  *
  * Pure copy/seed-message helpers for the start of an interview: the
  * interviewer's welcome message, the human-readable problem-type label, and the
- * AI coding-partner's opening message (absent for DSA, which has no partner).
+ * Sparra's opening message (absent for DSA, which has no partner).
  * Extracted from `app/interview/page.tsx` so seed copy lives in one place.
  */
 import type { Scenario } from "@/lib/scenarios"
@@ -36,7 +36,7 @@ export function getProblemTypeLabel(scenarioType: string): string {
 }
 
 /**
- * The AI coding-partner's opening message. Returns `null` for DSA scenarios,
+ * Sparra's opening message. Returns `null` for DSA scenarios,
  * which have no AI partner (and therefore start with an empty chat).
  */
 export function getInitialPartnerMessage(
@@ -45,6 +45,6 @@ export function getInitialPartnerMessage(
   if (scenario.type === "dsa") return null
 
   return scenario.type === "bugfix"
-    ? `Hi! I'm your AI coding partner for ${scenario.title}. Share what you have checked and I can nudge you toward the next useful file, test, or hypothesis.`
-    : `Hi! I'm your AI coding partner. I can help with algorithms, debugging, and hints for ${scenario.title}. Just ask!`
+    ? `Hi, I'm Sparra, your AI debugging partner for ${scenario.title}. Share what you have checked and I can nudge you toward the next useful file, test, or hypothesis.`
+    : `Hi, I'm Sparra, your AI coding partner for ${scenario.title}. Ask me for a hint or help thinking through your next step.`
 }
