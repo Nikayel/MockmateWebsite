@@ -23,10 +23,6 @@ export interface LabsTrack {
   blurb: string
   /** Commitment shown beside access terms on the chooser. */
   commitment: string
-  /** The card's final action label. */
-  actionLabel: string
-  /** What a visitor can do before signing in. */
-  accessNote: string
   /** Where the card goes. A real address, so middle-click and cmd-click work. */
   href: string
   Icon: LucideIcon
@@ -46,8 +42,6 @@ export const LABS_TRACKS: LabsTrack[] = [
     blurb:
       "Scope an underspecified response problem, choose a ranking, and build it in a real codebase.",
     commitment: "60 minutes",
-    actionLabel: "Start 911 Dispatch",
-    accessNote: "Try without an account",
     // 911 Dispatch is the authored decomposition round. Keep the route test pinned to its registry id.
     href: "/labs/palantir-911-dispatch",
     Icon: Layers,
@@ -60,8 +54,6 @@ export const LABS_TRACKS: LabsTrack[] = [
     blurb:
       "One evolving codebase across ten sprints. Ship tickets, then live with your earlier decisions.",
     commitment: "10 sprints · about 58 hours",
-    actionLabel: "Enter Meridian",
-    accessNote: "Sign in · sprint 1 free, later sprints Pro",
     // The flagship Meridian overview owns its Start/Resume action and onboarding cinematic.
     href: "/sprint-labs/meridian",
     Icon: Workflow,
@@ -77,4 +69,13 @@ export function labsNavIsActive(pathname: string): boolean {
 /** The tracks to show given the Sprint flag. `null`/`false` fail closed. */
 export function visibleLabsTracks(sprintLabsEnabled: boolean | null): LabsTrack[] {
   return LABS_TRACKS.filter((track) => !track.requiresSprintLabs || sprintLabsEnabled === true)
+}
+
+/** True when a track destination (or one of its nested routes) is still unavailable. */
+export function isLabsPathComingSoon(pathname: string): boolean {
+  return LABS_TRACKS.some(
+    (track) =>
+      track.statusLabel === "Coming soon" &&
+      (pathname === track.href || pathname.startsWith(`${track.href}/`))
+  )
 }

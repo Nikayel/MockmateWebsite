@@ -26,6 +26,7 @@ import { isLessonWorkspacePath } from "@/lib/tutorials/lesson-routes"
 // rather than by a prefix, so the gate and the link builder read from one definition and cannot
 // drift apart.
 const PROTECTED_ROUTES = ["/admin"]
+const COMING_SOON_ROUTES = ["/labs/palantir-911-dispatch", "/sprint-labs/meridian"]
 
 // PUBLIC_ROUTES, AUTH_ROUTES and isAuthRoute used to live here. None of them
 // were reachable: PUBLIC_ROUTES was never referenced at all, and isAuthRoute
@@ -77,6 +78,10 @@ function isProtectedRoute(pathname: string): boolean {
   return PROTECTED_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))
 }
 
+function isComingSoonRoute(pathname: string): boolean {
+  return COMING_SOON_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))
+}
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -88,6 +93,12 @@ export function proxy(request: NextRequest) {
     pathname.includes(".") // Files with extensions
   ) {
     return NextResponse.next()
+  }
+
+  // Block these paths before Next starts streaming a page. Layout `notFound()` guards remain as a
+  // second layer, but streaming can send an HTTP 200 before that boundary renders.
+  if (isComingSoonRoute(pathname)) {
+    return NextResponse.redirect(new URL("/labs/choose", request.url))
   }
 
   const isAuthenticated = hasAuthToken(request)
@@ -113,5 +124,10 @@ export function proxy(request: NextRequest) {
 // Vercel Function. Keep this list aligned with isProtectedRoute() so public
 // pages, assets, API routes, and bot probes bypass the proxy entirely.
 export const config = {
-  matcher: ["/admin/:path*", "/learn/:track/:levelSlug/:lessonId/workspace/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/learn/:track/:levelSlug/:lessonId/workspace/:path*",
+    "/labs/palantir-911-dispatch/:path*",
+    "/sprint-labs/meridian/:path*",
+  ],
 }

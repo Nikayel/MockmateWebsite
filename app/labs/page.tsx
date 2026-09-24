@@ -47,6 +47,7 @@ import Link from "next/link"
 import { ArrowDown } from "lucide-react"
 
 import { Header } from "@/components/header"
+import { isLabsPathComingSoon } from "@/components/labs/labs-tracks"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { CaseLabGallery } from "@/components/labs/CaseLabGallery"
@@ -87,13 +88,15 @@ export default async function CaseLabsGalleryPage() {
           `isAccessibleForFree` claim inside the schema is true of what is indexed here: the brief,
           the five milestones and the Build workspace all open without an account. */}
       <CourseListJsonLd
-        courses={labs.map((lab) => ({
-          name: lab.title,
-          description: lab.hook,
-          url: `/labs/${lab.id}`,
-          workloadMinutes: lab.estimatedMinutes,
-          teaches: lab.skills,
-        }))}
+        courses={labs
+          .filter((lab) => !isLabsPathComingSoon(`/labs/${lab.id}`))
+          .map((lab) => ({
+            name: lab.title,
+            description: lab.hook,
+            url: `/labs/${lab.id}`,
+            workloadMinutes: lab.estimatedMinutes,
+            teaches: lab.skills,
+          }))}
       />
       <main className="case-lab-workbook min-h-screen bg-[var(--wb-page)] text-[var(--wb-text)]">
         <div className="container mx-auto flex max-w-[1120px] flex-col gap-10 px-4 pt-20 pb-16 sm:pt-24">

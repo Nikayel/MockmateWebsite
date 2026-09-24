@@ -13,6 +13,8 @@ describe("/labs Case Labs catalog", () => {
     expect(html).toContain("Case Labs · Coming soon")
     expect(html).toContain("Pick a case lab")
     expect(html).toContain("Ontology Learning Round")
+    expect(html).not.toContain('href="/labs/palantir-911-dispatch"')
+    expect(html).toContain("Coming soon")
     expect(html).not.toContain("Sprint labs")
     expect(html).not.toContain("Jump to a catalog")
     expect(html).not.toContain("Meridian")

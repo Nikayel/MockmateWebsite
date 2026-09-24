@@ -39,12 +39,13 @@
  */
 
 import Link from "next/link"
-import { ArrowRight, Clock } from "lucide-react"
+import { ArrowRight, Clock, LockKeyhole } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { CompanyLogo } from "@/components/labs/CompanyLogo"
 import { getCompanyBrand } from "@/lib/labs/companies"
 import { workspaceLanguageLabel } from "@/lib/ui/language-labels"
 import type { CaseLab } from "@/lib/labs/types"
+import { isLabsPathComingSoon } from "@/components/labs/labs-tracks"
 
 /** Filled segments per level. Ordinal, which is the whole point of the meter. */
 const DIFFICULTY_STEPS: Record<string, number> = { easy: 1, medium: 2, hard: 3 }
@@ -74,18 +75,10 @@ function DifficultyMeter({ difficulty }: { difficulty: string }) {
 
 export function CaseLabCard({ lab }: { lab: CaseLab }) {
   const brand = getCompanyBrand(lab.company)
+  const comingSoon = isLabsPathComingSoon(`/labs/${lab.id}`)
 
-  return (
-    <Link
-      href={`/labs/${lab.id}`}
-      className={cn(
-        "group flex h-full cursor-pointer flex-col gap-3 rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-card)] p-4 transition-all duration-200 sm:p-5",
-        // Hover lift. `motion-reduce` drops the transform, not the colour change: the border and
-        // shadow still say "this is the one under the cursor" without moving anything.
-        "hover:-translate-y-[3px] hover:border-[var(--wb-accent)] hover:shadow-md motion-reduce:transform-none motion-reduce:transition-none",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wb-accent)]"
-      )}
-    >
+  const content = (
+    <>
       <div className="flex items-start gap-3">
         <CompanyLogo company={lab.company} size="md" className="mt-0.5 shrink-0" />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -101,32 +94,53 @@ export function CaseLabCard({ lab }: { lab: CaseLab }) {
 
       <p className="text-sm leading-relaxed text-[var(--wb-text-secondary)]">{lab.hook}</p>
 
-      {/* Keywords, not affordances. Five grey pills per card was the largest block of low-value
-          texture in the grid and read at nearly body weight; as middot-separated text they still
-          say what the lab is about and stop competing with the title. The demotion comes from
-          removing the fill, NOT from lowering the contrast: `--wb-muted` measures 2.48:1 on the
-          card, which is not a legible way to make something quiet. */}
       <p className="text-[11px] leading-relaxed text-[var(--wb-text-secondary)]">
         {lab.skills.join(" · ")}
       </p>
 
-      {/* `mt-auto` pins the footer so cards of unequal hook length still align across the grid. */}
       <div className="mt-auto flex items-center gap-3 border-t border-[var(--wb-border)] pt-3 text-xs text-[var(--wb-text-secondary)]">
         <span className="flex items-center gap-1">
           <Clock className="h-3.5 w-3.5" aria-hidden />
           {lab.estimatedMinutes} min
         </span>
-        {/* The build milestone's language. Test-pinned against the workspace it opens, so this
-            cannot promise Python and hand over JavaScript. */}
         <span>{workspaceLanguageLabel(lab.buildLanguage)}</span>
-        <span
-          aria-hidden
-          className="ml-auto flex items-center gap-1 font-medium text-[var(--wb-accent-strong)]"
-        >
-          Open
-          <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-[3px] motion-reduce:transform-none" />
-        </span>
+        {comingSoon ? (
+          <button
+            type="button"
+            disabled
+            className="ml-auto inline-flex cursor-not-allowed items-center gap-1 font-medium text-[var(--wb-text-secondary)] disabled:opacity-100"
+          >
+            Coming soon
+            <LockKeyhole className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        ) : (
+          <span
+            aria-hidden
+            className="ml-auto flex items-center gap-1 font-medium text-[var(--wb-accent-strong)]"
+          >
+            Open
+            <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-[3px] motion-reduce:transform-none" />
+          </span>
+        )}
       </div>
+    </>
+  )
+
+  const cardClassName = cn(
+    "group flex h-full flex-col gap-3 rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-card)] p-4 transition-all duration-200 sm:p-5",
+    // Hover lift. `motion-reduce` drops the transform, not the colour change: the border and
+    // shadow still say "this is the one under the cursor" without moving anything.
+    !comingSoon &&
+      "cursor-pointer hover:-translate-y-[3px] hover:border-[var(--wb-accent)] hover:shadow-md motion-reduce:transform-none motion-reduce:transition-none",
+    !comingSoon &&
+      "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--wb-accent)]"
+  )
+
+  return comingSoon ? (
+    <article className={cn(cardClassName, "cursor-not-allowed opacity-75")}>{content}</article>
+  ) : (
+    <Link href={`/labs/${lab.id}`} className={cardClassName}>
+      {content}
     </Link>
   )
 }

@@ -37,8 +37,8 @@ export default async function LabsChooserPage() {
             </h1>
             <p className="max-w-xl text-base leading-relaxed text-[#c9c1b5] sm:text-lg">
               {tracks.length > 1
-                ? "One case to solve today, or one codebase to grow into. Pick the work that matches your next interview."
-                : "Take on one real-world case. Scope the ambiguity, then build until the tests pass."}
+                ? "Decomposition and Sprint Labs are being prepared. Browse all Case Labs to practice now."
+                : "The 911 Dispatch round is being prepared. Browse all Case Labs to practice now."}
             </p>
           </header>
           <nav aria-label="Choose a lab path">

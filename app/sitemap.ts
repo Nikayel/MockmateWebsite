@@ -39,6 +39,7 @@
 import type { MetadataRoute } from "next"
 import { getAllBlogPosts } from "@/lib/mdx"
 import { listCaseLabs } from "@/lib/labs/case-labs"
+import { isLabsPathComingSoon } from "@/components/labs/labs-tracks"
 import { getFlagAsync } from "@/lib/feature-flags"
 import { absoluteUrl } from "@/lib/seo/site"
 import {
@@ -222,22 +223,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Case Lab detail pages, derived from the registry for the same reason blog posts are derived from
   // their front matter: authoring a lab should put it in the sitemap, not require a second edit here.
-  const caseLabPages: MetadataRoute.Sitemap = listCaseLabs().map((lab) => ({
-    url: absoluteUrl(`/labs/${lab.id}`),
-    changeFrequency: "monthly" as const,
-    priority: 0.8,
-  }))
+  const caseLabPages: MetadataRoute.Sitemap = listCaseLabs()
+    .filter((lab) => !isLabsPathComingSoon(`/labs/${lab.id}`))
+    .map((lab) => ({
+      url: absoluteUrl(`/labs/${lab.id}`),
+      changeFrequency: "monthly" as const,
+      priority: 0.8,
+    }))
 
   // Meridian is the public Sprint Labs entry point. Fixture content stays out of search results.
-  const sprintLabPages: MetadataRoute.Sitemap = sprintLabsEnabled
-    ? [
-        {
-          url: absoluteUrl("/sprint-labs/meridian"),
-          changeFrequency: "monthly",
-          priority: 0.8,
-        },
-      ]
-    : []
+  const sprintLabPages: MetadataRoute.Sitemap =
+    sprintLabsEnabled && !isLabsPathComingSoon("/sprint-labs/meridian")
+      ? [
+          {
+            url: absoluteUrl("/sprint-labs/meridian"),
+            changeFrequency: "monthly",
+            priority: 0.8,
+          },
+        ]
+      : []
 
   // Roadmap preview page. Also where the retired /interview-prep family 308s (next.config.mjs).
   const roadmapPages: MetadataRoute.Sitemap = [
