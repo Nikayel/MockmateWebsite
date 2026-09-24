@@ -45,6 +45,9 @@ export interface BugfixSemanticScorerInput {
 /** Characters of transcript sent to the scorer. ~1.5k tokens, once per session. */
 export const BUGFIX_TRANSCRIPT_BUDGET = 6000
 
+/** Includes GPT reasoning tokens as well as the small visible JSON response. */
+export const BUGFIX_SEMANTIC_MAX_TOKENS = 1024
+
 /**
  * Fit a transcript to `budget` while keeping BOTH ends.
  *
@@ -82,7 +85,12 @@ export async function scoreBugfixSemantics(
     const response = await generateAIResponseEdge(
       "You score debugging interviews. Return ONLY valid JSON matching the specified schema. No prose, no markdown.",
       prompt,
-      { maxTokens: 256, temperature: 0, reasoningEffort: "medium", onUsage }
+      {
+        maxTokens: BUGFIX_SEMANTIC_MAX_TOKENS,
+        temperature: 0,
+        reasoningEffort: "medium",
+        onUsage,
+      }
     )
 
     const jsonMatch = response.text.match(/\{[\s\S]*\}/)
