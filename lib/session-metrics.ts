@@ -1251,9 +1251,7 @@ export async function getRecentSessions(
   }
 }
 
-/**
- * Get user's performance trends
- */
+/** Get trends from the same final feedback scores shown on session results. */
 export async function getPerformanceTrends(
   userId: string,
   days: number = 30
@@ -1263,45 +1261,60 @@ export async function getPerformanceTrends(
   trend: "improving" | "stable" | "declining"
 }> {
   try {
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - days)
+    const now = Date.now()
+    const dailyStart = new Date(now - days * 24 * 60 * 60 * 1000).toISOString()
+    const weeklyStart = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const queryStart = dailyStart < weeklyStart ? dailyStart : weeklyStart
 
     const snapshot = await adminDb
-      .collection("users")
-      .doc(userId)
-      .collection("session_summaries")
-      .where("completedAt", ">=", startDate.toISOString())
-      .orderBy("completedAt", "asc")
+      .collection("interview_sessions")
+      .where("user_id", "==", userId)
+      .where("completed_at", ">=", queryStart)
+      .orderBy("completed_at", "desc")
       .get()
 
-    // Group by date
+    // session_summaries.performanceScore is an older interaction-derived score.
+    // Only feedback persistence writes the final score shown on session results.
     const dailyMap = new Map<string, { total: number; count: number }>()
+    let weeklyTotal = 0
+    let weeklyCount = 0
 
     snapshot.docs.forEach((doc) => {
       const data = doc.data()
-      // Skip sessions without a valid performance score
-      const score = data.performanceScore ?? data.performance_score
-      if (score === undefined || score === null || score === 0) return
+      const score = data.performance_score
+      const completedAt = data.completed_at
+      if (
+        data.feedback_status !== "complete" ||
+        typeof score !== "number" ||
+        !Number.isFinite(score) ||
+        score < 0 ||
+        score > 100 ||
+        typeof completedAt !== "string"
+      )
+        return
 
-      const date = data.completedAt.split("T")[0]
+      if (completedAt >= weeklyStart) {
+        weeklyTotal += score
+        weeklyCount++
+      }
+      if (completedAt < dailyStart) return
+
+      const date = completedAt.split("T")[0]
       const existing = dailyMap.get(date) || { total: 0, count: 0 }
       existing.total += score
       existing.count++
       dailyMap.set(date, existing)
     })
 
-    const daily = Array.from(dailyMap.entries()).map(([date, { total, count }]) => ({
-      date,
-      score: Math.round(total / count),
-      sessions: count,
-    }))
+    const daily = Array.from(dailyMap.entries())
+      .map(([date, { total, count }]) => ({
+        date,
+        score: Math.round(total / count),
+        sessions: count,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date))
 
-    // Calculate weekly average (last 7 days)
-    const lastWeek = daily.slice(-7)
-    const weeklyAverage =
-      lastWeek.length > 0
-        ? Math.round(lastWeek.reduce((sum, d) => sum + d.score, 0) / lastWeek.length)
-        : 0
+    const weeklyAverage = weeklyCount > 0 ? Math.round(weeklyTotal / weeklyCount) : 0
 
     // Calculate trend
     let trend: "improving" | "stable" | "declining" = "stable"
