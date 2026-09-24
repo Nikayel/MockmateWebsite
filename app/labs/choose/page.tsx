@@ -1,5 +1,4 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 
 import { Header } from "@/components/header"
 import { LabsAssignmentCards } from "@/components/labs/LabsAssignmentCards"
@@ -37,22 +36,13 @@ export default async function LabsChooserPage() {
             </h1>
             <p className="max-w-xl text-base leading-relaxed text-[#c9c1b5] sm:text-lg">
               {tracks.length > 1
-                ? "Decomposition and Sprint Labs are being prepared. Browse all Case Labs to practice now."
-                : "The 911 Dispatch round is being prepared. Browse all Case Labs to practice now."}
+                ? "Decomposition and Sprint Labs are being prepared. They’ll open here when they’re ready."
+                : "The 911 Dispatch round is being prepared. It’ll open here when it’s ready."}
             </p>
           </header>
           <nav aria-label="Choose a lab path">
             <LabsAssignmentCards tracks={tracks} />
           </nav>
-          <Link
-            href="/labs"
-            className="w-fit rounded-sm text-sm text-[#c9c1b5] underline underline-offset-4 hover:text-[#f6f2ea] focus-visible:ring-2 focus-visible:ring-[#dca47b] focus-visible:outline-none"
-          >
-            Browse all Case Labs
-          </Link>
-          <p className="text-[12px] leading-relaxed text-[#aaa397]">
-            Try the available labs now. More are coming soon.
-          </p>
         </div>
       </main>
     </>
