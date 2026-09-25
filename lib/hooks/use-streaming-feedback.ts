@@ -26,6 +26,7 @@ import { getGuidedLabMasterySummary } from "@/lib/stores/guided-lab-store"
 import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import { REFUSAL_TITLES, isKnownRefusalCode } from "@/lib/interview/refusal-copy"
 import { trackEvent } from "@/lib/analytics"
+import { createServerSentEventParser } from "@/lib/feedback/sse-parser"
 
 export interface StreamingScores {
   understanding: number
@@ -477,8 +478,28 @@ export function useStreamingFeedback() {
           throw new Error("No response body")
         }
 
-        const decoder = new TextDecoder()
-        let buffer = ""
+        const parser = createServerSentEventParser()
+
+        const processEvent = (event: string, rawData: string) => {
+          try {
+            const data: unknown = JSON.parse(rawData)
+
+            if (event === "refined_scores") {
+              finalScores = data as StreamingScores
+            } else if (event === "scores" && !finalScores) {
+              finalScores = data as StreamingScores
+            } else if (event === "feedback") {
+              finalFeedback = data as StreamingFeedback
+              if ((data as StreamingFeedback).scores) {
+                finalScores = (data as StreamingFeedback).scores
+              }
+            }
+
+            handleEvent(event, data)
+          } catch {
+            logger.warn("[StreamingFeedback] Ignoring malformed SSE event", { event })
+          }
+        }
 
         while (true) {
           const { done, value } = await reader.read()
@@ -487,48 +508,13 @@ export function useStreamingFeedback() {
             break
           }
 
-          buffer += decoder.decode(value, { stream: true })
-
-          // Parse SSE events from buffer
-          const lines = buffer.split("\n")
-          buffer = lines.pop() || "" // Keep incomplete line in buffer
-
-          let currentEvent = ""
-          let currentData = ""
-
-          for (const line of lines) {
-            if (line.startsWith("event: ")) {
-              currentEvent = line.slice(7)
-            } else if (line.startsWith("data: ")) {
-              currentData = line.slice(6)
-
-              // Process complete event
-              if (currentEvent && currentData) {
-                try {
-                  const data = JSON.parse(currentData)
-
-                  // Capture final scores and feedback for persist
-                  if (currentEvent === "refined_scores") {
-                    finalScores = data as StreamingScores
-                  } else if (currentEvent === "scores" && !finalScores) {
-                    finalScores = data as StreamingScores
-                  } else if (currentEvent === "feedback") {
-                    finalFeedback = data as StreamingFeedback
-                    // Also update finalScores from feedback if available
-                    if ((data as StreamingFeedback).scores) {
-                      finalScores = (data as StreamingFeedback).scores
-                    }
-                  }
-
-                  handleEvent(currentEvent, data)
-                } catch {
-                  // Invalid JSON, skip
-                }
-                currentEvent = ""
-                currentData = ""
-              }
-            }
+          for (const event of parser.push(value)) {
+            processEvent(event.event, event.data)
           }
+        }
+
+        for (const event of parser.finish()) {
+          processEvent(event.event, event.data)
         }
 
         // After streaming completes, persist to Firestore
