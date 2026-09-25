@@ -78,6 +78,8 @@ import type {
 // CRITICAL: Edge runtime for no timeout on streaming
 export const runtime = "edge"
 
+const SSE_HEARTBEAT_INTERVAL_MS = 10_000
+
 // ============================================================================
 // Rate limiting (Edge)
 // ============================================================================
@@ -380,14 +382,41 @@ export async function POST(request: NextRequest) {
   // first failed write flips clientGone and later frames become no-ops, so
   // generation and the server-side persist below always run to completion.
   let clientGone = false
+  let writeQueue: Promise<void> = Promise.resolve()
+  const writeFrame = (payload: string): Promise<void> => {
+    if (clientGone) return Promise.resolve()
+
+    const write = writeQueue
+      .then(async () => {
+        if (clientGone) return
+        await writer.write(encoder.encode(payload))
+      })
+      .catch(() => {
+        clientGone = true
+      })
+
+    writeQueue = write
+    return write
+  }
+
   const sendEvent = async (event: string, data: unknown) => {
-    if (clientGone) return
-    try {
-      const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
-      await writer.write(encoder.encode(payload))
-    } catch {
-      clientGone = true
-    }
+    await writeFrame(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+  }
+
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+  let heartbeatPending = false
+  const startHeartbeat = () => {
+    heartbeatTimer = setInterval(() => {
+      if (clientGone || heartbeatPending) return
+      heartbeatPending = true
+      void writeFrame(": heartbeat\n\n").finally(() => {
+        heartbeatPending = false
+      })
+    }, SSE_HEARTBEAT_INTERVAL_MS)
+  }
+  const stopHeartbeat = () => {
+    if (heartbeatTimer) clearInterval(heartbeatTimer)
+    heartbeatTimer = null
   }
 
   // Server-side persistence: the browser used to be the ONLY caller of
@@ -448,6 +477,7 @@ export async function POST(request: NextRequest) {
   let persistTarget: { sessionId: string; userId: string } | null = null
 
   const processRequest = async () => {
+    startHeartbeat()
     try {
       const body = await request.json()
       const {
@@ -1115,6 +1145,8 @@ export async function POST(request: NextRequest) {
         })
       }
     } finally {
+      stopHeartbeat()
+      await writeQueue
       try {
         await writer.close()
       } catch {

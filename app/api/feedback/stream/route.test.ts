@@ -133,6 +133,33 @@ describe("/api/feedback/stream cost bounds", () => {
     })
   })
 
+  describe("stream heartbeat", () => {
+    it("keeps the SSE connection active while feedback generation is idle", async () => {
+      vi.useFakeTimers()
+      let resolveFeedback: ((value: { text: string; provider: string; latencyMs: number }) => void) |
+        undefined
+      mocks.generateFeedbackResponseEdge.mockReturnValue(
+        new Promise((resolve) => {
+          resolveFeedback = resolve
+        })
+      )
+
+      try {
+        const { POST } = await import("./route")
+        const response = await POST(makeRequest())
+        const streamPromise = drain(response)
+
+        await vi.advanceTimersByTimeAsync(10_000)
+        resolveFeedback?.({ text: "**TL;DR** fine.", provider: "openai", latencyMs: 10 })
+
+        const stream = await streamPromise
+        expect(stream).toContain(": heartbeat\n\n")
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
+
   describe("rate limiting", () => {
     it("rejects the fourth request in a minute with 429 and Retry-After", async () => {
       installThreeRequestLimit()
