@@ -16,6 +16,8 @@
  * across repeated runs — see ts-transpiler-loader.js's header.
  */
 
+import { WORKER_START_FAILURE_MESSAGE } from "../harness-errors"
+
 export interface TsWorkerFile {
   path: string
   content: string
@@ -41,6 +43,7 @@ interface WorkerPhaseMessage {
   logs?: TsWorkerRunResult["logs"]
   error?: string
   timestamp?: number
+  workerStartFailed?: boolean
 }
 
 interface PendingTsRun {
@@ -48,6 +51,10 @@ interface PendingTsRun {
   timeoutId: ReturnType<typeof setTimeout>
   execTimeoutMs: number
   logs: TsWorkerRunResult["logs"]
+  // Carried so a worker-start failure can respawn a fresh worker and re-post the same run.
+  workerData: TsWorkerData
+  transpileTimeoutMs: number
+  attempt: number
 }
 
 // ~60 files, cold (first run in a fresh worker: importScripts of the ~9MB vendored compiler PLUS
@@ -104,6 +111,13 @@ function getTsWorker(): Worker {
       if (!pendingRun) return
       const data = event.data as WorkerPhaseMessage
 
+      if (data.workerStartFailed === true) {
+        // A dependency script failed to load inside the worker (e.g. the TypeScript compiler).
+        // Retry once with a fresh worker before showing the learner a plain message.
+        handleTsStartFailure()
+        return
+      }
+
       if (data.type === "transpile-start") {
         pendingRun.logs.push({
           type: "info",
@@ -141,25 +155,51 @@ function getTsWorker(): Worker {
       })
     }
 
-    tsWorker.onerror = (error) => {
-      // resetTsWorker() must run regardless of whether there was an active pending run: an error
-      // event on a worker with no pendingRun (a stray/late event after a run already settled)
-      // used to early-return before reaching it, leaving a worker that just errored alive to be
-      // reused by the next getTsWorker() call.
+    tsWorker.onerror = () => {
+      // A worker-level error (the worker script or one of its dependencies failed to fetch) is a
+      // worker-start failure: retry once with a fresh worker before giving up. When there is no
+      // active pending run (a stray/late event after a run already settled) just reset the
+      // worker, so the errored one is not silently reused by the next getTsWorker() call.
       if (pendingRun) {
-        clearTimeout(pendingRun.timeoutId)
-        const statusLogs = pendingRun.logs
-        resolveActive({
-          success: false,
-          logs: statusLogs,
-          error: error.message || "Unknown worker error",
-        })
+        handleTsStartFailure()
+      } else {
+        resetTsWorker()
       }
-      resetTsWorker()
     }
   }
 
   return tsWorker
+}
+
+/**
+ * Retries the run once with a fresh attempt after a worker-start failure; if the failing attempt
+ * was already the retry, resolves with a plain, learner-readable message instead of a raw browser
+ * error.
+ */
+function retryOrGiveUp(
+  workerData: TsWorkerData,
+  execTimeoutMs: number,
+  transpileTimeoutMs: number,
+  resolve: (value: TsWorkerRunResult) => void,
+  attempt: number
+): void {
+  if (attempt < 2) {
+    attemptTsRun(workerData, execTimeoutMs, transpileTimeoutMs, resolve, attempt + 1)
+    return
+  }
+  resolve({ success: false, logs: [], error: WORKER_START_FAILURE_MESSAGE })
+}
+
+/**
+ * Handles a worker-start failure for the active run: a failed fetch of the worker script or one
+ * of its dependency scripts.
+ */
+function handleTsStartFailure(): void {
+  if (!pendingRun) return
+  const { resolve, workerData, execTimeoutMs, transpileTimeoutMs, attempt } = pendingRun
+  clearTimeout(pendingRun.timeoutId)
+  resetTsWorker()
+  retryOrGiveUp(workerData, execTimeoutMs, transpileTimeoutMs, resolve, attempt)
 }
 
 function resolveActive(value: TsWorkerRunResult): void {
@@ -196,34 +236,49 @@ function startTsRun(
   transpileTimeoutMs: number
 ): Promise<TsWorkerRunResult> {
   return new Promise((resolve) => {
-    let worker: Worker
-    try {
-      worker = getTsWorker()
-    } catch (error) {
-      resolve({
-        success: false,
-        logs: [],
-        error: error instanceof Error ? error.message : "Failed to spawn TypeScript Web Worker",
-      })
-      return
-    }
-
-    // Start on the transpile budget. It is replaced by the execution budget as soon as the
-    // worker reports `exec-start` (immediately, with no transpile-start at all, for a workspace
-    // with no .ts/.tsx files).
-    const timeoutId = setTimeout(() => {
-      // `pendingRun` is guaranteed set by the time this fires (it is assigned synchronously right
-      // after this timer is created, below) — read its accumulated logs (e.g. the "Transpiling
-      // TypeScript..." status entry) rather than discarding them.
-      resolveActive({
-        success: false,
-        logs: pendingRun ? pendingRun.logs : [],
-        error: TRANSPILE_TIMEOUT_MESSAGE,
-      })
-      resetTsWorker()
-    }, transpileTimeoutMs)
-
-    pendingRun = { resolve, timeoutId, execTimeoutMs, logs: [] }
-    worker.postMessage(workerData)
+    attemptTsRun(workerData, execTimeoutMs, transpileTimeoutMs, resolve, 1)
   })
+}
+
+function attemptTsRun(
+  workerData: TsWorkerData,
+  execTimeoutMs: number,
+  transpileTimeoutMs: number,
+  resolve: (value: TsWorkerRunResult) => void,
+  attempt: number
+): void {
+  let worker: Worker
+  try {
+    worker = getTsWorker()
+  } catch {
+    // Spawning the worker threw — a worker-start failure like any other.
+    retryOrGiveUp(workerData, execTimeoutMs, transpileTimeoutMs, resolve, attempt)
+    return
+  }
+
+  // Start on the transpile budget. It is replaced by the execution budget as soon as the
+  // worker reports `exec-start` (immediately, with no transpile-start at all, for a workspace
+  // with no .ts/.tsx files).
+  const timeoutId = setTimeout(() => {
+    // `pendingRun` is guaranteed set by the time this fires (it is assigned synchronously right
+    // after this timer is created, below) — read its accumulated logs (e.g. the "Transpiling
+    // TypeScript..." status entry) rather than discarding them.
+    resolveActive({
+      success: false,
+      logs: pendingRun ? pendingRun.logs : [],
+      error: TRANSPILE_TIMEOUT_MESSAGE,
+    })
+    resetTsWorker()
+  }, transpileTimeoutMs)
+
+  pendingRun = {
+    resolve,
+    timeoutId,
+    execTimeoutMs,
+    logs: [],
+    workerData,
+    transpileTimeoutMs,
+    attempt,
+  }
+  worker.postMessage(workerData)
 }
