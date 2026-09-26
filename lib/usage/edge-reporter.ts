@@ -48,6 +48,8 @@ export interface EdgeUsageReport {
   inputTokens?: number
   /** Provider-reported output tokens. Preferred over the estimate when present. */
   outputTokens?: number
+  /** Provider-reported prompt-cache hits, used by DeepSeek's rate schedule. */
+  cachedInputTokens?: number
   latencyMs?: number
   sessionId?: string
   scenarioId?: string
@@ -115,6 +117,7 @@ export async function reportEdgeUsage(report: EdgeUsageReport): Promise<boolean>
         provider: report.provider,
         inputTokens,
         outputTokens,
+        cachedInputTokens: report.cachedInputTokens,
         latencyMs: report.latencyMs,
         sessionId: report.sessionId,
         scenarioId: report.scenarioId,

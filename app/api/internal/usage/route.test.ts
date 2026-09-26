@@ -169,6 +169,19 @@ describe("POST /api/internal/usage", () => {
       expect(recorded.isExactTokenCount).toBe(false)
     })
 
+    it("bounds and records vendor-reported prompt cache hits", async () => {
+      await POST(
+        makeRequest(
+          { ...validBody, provider: "deepseek", cachedInputTokens: 5_000 },
+          `Bearer ${SECRET}`
+        )
+      )
+      const recorded = trackUsageEvent.mock.calls[0][0] as {
+        metadata: { cachedInputTokens: number }
+      }
+      expect(recorded.metadata.cachedInputTokens).toBe(1_000)
+    })
+
     it("tags the record as coming from the Edge path", async () => {
       // Lets a reconciliation tell Edge-estimated spend from Node-measured spend.
       await POST(makeRequest(validBody, `Bearer ${SECRET}`))

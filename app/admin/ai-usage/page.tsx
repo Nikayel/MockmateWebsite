@@ -42,7 +42,9 @@ import {
   X,
 } from "lucide-react"
 import { SpendHealthPanel } from "./_components/SpendHealthPanel"
+import { UnitEconomicsPanel } from "./_components/UnitEconomicsPanel"
 import { getProviderCostInfo, AI_BUDGET_CAPS } from "@/lib/pricing"
+import type { SubscriptionUnitEconomics } from "@/lib/admin/unit-economics"
 import { usageServiceLabel, UNATTRIBUTED_SERVICE } from "@/lib/usage/services"
 import { logger } from "@/lib/logger"
 
@@ -152,6 +154,7 @@ interface AIUsageData {
     averageTokensPerRequest: number
   }
   health?: UsageHealth
+  unitEconomics?: SubscriptionUnitEconomics
   coverage?: {
     anyTruncated: boolean
     events: ScanCoverage
@@ -833,6 +836,8 @@ export default function AIUsagePage() {
                 <SpendHealthPanel health={aiUsage.health} coverage={aiUsage.coverage} />
               )}
 
+              {aiUsage.unitEconomics && <UnitEconomicsPanel economics={aiUsage.unitEconomics} />}
+
               {/* Which product surface spent the money. The llm/voice/embeddings
                   split below is too coarse to act on: it cannot tell the five
                   LLM calls behind one feedback request apart from each other. */}
@@ -1211,7 +1216,7 @@ export default function AIUsagePage() {
                   Provider Pricing
                 </CardTitle>
                 <CardDescription className="text-gray-400">
-                  Cost per 1K tokens (updated Jan 2026)
+                  Base cost per 1K tokens; DeepSeek is time/cache-adjusted in the ledger
                 </CardDescription>
               </CardHeader>
               <CardContent>

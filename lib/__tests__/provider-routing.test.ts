@@ -133,7 +133,7 @@ describe("provider routing", () => {
 
   it("routes the two score-producing paths to the stronger DeepSeek tier", () => {
     // complex and critique fall back to `deepseek` (V4 Pro); everything else
-    // falls back to `deepseek-chat` (V4 Flash). Before V4 both keys named the
+    // falls back to `deepseek-chat` (V4.1 Flash). Before V4 both keys named the
     // same retired model, so this distinction was decorative.
     const status = getProviderStatus()
     expect(status["deepseek"].model).toBe("deepseek-v4-pro")

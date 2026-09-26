@@ -10,6 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const mocks = vi.hoisted(() => ({
   sendMessage: vi.fn(),
+  calculateCost: vi.fn(() => 0),
+  trackUsageEvent: vi.fn(async () => undefined),
 }))
 
 vi.mock("@google/generative-ai", () => ({
@@ -27,8 +29,8 @@ vi.mock("../ai-cache", () => ({
 }))
 
 vi.mock("../usage-tracking", () => ({
-  trackUsageEvent: vi.fn(async () => undefined),
-  calculateCost: vi.fn(() => 0),
+  trackUsageEvent: mocks.trackUsageEvent,
+  calculateCost: mocks.calculateCost,
   PROVIDER_COSTS: {},
 }))
 
@@ -110,7 +112,12 @@ describe("generateAIResponse provider-reported token usage", () => {
       ok: true,
       json: async () => ({
         choices: [{ message: { content: "deepseek reply" } }],
-        usage: { prompt_tokens: 300, completion_tokens: 80, total_tokens: 380 },
+        usage: {
+          prompt_tokens: 300,
+          completion_tokens: 80,
+          total_tokens: 380,
+          prompt_cache_hit_tokens: 240,
+        },
       }),
     })
     const { generateAIResponse } = await import("../ai-providers")
@@ -123,5 +130,14 @@ describe("generateAIResponse provider-reported token usage", () => {
     expect(result.text).toBe("deepseek reply")
     expect(result.tokensIn).toBe(300)
     expect(result.tokensOut).toBe(80)
+    expect(mocks.calculateCost).toHaveBeenCalledWith(
+      300,
+      80,
+      "deepseek-chat",
+      expect.objectContaining({ at: expect.any(Date), cachedInputTokens: 240 })
+    )
+    expect(mocks.trackUsageEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: { cachedInputTokens: 240 } })
+    )
   })
 })

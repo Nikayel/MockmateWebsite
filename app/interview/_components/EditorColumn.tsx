@@ -318,6 +318,19 @@ export const EditorColumn = memo(function EditorColumn({
             whole width of the one column the candidate types in. */}
         <div className="border-border relative min-h-0 flex-1 overflow-auto rounded border">
           {editorSurface}
+          {selectedScenario && selectedScenario.type !== "dsa" && (
+            <SparraPartnerWidget
+              expanded={isAIPartnerExpanded}
+              onExpandedChange={onAIPartnerExpandedChange}
+              messages={chatMessages}
+              messagesEndRef={chatEndRef}
+              input={chatInput}
+              onInputChange={onChatInputChange}
+              isLoading={isLoadingChat}
+              onSendMessage={onSendPartnerMessage}
+              isDebuggingScenario={selectedScenario.type === "bugfix"}
+            />
+          )}
         </div>
 
         {isInterviewStarted && selectedScenario?.type !== "system-design" && (
@@ -346,20 +359,6 @@ export const EditorColumn = memo(function EditorColumn({
           guidedLabBlocksSubmit={guidedLabBlocksSubmit}
         />
       </div>
-
-      {selectedScenario && selectedScenario.type !== "dsa" && (
-        <SparraPartnerWidget
-          expanded={isAIPartnerExpanded}
-          onExpandedChange={onAIPartnerExpandedChange}
-          messages={chatMessages}
-          messagesEndRef={chatEndRef}
-          input={chatInput}
-          onInputChange={onChatInputChange}
-          isLoading={isLoadingChat}
-          onSendMessage={onSendPartnerMessage}
-          isDebuggingScenario={selectedScenario.type === "bugfix"}
-        />
-      )}
     </Card>
   )
 })

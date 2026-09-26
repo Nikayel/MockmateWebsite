@@ -236,14 +236,6 @@ export interface AIProviderRate {
   outputPer1M: number
 }
 
-/**
- * A `cachedInputPer1M` rate (DeepSeek prices a prompt-cache hit at roughly
- * 1/50th of a miss) used to sit on the type above and on the two DeepSeek rows,
- * and getProviderCostInfo() published it to the admin cost tables. Nothing ever
- * applied it, so a table that names a cache rate stated a discount the platform
- * does not receive. It is removed along with the calculateAICost option that was
- * its only consumer; that function's docstring records how to restore both.
- */
 export const AI_PROVIDER_RATES = {
   // --- GPT-6 Luna, one key per active reasoning effort ---
   // The RATE is identical across all three: effort changes how many output tokens
@@ -265,9 +257,12 @@ export const AI_PROVIDER_RATES = {
   // --- Gemini, matching the live pins in lib/ai/model-ids.ts ---
   gemini: { inputPer1M: 1.5, outputPer1M: 7.5 }, // Gemini 3.6 Flash
   "gemini-lite": { inputPer1M: 0.3, outputPer1M: 2.5 }, // Gemini 3.5 Flash-Lite
-  // --- DeepSeek V4 ---
-  deepseek: { inputPer1M: 0.435, outputPer1M: 0.87 }, // V4 Pro
-  "deepseek-chat": { inputPer1M: 0.14, outputPer1M: 0.28 }, // V4 Flash
+  // --- DeepSeek, off-peak cache-miss headline rates ---
+  // Calls are priced with the full time/cache-aware schedule below. These rows
+  // are the deterministic reference used by the admin rate card and by callers
+  // that have no timestamp; they deliberately represent a cache miss.
+  deepseek: { inputPer1M: 0.66, outputPer1M: 1.98 }, // V4 Pro
+  "deepseek-chat": { inputPer1M: 0.15, outputPer1M: 0.6 }, // V4.1 Flash
   // --- Configured but not routed to by FALLBACK_ORDER ---
   // Priced from the model actually pinned in lib/ai-providers.ts
   // (claude-haiku-4-5-20251001, documented there as $1 in / $5 out per 1M).
@@ -282,6 +277,35 @@ export const AI_PROVIDER_RATES = {
 } as const satisfies Record<string, AIProviderRate>
 
 export type AIProvider = keyof typeof AI_PROVIDER_RATES
+
+interface DeepSeekRateBand extends AIProviderRate {
+  cachedInputPer1M: number
+}
+
+const DEEPSEEK_RATE_BANDS: Record<
+  "deepseek" | "deepseek-chat",
+  {
+    offPeak: DeepSeekRateBand
+    peak: DeepSeekRateBand
+  }
+> = {
+  deepseek: {
+    offPeak: { inputPer1M: 0.66, cachedInputPer1M: 0.022, outputPer1M: 1.98 },
+    peak: { inputPer1M: 1.32, cachedInputPer1M: 0.044, outputPer1M: 3.96 },
+  },
+  "deepseek-chat": {
+    offPeak: { inputPer1M: 0.15, cachedInputPer1M: 0.003, outputPer1M: 0.6 },
+    peak: { inputPer1M: 0.3, cachedInputPer1M: 0.006, outputPer1M: 1.2 },
+  },
+}
+
+/** DeepSeek peak hours: 01:00-04:00 and 06:00-10:00 UTC, Monday-Friday. */
+export function isDeepSeekPeakWindow(at: Date): boolean {
+  const day = at.getUTCDay()
+  if (day === 0 || day === 6) return false
+  const hour = at.getUTCHours()
+  return (hour >= 1 && hour < 4) || (hour >= 6 && hour < 10)
+}
 
 /**
  * Round to 10 decimal places. Rate arithmetic in binary floating point produces
@@ -335,32 +359,39 @@ export function resolveProviderRate(provider: string): {
 /**
  * Cost of one AI call in USD, priced per direction.
  *
- * REMOVED from here: a `cachedInputTokens` option that billed the cache-hit
- * subset of the prompt at the vendor's prompt-cache rate. The arithmetic was
- * correct and it had zero callers, which made it worse than absent: this
- * docstring described the DeepSeek cache discount as handled while every call
- * was in fact billed at the full input rate.
- *
- * To apply that discount the hit count has to come from the vendor's own
- * response, and the only place that response is in scope is lib/ai-providers.ts,
- * whose DeepSeek branch already reads `data.usage.prompt_tokens` off the same
- * object that carries `prompt_cache_hit_tokens` (OpenAI spells it
- * `prompt_tokens_details.cached_tokens`). Wiring it means extending
- * ProviderTokenUsage there and passing the count down to calculateCost.
- *
- * The two callers in lib/usage-tracking.ts could not have supplied it: both
- * count tokens from raw text with tiktoken and never see a vendor response, so
- * any figure they passed would have been invented.
+ * DeepSeek changed to peak/off-peak rates on 2026-09-10 and exposes prompt
+ * cache-hit tokens in its response. Runtime callers pass both facts through;
+ * callers without them use the off-peak cache-miss headline rate above rather
+ * than inventing a discount.
  */
+export interface AICostContext {
+  at?: Date
+  cachedInputTokens?: number
+}
+
 export function calculateAICost(
   inputTokens: number,
   outputTokens: number,
-  provider: AIProvider | string
+  provider: AIProvider | string,
+  context: AICostContext = {}
 ): number {
   const { rate } = resolveProviderRate(provider)
 
   const safeInput = Math.max(0, inputTokens)
   const safeOutput = Math.max(0, outputTokens)
+
+  if ((provider === "deepseek" || provider === "deepseek-chat") && context.at) {
+    const bands = DEEPSEEK_RATE_BANDS[provider]
+    const dynamicRate = isDeepSeekPeakWindow(context.at) ? bands.peak : bands.offPeak
+    const cachedInputTokens = Math.min(safeInput, Math.max(0, context.cachedInputTokens ?? 0))
+    const uncachedInputTokens = safeInput - cachedInputTokens
+    return (
+      (uncachedInputTokens * dynamicRate.inputPer1M +
+        cachedInputTokens * dynamicRate.cachedInputPer1M +
+        safeOutput * dynamicRate.outputPer1M) /
+      1_000_000
+    )
+  }
 
   return (safeInput * rate.inputPer1M + safeOutput * rate.outputPer1M) / 1_000_000
 }
@@ -381,7 +412,7 @@ const PROVIDER_DISPLAY_NAMES: Record<AIProvider, string> = {
   "gemini-lite": "Gemini 3.5 Flash-Lite",
   "gemini-pro": "Gemini 2.5 Pro",
   deepseek: "DeepSeek V4 Pro",
-  "deepseek-chat": "DeepSeek V4 Flash",
+  "deepseek-chat": "DeepSeek V4.1 Flash",
   // Named for the model actually pinned in lib/ai-providers.ts. It said
   // "Claude 3.5 Haiku" while the pin was claude-haiku-4-5-20251001.
   claude: "Claude Haiku 4.5",

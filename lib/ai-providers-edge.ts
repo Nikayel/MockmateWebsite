@@ -45,16 +45,24 @@ export interface EdgeAIResponse {
    */
   tokensIn?: number
   tokensOut?: number
+  cachedInputTokens?: number
 }
 
 /** Accept vendor-reported usage only when both halves are real numbers. */
 function normalizeEdgeUsage(
   inputTokens: unknown,
-  outputTokens: unknown
-): { tokensIn: number; tokensOut: number } | undefined {
+  outputTokens: unknown,
+  cachedInputTokens?: unknown
+): { tokensIn: number; tokensOut: number; cachedInputTokens?: number } | undefined {
   const isValid = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0
   if (!isValid(inputTokens) || !isValid(outputTokens)) return undefined
-  return { tokensIn: inputTokens, tokensOut: outputTokens }
+  return {
+    tokensIn: inputTokens,
+    tokensOut: outputTokens,
+    ...(isValid(cachedInputTokens) && cachedInputTokens <= inputTokens
+      ? { cachedInputTokens }
+      : {}),
+  }
 }
 
 /**
@@ -76,6 +84,7 @@ export interface EdgeAICallRecord {
   /** Vendor-reported counts; absent when the vendor returned none (see EdgeAIResponse). */
   tokensIn?: number
   tokensOut?: number
+  cachedInputTokens?: number
 }
 
 /**
@@ -115,7 +124,7 @@ const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || ""
 
 /**
  * Edge-safe DeepSeek call: plain fetch, OpenAI-compatible chat completions.
- * Fallback path only — Gemini stays primary for cost and scoring consistency.
+ * This is the second rung after OpenAI and before Gemini in the Edge chain.
  */
 async function generateDeepSeekResponseEdge(
   systemPrompt: string,
@@ -151,7 +160,12 @@ async function generateDeepSeekResponseEdge(
 
   const data = (await response.json()) as {
     choices?: Array<{ message?: { content?: string } }>
-    usage?: { prompt_tokens?: number; completion_tokens?: number }
+    usage?: {
+      prompt_tokens?: number
+      completion_tokens?: number
+      prompt_cache_hit_tokens?: number
+      prompt_tokens_details?: { cached_tokens?: number }
+    }
   }
   const text = data.choices?.[0]?.message?.content
   if (!text) {
@@ -162,7 +176,11 @@ async function generateDeepSeekResponseEdge(
     text,
     provider: "deepseek",
     latencyMs: Date.now() - startTime,
-    ...normalizeEdgeUsage(data.usage?.prompt_tokens, data.usage?.completion_tokens),
+    ...normalizeEdgeUsage(
+      data.usage?.prompt_tokens,
+      data.usage?.completion_tokens,
+      data.usage?.prompt_cache_hit_tokens ?? data.usage?.prompt_tokens_details?.cached_tokens
+    ),
   }
 }
 
@@ -357,6 +375,7 @@ export async function generateAIResponseEdge(
             // estimates from text when these are absent.
             tokensIn: response.tokensIn,
             tokensOut: response.tokensOut,
+            cachedInputTokens: response.cachedInputTokens,
           })
         } catch {
           // Losing a usage record costs accounting accuracy. Losing the user's

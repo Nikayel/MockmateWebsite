@@ -113,13 +113,8 @@ describe("calculateCost prices per direction, not blended", () => {
     }
   })
 
-  /**
-   * A cached-input test used to live here, asserting that DeepSeek cache hits
-   * bill at 1/50th of a miss. It passed while no production caller ever supplied
-   * a hit count, so it certified a discount the platform never took. The option
-   * it exercised has been removed; see calculateAICost in lib/pricing.ts for
-   * where the count would have to come from to restore it.
-   */
+  // DeepSeek's dynamic schedule is tested separately below because it requires
+  // a call timestamp and, for cache pricing, a vendor-reported hit count.
 })
 
 describe("calculateCost provider attribution", () => {
@@ -168,5 +163,31 @@ describe("calculateCost provider attribution", () => {
     for (const provider of ["openai", "gemini", "deepseek"]) {
       expect(PROVIDER_COSTS).toHaveProperty(provider)
     }
+  })
+})
+
+describe("calculateCost DeepSeek rate windows and prompt cache", () => {
+  it("applies the weekday peak rate from the call timestamp", async () => {
+    const { calculateCost } = await import("../usage-tracking")
+    const offPeak = new Date("2026-09-23T11:00:00.000Z")
+    const peak = new Date("2026-09-23T07:00:00.000Z")
+
+    expect(calculateCost(1_000_000, 1_000_000, "deepseek-chat", { at: offPeak })).toBeCloseTo(
+      0.75,
+      10
+    )
+    expect(calculateCost(1_000_000, 1_000_000, "deepseek-chat", { at: peak })).toBeCloseTo(1.5, 10)
+  })
+
+  it("prices vendor-reported prompt cache hits at the cache rate", async () => {
+    const { calculateCost } = await import("../usage-tracking")
+    const offPeak = new Date("2026-09-23T11:00:00.000Z")
+
+    expect(
+      calculateCost(1_000_000, 1_000_000, "deepseek-chat", {
+        at: offPeak,
+        cachedInputTokens: 1_000_000,
+      })
+    ).toBeCloseTo(0.603, 10)
   })
 })

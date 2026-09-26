@@ -83,6 +83,8 @@ export interface AIResponse {
 interface ProviderTokenUsage {
   inputTokens: number
   outputTokens: number
+  /** Vendor-reported prompt tokens served from its cache, when available. */
+  cachedInputTokens?: number
 }
 
 /**
@@ -98,7 +100,14 @@ function normalizeProviderUsage(usage?: ProviderTokenUsage): ProviderTokenUsage 
   const { inputTokens, outputTokens } = usage
   const isValid = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n) && n >= 0
   if (!isValid(inputTokens) || !isValid(outputTokens)) return undefined
-  return { inputTokens, outputTokens }
+  const cachedInputTokens = usage.cachedInputTokens
+  return {
+    inputTokens,
+    outputTokens,
+    ...(isValid(cachedInputTokens) && cachedInputTokens <= inputTokens
+      ? { cachedInputTokens }
+      : {}),
+  }
 }
 
 /** Text plus (when the provider exposes it) measured token usage. */
@@ -208,7 +217,7 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     enabled: !!process.env.DEEPSEEK_API_KEY,
     apiKey: process.env.DEEPSEEK_API_KEY,
     baseUrl: "https://api.deepseek.com/v1",
-    model: DEEPSEEK_MODELS.pro, // V4 Pro - $0.435/1M in, $0.87/1M out - the quality fallback
+    model: DEEPSEEK_MODELS.pro, // V4 Pro - time/cache-priced in lib/pricing.ts
     maxTokens: 4096,
     temperature: 0.7,
   },
@@ -217,7 +226,7 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     enabled: !!process.env.DEEPSEEK_API_KEY,
     apiKey: process.env.DEEPSEEK_API_KEY,
     baseUrl: "https://api.deepseek.com/v1",
-    model: DEEPSEEK_MODELS.flash, // V4 Flash - $0.14/1M in, $0.28/1M out - the volume fallback
+    model: DEEPSEEK_MODELS.flash, // V4.1 Flash alias - time/cache-priced in lib/pricing.ts
     maxTokens: 1024,
     temperature: 0.7,
   },
@@ -251,7 +260,7 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
  * model tier without measured evidence.
  *
  * The DeepSeek rung mirrors the same quality split: V4 Pro (`deepseek`) backs
- * the two paths that produce scores, V4 Flash (`deepseek-chat`) backs the rest.
+ * the two paths that produce scores, V4.1 Flash (`deepseek-chat`) backs the rest.
  * Gemini is the third rung everywhere and stays pinned to the models that were
  * latency-verified in the 2026-07-28 migration.
  *
@@ -529,7 +538,14 @@ async function callDeepseek(
     const usage: ProviderTokenUsage | undefined =
       typeof data.usage?.prompt_tokens === "number" &&
       typeof data.usage?.completion_tokens === "number"
-        ? { inputTokens: data.usage.prompt_tokens, outputTokens: data.usage.completion_tokens }
+        ? {
+            inputTokens: data.usage.prompt_tokens,
+            outputTokens: data.usage.completion_tokens,
+            cachedInputTokens:
+              typeof data.usage.prompt_cache_hit_tokens === "number"
+                ? data.usage.prompt_cache_hit_tokens
+                : data.usage.prompt_tokens_details?.cached_tokens,
+          }
         : undefined
     return { text: content, usage }
   } catch (error: any) {
@@ -944,7 +960,10 @@ export async function generateAIResponse(
         const inputTokens = measuredUsage?.inputTokens ?? estimatedInputTokens
         const outputTokens = measuredUsage?.outputTokens ?? estimatedOutputTokens
         const totalTokens = inputTokens + outputTokens
-        const cost = calculateCost(inputTokens, outputTokens, provider)
+        const cost = calculateCost(inputTokens, outputTokens, provider, {
+          at: new Date(),
+          cachedInputTokens: measuredUsage?.cachedInputTokens,
+        })
 
         // Flag single-request cost anomalies (runaway calls, abuse) without
         // blocking the response. Strictly fire-and-forget: never awaited, so it
@@ -989,6 +1008,9 @@ export async function generateAIResponse(
           // Lets a reconciliation separate measured rows from estimated ones
           // without re-deriving which providers report usage.
           isExactTokenCount: measuredUsage !== undefined,
+          ...(measuredUsage?.cachedInputTokens !== undefined
+            ? { metadata: { cachedInputTokens: measuredUsage.cachedInputTokens } }
+            : {}),
         }).catch(() => {
           // Usage tracking failure is non-critical - silent fail
         })

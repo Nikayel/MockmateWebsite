@@ -314,6 +314,31 @@ describe("edge usage sink", () => {
     expect(record.tokensOut).toBe(2048)
   })
 
+  it("carries DeepSeek cache-hit tokens through the response and the sink", async () => {
+    mockFetchByHost({
+      openai: () => ({ ok: false, status: 500 }),
+      deepseek: () => ({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: "cached DeepSeek answer" } }],
+          usage: {
+            prompt_tokens: 6000,
+            completion_tokens: 512,
+            prompt_cache_hit_tokens: 4000,
+          },
+        }),
+      }),
+    })
+    const { generateAIResponseEdge } = await import("../ai-providers-edge")
+    const onUsage = vi.fn()
+
+    const result = await generateAIResponseEdge("sys", "user", { onUsage })
+
+    expect(result.cachedInputTokens).toBe(4000)
+    const record = onUsage.mock.calls[0][0] as { cachedInputTokens?: number }
+    expect(record.cachedInputTokens).toBe(4000)
+  })
+
   it("omits token fields entirely when the vendor reports none or garbage", async () => {
     mockFetchByHost({
       openai: () => ({

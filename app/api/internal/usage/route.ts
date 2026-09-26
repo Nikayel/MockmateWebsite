@@ -50,6 +50,7 @@ interface ParsedUsageReport {
   provider: string
   inputTokens: number
   outputTokens: number
+  cachedInputTokens?: number
   latencyMs?: number
   sessionId?: string
   scenarioId?: string
@@ -103,6 +104,11 @@ function parseUsageReport(
     rawService !== undefined && isUsageServiceId(rawService)
       ? rawService
       : LEGACY_EVENT_TYPE_SERVICE[eventType as UsageEventType]
+  const inputTokens = readTokenCount(raw.inputTokens)
+  const cachedInputTokens =
+    raw.cachedInputTokens === undefined
+      ? undefined
+      : Math.min(readTokenCount(raw.cachedInputTokens), inputTokens)
 
   return {
     ok: true,
@@ -111,8 +117,9 @@ function parseUsageReport(
       eventType: eventType as UsageEventType,
       service,
       provider,
-      inputTokens: readTokenCount(raw.inputTokens),
+      inputTokens,
       outputTokens: readTokenCount(raw.outputTokens),
+      cachedInputTokens,
       latencyMs:
         typeof raw.latencyMs === "number" && Number.isFinite(raw.latencyMs)
           ? Math.max(0, Math.floor(raw.latencyMs))
@@ -149,7 +156,10 @@ export async function POST(request: NextRequest) {
   const totalTokens = report.inputTokens + report.outputTokens
   // Cost is computed HERE from the token counts, never accepted from the
   // caller, so the pricing table stays the single authority on rates.
-  const cost = calculateCost(report.inputTokens, report.outputTokens, report.provider)
+  const cost = calculateCost(report.inputTokens, report.outputTokens, report.provider, {
+    at: new Date(),
+    cachedInputTokens: report.cachedInputTokens,
+  })
 
   // Wrapped, and the result checked, because this endpoint is the ONLY place
   // Edge AI spend enters the ledger, the per-user budget and the daily
@@ -176,7 +186,12 @@ export async function POST(request: NextRequest) {
       difficulty: report.difficulty,
       scenarioTitle: report.scenarioTitle,
       isExactTokenCount: !report.estimatedTokens,
-      metadata: { source: "edge" },
+      metadata: {
+        source: "edge",
+        ...(report.cachedInputTokens !== undefined
+          ? { cachedInputTokens: report.cachedInputTokens }
+          : {}),
+      },
     })
   } catch (error) {
     // trackUsageEvent swallows its own failures today, so this is defence

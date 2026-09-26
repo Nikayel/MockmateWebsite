@@ -74,7 +74,7 @@ export function SparraPartnerWidget({
         aria-controls="sparra-partner-chat"
         aria-label="Open Sparra AI partner"
         data-bugfix-tour={isDebuggingScenario ? "ai-partner" : undefined}
-        className="border-border bg-card/95 text-foreground hover:border-accent/50 focus-visible:ring-accent/50 absolute right-3 bottom-3 z-40 flex min-h-12 cursor-pointer items-center gap-2 rounded-full border py-1.5 pr-4 pl-1.5 shadow-xl backdrop-blur transition-colors focus-visible:ring-2 focus-visible:outline-none"
+        className="border-border bg-card/70 text-foreground hover:border-accent/50 hover:bg-card/95 focus-visible:ring-accent/50 focus-visible:bg-card/95 absolute top-3 right-3 z-40 flex min-h-12 cursor-pointer items-center gap-2 rounded-full border py-1.5 pr-4 pl-1.5 opacity-75 shadow-xl backdrop-blur transition-all duration-200 hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
       >
         <Sparra state={isLoading ? "thinking" : "idle"} size={34} />
         <span className="text-sm font-semibold">Ask Sparra</span>
@@ -95,7 +95,7 @@ export function SparraPartnerWidget({
       role="dialog"
       aria-label="Sparra AI partner"
       data-bugfix-tour={isDebuggingScenario ? "ai-partner" : undefined}
-      className="border-border bg-card/95 absolute right-3 bottom-3 z-40 flex h-[26rem] max-h-[calc(100%-1.5rem)] w-[calc(100%-1.5rem)] max-w-sm flex-col overflow-hidden rounded-2xl border shadow-2xl backdrop-blur"
+      className="border-border bg-card/95 absolute top-3 right-3 z-40 flex h-[26rem] max-h-[calc(100%-1.5rem)] w-[calc(100%-1.5rem)] max-w-sm flex-col overflow-hidden rounded-2xl border shadow-2xl backdrop-blur"
     >
       <header className="border-border flex items-center justify-between border-b px-3 py-2">
         <div className="flex min-w-0 items-center gap-2.5">

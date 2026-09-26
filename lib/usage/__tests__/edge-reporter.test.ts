@@ -119,6 +119,25 @@ describe("reportEdgeUsage failure visibility", () => {
     expect(parsed.estimatedTokens).toBe(false)
   })
 
+  it("forwards vendor-reported prompt cache hits for DeepSeek pricing", async () => {
+    const fetchSpy = vi.fn(async () => ({ ok: true, status: 200 }))
+    vi.stubGlobal("fetch", fetchSpy)
+    const { reportEdgeUsage } = await import("../edge-reporter")
+
+    await reportEdgeUsage({
+      ...REPORT,
+      provider: "deepseek",
+      inputTokens: 6_000,
+      outputTokens: 2_048,
+      cachedInputTokens: 4_000,
+    })
+
+    const parsed = JSON.parse(
+      ((fetchSpy.mock.calls[0] as unknown[])[1] as { body: string }).body
+    ) as Record<string, unknown>
+    expect(parsed.cachedInputTokens).toBe(4_000)
+  })
+
   it("flags a malformed vendor count as estimated, matching what it actually sent", async () => {
     // NaN is not undefined: the old flag used `=== undefined` while the value
     // resolution used Number.isFinite, so a NaN fell back to the estimate but

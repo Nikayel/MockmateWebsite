@@ -41,6 +41,7 @@ import {
   countSessionsSince,
 } from "@/lib/admin/usage-views"
 import { getUsageHealth } from "@/lib/admin/usage-health"
+import { getSubscriptionUnitEconomics } from "@/lib/admin/unit-economics"
 import {
   resolveTier,
   resolveBudgetCap,
@@ -141,18 +142,26 @@ async function buildOverview() {
   // construction here would count a different month than the ledger bills.
   const startOfMonth = utcMonthStart(now)
 
-  const [stats, cacheStats, serviceBreakdown, granularBreakdown, dailyTrends, sessionsCounted] =
-    await Promise.all([
-      getAdminUsageStats(),
-      getCacheStats(),
-      getServiceBreakdown(),
-      getGranularUsageBreakdown(),
-      getDailyUsageTrends(30),
-      // A count aggregation, not a scan. Cost per session must divide this
-      // month's spend by this month's sessions, and paying 500 document reads
-      // to measure a different window would be wrong twice over.
-      countSessionsSince(startOfMonth),
-    ])
+  const [
+    stats,
+    cacheStats,
+    serviceBreakdown,
+    granularBreakdown,
+    dailyTrends,
+    sessionsCounted,
+    unitEconomics,
+  ] = await Promise.all([
+    getAdminUsageStats(),
+    getCacheStats(),
+    getServiceBreakdown(),
+    getGranularUsageBreakdown(),
+    getDailyUsageTrends(30),
+    // A count aggregation, not a scan. Cost per session must divide this
+    // month's spend by this month's sessions, and paying 500 document reads
+    // to measure a different window would be wrong twice over.
+    countSessionsSince(startOfMonth),
+    getSubscriptionUnitEconomics(now),
+  ])
 
   const health = await getUsageHealth({
     totalCost: stats.totalCost,
@@ -174,6 +183,7 @@ async function buildOverview() {
           : 0,
     },
     health,
+    unitEconomics,
     cache: cacheStats,
     topUsers: stats.userStats.slice(0, 20),
     budgetCaps: BUDGET_CAPS,

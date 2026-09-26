@@ -147,19 +147,22 @@ export function SpendHealthPanel({
           </div>
         )}
 
-        {/* Unit economics: the numbers that decide whether the pricing holds. */}
+        {/* Platform-wide spend density. Subscriber economics live in the
+            dedicated cohort panel below, where revenue and Stripe fees exist. */}
         <div className="grid grid-cols-2 gap-4 border-t border-gray-800 pt-4">
           <div>
-            <p className="text-xs tracking-wide text-gray-500 uppercase">Cost per session</p>
+            <p className="text-xs tracking-wide text-gray-500 uppercase">Platform AI / session</p>
             <p className="mt-1 font-mono text-lg text-green-400">
               {formatUnitCost(unitEconomics.costPerSession)}
             </p>
             <p className="text-xs text-gray-500">
-              over {unitEconomics.sessionsCounted.toLocaleString()} sessions
+              all accounts · {unitEconomics.sessionsCounted.toLocaleString()} sessions
             </p>
           </div>
           <div>
-            <p className="text-xs tracking-wide text-gray-500 uppercase">Cost per active user</p>
+            <p className="text-xs tracking-wide text-gray-500 uppercase">
+              Platform AI / active account
+            </p>
             <p className="mt-1 font-mono text-lg text-green-400">
               {formatUnitCost(unitEconomics.costPerActiveUser)}
             </p>

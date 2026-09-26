@@ -33,6 +33,7 @@ import {
   FALLBACK_RATE_PROVIDER,
   calculateAICost,
   resolveProviderRate,
+  type AICostContext,
 } from "./pricing"
 import { resolveBudgetCap, resolveTier, hasBudgetOverride, budgetUsedPercent } from "./usage/budget"
 import { fetchProfilesById } from "./usage/profile-lookup"
@@ -572,14 +573,19 @@ export async function checkUserBudget(userId: string): Promise<{
  * nothing in the system distinguished "priced correctly" from "priced by
  * accident", so the mistake was invisible in every dashboard that used it.
  */
-export function calculateCost(inputTokens: number, outputTokens: number, provider: string): number {
+export function calculateCost(
+  inputTokens: number,
+  outputTokens: number,
+  provider: string,
+  context?: AICostContext
+): number {
   if (!resolveProviderRate(provider).matched) {
     logger.error("Unknown AI provider has no cost row; billing at the gemini rate", {
       provider,
       fallbackRateProvider: FALLBACK_RATE_PROVIDER,
     })
   }
-  return calculateAICost(inputTokens, outputTokens, provider)
+  return calculateAICost(inputTokens, outputTokens, provider, context)
 }
 
 /**
