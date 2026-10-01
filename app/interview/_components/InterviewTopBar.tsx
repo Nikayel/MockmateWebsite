@@ -40,7 +40,8 @@ interface InterviewTopBarProps {
   elapsedTime: number
   strictTimeLimit: number | null
   onReplayBugfixTour?: () => void
-  onCloseClick: () => void
+  /** Omitted after an interview ends; result views supply their own direct exit. */
+  onCloseClick?: () => void
 }
 
 export const InterviewTopBar = memo(function InterviewTopBar({
@@ -254,15 +255,17 @@ export const InterviewTopBar = memo(function InterviewTopBar({
 
         <ThemeToggle />
 
-        <Button
-          onClick={onCloseClick}
-          variant="outline"
-          size="sm"
-          className="border-border text-muted-foreground hover:bg-secondary h-7 bg-transparent text-xs"
-        >
-          <ArrowLeft className="mr-1 h-3 w-3" />
-          <span className="hidden sm:inline">Close</span>
-        </Button>
+        {onCloseClick && (
+          <Button
+            onClick={onCloseClick}
+            variant="outline"
+            size="sm"
+            className="border-border text-muted-foreground hover:bg-secondary h-7 bg-transparent text-xs"
+          >
+            <ArrowLeft className="mr-1 h-3 w-3" />
+            <span className="hidden sm:inline">Close</span>
+          </Button>
+        )}
       </div>
     </div>
   )

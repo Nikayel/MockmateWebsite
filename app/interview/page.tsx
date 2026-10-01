@@ -2121,7 +2121,10 @@ function InterviewPageContent() {
                       }
                     : undefined
                 }
-                onCloseClick={() => setShowCloseDialog(true)}
+                // A completed session already has its own direct exit in the
+                // result surface. Keep the confirmation-only close control
+                // exclusive to active, resumable interview work.
+                onCloseClick={isResultView ? undefined : () => setShowCloseDialog(true)}
               />
 
               {/* ═══════════════════════════════════════════════════════════════
