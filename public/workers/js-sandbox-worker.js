@@ -1,27 +1,47 @@
 // Web Worker for JavaScript Execution Sandbox
 
-// The `assert` implementation the scenario suites run against. It lives in its own file so
-// it can be unit tested, which is how it earned that file: the version that used to sit
-// inline here was missing `deepEqual` entirely, and every scenario that called it reported
-// a Type Error against the candidate's own code.
-importScripts("/workers/assert-shim.js")
-// describe/it/expect for TypeScript (and any other) workspace suites — see that file's header
-// for the full API and its deliberate scope limits. Loaded unconditionally alongside assert-shim
-// (it is small); the vendored TypeScript COMPILER below is the heavy, genuinely-lazy load.
-importScripts("/workers/vitest-shim.js")
-// The content-hash transpile cache. Also small; the compiler it wraps is loaded lazily by
-// ensureTypeScriptCompiler(), only when a workspace actually contains a .ts/.tsx file.
-importScripts("/workers/ts-transpiler-loader.js")
+// assert-shim (the `assert` the scenario suites run against) and vitest-shim (describe/it/expect
+// for workspace suites) are the small, always-needed shims. Both are wrapped in a try/catch so a
+// transient failure to fetch either one does not throw at load time — that used to kill the
+// whole worker and surface to the learner as a raw browser network error, even for a plain
+// JavaScript run that needs neither shim. The failure is recorded and reported as a retriable
+// worker-start failure only when a mode that actually needs the shims runs.
+let bootDependencyError = null
+try {
+  importScripts("/workers/assert-shim.js")
+  importScripts("/workers/vitest-shim.js")
+} catch (err) {
+  bootDependencyError = err
+}
 
-// Created ONCE per worker and reused for every run (see ts-transpiler-loader.js's header): a
-// learner re-running the same workspace after editing one file re-transpiles only that file.
-const tsTranspileCache = self.createTsTranspileCache()
+// The content-hash transpile cache and the ~9MB vendored TypeScript compiler are TypeScript-only.
+// Both are loaded lazily by ensureTypeScriptCompiler(), once per worker lifetime, so a failed
+// fetch of either cannot take down a plain JavaScript run.
+let tsTranspileCache = null
 let typeScriptCompilerLoaded = false
 
-/** Lazily importScripts the ~9MB vendored TypeScript compiler build, once per worker lifetime. */
+/** Builds an Error tagged so the message handler reports it as a retriable worker-start failure. */
+function workerStartError(message) {
+  const error = new Error(message)
+  error.workerStartFailure = true
+  return error
+}
+
+/** Lazily importScripts the transpile cache and the vendored TypeScript compiler build. */
 function ensureTypeScriptCompiler() {
   if (!typeScriptCompilerLoaded) {
-    importScripts("/vendor/typescript/typescript.js")
+    try {
+      importScripts("/workers/ts-transpiler-loader.js")
+      importScripts("/vendor/typescript/typescript.js")
+    } catch (err) {
+      throw workerStartError(
+        "Could not load the code runner's TypeScript support: " +
+          (err && err.message ? err.message : String(err))
+      )
+    }
+    // Created ONCE per worker and reused for every run (see ts-transpiler-loader.js's header): a
+    // learner re-running the same workspace after editing one file re-transpiles only that file.
+    tsTranspileCache = self.createTsTranspileCache()
     typeScriptCompilerLoaded = true
   }
   return self.ts
@@ -250,6 +270,13 @@ self.onmessage = async function (e) {
   }
 
   try {
+    // Both workspace modes below need the test shims; single-file mode (no `files`) does not. If a
+    // shim failed to load at boot, report it as a retriable worker-start failure for those modes
+    // only, so a plain JavaScript run is never taken down by a shim it does not use.
+    if (files && bootDependencyError) {
+      throw workerStartError("Could not load the code runner's test shims.")
+    }
+
     let result
 
     if (files && Array.isArray(testPaths) && Array.isArray(hiddenTestPaths)) {
@@ -371,6 +398,9 @@ self.onmessage = async function (e) {
       error: error.message || String(error),
       stack: error.stack,
       logs: logs,
+      // A dependency script failed to load. The runner treats this as a retriable worker-start
+      // failure: it retries once with a fresh worker before showing the learner a plain message.
+      workerStartFailed: error && error.workerStartFailure === true ? true : undefined,
     })
   }
 }

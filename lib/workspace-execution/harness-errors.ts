@@ -62,3 +62,11 @@ export const HARNESS_ERROR_NOTICE =
   "This is a fault in our test harness, not in your code. Your solution has not been " +
   "judged. Please tell us about it so we can fix it, and try a different problem in the " +
   "meantime."
+
+/**
+ * Shown when the sandbox worker fails to START — the worker script or one of its dependency
+ * scripts could not be fetched — and a fresh-worker retry also failed to start. Unlike
+ * HARNESS_ERROR_NOTICE this is a transient fault, so it asks the learner to try again rather
+ * than to move on. Shared by both worker runners so the two paths never drift apart.
+ */
+export const WORKER_START_FAILURE_MESSAGE = "We couldn't start the code runner. Please try again."
