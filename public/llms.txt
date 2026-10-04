@@ -1,271 +1,84 @@
 # CodeSparring
 # https://www.codesparring.dev
 
-> CodeSparring is two things: a free, public curriculum that teaches Python, data engineering, and
-> system design the way interviews actually ask about them, and an AI mock-interview room where you
-> practice talking through a problem out loud under time pressure, in DSA, debugging, and system
-> design rounds. It serves software engineers and data engineers. The reading half of every lesson
-> is free and open to anyone, no account required.
+> CodeSparring is an interview-practice platform for software engineers and data engineers. It
+> combines a free public curriculum with AI-led coding, debugging, and system-design practice.
+> Public lesson reading is available without an account. Graded lesson workspaces and AI interview
+> feedback require sign-in; the interview room also offers a limited guest trial.
 
-Last reviewed: 2026-08-12. Every claim below was checked against the running code on that date.
-The curriculum grows continuously, so this file describes tracks and levels rather than exact
-lesson counts, and states bank sizes as dated, verified floors. On 2026-08-12 the registries held
-425 free-to-read lessons (Python 83, Data Engineering 134, System Design 208) and 200+ interview
-scenarios overall, of which 170+ are DSA scenarios across 18 patterns.
+Last reviewed: 2026-10-04. Volatile quotas, prices, and feature availability belong on the live
+[pricing page](https://www.codesparring.dev/pricing), not in this file.
 
-## What CodeSparring is for
+## Public curriculum
 
-Most practice tools test whether you can solve a problem alone and in silence. An interview tests
-something else: whether you can explain your reasoning while you work, recover when the interviewer
-pushes back, and say why you chose one design over another. CodeSparring is built around that second
-skill, and the Learn curriculum exists to give you something specific to say.
+- [Learn hub](https://www.codesparring.dev/learn): public Python, Data Engineering, and System
+  Design courses.
+- [All lessons](https://www.codesparring.dev/learn/all): a flat index of public lessons.
+- [Python](https://www.codesparring.dev/learn/python): interview-focused Python fundamentals,
+  idioms, applied development, engineering, and code review.
+- [Data Engineering](https://www.codesparring.dev/learn/data-engineering): SQL foundations,
+  joins, modeling, data quality, cloud data, warehouses, pipelines, streaming/CDC, distributed
+  compute, and data for AI.
+- [System Design](https://www.codesparring.dev/learn/system-design): interview method, foundations,
+  storage, scaling, distributed systems, event-driven systems, reliability, security, modern
+  architecture, case studies, and specialized systems.
 
-## Learn: the free public curriculum
-
-Every lesson has three phases. The first is free and public. The second and third require an account.
-
-1. **Read** (public, no account). The teaching body: prose, worked examples, diagrams, runnable demo
-   code, and inline check questions that reveal their answer on click.
-2. **Apply** (account required). A guided exercise with hints and a reference solution.
-3. **Practice** (account required). The same idea without the scaffolding, graded by hidden tests.
-
-Public lesson pages are static and indexable. The graded workspace is a separate URL, requires
-sign-in, and is marked `noindex`.
-
-### URL shape
-
-- `/learn` is the hub.
-- `/learn/{track}` is a track landing page. Tracks are `python`, `data-engineering`, and
-  `system-design`. (`/learn/sql` permanently redirects to `/learn/data-engineering`.)
-- `/learn/{track}/{levelSlug}` is a level index.
-- `/learn/{track}/{levelSlug}/{lessonId}` is the canonical public lesson page. This is the URL to
-  cite and the URL that appears in the sitemap.
-- `/learn/{track}/{levelSlug}/{lessonId}/workspace` is the interactive graded player. It is
-  auth-gated, never listed in the sitemap, and never indexed.
-
-### Track: Python (`/learn/python`, 5 levels)
-
-Aimed at someone who will be asked to write and defend Python in an interview, not at someone
-learning to program for the first time. It concentrates on the behaviour that trips candidates up.
-
-- **Level 1: Foundations** (`/learn/python/fundamentals`). Variables, types, loops, functions, and
-  the traps inside them: float equality, integer division, truthiness, booleans as integers.
-- **Level 2: Idioms** (`/learn/python/intermediate`). Comprehensions, generators, classes,
-  dataclasses, decorators, and the standard-library idioms for dates, text, files, and APIs.
-- **Level 3: Patterns** (`/learn/python/applied`). Modules, imports, typing, pathlib, sqlite3 with
-  bound parameters, CLIs, packaging, and working across real files.
-- **Level 4: Engineering** (`/learn/python/engineering`). Advanced OOP, descriptors, the GIL,
-  threads versus processes, asyncio, profiling, and packaging.
-- **Level 5: Judging Code You Did Not Write** (`/learn/python/verification`). Reading unfamiliar
-  code, property-based testing, shrinking a failure, and reviewing AI-generated code that looks
-  right and is not.
-
-### Track: Data Engineering (`/learn/data-engineering`, 11 levels)
-
-Written for data-engineering and analytics interviews. This track was previously called the SQL
-track; `/learn/sql` and `/learn/sql/*` now permanently redirect to `/learn/data-engineering`.
-Exercises run against a real SQLite engine in the browser and are graded on the result set they
-return.
-
-- **Level 1: SQL Foundations** (`/learn/data-engineering/foundations`). SELECT, WHERE, ORDER BY,
-  types, NULL semantics, dates.
-- **Level 2: Aggregation and Joins** (`/learn/data-engineering/aggregation`). Aggregates, GROUP BY
-  and HAVING, every join flavour, subqueries, CTEs.
-- **Level 3: Data Modeling and Schema Design** (`/learn/data-engineering/modeling`). DDL, keys,
-  constraints, cardinality, normalization.
-- **Level 4: Data Engineering with SQL** (`/learn/data-engineering/engineering`). Window functions,
-  recursive CTEs, slowly changing dimensions, idempotent merges, data-quality checks.
-- **Level 5: Advanced and Company-Specific SQL** (`/learn/data-engineering/advanced-company-sql`).
-  The four rounds of a data-engineering loop rehearsed as graded SQL: power screen, modeling,
-  pipeline, and system-design reasoning. Includes sessionization, join fan-out and skew, CDC
-  changelog apply, and write-audit-publish quality gates.
-- **Level 6: Cloud and Data Engineering Foundations**
-  (`/learn/data-engineering/cloud-data-foundations`). The platform underneath the query: object
-  storage, columnar files and row groups, partitioning and pruning, bucketing, distributed
-  execution, skew, orchestration. Taught as graded queries against simulated platform metadata.
-  Beginner friendly; it can be started right after Level 2.
-- **Level 7: Warehouses, Lakehouse and Dimensional Modeling**
-  (`/learn/data-engineering/warehouses-lakehouse`).
-- **Level 8: Batch Pipelines and Orchestration** (`/learn/data-engineering/batch-pipelines`).
-- **Level 9: Streaming and Change Data Capture** (`/learn/data-engineering/streaming-cdc`).
-- **Level 10: Distributed Compute and Data Operations**
-  (`/learn/data-engineering/spark-and-operations`).
-- **Level 11: Data Engineering for AI** (`/learn/data-engineering/data-for-ai`).
-
-### Track: System Design (`/learn/system-design`, 12 levels)
-
-The largest track. Lessons are free-response: read the material, write your own answer, then compare
-it against a model answer. Level 0 through Level 11:
-
-- **Level 0: Interview and Communication Method** (`/learn/system-design/interview-method`). Scoping
-  a vague prompt, estimation, structuring the walkthrough, driving tradeoffs, level calibration.
-- **Level 1: Foundations and Mental Models** (`/learn/system-design/foundations`). Networking, API
-  contracts, real-time delivery options, idempotency, pagination, serialization, CDN basics.
-- **Level 2: Data Storage and Modeling** (`/learn/system-design/data-storage`). Relational versus
-  NoSQL, B-tree versus LSM, isolation levels, MVCC, access-pattern modeling.
-- **Level 3: Scaling the Data Tier** (`/learn/system-design/scaling-data`). Replication, sharding
-  and shard keys, caching and stampedes, search and vector indexes, CDC.
-- **Level 4: Scaling Compute and Traffic** (`/learn/system-design/scaling-compute`). Load balancing,
-  service discovery, gateways, rate limiting, load shedding, capacity planning, cell architecture.
-- **Level 5: Distributed Systems Core** (`/learn/system-design/distributed-core`). CAP and PACELC,
-  consistency models, clocks, consensus, two-phase commit, sagas, CRDTs, failure detection.
-- **Level 6: Asynchronous and Event-Driven Systems** (`/learn/system-design/event-driven`). Queues,
-  pub/sub and the log, Kafka internals, delivery semantics, stream processing, schema evolution.
-- **Level 7: Reliability, Resilience and Operations** (`/learn/system-design/reliability-ops`). SLOs
-  and error budgets, golden signals, OpenTelemetry, retries and circuit breakers, multi-region DR,
-  progressive delivery, chaos engineering, postmortems.
-- **Level 8: Security, Privacy and Multi-tenancy** (`/learn/system-design/security-privacy`).
-  Passkeys, OAuth and OIDC, sessions and tokens, RBAC and ReBAC, encryption and secrets, abuse
-  defense, compliance and DSAR.
-- **Level 9: Modern Architecture and Delivery** (`/learn/system-design/modern-architecture`).
-  Monolith versus microservices, DDD decomposition, Kubernetes, service mesh, serverless and edge,
-  GitOps and IaC, FinOps, lakehouse and table formats.
-- **Level 10: Applied Case Studies** (`/learn/system-design/case-studies`). Full-length "design X"
-  interviews: URL shortener, rate limiter, typeahead, news feed, chat, ride sharing, file sync,
-  video streaming, collaborative editor, key-value store, object store, message queue, distributed
-  job scheduler, payment ledger, ad click aggregator, stock exchange, and more.
-- **Level 11: Specialized and Frontier Systems**
-  (`/learn/system-design/specialized-systems`). ML systems, feature stores, RAG architecture, vector
-  databases and ANN, LLM inference serving, agents, evaluation and guardrails, real-time analytics,
-  IoT and edge, time-series storage.
+Public lesson URL pattern: `/learn/{track}/{levelSlug}/{lessonId}`. The lesson's `/workspace` child
+is the authenticated, graded surface and is not an indexable public resource. The legacy
+`/learn/sql` family redirects to the Data Engineering track.
 
 ## Interview practice
 
-- **AI interviewer.** A conversational interviewer that asks follow-ups, pushes on tradeoffs, and
-  reacts to what you say rather than only to what you type.
-- **Voice.** Speak your reasoning out loud, the way the real round works.
-- **In-browser execution.** CodeMirror editor with Python running client-side via Pyodide and SQL
-  via sql.js, so code runs without a server round trip.
-- **Scenario bank.** 170+ DSA interview scenarios across 18 patterns, from arrays and hashing
-  through graphs, dynamic programming, and tries, each with executable tests. 200+ interview
-  scenarios overall once debugging and system design rounds are counted (verified 2026-08-12).
-- **Two interview tracks.** `/interview` runs a DSA track and a debugging track. The debugging
-  track drops you into a multi-file codebase with a failing suite and grades the fix you ship, in
-  rounds styled on real systems: Stripe webhook idempotency, Datadog metric rollups and alert
-  dedup ordering, Palantir pipeline order dependence.
-- **System design rounds.** 12 system design interview scenarios run as timed AI rounds, reached
-  from the drills on `/learn/system-design`.
-- **Guest trial.** You can open the workspace and try a problem with no account: write code, run
-  the tests, submit. Signing in with a free account unlocks the AI interviewer and feedback; the
-  free plan includes 8 full sessions a month.
-- **Structured feedback.** Scored on communication, problem-solving approach, and code quality, not
-  only on whether the tests pass.
-- **Spaced repetition.** Reviews are scheduled for long-term retention. Two schedulers are in
-  production at once, FSRS and SM-2, assigned per user as a live A/B, so the claim being tested is
-  which one actually improves recall on this material.
-- **Open learner model.** `/knowledge` shows the system's current belief about what you know, the
-  evidence behind it, and a way to challenge or correct it.
-- **Personalized roadmap.** A prep plan built from your target company, interview date, and measured
-  skill gaps, blending DSA, bug-fix, and decomposition work. Company targeting spans 38 companies,
-  including Google, Meta, Amazon, Apple, Netflix, Microsoft, Stripe, Airbnb, Uber, and Databricks.
-- **Case labs.** Four company-style labs you carry end to end: 911 Dispatch Optimization, Usage
-  Rollup Double-Count, Ontology Learning Round, and Billing Webhook Idempotency. They exercise
-  the skills data and platform loops probe: idempotency, event ordering, deduplication, stale and
-  real-time data, at-least-once delivery.
+- [AI coding interview practice](https://www.codesparring.dev/ai-coding-interview-practice):
+  explain an approach, write code against tests, and receive rubric-based feedback.
+- [Bug-fix interview practice](https://www.codesparring.dev/bug-fix-interview-practice): debug a
+  multi-file codebase with a failing test, explain a hypothesis, and verify the fix.
+- [System design interview practice](https://www.codesparring.dev/system-design-interview-practice):
+  practice open-ended architecture conversations and tradeoffs.
+- [Interview rounds](https://www.codesparring.dev/rounds): overview of debugging and real-world case
+  formats.
+- [Case Labs](https://www.codesparring.dev/labs): longer, multi-file engineering scenarios.
+- [Sample feedback](https://www.codesparring.dev/samples): public examples of scored interview
+  reports.
+- [Free AI interview](https://www.codesparring.dev/free-ai-coding-interview): current guest and
+  free-account access details.
 
-## Pricing
+The product supports voice or text interaction, executable coding tasks where the selected runner
+supports the language, session feedback, progress tracking, and (on eligible plans) roadmap and
+spaced-review features. See the live product pages for current limits and availability.
 
-- **Free.** $0, no credit card. 8 full interview sessions per month, 20+ problems with unlimited
-  practice, the AI interviewer with real-time feedback, performance tracking, and the whole Learn
-  curriculum. No personalized roadmap, no spaced repetition scheduling, no pattern mastery tracking.
-- **Pro.** $25/month, or $225/year, which works out to $19/month. 35 full interview sessions per
-  month, unlimited re-practice within a scenario you have started, spaced repetition scheduling,
-  personalized roadmap, pattern mastery tracking, company-specific prep, system-design interviews.
-- **Enterprise.** Custom pricing for teams.
+## Useful public lessons
 
-The Learn curriculum's reading half is free on every plan and requires no account at all.
+- [HTTP semantics: methods, status codes, and caching](https://www.codesparring.dev/learn/system-design/foundations/sd-l1-http-semantics): safety, idempotency, conditional requests, and cache headers.
+- [HTTP versions](https://www.codesparring.dev/learn/system-design/foundations/sd-l1-http-versions): HTTP/1.1, HTTP/2, and HTTP/3 tradeoffs.
+- [Delivery semantics](https://www.codesparring.dev/learn/system-design/event-driven/sd-l6-delivery-semantics): at-most-once, at-least-once, effectively-once effects, and idempotency boundaries.
+- [Retries, DLQs, and backpressure](https://www.codesparring.dev/learn/system-design/event-driven/sd-l6-retries-dlq-backpressure): transient versus permanent failures, retry topics, poison messages, consumer lag, and bounded work.
+- [Leader election and fencing](https://www.codesparring.dev/learn/system-design/distributed-core/sd-l5-leader-election-fencing): leases, fencing tokens, split brain, and stale leaders.
 
-## Who it is for
+These are educational resources, not operational guarantees or vendor-specific product documentation.
 
-- Software engineers preparing for technical interviews at any level.
-- Beginners included: nothing requires prior LeetCode. The courses start at the fundamentals, 47
-  of the DSA scenarios were rated easy on 2026-08-12, the first scenario in the browse list is a
-  guided warm-up, and the personalized roadmap adapts to measured skill. Starting here and adding
-  a problem bank later works just as well as the reverse.
-- Students and new grads applying for internships and first roles.
-- Data engineering and analytics candidates, who are the Data Engineering track's primary
-  audience: an 11-level curriculum plus debugging rounds and case labs built on pipeline failure
-  modes.
-- Career changers who can solve problems but freeze when asked to narrate.
+## Current public entry points
 
-## Technology
-
-- Next.js 16 App Router, React 19, TypeScript, Tailwind, Firebase, deployed on Vercel.
-- Interview conversation and feedback run on Gemini 3.6 Flash, with Gemini 3.5 Flash-Lite for
-  cheaper paths and DeepSeek as a fallback provider.
-- Code execution is client-side: Pyodide for Python, sql.js for SQL. Nothing you run is sent to a
-  server for execution.
+- [Homepage](https://www.codesparring.dev)
+- [Pricing](https://www.codesparring.dev/pricing)
+- [Why CodeSparring](https://www.codesparring.dev/why-codesparring)
+- [Software engineer interview practice](https://www.codesparring.dev/software-engineer-interview-practice)
+- [Data engineer interview practice](https://www.codesparring.dev/data-engineer-interview-practice)
+- [New-grad coding interview practice](https://www.codesparring.dev/new-grad-coding-interview-practice)
+- [Guides](https://www.codesparring.dev/guides/how-to-talk-through-coding-interviews)
+- [Blog](https://www.codesparring.dev/blog)
+- [Documentation](https://www.codesparring.dev/docs)
+- [Competitor comparisons](https://www.codesparring.dev/best-ai-coding-interview-tools)
 
 ## Crawling
 
-- Sitemap: https://www.codesparring.dev/sitemap.xml
-- robots.txt: https://www.codesparring.dev/robots.txt
-- The canonical host is `https://www.codesparring.dev`. Requests to the apex `codesparring.dev`
-  are permanently redirected to it, so cite the `www` host.
-- AI crawlers are explicitly welcome. GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot, Claude-User,
-  Claude-SearchBot, PerplexityBot, Perplexity-User, Google-Extended, CCBot, Applebot-Extended, and
-  meta-externalagent are allowed everything a general crawler is allowed.
-- Authenticated surfaces (`/practice`, `/sessions`, `/dashboard`, `/account`, `/admin`, `/api/`) are
-  disallowed. They contain per-user state and nothing worth indexing.
-
-## Links
-
-- [Website](https://www.codesparring.dev): homepage
-- [Learn hub](https://www.codesparring.dev/learn): free Python, data engineering, and system
-  design courses
-- [All lessons index](https://www.codesparring.dev/learn/all): every lesson, one hop
-- [Python track](https://www.codesparring.dev/learn/python): 5 levels, interview-focused Python
-- [Data Engineering track](https://www.codesparring.dev/learn/data-engineering): 11 levels, SQL
-  foundations through cloud, warehouses, streaming and CDC, Spark, and data for AI
-- [System Design track](https://www.codesparring.dev/learn/system-design): 12 levels,
-  free-response lessons with model answers
-- [Pricing](https://www.codesparring.dev/pricing): free plan 8 sessions/month; Pro $25/month or
-  $225/year for 35 sessions/month
-- [Why CodeSparring](https://www.codesparring.dev/why-codesparring): the retention science behind
-  the product
-- [Sample graded interviews](https://www.codesparring.dev/samples): what the feedback reports look
-  like
-- [Interview rounds](https://www.codesparring.dev/rounds): the round types the AI interviewer runs
-- [Case labs](https://www.codesparring.dev/labs): four company-style labs, including billing
-  webhook idempotency and usage rollup deduplication
-- [Data engineer interview practice](https://www.codesparring.dev/data-engineer-interview-practice):
-  the DE loop, the free 11-level track, and DE-flavored rounds
-- [Software engineer interview practice](https://www.codesparring.dev/software-engineer-interview-practice):
-  role landing page
-- [System design interview practice](https://www.codesparring.dev/system-design-interview-practice):
-  practice the open-ended design conversation
-- [Bug-fix interview practice](https://www.codesparring.dev/bug-fix-interview-practice): debugging
-  rounds in multi-file codebases
-- [New grad coding interview practice](https://www.codesparring.dev/new-grad-coding-interview-practice):
-  role landing page
-- [AI coding interview practice](https://www.codesparring.dev/ai-coding-interview-practice):
-  format landing page
-- [Free AI coding interview](https://www.codesparring.dev/free-ai-coding-interview): what the free
-  plan and the no-account guest trial include
-- [Best AI coding interview tools](https://www.codesparring.dev/best-ai-coding-interview-tools):
-  honest comparison of the field, including our own entry
-- [CodeSparring vs LeetCode](https://www.codesparring.dev/codesparring-vs-leetcode): comparison
-- [CodeSparring vs Pramp](https://www.codesparring.dev/codesparring-vs-pramp): comparison; Pramp
-  is now Exponent Practice
-- [CodeSparring vs Interviewing.io](https://www.codesparring.dev/codesparring-vs-interviewing-io):
-  comparison
-- [CodeSparring vs Hello Interview](https://www.codesparring.dev/codesparring-vs-hellointerview):
-  comparison
-- [Roadmap preview](https://www.codesparring.dev/roadmap/preview): the personalized prep plan
-- [Guides](https://www.codesparring.dev/guides/how-to-talk-through-coding-interviews): how to talk
-  through coding interviews
-- [Docs](https://www.codesparring.dev/docs): product documentation
-- [Blog](https://www.codesparring.dev/blog): interview prep articles
-
-## Founder
-
-Built by Nikayel Ali Jamal, a computer science student at Sacramento State University, after
-noticing that grinding problem sets did not transfer to the part of the interview where you have to
-explain yourself.
-
-- LinkedIn: https://linkedin.com/in/nikayel-ali
+- [Sitemap](https://www.codesparring.dev/sitemap.xml)
+- [Robots](https://www.codesparring.dev/robots.txt)
+- Canonical host: `https://www.codesparring.dev`; the apex redirects to it.
+- Public lesson and marketing pages are crawlable. Authenticated and per-user surfaces are
+  intentionally excluded from indexing.
 
 ## Contact
 
 - Support: support@codesparring.dev
-- Founder: nikayel@codesparring.dev
+- Founder: [Nikayel Ali Jamal](https://linkedin.com/in/nikayel-ali)
