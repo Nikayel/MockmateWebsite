@@ -70,6 +70,7 @@ export interface UseSystemDesignFeedbackOptions {
   setScoreBreakdown: Dispatch<SetStateAction<ScoreBreakdown>>
   setComprehensiveFeedback: Dispatch<SetStateAction<string>>
   setPerformanceScore: Dispatch<SetStateAction<number | null>>
+  setFeedbackQueued: Dispatch<SetStateAction<boolean>>
   setShowPostInterviewDiscussion: Dispatch<SetStateAction<boolean>>
   setInterviewerMessages: Dispatch<SetStateAction<ChatMessage[]>>
 
@@ -100,6 +101,7 @@ export function useSystemDesignFeedback(
 ): UseSystemDesignFeedbackResult {
   const triggerSystemDesignFeedback = async () => {
     opts.setIsGeneratingDiscussion(true)
+    opts.setFeedbackQueued(false)
 
     try {
       if (!opts.selectedScenario || opts.selectedScenario.type !== "system-design") {
@@ -150,6 +152,7 @@ export function useSystemDesignFeedback(
       // Generate comprehensive feedback
       let comprehensiveFeedback = `Completed system design interview: ${opts.selectedScenario?.title}`
       let calculatedPerformanceScore = 0
+      let feedbackPending = false
 
       // Mark session as evaluating BEFORE feedback generation starts
       // This prevents the session from being reopened if user refreshes
@@ -236,8 +239,13 @@ export function useSystemDesignFeedback(
         | undefined
       if (feedbackResponse.ok) {
         const feedbackData = await feedbackResponse.json()
-        comprehensiveFeedback = feedbackData.feedback || comprehensiveFeedback
-        calculatedPerformanceScore = feedbackData.scores?.overall || 0
+        feedbackPending = feedbackData.feedbackPending === true
+        comprehensiveFeedback = feedbackPending
+          ? ""
+          : feedbackData.feedback || comprehensiveFeedback
+        calculatedPerformanceScore =
+          typeof feedbackData.scores?.overall === "number" ? feedbackData.scores.overall : 0
+        opts.setFeedbackQueued(feedbackPending)
         if (feedbackData.structured) {
           systemDesignStructuredFeedback = feedbackData.structured
           opts.setStructuredFeedback({
@@ -285,7 +293,7 @@ export function useSystemDesignFeedback(
       opts.setPerformanceScore(calculatedPerformanceScore)
 
       // Update session with completion data
-      if (opts.currentSessionId && opts.user) {
+      if (opts.currentSessionId && opts.user && !feedbackPending) {
         try {
           await updateInterviewSession(
             opts.currentSessionId,
@@ -402,7 +410,10 @@ export function useSystemDesignFeedback(
       }
 
       // Start post-interview discussion phase
-      opts.setShowPostInterviewDiscussion(true)
+      // If narrative generation has been deferred, send the user straight to
+      // the saved score and background-retry notice instead of the discussion
+      // view, which would hide the score-only result surface.
+      opts.setShowPostInterviewDiscussion(!feedbackPending)
 
       // Trigger interviewer to provide final feedback
       const finalMessage = `The candidate has submitted their design. Please provide a brief summary of their performance, highlighting strengths and areas for improvement. Keep it concise (2-3 sentences).`

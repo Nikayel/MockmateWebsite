@@ -16,7 +16,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
-import { FieldValue } from "firebase-admin/firestore"
+import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { logger } from "@/lib/logger"
 import { verifyAuth } from "@/lib/auth-helpers"
 import {
@@ -28,9 +28,12 @@ import { getScenarioById } from "@/lib/scenarios"
 import {
   validatePersistRequestBody,
   validateFeedbackFailureReport,
+  validateFeedbackScoreReadyReport,
+  validateFeedbackGenerationFailureReport,
 } from "@/lib/feedback/persist-request-schema"
 import { resolvePersistAction } from "@/lib/feedback/persist-guard"
 import { prepareTranscriptForStorage } from "@/lib/feedback/transcript-storage"
+import { verifyFeedbackInternalRequest } from "@/lib/feedback/internal-auth"
 
 // This route does Firestore writes only, no AI calls, so it does not need a
 // large budget. The previous `export const maxDuration = 10` cited a Vercel
@@ -38,6 +41,24 @@ import { prepareTranscriptForStorage } from "@/lib/feedback/transcript-storage"
 // grants 30s to every app/api function, and a per-route export OVERRIDES
 // that). Dropping the export inherits the vercel.json value rather than
 // keeping a tighter ceiling nobody currently intends.
+
+const INLINE_FEEDBACK_LEASE_MS = 5 * 60_000
+
+function isFeedbackScores(value: unknown): value is {
+  understanding: number
+  problemSolving: number
+  codeQuality: number
+  communication: number
+  overall: number
+} {
+  if (typeof value !== "object" || value === null) return false
+  return ["understanding", "problemSolving", "codeQuality", "communication", "overall"].every(
+    (key) => {
+      const score = (value as Record<string, unknown>)[key]
+      return typeof score === "number" && Number.isFinite(score)
+    }
+  )
+}
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
@@ -52,6 +73,170 @@ export async function POST(request: NextRequest) {
     const authenticatedUserId = authResult.userId
 
     const rawBody: unknown = await request.json()
+
+    const outcome =
+      typeof rawBody === "object" && rawBody !== null
+        ? (rawBody as { outcome?: unknown }).outcome
+        : undefined
+
+    // The Edge stream cannot write Firestore directly. It saves the finalized
+    // score and a server-only narrative job here before making the inline LLM
+    // call, so a failed request never loses the score.
+    if (outcome === "score_ready") {
+      if (!verifyFeedbackInternalRequest(request)) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+      const scoreReady = validateFeedbackScoreReadyReport(rawBody)
+      if (!scoreReady.success) {
+        return NextResponse.json({ error: scoreReady.error }, { status: 400 })
+      }
+      if (Buffer.byteLength(JSON.stringify(scoreReady.data), "utf8") > 800_000) {
+        return NextResponse.json({ error: "Feedback job payload is too large" }, { status: 413 })
+      }
+      if (scoreReady.data.userId !== authenticatedUserId) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+
+      const { sessionId, userId, scores } = scoreReady.data
+      const sessionRef = adminDb.collection("interview_sessions").doc(sessionId)
+      const jobRef = adminDb.collection("feedback_jobs").doc(sessionId)
+      const nowMs = Date.now()
+      const transactionResult = await adminDb.runTransaction(async (transaction) => {
+        const [sessionSnapshot, jobSnapshot] = await Promise.all([
+          transaction.get(sessionRef),
+          transaction.get(jobRef),
+        ])
+        if (!sessionSnapshot.exists) return { error: "not-found" as const }
+        if (sessionSnapshot.get("user_id") !== authenticatedUserId) {
+          return { error: "forbidden" as const }
+        }
+        if (sessionSnapshot.get("feedback_status") === "complete") {
+          return {
+            saved: typeof sessionSnapshot.get("performance_score") === "number",
+            skipped: "already complete" as const,
+          }
+        }
+        if (jobSnapshot.exists) {
+          return {
+            saved: sessionSnapshot.get("feedback_score_frozen") === true,
+            skipped: "job already exists" as const,
+          }
+        }
+
+        transaction.update(sessionRef, {
+          performance_score: scores.overall,
+          score_breakdown: {
+            understandingScore: scores.understanding,
+            problemSolvingScore: scores.problemSolving,
+            codeQualityScore: scores.codeQuality,
+            communicationScore: scores.communication,
+            overallScore: scores.overall,
+          },
+          feedback_score_snapshot: scores,
+          feedback_score_frozen: true,
+          feedback_status: "queued",
+          feedback_error: FieldValue.delete(),
+          updated_at: FieldValue.serverTimestamp(),
+        })
+        transaction.create(jobRef, {
+          session_id: sessionId,
+          user_id: userId,
+          scenario_type: scoreReady.data.scenarioType,
+          scenario_title: scoreReady.data.scenarioTitle,
+          scenario_id: scoreReady.data.scenarioId ?? null,
+          scores,
+          system_prompt: scoreReady.data.systemPrompt,
+          user_prompt: scoreReady.data.userPrompt,
+          silent_notes: scoreReady.data.silentNotes ?? [],
+          bugfix_evidence_summary: scoreReady.data.bugfixEvidenceSummary ?? null,
+          bugfix_score_breakdown: scoreReady.data.bugfixScoreBreakdown ?? null,
+          bugfix_post_session_report: scoreReady.data.bugfixPostSessionReport ?? null,
+          status: "inline",
+          attempt_count: 0,
+          manual_retry_count: 0,
+          next_attempt_at: Timestamp.fromMillis(nowMs),
+          lease_until: Timestamp.fromMillis(nowMs + INLINE_FEEDBACK_LEASE_MS),
+          created_at: FieldValue.serverTimestamp(),
+          updated_at: FieldValue.serverTimestamp(),
+        })
+        return { saved: true as const }
+      })
+
+      if (transactionResult.error === "not-found") {
+        return NextResponse.json({ error: "Session not found" }, { status: 404 })
+      }
+      if (transactionResult.error === "forbidden") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+      return NextResponse.json({
+        success: true,
+        scoreSaved: transactionResult.saved === true,
+        skipped: transactionResult.skipped,
+      })
+    }
+
+    // A failed inline attempt releases its lease immediately so the cron
+    // worker can claim the existing durable job on its next run.
+    if (outcome === "generation_failed") {
+      if (!verifyFeedbackInternalRequest(request)) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+      const failure = validateFeedbackGenerationFailureReport(rawBody)
+      if (!failure.success) {
+        return NextResponse.json({ error: failure.error }, { status: 400 })
+      }
+      if (failure.data.userId !== authenticatedUserId) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+      const sessionRef = adminDb.collection("interview_sessions").doc(failure.data.sessionId)
+      const jobRef = adminDb.collection("feedback_jobs").doc(failure.data.sessionId)
+      const now = Timestamp.now()
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const [sessionSnapshot, jobSnapshot] = await Promise.all([
+          transaction.get(sessionRef),
+          transaction.get(jobRef),
+        ])
+        if (!sessionSnapshot.exists) return { error: "not-found" as const }
+        if (sessionSnapshot.get("user_id") !== authenticatedUserId) {
+          return { error: "forbidden" as const }
+        }
+        if (sessionSnapshot.get("feedback_status") === "complete") {
+          return { skipped: "already complete" as const }
+        }
+        if (!jobSnapshot.exists) return { error: "job-not-found" as const }
+        if (jobSnapshot.get("status") === "processing") {
+          return { queued: true as const }
+        }
+        if (jobSnapshot.get("status") === "complete") {
+          return { skipped: "already complete" as const }
+        }
+
+        transaction.update(jobRef, {
+          status: "queued",
+          next_attempt_at: now,
+          lease_until: FieldValue.delete(),
+          last_error: failure.data.errorMessage ?? "Inline feedback generation failed",
+          updated_at: FieldValue.serverTimestamp(),
+        })
+        transaction.update(sessionRef, {
+          feedback_status: "queued",
+          feedback_error: FieldValue.delete(),
+          updated_at: FieldValue.serverTimestamp(),
+        })
+        return { queued: true as const }
+      })
+
+      if (result.error === "not-found") {
+        return NextResponse.json({ error: "Session not found" }, { status: 404 })
+      }
+      if (result.error === "forbidden") {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+      if (result.error === "job-not-found") {
+        return NextResponse.json({ error: "Feedback job not found" }, { status: 404 })
+      }
+      return NextResponse.json({ success: true, queued: result.queued === true })
+    }
 
     // Failure reports: the stream route's error path marks the session failed
     // so it lands in a terminal state (with the retry UI) even when the client
@@ -80,6 +265,12 @@ export async function POST(request: NextRequest) {
       if (snapshot.get("feedback_status") === "complete") {
         return NextResponse.json({ success: true, skipped: "already complete" })
       }
+      if (
+        snapshot.get("feedback_status") === "queued" &&
+        snapshot.get("feedback_score_frozen") === true
+      ) {
+        return NextResponse.json({ success: true, skipped: "score saved; feedback queued" })
+      }
       await sessionRef.update({
         feedback_status: "failed",
         feedback_error: failure.data.errorMessage ?? null,
@@ -102,7 +293,7 @@ export async function POST(request: NextRequest) {
     const {
       sessionId,
       userId,
-      scores,
+      scores: requestScores,
       feedback,
       testsPassed,
       testsTotal,
@@ -134,6 +325,10 @@ export async function POST(request: NextRequest) {
     if (sessionSnapshot.get("user_id") !== authenticatedUserId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
+    const frozenScoreSnapshot = sessionSnapshot.get("feedback_score_snapshot")
+    const savedScores = isFeedbackScores(frozenScoreSnapshot) ? frozenScoreSnapshot : null
+    const scores = savedScores ?? requestScores
+    const hasFrozenScore = sessionSnapshot.get("feedback_score_frozen") === true && !!savedScores
 
     // Two writers race for every session now (client-after-stream and the
     // stream route's server-side persist). First real persist wins; real
@@ -257,19 +452,23 @@ export async function POST(request: NextRequest) {
 
       // Scores — guided labs keep the (invalid) interview score out of the
       // readiness fields and surface a labeled practice/mastery number instead.
-      performance_score: isGuidedLabRun ? masteryScore : scores.overall,
+      ...(!hasFrozenScore && {
+        performance_score: isGuidedLabRun ? masteryScore : scores.overall,
+      }),
       mastery_score: masteryScore,
       technical_score: isGuidedLabRun ? null : technicalScore,
       efficiency_score: masteryResult.components.timeEfficiencyScore,
 
       // Score breakdown (for detailed display)
-      score_breakdown: {
-        understandingScore: scores.understanding,
-        problemSolvingScore: scores.problemSolving,
-        codeQualityScore: scores.codeQuality,
-        communicationScore: scores.communication,
-        overallScore: scores.overall,
-      },
+      ...(!hasFrozenScore && {
+        score_breakdown: {
+          understandingScore: scores.understanding,
+          problemSolvingScore: scores.problemSolving,
+          codeQualityScore: scores.codeQuality,
+          communicationScore: scores.communication,
+          overallScore: scores.overall,
+        },
+      }),
 
       // Structured feedback
       structured_feedback: {
@@ -309,6 +508,19 @@ export async function POST(request: NextRequest) {
     }
 
     await adminDb.collection("interview_sessions").doc(sessionId).update(updateData)
+    const feedbackJobRef = adminDb.collection("feedback_jobs").doc(sessionId)
+    const feedbackJobSnapshot = await feedbackJobRef.get()
+    if (feedbackJobSnapshot.exists) {
+      await feedbackJobRef.update({
+        status: "complete",
+        system_prompt: FieldValue.delete(),
+        user_prompt: FieldValue.delete(),
+        lease_until: FieldValue.delete(),
+        lease_token: FieldValue.delete(),
+        completed_at: FieldValue.serverTimestamp(),
+        updated_at: FieldValue.serverTimestamp(),
+      })
+    }
 
     // Archive the conversation. This is the ONLY moment the full transcript
     // exists server-side; before 2026-08-18 it was counted and discarded, so

@@ -16,7 +16,7 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["**/*.integration.test.ts"],
-    exclude: ["node_modules", ".next", "dist", "extension/**", "**/._*"],
+    exclude: ["node_modules", ".next", "dist", "extension/**", "**/._*", ".claude/worktrees/**"],
     setupFiles: ["./vitest.integration.setup.ts"],
     // Emulator round-trips are slower than mocked calls, and these suites
     // share one Firestore instance, so keep them serial and patient.
@@ -27,6 +27,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": resolve(__dirname, "./"),
+      // Same empty marker Next.js uses for server code; no SDK/service mocks.
+      "server-only": resolve(__dirname, "node_modules/server-only/empty.js"),
     },
   },
 })

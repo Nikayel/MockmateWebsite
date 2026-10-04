@@ -1,6 +1,17 @@
 # SEO: manual steps
 
-Everything in this folder is work a human has to do **outside the codebase**: platform settings,
+## Release boundaries
+
+Code presence is not proof of deployment or completed Search Console setup.
+Use the numbered tickets below to verify external release work, and the
+[measurement guide](../docs/seo-measurement.md) for repeatable data collection.
+Post-interview recommendations have a separate
+[engine contract and release checklist](../docs/RECOMMENDATION-ENGINE.md);
+the new implementation is local until the normal release workflow is completed.
+
+## Manual tickets
+
+The numbered tickets in this folder describe work a human has to do **outside the codebase**: platform settings,
 Search Console, and content decisions. None of it can be done by a commit, and none of it is covered
 by CI, which is exactly why it is written down.
 

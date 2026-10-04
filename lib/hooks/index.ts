@@ -22,18 +22,8 @@ export type {
 export { useDSARoadmap, inferPattern } from "./useDSARoadmap"
 export type { NodeStats, UseDSARoadmapOptions, UseDSARoadmapReturn } from "./useDSARoadmap"
 
-export {
-  useSkillInsights,
-  useSmartRecommendations,
-  useEnhancedProfile,
-  useCodeAnalysis,
-} from "./useSkillInsights"
-export type {
-  SkillInsightsData,
-  SmartRecommendation,
-  SessionInsight,
-  UserSummary,
-  SmartRecommendationsResponse,
-} from "./useSkillInsights"
+export { useSkillInsights, useEnhancedProfile, useCodeAnalysis } from "./useSkillInsights"
+export type { SkillInsightsData } from "./useSkillInsights"
 
 export { useAuthedFetch } from "./useAuthedFetch"
+export { useNextPractice } from "./useNextPractice"

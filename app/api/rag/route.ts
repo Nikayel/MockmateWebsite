@@ -14,6 +14,7 @@ import {
   handleStoreSolution,
 } from "@/lib/rag/actions"
 import { ragRateLimit, ragStorageRateLimit } from "@/lib/rate-limiting"
+import { markLegacyRecommendationResponse } from "@/lib/agents/recommendations/legacy-api"
 
 /**
  * Legacy RAG API endpoint.
@@ -85,16 +86,16 @@ export async function POST(request: NextRequest) {
         return handleGetSimilarSolutions(params)
 
       case "get-recommendations":
-        return handleGetRecommendations(params)
+        return markLegacyRecommendationResponse(await handleGetRecommendations(params))
 
       case "store-solution":
         return handleStoreSolution(params)
 
       case "get-learning-path":
-        return handleGetLearningPath(params)
+        return markLegacyRecommendationResponse(await handleGetLearningPath(params))
 
       case "get-next-problems":
-        return handleGetNextProblems(params)
+        return markLegacyRecommendationResponse(await handleGetNextProblems(params))
 
       case "store-onboarding":
         return handleStoreOnboarding(params)

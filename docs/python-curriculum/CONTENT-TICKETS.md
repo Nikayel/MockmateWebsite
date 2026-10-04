@@ -129,7 +129,7 @@ Legend: **SF** = single-file, **WS** = workspace.
 
 ---
 
-## Gap-fill additions (post-launch, from CURRICULUM-GAP-ANALYSIS.md)
+## Gap-fill additions
 
 Shipped after the curriculum audit — the highest-value beginner topics the original 46-lesson tree
 missed. All single-file, reference solutions verified in `python3`, `pnpm typecheck` + tutorial tests
@@ -149,4 +149,4 @@ green.
 **Still open from the analysis (need a different vehicle, not plain single-file):** `venv`/`pip`
 (not runnable in the Pyodide sandbox — teach-only), interactive `breakpoint()`/`pdb` (sandbox
 caveat), and an optional `numpy`/`pandas` data-track module. See
-`CURRICULUM-GAP-ANALYSIS.md` for the full ranked list.
+the active curriculum backlog for additional authoring priorities.

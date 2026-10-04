@@ -1,6 +1,6 @@
 /**
  * Tests for the hidden-gate runner: the server-side comparison D1 depends on
- * (docs/sprint-labs/EXECUTION-STATE.md). Given the sealed hidden cases, which
+ * (docs/sprint-labs/DECISIONS.md). Given the sealed hidden cases, which
  * io-case ids this attempt's variant issued, and what the client posted back
  * (raw outputs for io-cases, booleans for probes), it produces the
  * whitelist-projected `GateResult` plus the SCORED counts (io-case only) and

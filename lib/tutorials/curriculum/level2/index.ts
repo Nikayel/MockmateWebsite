@@ -4450,7 +4450,7 @@ def gcd_of(a, b):
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// L2-M6: Standard Library Toolkit  (gap-fill: see CURRICULUM-GAP-ANALYSIS.md)
+// L2-M6: Standard Library Toolkit  (gap-fill: see docs/python-curriculum/CONTENT-TICKETS.md)
 // Regular expressions and specialized collections: high-use stdlib the original
 // tree named but never taught directly.
 // ───────────────────────────────────────────────────────────────────────────

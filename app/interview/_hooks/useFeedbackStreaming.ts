@@ -196,7 +196,26 @@ export function useFeedbackStreaming(
 
     // Wait for feedback to be persisted before showing final scores
     // This prevents the "flickering scores" issue where instant scores show then get replaced
-    if (feedbackState.isPersisted && feedbackState.feedback) {
+    if (feedbackState.feedbackQueued && feedbackState.refinedScores) {
+      const finalScores = feedbackState.refinedScores
+      setScoreBreakdown({
+        understandingScore: finalScores.understanding,
+        problemSolvingScore: finalScores.problemSolving,
+        codeQualityScore: finalScores.codeQuality,
+        communicationScore: finalScores.communication,
+      })
+      setPerformanceScore(finalScores.overall)
+      setIsGeneratingFeedback(false)
+
+      if (!feedbackCompletionToastShown.current) {
+        feedbackCompletionToastShown.current = true
+        toast.info("Your score is ready", {
+          description:
+            "Written feedback is taking longer than expected. We’ll retry it in the background; you can come back to Sessions later.",
+          duration: 10000,
+        })
+      }
+    } else if (feedbackState.isPersisted && feedbackState.feedback) {
       // Use the final scores from the feedback (which includes refined scores)
       const finalScores = feedbackState.feedback.scores
       if (finalScores) {

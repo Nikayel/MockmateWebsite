@@ -629,7 +629,7 @@ were 23.05 (page), 25.84 (site-wide by date) and 48.93 (query).
 | Date | Clicks (28d) | Impressions (28d) | Avg position | Queries in top 10 | Notes |
 | --- | --- | --- | --- | --- | --- |
 | 2026-08-13 | 11 | 1,185 | 23.0 | 25 | Baseline. |
-| 2026-08-16 | 13 | 2,614 | 23.05 | 32 | Re-pull, NOT a new baseline. Window 2026-07-19 to 2026-08-15, 247 ranking pages, 327 ranking queries. Site-wide totals for the same window: 2,567 impressions at 25.84. The impression jump is the August crawl event receding (740 on 08-09 down to 115 on 08-14), not growth; see `docs/seo-visibility-event.md`. Query-dimension clicks are still 0 against the page dimension's 13, same withholding as the baseline. |
+| 2026-08-16 | 13 | 2,614 | 23.05 | 32 | Re-pull, NOT a new baseline. Window 2026-07-19 to 2026-08-15, 247 ranking pages, 327 ranking queries. Site-wide totals for the same window: 2,567 impressions at 25.84. The impression jump is the August crawl event receding (740 on 08-09 down to 115 on 08-14), not growth; see `historical August crawl-event export (removed; recoverable in Git)`. Query-dimension clicks are still 0 against the page dimension's 13, same withholding as the baseline. |
 
 ---
 
@@ -690,7 +690,7 @@ not replaced. `app/__tests__/no-keywords-meta.test.ts` fails if it returns.
 ### SEO-31 — new state, still open
 
 The rendered-HTML comparison the item asked for is **done, and it came back negative.** Full route
-audit 2026-08-16: `docs/seo-route-map.csv` (one row per public URL) and `docs/seo-visibility-event.md`.
+audit 2026-08-16: `docs/seo-route-map.csv` (one row per public URL) and `historical August crawl-event export (removed; recoverable in Git)`.
 
 `sd-l4-lb-l4-l7`, in the suppressed `scaling-compute` level, is byte-for-byte the same CLASS of page
 as `sd-l5-logical-clocks`, the indexed control: both server-render their teach prose into the initial

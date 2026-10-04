@@ -72,7 +72,7 @@ export type GateKind = z.infer<typeof gateKindSchema>
  * Who produced a transcript message. `"agent"` has no v0 producer (the
  * partner ships chat-only, no edit/bash tools) but is declared now so a
  * later tool-enabled partner needs no schema change
- * (EXECUTION-STATE.md owner decision 4).
+ * (DECISIONS.md partner boundary).
  */
 export const provenanceSchema = z.enum(["human", "agent"])
 export type Provenance = z.infer<typeof provenanceSchema>

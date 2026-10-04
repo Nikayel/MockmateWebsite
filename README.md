@@ -181,6 +181,7 @@ MockmateWebsite/
 |----------|-------------|
 | [Architecture](docs/ARCHITECTURE.md) | System design & data flow |
 | [Platform Architecture (Quick)](docs/PLATFORM-ARCHITECTURE.md) | High-level architecture and runtime flows |
+| [Post-interview recommendations](docs/RECOMMENDATION-ENGINE.md) | Free-advice contract, deterministic selector, compatibility, and release checks |
 | [Backend](docs/BACKEND.md) | API domains, integrations, request lifecycle |
 | [PRD](docs/PRD.md) | Product vision, requirements, success metrics |
 | [Mermaid architecture](docs/PLATFORM-ARCHITECTURE-MERMAID.md) | Supplemental copy-paste diagrams; primary diagrams are inline below |

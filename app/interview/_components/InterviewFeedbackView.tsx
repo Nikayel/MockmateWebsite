@@ -70,6 +70,7 @@ interface InterviewFeedbackViewProps {
   scoringRingEase: FeedbackLoadingStateProps["ringEase"]
   // PracticeFeedback
   feedback: PracticeFeedbackProps["feedback"]
+  feedbackQueued: boolean
   performanceScore: PracticeFeedbackProps["performanceScore"]
   technicalScore: PracticeFeedbackProps["technicalScore"]
   scoreBreakdown: PracticeFeedbackProps["scoreBreakdown"]
@@ -82,6 +83,7 @@ interface InterviewFeedbackViewProps {
   efficiencyScore: PracticeFeedbackProps["efficiencyScore"]
   elapsedTime: PracticeFeedbackProps["elapsedTime"]
   userId: PracticeFeedbackProps["userId"]
+  sessionId?: PracticeFeedbackProps["sessionId"]
   problemType: PracticeFeedbackProps["problemType"]
   difficulty: PracticeFeedbackProps["difficulty"]
   problemTitle: PracticeFeedbackProps["problemTitle"]
@@ -134,6 +136,7 @@ export function InterviewFeedbackView({
   scoringRingTweenMs,
   scoringRingEase,
   feedback,
+  feedbackQueued,
   performanceScore,
   technicalScore,
   scoreBreakdown,
@@ -146,6 +149,7 @@ export function InterviewFeedbackView({
   efficiencyScore,
   elapsedTime,
   userId,
+  sessionId,
   problemType,
   difficulty,
   problemTitle,
@@ -197,6 +201,7 @@ export function InterviewFeedbackView({
       <ErrorBoundary>
         <PracticeFeedback
           feedback={feedback}
+          feedbackPending={feedbackQueued}
           performanceScore={performanceScore}
           technicalScore={technicalScore}
           scoreBreakdown={scoreBreakdown}
@@ -209,6 +214,7 @@ export function InterviewFeedbackView({
           efficiencyScore={efficiencyScore}
           elapsedTime={elapsedTime}
           userId={userId}
+          sessionId={sessionId}
           problemType={problemType}
           difficulty={difficulty}
           problemTitle={problemTitle}
@@ -218,14 +224,33 @@ export function InterviewFeedbackView({
           onClose={onGoToDashboard}
           clarifyingQuestionsAssessment={clarifyingQuestionsAssessment}
           afterScore={
-            showProfilePersonalization && userId ? (
-              <ProfilePersonalizationPrompt
-                userId={userId}
-                source="feedback"
-                profile={personalizationProfile}
-                onCompleted={onProfilePersonalizationCompleted}
-              />
-            ) : undefined
+            <>
+              {feedbackQueued && (
+                <div
+                  className="border-primary/20 bg-primary/5 text-foreground rounded-xl border p-4"
+                  role="status"
+                >
+                  <p className="font-medium">
+                    Your score is ready. Written feedback is taking longer.
+                  </p>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    We’re retrying in the background. You can leave now and return to Sessions
+                    later.
+                  </p>
+                  <Button variant="outline" size="sm" className="mt-3" onClick={onGoToDashboard}>
+                    Go to Sessions
+                  </Button>
+                </div>
+              )}
+              {showProfilePersonalization && userId && !feedbackQueued && (
+                <ProfilePersonalizationPrompt
+                  userId={userId}
+                  source="feedback"
+                  profile={personalizationProfile}
+                  onCompleted={onProfilePersonalizationCompleted}
+                />
+              )}
+            </>
           }
         />
       </ErrorBoundary>

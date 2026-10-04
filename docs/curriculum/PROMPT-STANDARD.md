@@ -13,6 +13,15 @@ Applies to:
 Related: [[no-em-dashes-in-content]] style rule, and the `PROMPT_STANDARD` test at
 `lib/tutorials/__tests__/prompt-standards.test.ts`.
 
+## Interview problem statements
+
+DSA interview statements are a separate assessment surface, not guided Learn
+prompts. State the problem and expected outputs without naming the solution's
+algorithm, data structure, traversal, or step-by-step approach.
+Keep approach guidance in the click-to-reveal `hints` array.
+Fence ASCII diagrams so Markdown preserves their layout. Diagrams may label
+example inputs and outputs, but must not reveal how to solve the task.
+
 ---
 
 ## The golden rule: lead with the deliverable

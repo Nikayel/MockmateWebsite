@@ -14,7 +14,7 @@
  * (Fluid Compute runs Node in the same regions at the same price). The
  * remaining reason this is separate is inertia plus the Firebase-Admin split
  * (Edge cannot use it, hence /api/feedback/persist). See
- * docs/EDGE-TO-NODE-CONSOLIDATION.md for the migration assessment.
+ * docs/plans/technical-chores.md for the migration assessment.
  *
  * Flow:
  * 1. Receive session data
@@ -439,18 +439,26 @@ export async function POST(request: NextRequest) {
       return null
     }
   }
-  const persistServerSide = async (payload: Record<string, unknown>) => {
+  const persistServerSide = async (payload: Record<string, unknown>): Promise<boolean> => {
     const persistUrl = resolvePersistUrl()
     if (!persistUrl) {
       logger.error("[Streaming Feedback] Cannot resolve persist URL; server-side persist skipped", {
         sessionId: payload.sessionId,
       })
-      return
+      return false
     }
     try {
+      const isInternalAction =
+        payload.outcome === "score_ready" || payload.outcome === "generation_failed"
       const response = await fetch(persistUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: forwardedAuth },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: forwardedAuth,
+          ...(isInternalAction && process.env.CRON_SECRET
+            ? { "x-feedback-internal-secret": process.env.CRON_SECRET }
+            : {}),
+        },
         body: JSON.stringify(payload),
       })
       if (!response.ok) {
@@ -459,11 +467,17 @@ export async function POST(request: NextRequest) {
           sessionId: payload.sessionId,
         })
       }
+      if (payload.outcome === "score_ready" && response.ok) {
+        const result = (await response.json().catch(() => null)) as { scoreSaved?: unknown } | null
+        return result?.scoreSaved === true
+      }
+      return response.ok
     } catch (error) {
       logger.error("[Streaming Feedback] Server-side persist failed", {
         sessionId: payload.sessionId,
         error,
       })
+      return false
     }
   }
 
@@ -475,6 +489,7 @@ export async function POST(request: NextRequest) {
   // Set once the body names a real Firestore session owned by the caller; the
   // catch uses it to mark that session "failed" instead of leaving "processing".
   let persistTarget: { sessionId: string; userId: string } | null = null
+  let scoreSnapshotSaved = false
 
   const processRequest = async () => {
     startHeartbeat()
@@ -999,6 +1014,52 @@ export async function POST(request: NextRequest) {
         testsTotal,
       })
 
+      const bugfixPostSessionReport =
+        bugfixEvidenceSummary && bugfixScoreBreakdown
+          ? buildBugfixPostSessionReport({
+              evidence: bugfixEvidenceSummary,
+              score: bugfixScoreBreakdown,
+              rootCauseText: typeof bugfixRootCause === "string" ? bugfixRootCause : undefined,
+              preventionText: typeof bugfixPrevention === "string" ? bugfixPrevention : undefined,
+            })
+          : undefined
+
+      // Save the finalized score and exact narrative prompts before attempting
+      // the inline generation. The worker can reclaim the lease if this stream
+      // process disappears, or retry immediately when generation throws.
+      if (persistTarget) {
+        scoreSnapshotSaved = await persistServerSide({
+          outcome: "score_ready",
+          sessionId: persistTarget.sessionId,
+          userId: persistTarget.userId,
+          scores: {
+            understanding: finalScores.understanding,
+            problemSolving: finalScores.problemSolving,
+            codeQuality: finalScores.codeQuality,
+            communication: finalScores.communication,
+            overall: finalScores.overall,
+          },
+          systemPrompt: systemInstruction,
+          userPrompt: prompt,
+          scenarioType: scenarioType || "dsa",
+          scenarioTitle: scenarioTitle || "Unknown",
+          scenarioId,
+          silentNotes: finalSilentNotes,
+          bugfixEvidenceSummary: bugfixEvidenceSummary ?? null,
+          bugfixScoreBreakdown: bugfixScoreBreakdown ?? null,
+          bugfixPostSessionReport: bugfixPostSessionReport ?? null,
+        })
+        if (scoreSnapshotSaved) {
+          await sendEvent("score_saved", {
+            understanding: finalScores.understanding,
+            problemSolving: finalScores.problemSolving,
+            codeQuality: finalScores.codeQuality,
+            communication: finalScores.communication,
+            overall: finalScores.overall,
+          })
+        }
+      }
+
       const aiResponse = await generateFeedbackResponseEdge(systemInstruction, prompt)
 
       const feedback = aiResponse.text
@@ -1050,16 +1111,6 @@ export async function POST(request: NextRequest) {
       // The client sets "complete" itself once the results are genuinely
       // renderable (lib/hooks/use-streaming-feedback.ts), which is the only moment
       // that word is true.
-
-      const bugfixPostSessionReport =
-        bugfixEvidenceSummary && bugfixScoreBreakdown
-          ? buildBugfixPostSessionReport({
-              evidence: bugfixEvidenceSummary,
-              score: bugfixScoreBreakdown,
-              rootCauseText: typeof bugfixRootCause === "string" ? bugfixRootCause : undefined,
-              preventionText: typeof bugfixPrevention === "string" ? bugfixPrevention : undefined,
-            })
-          : undefined
 
       const finalScoresPayload = {
         understanding: finalScores.understanding,
@@ -1129,13 +1180,25 @@ export async function POST(request: NextRequest) {
         scenarioType: loggedScenarioType,
         error,
       })
-      await sendEvent("error", {
-        message: error instanceof Error ? error.message : "Failed to generate feedback",
-      })
-      // Land the session in a terminal state. Without this, a generation error
-      // after the client disconnected left feedback_status "processing"
-      // forever, with no retry UI and nothing for the reaper to have to catch.
-      if (persistTarget) {
+      if (scoreSnapshotSaved && persistTarget) {
+        await persistServerSide({
+          outcome: "generation_failed",
+          sessionId: persistTarget.sessionId,
+          userId: persistTarget.userId,
+          errorMessage:
+            error instanceof Error ? error.message.slice(0, 500) : "Feedback generation failed",
+        })
+        await sendEvent("queued", {
+          message: "Your score is ready. Written feedback is taking longer than expected.",
+        })
+      } else {
+        await sendEvent("error", {
+          message: error instanceof Error ? error.message : "Failed to generate feedback",
+        })
+      }
+      // If there is no score-ready job to recover from, keep the old terminal
+      // failure path. A saved score remains queued and is retried by the worker.
+      if (persistTarget && !scoreSnapshotSaved) {
         await persistServerSide({
           outcome: "failed",
           sessionId: persistTarget.sessionId,

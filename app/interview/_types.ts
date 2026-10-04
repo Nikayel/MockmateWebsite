@@ -1,17 +1,7 @@
 import type { WorkspaceScenarioFile } from "@/lib/scenarios/types"
 
-export const SUPPORTED_LANGUAGES = ["javascript", "typescript", "python"] as const
-export const EDITOR_LANGUAGES = [
-  ...SUPPORTED_LANGUAGES,
-  "java",
-  "cpp",
-  "csharp",
-  "go",
-  "rust",
-] as const
-
-export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
-export type EditorLanguage = (typeof EDITOR_LANGUAGES)[number]
+export { SUPPORTED_LANGUAGES, EDITOR_LANGUAGES } from "@/lib/interview/languages"
+export type { SupportedLanguage, EditorLanguage } from "@/lib/interview/languages"
 
 export type WorkspaceContextFile = {
   path: string

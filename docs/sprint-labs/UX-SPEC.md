@@ -4,7 +4,7 @@ Binding for W4 (screens) and W5 (agent panel). One section per screen:
 **Purpose · Layout · Component map · States · Interactions · Objectives surfacing · Copy notes.**
 
 Source documents this spec obeys: `WORKBOOK-SPEC.md` (product, §4 flow, §5 scoring),
-`SPRINT-PLAN.md` (content shapes), `EXECUTION-STATE.md` (owner decisions),
+`SPRINT-PLAN.md` (content shapes), `DECISIONS.md` (owner decisions),
 `AUTHORING-RULES.md` §6 (voice), `AGENT-CONTEXT.md` §3/§6/§7 (agent layers, modes, learner model),
 and `.superpowers/sdd/PLAN/w1-a-caselabs-ui.md` (what already exists).
 
@@ -1139,7 +1139,7 @@ autosave failures are soft: one line, the rest of the screen keeps working, whic
 
 ## 15. Spec conflicts and open questions
 
-Recorded rather than silently resolved, per `EXECUTION-STATE.md`'s standing rule.
+Recorded rather than silently resolved, per `DECISIONS.md`'s standing rule.
 
 1. **`WORKBOOK-SPEC.md` §4 puts the review round between submit and retro for every ticket, while §4's
    `ai_policy` table scores it under `review-only` only.** Resolved in the UI as: the round renders

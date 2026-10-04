@@ -110,13 +110,75 @@ export const feedbackFailureReportSchema = z.object({
   errorMessage: z.string().max(500).optional(),
 })
 
+/**
+ * Score snapshot plus the exact prompts needed to backfill its narrative.
+ * This action is accepted only from the Edge stream via the internal secret;
+ * it is deliberately separate from the public client persist contract.
+ */
+export const feedbackScoreReadyReportSchema = z.object({
+  outcome: z.literal("score_ready"),
+  sessionId: z.string().min(1),
+  userId: z.string().min(1),
+  scores: persistScoresSchema,
+  systemPrompt: z.string().min(1).max(10_000),
+  userPrompt: z.string().min(1).max(210_000),
+  scenarioType: z.enum(["dsa", "system-design", "bugfix"]),
+  scenarioTitle: z.string().max(500),
+  scenarioId: z.string().max(200).optional(),
+  silentNotes: z
+    .array(persistSilentNoteSchema.catch(null as never))
+    .max(100)
+    .nullish(),
+  bugfixEvidenceSummary: z.record(z.unknown()).nullish(),
+  bugfixScoreBreakdown: z.record(z.unknown()).nullish(),
+  bugfixPostSessionReport: z.record(z.unknown()).nullish(),
+})
+
+export const feedbackGenerationFailureReportSchema = z.object({
+  outcome: z.literal("generation_failed"),
+  sessionId: z.string().min(1),
+  userId: z.string().min(1),
+  errorMessage: z.string().max(500).optional(),
+})
+
 export type FeedbackFailureReport = z.infer<typeof feedbackFailureReportSchema>
+export type FeedbackScoreReadyReport = z.infer<typeof feedbackScoreReadyReportSchema>
+export type FeedbackGenerationFailureReport = z.infer<typeof feedbackGenerationFailureReportSchema>
 
 export function validateFeedbackFailureReport(
   rawBody: unknown
 ): { success: true; data: FeedbackFailureReport } | { success: false; error: string } {
   const parsed = feedbackFailureReportSchema.safeParse(rawBody)
   if (!parsed.success) return { success: false, error: "Invalid failure report" }
+  return { success: true, data: parsed.data }
+}
+
+export function validateFeedbackScoreReadyReport(
+  rawBody: unknown
+): { success: true; data: FeedbackScoreReadyReport } | { success: false; error: string } {
+  const parsed = feedbackScoreReadyReportSchema.safeParse(rawBody)
+  if (!parsed.success) return { success: false, error: "Invalid score-ready report" }
+  return {
+    success: true,
+    data: {
+      ...parsed.data,
+      scores: {
+        understanding: clampScore(parsed.data.scores.understanding),
+        problemSolving: clampScore(parsed.data.scores.problemSolving),
+        codeQuality: clampScore(parsed.data.scores.codeQuality),
+        communication: clampScore(parsed.data.scores.communication),
+        overall: clampScore(parsed.data.scores.overall),
+      },
+      silentNotes: parsed.data.silentNotes?.filter((note) => note !== null) ?? undefined,
+    },
+  }
+}
+
+export function validateFeedbackGenerationFailureReport(
+  rawBody: unknown
+): { success: true; data: FeedbackGenerationFailureReport } | { success: false; error: string } {
+  const parsed = feedbackGenerationFailureReportSchema.safeParse(rawBody)
+  if (!parsed.success) return { success: false, error: "Invalid generation failure report" }
   return { success: true, data: parsed.data }
 }
 

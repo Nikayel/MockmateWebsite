@@ -677,22 +677,24 @@ export default function DashboardPage() {
                     {sessions.map((session) => {
                       // Determine session state: completed, evaluating, or in-progress
                       // Note: Legacy sessions may not have feedback_status, treat completed_at as complete
-                      // Both transit states count: "pending" is what markSessionEvaluating
-                      // writes today, "processing" is the other transit state the reaper
-                      // and the sessions pages already honor. Counting only "pending"
-                      // made a mid-scoring session render as amber "In Progress" here,
-                      // with a link that reopened the interview workspace instead of the
-                      // scoring wait -- on the exact page the scoring screen's escape
-                      // button sends people to.
+                      // Pending/processing mean the score is still being computed.
+                      // Queued means the score is already frozen and only its written
+                      // report is pending, so link to the saved session and show its score.
                       const feedbackStatus = resolveFeedbackGenerationStatus(
                         session.feedback_status,
                         session.completed_at
                       )
+                      const hasFrozenScore =
+                        session.feedback_score_frozen === true &&
+                        typeof session.performance_score === "number"
                       const isEvaluating =
-                        feedbackStatus === "pending" || feedbackStatus === "processing"
+                        feedbackStatus === "pending" ||
+                        feedbackStatus === "processing" ||
+                        (feedbackStatus === "queued" && !hasFrozenScore)
                       const isFeedbackFailed = feedbackStatus === "failed"
                       const isCompleted =
-                        session.completed_at && (feedbackStatus === "complete" || !feedbackStatus)
+                        session.completed_at &&
+                        (feedbackStatus === "complete" || !feedbackStatus || hasFrozenScore)
                       const isInProgress = !session.completed_at && !isEvaluating
                       const score =
                         isCompleted && typeof session.performance_score === "number"
@@ -762,6 +764,11 @@ export default function DashboardPage() {
                               {isEvaluating && (
                                 <Badge className="border-0 bg-blue-500/10 px-1.5 py-0 text-[10px] text-blue-400">
                                   Evaluating
+                                </Badge>
+                              )}
+                              {feedbackStatus === "queued" && hasFrozenScore && (
+                                <Badge className="border-0 bg-blue-500/10 px-1.5 py-0 text-[10px] text-blue-400">
+                                  Feedback pending
                                 </Badge>
                               )}
                               {isFeedbackFailed && (

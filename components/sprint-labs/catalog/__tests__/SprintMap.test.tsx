@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * SprintMap is the overview's ten-sprint list. The one hard content rule under owner decision 2
- * (docs/sprint-labs/EXECUTION-STATE.md): sprint 1 is free, sprints 2-10 need Pro, and that must show
+ * (docs/sprint-labs/DECISIONS.md): sprint 1 is free, sprints 2-10 need Pro, and that must show
  * up as a real badge distinction, not just in prose.
  *
  * Assertions are plain DOM reads because this repo does not carry @testing-library/jest-dom.

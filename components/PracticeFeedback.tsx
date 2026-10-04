@@ -41,6 +41,7 @@ interface PracticeFeedbackProps {
   efficiencyScore?: number
   elapsedTime?: number
   userId?: string
+  sessionId?: string
   problemType?: string
   difficulty?: string
   problemTitle?: string
@@ -70,6 +71,8 @@ interface PracticeFeedbackProps {
   } | null
   /** A high-priority next action rendered after the score and before detail. */
   afterScore?: ReactNode
+  /** Keep the score visible while the written report is being retried. */
+  feedbackPending?: boolean
 }
 
 export default function PracticeFeedback({
@@ -86,20 +89,20 @@ export default function PracticeFeedback({
   efficiencyScore,
   elapsedTime = 0,
   userId,
+  sessionId,
   problemType,
-  difficulty,
   problemTitle,
   code,
   language = "javascript",
   chatMessages,
   interviewerMessages,
   onExport,
-  onNewProblem,
   onClose,
   complexityAnalysis,
   alternativeApproaches,
   clarifyingQuestionsAssessment,
   afterScore,
+  feedbackPending = false,
 }: PracticeFeedbackProps) {
   // Parse feedback text, then override with structured data if available from API
   const parsedSections = parseFeedback(feedback)
@@ -229,24 +232,22 @@ export default function PracticeFeedback({
 
       {afterScore}
 
-      <FeedbackSections
-        sections={sections}
-        code={code}
-        language={language}
-        problemType={problemType}
-        userId={userId}
-        difficulty={difficulty}
-        problemTitle={problemTitle}
-        feedback={feedback}
-        overallScore={overallScore}
-        constitutionalAICritique={constitutionalAICritique}
-        onNewProblem={onNewProblem}
-        chatMessages={chatMessages}
-        interviewerMessages={interviewerMessages}
-        complexityAnalysis={complexityAnalysis}
-        alternativeApproaches={alternativeApproaches}
-        clarifyingQuestionsAssessment={clarifyingQuestionsAssessment}
-      />
+      {!feedbackPending && (
+        <FeedbackSections
+          sections={sections}
+          code={code}
+          language={language}
+          problemType={problemType}
+          userId={userId}
+          sessionId={sessionId}
+          constitutionalAICritique={constitutionalAICritique}
+          chatMessages={chatMessages}
+          interviewerMessages={interviewerMessages}
+          complexityAnalysis={complexityAnalysis}
+          alternativeApproaches={alternativeApproaches}
+          clarifyingQuestionsAssessment={clarifyingQuestionsAssessment}
+        />
+      )}
     </div>
   )
 }

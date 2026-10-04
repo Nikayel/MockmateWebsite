@@ -85,7 +85,7 @@ export const FLAGS = {
   // orphan: no reader exists yet because Task 1 lands this flag ahead of the
   // screens that check it (PLAN.md Tasks 10-13) — it is wired before merge to
   // main, per the owner's ship-behind-a-flag decision in
-  // docs/sprint-labs/EXECUTION-STATE.md.
+  // docs/sprint-labs/DECISIONS.md.
   SPRINT_LABS_ENABLED: false,
 
   // Lets a signed-in free learner create exactly one full roadmap. The claim is

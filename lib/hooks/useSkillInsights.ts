@@ -1,13 +1,12 @@
-'use client'
+"use client"
 
 /**
- * React hooks for fetching skill insights and smart recommendations
+ * React hooks for fetching skill insights
  * from the RAG v2 API.
  */
 
-import { useState, useEffect, useCallback } from 'react'
-import type { DSAPattern } from '@/lib/types/dsa-patterns'
-import type { CompanyId } from '@/lib/data/company-questions/types'
+import { useState, useEffect, useCallback } from "react"
+import type { DSAPattern } from "@/lib/types/dsa-patterns"
 
 // ============================================================================
 // TYPES
@@ -91,70 +90,6 @@ export interface SkillInsightsData {
   }
 }
 
-export interface SmartRecommendation {
-  id: string
-  problemId: string
-  title: string
-  pattern: DSAPattern
-  difficulty: 'easy' | 'medium' | 'hard'
-  symbol: {
-    icon: string
-    label: string
-    color: string
-    priority: number
-  }
-  tags: Array<{
-    text: string
-    color: string
-    icon?: string
-  }>
-  explanation: {
-    headline: string
-    reasoning: string[]
-    evidence: Array<{
-      type: string
-      icon: string
-      text: string
-      value?: string | number
-    }>
-    confidence: number
-    alternativeAction?: string
-  }
-  score: number
-  userReadiness: number
-  interviewRelevance: number
-  estimatedMinutes: number
-  prerequisitesMet: boolean
-}
-
-export interface SessionInsight {
-  icon: string
-  title: string
-  description: string
-  actionable: boolean
-  action?: string
-}
-
-export interface UserSummary {
-  level: 'beginner' | 'intermediate' | 'advanced'
-  interviewReadiness: number
-  strengths: Array<{ pattern: DSAPattern; score: number }>
-  focusAreas: Array<{ pattern: DSAPattern; reason: string }>
-  streak: number
-  trend: 'improving' | 'stable' | 'declining'
-}
-
-export interface SmartRecommendationsResponse {
-  recommendations: SmartRecommendation[]
-  sessionInsights: SessionInsight[]
-  userSummary: UserSummary
-  meta: {
-    generatedAt: string
-    personalizationLevel: string
-    confidenceLevel: string
-  }
-}
-
 // ============================================================================
 // HOOKS
 // ============================================================================
@@ -172,21 +107,21 @@ export function useSkillInsights() {
     setError(null)
 
     try {
-      const response = await fetch('/api/rag/v2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get-skill-insights' }),
+      const response = await fetch("/api/rag/v2", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "get-skill-insights" }),
       })
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to fetch skill insights')
+        throw new Error(errorData.error || "Failed to fetch skill insights")
       }
 
       const result = await response.json()
       setData(result)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : "Unknown error")
     } finally {
       setIsLoading(false)
     }
@@ -201,88 +136,6 @@ export function useSkillInsights() {
     isLoading,
     error,
     refetch: fetchInsights,
-  }
-}
-
-/**
- * Hook for fetching smart recommendations
- */
-export function useSmartRecommendations(options: {
-  targetCompany?: CompanyId
-  availableMinutes?: number
-  sessionGoal?: 'warmup' | 'practice' | 'challenge' | 'review' | 'interview-prep'
-  problems: Array<{
-    id: string
-    title: string
-    pattern: DSAPattern
-    difficulty: 'easy' | 'medium' | 'hard'
-    company?: CompanyId
-    frequency?: number
-  }>
-  excludeIds?: string[]
-  limit?: number
-}) {
-  const [data, setData] = useState<SmartRecommendationsResponse | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchRecommendations = useCallback(async () => {
-    if (!options.problems || options.problems.length === 0) {
-      setIsLoading(false)
-      return
-    }
-
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const response = await fetch('/api/rag/v2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'get-smart-recommendations',
-          targetCompany: options.targetCompany,
-          availableMinutes: options.availableMinutes,
-          sessionGoal: options.sessionGoal,
-          problems: options.problems,
-          excludeIds: options.excludeIds,
-          limit: options.limit,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to fetch recommendations')
-      }
-
-      const result = await response.json()
-      setData(result)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [
-    options.targetCompany,
-    options.availableMinutes,
-    options.sessionGoal,
-    options.problems,
-    options.excludeIds,
-    options.limit,
-  ])
-
-  useEffect(() => {
-    fetchRecommendations()
-  }, [fetchRecommendations])
-
-  return {
-    recommendations: data?.recommendations || [],
-    sessionInsights: data?.sessionInsights || [],
-    userSummary: data?.userSummary,
-    meta: data?.meta,
-    isLoading,
-    error,
-    refetch: fetchRecommendations,
   }
 }
 
@@ -310,21 +163,21 @@ export function useEnhancedProfile() {
     setError(null)
 
     try {
-      const response = await fetch('/api/rag/v2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get-enhanced-profile' }),
+      const response = await fetch("/api/rag/v2", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "get-enhanced-profile" }),
       })
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to fetch profile')
+        throw new Error(errorData.error || "Failed to fetch profile")
       }
 
       const result = await response.json()
       setProfile(result)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError(err instanceof Error ? err.message : "Unknown error")
     } finally {
       setIsLoading(false)
     }
@@ -382,42 +235,45 @@ export function useCodeAnalysis() {
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const analyzeCode = useCallback(async (
-    code: string,
-    pattern: DSAPattern,
-    testResults?: { passed: number; total: number; failingTests?: string[] }
-  ) => {
-    setIsAnalyzing(true)
-    setError(null)
+  const analyzeCode = useCallback(
+    async (
+      code: string,
+      pattern: DSAPattern,
+      testResults?: { passed: number; total: number; failingTests?: string[] }
+    ) => {
+      setIsAnalyzing(true)
+      setError(null)
 
-    try {
-      const response = await fetch('/api/rag/v2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'analyze-code',
-          code,
-          pattern,
-          testResults,
-        }),
-      })
+      try {
+        const response = await fetch("/api/rag/v2", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "analyze-code",
+            code,
+            pattern,
+            testResults,
+          }),
+        })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to analyze code')
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Failed to analyze code")
+        }
+
+        const result = await response.json()
+        setLastAnalysis(result)
+        return result
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error"
+        setError(message)
+        return null
+      } finally {
+        setIsAnalyzing(false)
       }
-
-      const result = await response.json()
-      setLastAnalysis(result)
-      return result
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
-      setError(message)
-      return null
-    } finally {
-      setIsAnalyzing(false)
-    }
-  }, [])
+    },
+    []
+  )
 
   return {
     analyzeCode,

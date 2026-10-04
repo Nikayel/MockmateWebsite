@@ -22,6 +22,7 @@ import { getContextBuilder } from "@/lib/rag/context-builder"
 import { getUserPerformanceRAG } from "@/lib/rag/user-performance-rag"
 import { getEnhancedProfileService } from "@/lib/rag/enhanced-user-profile"
 import { getSmartRecommendationService } from "@/lib/rag/smart-recommendations"
+import { markLegacyRecommendationResponse } from "@/lib/agents/recommendations/legacy-api"
 import { getMisconceptionTracker, analyzeCode } from "@/lib/rag/misconception-detection"
 import { getHybridProvider } from "@/lib/rag/embeddings/hybrid-provider"
 import { generateTextEmbedding, generateTextEmbeddings } from "@/lib/rag/services/embeddings"
@@ -126,13 +127,15 @@ export async function POST(request: NextRequest) {
         return handleGetUserPerformance(userId)
 
       case "get-recommendations":
-        return handleGetRecommendations(userId)
+        return markLegacyRecommendationResponse(await handleGetRecommendations(userId))
 
       case "get-enhanced-profile":
         return handleGetEnhancedProfile(userId)
 
       case "get-smart-recommendations":
-        return handleGetSmartRecommendations(userId, validation.data)
+        return markLegacyRecommendationResponse(
+          await handleGetSmartRecommendations(userId, validation.data)
+        )
 
       case "get-skill-insights":
         return handleGetSkillInsights(userId)

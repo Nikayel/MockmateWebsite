@@ -73,6 +73,7 @@ import { useInterviewChat } from "./_hooks/useInterviewChat"
 import { useInterviewProactiveAI } from "./_hooks/useInterviewProactiveAI"
 import { useInterviewMetrics } from "./_hooks/useInterviewMetrics"
 import { useInterviewSessionStart } from "./_hooks/useInterviewSessionStart"
+import { getNextPracticeEntry } from "@/lib/interview/next-practice-entry"
 import { useInterviewSessionReset } from "./_hooks/useInterviewSessionReset"
 import { useSessionReopen } from "./_hooks/useSessionReopen"
 import { useRedirectSignInReturn } from "./_hooks/useRedirectSignInReturn"
@@ -104,6 +105,7 @@ const ScenarioBrowser = nextDynamic(
 function InterviewPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const nextPracticeEntryRef = useRef(getNextPracticeEntry(searchParams))
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const {
     markQuestionCompleted,
@@ -183,6 +185,7 @@ function InterviewPageContent() {
   } | null>(null)
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false) // Track AI feedback generation
   const [isGeneratingDiscussion, setIsGeneratingDiscussion] = useState(false)
+  const [systemDesignFeedbackQueued, setSystemDesignFeedbackQueued] = useState(false)
 
   // Streaming feedback hook - Edge function with no timeout
   const streamingFeedback = useStreamingFeedback()
@@ -261,6 +264,10 @@ function InterviewPageContent() {
   // Declared before the voice/hint hooks below, which stamp it onto their
   // usage reports for per-session cost attribution.
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setSystemDesignFeedbackQueued(false)
+  }, [currentSessionId])
 
   const interviewerVoice = useVoiceInput({
     autoSendEnabled: true,
@@ -1112,6 +1119,7 @@ function InterviewPageContent() {
   })
 
   const { startInterview, isStarting } = useInterviewSessionStart({
+    nextPracticeEntry: nextPracticeEntryRef.current,
     router,
     user,
     firebaseUser,
@@ -1517,6 +1525,7 @@ function InterviewPageContent() {
     realInterviewMode,
     currentSessionId,
     setIsGeneratingDiscussion,
+    setFeedbackQueued: setSystemDesignFeedbackQueued,
     setStructuredFeedback,
     setTechnicalScore,
     setScoreBreakdown,
@@ -1965,6 +1974,7 @@ function InterviewPageContent() {
     (streamingFeedback.state.isConnected && !streamingFeedback.state.isPersisted) ||
     (streamingFeedback.state.phase !== "idle" &&
       streamingFeedback.state.phase !== "complete" &&
+      streamingFeedback.state.phase !== "queued" &&
       streamingFeedback.state.phase !== "error")
 
   // Progress lives here, above InterviewFeedbackView, so that re-rendering or
@@ -2266,6 +2276,9 @@ function InterviewPageContent() {
                   scoringRingTweenMs={scoring.tweenMs}
                   scoringRingEase={scoring.ease}
                   feedback={comprehensiveFeedback || ""}
+                  feedbackQueued={
+                    streamingFeedback.state.feedbackQueued || systemDesignFeedbackQueued
+                  }
                   performanceScore={performanceScore ?? 0}
                   technicalScore={technicalScore ?? undefined}
                   scoreBreakdown={scoreBreakdown || undefined}
@@ -2278,6 +2291,7 @@ function InterviewPageContent() {
                   efficiencyScore={efficiencyMetrics?.efficiencyScore}
                   elapsedTime={elapsedTime}
                   userId={user?.id}
+                  sessionId={currentSessionId ?? undefined}
                   problemType={selectedScenario?.type}
                   difficulty={selectedScenario?.difficulty}
                   problemTitle={selectedScenario?.title}

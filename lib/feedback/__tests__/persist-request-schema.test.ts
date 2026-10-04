@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
   validatePersistRequestBody,
   validateFeedbackFailureReport,
+  validateFeedbackScoreReadyReport,
 } from "../persist-request-schema"
 
 function validBody(overrides: Record<string, unknown> = {}) {
@@ -329,6 +330,47 @@ describe("validateFeedbackFailureReport", () => {
         userId: "u",
         errorMessage: "x".repeat(501),
       }).success
+    ).toBe(false)
+  })
+})
+
+describe("validateFeedbackScoreReadyReport", () => {
+  const report = {
+    outcome: "score_ready",
+    sessionId: "session-1",
+    userId: "user-1",
+    scores: {
+      understanding: 70,
+      problemSolving: 65,
+      codeQuality: 80,
+      communication: 60,
+      overall: 68,
+    },
+    systemPrompt: "You are an interviewer.",
+    userPrompt: "Generate concise feedback.",
+    scenarioType: "dsa",
+    scenarioTitle: "Two Sum",
+  }
+
+  it("accepts the narrative prompt and clamps the frozen score snapshot", () => {
+    const result = validateFeedbackScoreReadyReport({
+      ...report,
+      scores: { ...report.scores, overall: 120 },
+      silentNotes: [{ type: "missed", userSaid: "I missed this" }, null],
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.scores.overall).toBe(100)
+      expect(result.data.silentNotes).toHaveLength(1)
+    }
+  })
+
+  it("rejects unsupported scenario types and oversized prompts", () => {
+    expect(validateFeedbackScoreReadyReport({ ...report, scenarioType: "unknown" }).success).toBe(
+      false
+    )
+    expect(
+      validateFeedbackScoreReadyReport({ ...report, userPrompt: "x".repeat(210_001) }).success
     ).toBe(false)
   })
 })

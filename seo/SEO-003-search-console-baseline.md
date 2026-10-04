@@ -21,10 +21,9 @@ recorded baseline.
 ## Do this
 
 1. Open Search Console for the property, Performance report, last 90 days.
-2. Fill in the table below and commit this file with the numbers in it.
+2. Record the metrics below in a dated export, not another Markdown results report.
 3. Also record positions for the target queries in
-   `docs/learn-seo/LAUNCH-BASELINE.md`, which lists the specific query classes the corpus is aimed
-   at. Take them from the Queries tab, or from the URL Inspection tool if a query has no impressions
+   `docs/seo-measurement.md`, for the collection method; select priority queries from the current SEO backlog. Take them from the Queries tab, or from the URL Inspection tool if a query has no impressions
    yet (record "not ranking" explicitly, that is a real data point).
 4. Export the Performance report to CSV and keep it. Search Console's own retention will roll off.
 
@@ -50,12 +49,12 @@ npx tsx -e "import s from './app/sitemap'; console.log('sitemap URLs:', s().leng
 
 ## Done when
 
-The table above is filled in, the CSV export is saved somewhere durable, and the query level numbers
-are written into `docs/learn-seo/LAUNCH-BASELINE.md`.
+The metrics above and CSV export are saved somewhere durable, and the query-level numbers
+are included in the dated export with their property, dimensions, and window.
 
 ## Note on expectations
 
-`docs/learn-seo/LAUNCH-BASELINE.md` also carries the 30/60/90 day success criteria and an explicit
-abandon condition. Read it before you record the baseline, so you know which numbers you are going
+`docs/seo-measurement.md` describes the 30/60/90-day review checkpoints. Agree success
+thresholds and a stop condition before evaluating results. Read it before you record the baseline, so you know which numbers you are going
 to be judged against. Setting the abandon condition in advance is the part people skip, and it is
 the part that stops a project like this from quietly consuming attention for a year.

@@ -2,7 +2,7 @@
 
 Numbered tasks for the SDD loop. Spec authority: `WORKBOOK-SPEC.md`,
 `SPRINT-PLAN.md`, `AGENT-CONTEXT.md`; decisions/deviations:
-`EXECUTION-STATE.md`; repo facts: `INTEGRATION.md`; content rules:
+`DECISIONS.md`; repo facts: `INTEGRATION.md`; content rules:
 `AUTHORING-RULES.md`; screens: `UX-SPEC.md`.
 
 ## Global constraints (bind every task)

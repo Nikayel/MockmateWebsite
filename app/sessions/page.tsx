@@ -196,16 +196,16 @@ export default function SessionsPage() {
                   const isFeedbackPending =
                     feedbackStatus === "pending" ||
                     feedbackStatus === "processing" ||
+                    feedbackStatus === "queued" ||
                     (session.completed_at &&
                       !session.feedback &&
                       feedbackStatus !== "failed" &&
                       feedbackStatus !== "complete")
                   const isFeedbackFailed = feedbackStatus === "failed"
-                  const hasFeedback =
-                    session.feedback && session.completed_at && feedbackStatus === "complete"
-                  // Only show score if feedback generation is complete
+                  const hasFeedback = session.feedback && session.completed_at
+                  // A finalized score is visible while written feedback is queued or failed.
                   const score =
-                    feedbackStatus === "complete" && typeof session.performance_score === "number"
+                    typeof session.performance_score === "number"
                       ? Math.round(session.performance_score)
                       : null
 
@@ -228,7 +228,13 @@ export default function SessionsPage() {
                                   : "bg-muted text-muted-foreground"
                         }`}
                       >
-                        {score ? score : isFeedbackPending ? "..." : isInProgress ? "..." : "—"}
+                        {score !== null
+                          ? score
+                          : isFeedbackPending
+                            ? "..."
+                            : isInProgress
+                              ? "..."
+                              : "—"}
                       </div>
 
                       {/* Content */}
@@ -254,7 +260,7 @@ export default function SessionsPage() {
                           )}
                           {isFeedbackPending && !isInProgress && (
                             <span className="rounded bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-400">
-                              Scoring…
+                              {feedbackStatus === "queued" ? "Feedback pending" : "Scoring…"}
                             </span>
                           )}
                           {isFeedbackFailed && !isInProgress && (

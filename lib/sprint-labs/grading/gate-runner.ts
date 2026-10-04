@@ -1,6 +1,6 @@
 /**
  * The hidden-gate runner — the server-side comparison
- * docs/sprint-labs/EXECUTION-STATE.md's deviation D1 and standing note
+ * docs/sprint-labs/DECISIONS.md's execution and grading boundaries
  * depend on. The client runs the LEARNER's code against server-issued
  * io-case inputs and posts raw outputs; this module is the only place that
  * ever sees a sealed `expected` value, and it never returns one.

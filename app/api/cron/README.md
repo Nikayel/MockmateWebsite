@@ -30,3 +30,4 @@ Current jobs (see each route header for details):
 | `email-notifications`            | see route header                     |
 | `redis-keepalive`                | daily — failure notifications ON (fail-loud health check; see route header) |
 | `reap-stale-feedback`            | hourly — flips completed sessions stuck in feedback "pending"/"processing" to "failed" (retryable) |
+| `process-feedback-jobs`           | every 5 minutes — claims due written-feedback jobs and retries failures |

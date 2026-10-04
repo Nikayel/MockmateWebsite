@@ -3,7 +3,7 @@
  *
  * The corpus has a known, measured gap: four of its twelve levels were authored without retrieval
  * checks and with a fraction of their neighbours' visual budget (see
- * `docs/system-design-curriculum/COUNCIL-AUDIT-2026-08-13.md`). Several large authoring sweeps are
+ * `historical SD council audit (removed; recoverable in Git)`). Several large authoring sweeps are
  * going to close it. The purpose of this file is to make sure they only ever close it.
  *
  * ## Why a ratchet and not a floor of zero

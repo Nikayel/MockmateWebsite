@@ -19,6 +19,7 @@ import Link from "next/link"
 import { clampPracticeMinutes, isTruncatedDuration } from "@/lib/session-duration"
 import { resolveFeedbackGenerationStatus } from "@/lib/feedback/generation-stalled"
 import { SparraLoader } from "@/components/brand/SparraLoader"
+import { toast } from "sonner"
 
 export default function SessionDetailPage() {
   const router = useRouter()
@@ -28,6 +29,7 @@ export default function SessionDetailPage() {
   const [session, setSession] = useState<InterviewSession | null>(null)
   const [loading, setLoading] = useState(true)
   const [authCheckComplete, setAuthCheckComplete] = useState(false)
+  const [retryingFeedback, setRetryingFeedback] = useState(false)
 
   useEffect(() => {
     if (!initialized || authLoading) return
@@ -113,7 +115,9 @@ export default function SessionDetailPage() {
     session?.feedback_status,
     session?.completed_at
   )
-  const isTransitStatus = feedbackStatus === "pending" || feedbackStatus === "processing"
+  const isTransitStatus =
+    feedbackStatus === "pending" || feedbackStatus === "processing" || feedbackStatus === "queued"
+  const isScoring = feedbackStatus === "pending" || feedbackStatus === "processing"
   const hasSession = session !== null
   useEffect(() => {
     // Only poll if session is evaluating
@@ -139,7 +143,13 @@ export default function SessionDetailPage() {
             updatedSession.feedback_status,
             updatedSession.completed_at
           )
-          if (updatedStatus !== "pending" && updatedStatus !== "processing") return
+          if (
+            updatedStatus !== "pending" &&
+            updatedStatus !== "processing" &&
+            updatedStatus !== "queued"
+          ) {
+            return
+          }
         }
       }
 
@@ -165,11 +175,39 @@ export default function SessionDetailPage() {
     ? new Date(session.completed_at).getTime()
     : undefined
   const scoring = useScoringProgress({
-    active: isTransitStatus,
+    active: isScoring,
     hasResult: feedbackStatus === "complete",
     stepCount: 4,
     startedAtMs: Number.isFinite(scoringStartedAtMs) ? scoringStartedAtMs : undefined,
   })
+
+  const retryFeedback = async () => {
+    if (!firebaseUser || retryingFeedback) return
+    setRetryingFeedback(true)
+    try {
+      const idToken = await firebaseUser.getIdToken()
+      const response = await fetch("/api/feedback/retry", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ sessionId }),
+      })
+      if (!response.ok) throw new Error("Retry request failed")
+      const updatedSession = await loadSession()
+      if (updatedSession) setSession(updatedSession)
+      toast.success("Feedback retry queued", {
+        description: "Your saved score stays the same while we regenerate the written feedback.",
+      })
+    } catch {
+      toast.error("Could not retry feedback", {
+        description: "Please refresh and try again.",
+      })
+    } finally {
+      setRetryingFeedback(false)
+    }
+  }
 
   if (loading || authLoading || !initialized) {
     return <SparraLoader fullPage />
@@ -205,6 +243,12 @@ export default function SessionDetailPage() {
       </main>
     )
   }
+
+  const hasStoredScore = typeof session.performance_score === "number"
+  const showScoreOnly =
+    hasStoredScore &&
+    session.feedback_score_frozen === true &&
+    (feedbackStatus === "queued" || feedbackStatus === "failed")
 
   return (
     <main className="bg-background min-h-screen">
@@ -254,7 +298,7 @@ export default function SessionDetailPage() {
                 </div>
               </div>
 
-              {session.performance_score && (
+              {typeof session.performance_score === "number" && (
                 <div className="text-right">
                   <div
                     className={`text-3xl font-light ${
@@ -278,12 +322,10 @@ export default function SessionDetailPage() {
           {/* Feedback Section */}
           {/* Handle completed sessions - show feedback if available */}
           {/* Note: Legacy sessions may not have feedback_status, treat completed_at + feedback as complete */}
-          {session.feedback &&
-          session.completed_at &&
-          (feedbackStatus === "complete" || !feedbackStatus) ? (
+          {session.feedback && session.completed_at ? (
             <PracticeFeedback
               feedback={session.feedback}
-              performanceScore={session.performance_score || 0}
+              performanceScore={session.performance_score ?? 0}
               technicalScore={session.technical_score ?? session.mastery_score}
               scoreBreakdown={session.score_breakdown}
               constitutionalAICritique={session.constitutional_ai_critique}
@@ -309,6 +351,7 @@ export default function SessionDetailPage() {
                   1000
               )}
               userId={firebaseUser?.uid}
+              sessionId={session.id}
               problemType={session.type}
               difficulty={session.difficulty}
               problemTitle={session.topic}
@@ -318,6 +361,67 @@ export default function SessionDetailPage() {
               interviewerMessages={session.session_state?.interviewer_messages}
               onNewProblem={() => router.push("/interview")}
               clarifyingQuestionsAssessment={session.clarifying_questions_assessment}
+            />
+          ) : showScoreOnly ? (
+            <PracticeFeedback
+              feedback=""
+              feedbackPending
+              performanceScore={session.performance_score ?? 0}
+              technicalScore={session.technical_score ?? session.mastery_score}
+              scoreBreakdown={session.score_breakdown}
+              testsPassed={session.tests_passed ?? 0}
+              testsTotal={session.tests_total ?? 0}
+              elapsedTime={
+                session.completed_at
+                  ? Math.round(
+                      (new Date(session.completed_at).getTime() -
+                        new Date(session.started_at).getTime()) /
+                        1000
+                    )
+                  : 0
+              }
+              problemType={session.type}
+              difficulty={session.difficulty}
+              problemTitle={session.topic}
+              onNewProblem={() => router.push("/interview")}
+              afterScore={
+                feedbackStatus === "queued" ? (
+                  <div
+                    className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4"
+                    role="status"
+                  >
+                    <p className="text-foreground font-medium">
+                      Written feedback is taking longer than expected.
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      Your score is saved. We’re retrying the written feedback in the background;
+                      you can leave this page and come back later.
+                    </p>
+                  </div>
+                ) : (
+                  <div
+                    className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4"
+                    role="status"
+                  >
+                    <p className="text-foreground font-medium">
+                      We couldn’t finish the written feedback after automatic retries.
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      Your score is saved and won’t change if you retry the feedback.
+                    </p>
+                    {(session.feedback_manual_retry_count ?? 0) < 1 && (
+                      <Button
+                        className="mt-3"
+                        variant="outline"
+                        disabled={retryingFeedback}
+                        onClick={retryFeedback}
+                      >
+                        {retryingFeedback ? "Queuing retry…" : "Retry written feedback"}
+                      </Button>
+                    )}
+                  </div>
+                )
+              }
             />
           ) : feedbackStatus === "pending" || feedbackStatus === "processing" ? (
             // Session is being evaluated - show evaluating state. "processing"

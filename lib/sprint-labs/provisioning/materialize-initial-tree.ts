@@ -5,7 +5,7 @@
  * workspace bundle a learner would receive when opening this ticket", by its own doc comment; Task
  * 7's provisioning scan already reuses it for the identical reason).
  *
- * RULING R27 (docs/sprint-labs/EXECUTION-STATE.md): provision at request time by reusing Task 7's
+ * Provisioning boundary (docs/sprint-labs/DECISIONS.md): provision at request time by reusing Task 7's
  * materializer. Compile-time materialization (baking a ticket's initial tree into the content
  * compiler's output at build time, which would sidestep this file's PRODUCTION NOTE below) is
  * explicitly deferred production hardening, not built here — this module never touches
@@ -53,7 +53,7 @@
  * root config like `package.json`/`tsconfig.json`/`.env.example`, and the seed's own day-one test
  * suite named above) is DROPPED, not merely tagged non-editable: `lib/sprint-labs/workspace/tree.ts`'s
  * three-group model (docs/src/tests) has no fourth place to put them, and the server-side sandbox
- * that would make most of them actionable for a learner does not exist yet (EXECUTION-STATE.md: "no
+ * that would make most of them actionable for a learner does not exist yet (DECISIONS.md: "no
  * server-side sandbox yet"). If a later task needs them mounted, that is a deliberate, separate
  * decision — not an oversight of this pass.
  *

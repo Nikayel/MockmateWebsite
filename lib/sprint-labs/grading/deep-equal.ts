@@ -1,7 +1,7 @@
 /**
  * Structural deep-equal for comparing a client-posted io-case output against
  * the sealed `expected` value (the server-side comparison D1 depends on —
- * docs/sprint-labs/EXECUTION-STATE.md). Inputs are always JSON-compatible:
+ * docs/sprint-labs/DECISIONS.md). Inputs are always JSON-compatible:
  * io-cases are authored as YAML data (WORKBOOK-SPEC.md §6), so this never
  * needs to handle functions, symbols, `Date`, or circular references.
  *

@@ -22,7 +22,7 @@ Search Console, Pages report (Indexing). Look at the **categories**, not the tot
 | `Excluded by noindex` in bulk on /learn | A noindex leaked onto public pages. Workspace pages are correctly noindexed; lesson pages must not be | Check the lesson route metadata |
 | `Duplicate, Google chose different canonical` | Two URLs serve the same lesson | Should be impossible: `findCatalogEntry` validates the level slug and `dynamicParams = false` 404s anything else. If it appears, something regressed |
 | `Crawled, currently not indexed`, moderate | Normal for a new corpus of this size. Google crawled it and is deciding | Wait. This is the expected state at day 7 |
-| `Crawled, currently not indexed`, nearly all of it, at day 60 | A quality signal problem, not a bug | See the abandon condition in `docs/learn-seo/LAUNCH-BASELINE.md` |
+| `Crawled, currently not indexed`, nearly all of it, at day 60 | A quality signal problem, not a bug | Apply the agreed review/stop condition; see `docs/seo-measurement.md` |
 | `Discovered, currently not indexed` | Crawl budget. Google knows the URL but has not fetched it | Usually resolves. The `/learn/all` flat index exists to help here |
 | `Soft 404` on /learn | A page is rendering empty or near empty | Check that the teach markdown is in the served HTML |
 
@@ -38,5 +38,5 @@ where it should not be, or opened a follow up for whatever was.
 
 At day 7 you should expect: most URLs discovered, many crawled, a minority indexed, and essentially
 no clicks. That is a healthy start, not a failure. The 30/60/90 day criteria in
-`docs/learn-seo/LAUNCH-BASELINE.md` are what to judge against, and they were written to be
+`docs/seo-measurement.md` are review checkpoints; agree thresholds in advance so they are
 falsifiable rather than flattering.
