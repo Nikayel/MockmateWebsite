@@ -784,3 +784,38 @@ a 2026-07-28 to 2026-08-24 pull (`sd-l6-retries-dlq-backpressure`: 20 impression
 1 click; `sd-l1-concurrency-models`: 12 impressions at position 11.92, 1 click), so they are worth a
 numbered item with real Evidence, Do, and Accept before an agent edits either lesson. Nothing in
 either lesson changed.
+
+## Focused content improvements, 2026-10-04
+
+### SEO-37 — Retries, DLQs, and backpressure near page one
+
+**Evidence.** The recorded 2026-07-28 to 2026-08-24 GSC pull above reports 20 impressions,
+one click, and average position 11.45 for `sd-l6-retries-dlq-backpressure`. This is a historical
+candidate signal, not a current rank. The existing lesson explained the mechanisms but did not
+offer an opening comparison that helps a reader choose between them.
+
+**Do (implemented).** Add a short opening answer and a comparison table mapping each mechanism
+to its failure mode, action, and operational signal. Link to delivery semantics and consumer groups.
+Keep exercises, widgets, and grading unchanged. File: `lib/tutorials/system-design/curriculum/level6.ts`.
+
+**Accept.** Content/metadata checks pass and the public page renders the table and valid links.
+After deployment, capture a new page-filtered GSC baseline, then compare equal 28-day windows by
+query/device. Look for more relevant impressions/clicks and improved position on stable queries;
+do not claim causal lift from a small, changing query mix. No ranking outcome is known yet.
+
+### SEO-38 — HTTP semantics discovery and useful next steps
+
+**Evidence.** Live GSC Overview for URL-prefix property `https://www.codesparring.dev/`, read
+2026-10-03, flagged this page with 837% more impressions in September 22–28 versus September
+15–21. The overview does not expose underlying counts or current average position. The lesson
+was absent from the curated related-concepts registry and had no authored search description.
+
+**Do (implemented).** Add a concise description, safe/idempotent/cacheable method comparison,
+and an ambiguous order-POST retry example. Add relevant incoming links from TLS and retry lessons,
+outgoing prerequisite links, and the existing tracked system-design practice CTA. Files:
+`lib/tutorials/system-design/curriculum/level1.ts`, `lib/tutorials/related-concepts.ts`.
+
+**Accept.** Description stays within the existing 110–155-character budget, linked lesson IDs
+resolve, and the initial public HTML contains the explanations and practice link. Capture current
+page-filtered queries after deployment; use the same measurement rules as SEO-37. GSC overview's
+weekly percentage alone does not establish search intent, durable growth, or a content win.

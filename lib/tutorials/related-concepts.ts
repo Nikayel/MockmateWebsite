@@ -642,8 +642,37 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
     },
   },
 
+  "sd-l1-http-semantics": {
+    related: [
+      {
+        id: "sd-l1-idempotency-retries",
+        anchor: "Idempotency keys for a POST whose response never reaches the client",
+      },
+      {
+        id: "sd-l1-cdn-caching-foundations",
+        anchor: "Cache-Control, shared caches, and keeping personalized responses private",
+      },
+      {
+        id: "sd-l1-tls-https",
+        anchor: "What HTTPS encrypts and where TLS termination happens",
+      },
+      {
+        id: "sd-l7-timeouts-retries",
+        anchor: "Retry budgets and backoff after a timeout or an overloaded dependency",
+      },
+    ],
+    cta: {
+      href: "/system-design-interview-practice",
+      label: "Practice explaining API retries and caching choices in a system design interview",
+    },
+  },
+
   "sd-l1-tls-https": {
     related: [
+      {
+        id: "sd-l1-http-semantics",
+        anchor: "HTTP methods, safe retries, and cache rules inside the encrypted connection",
+      },
       {
         id: "sd-l4-tls-connection-mgmt",
         anchor:
@@ -1011,6 +1040,10 @@ export const RELATED_CONCEPTS: Readonly<Record<string, RelatedConceptsEntry>> = 
   "sd-l7-timeouts-retries": {
     related: [
       { id: "sd-l7-circuit-breakers", anchor: "Circuit breakers, bulkheads and fallbacks" },
+      {
+        id: "sd-l1-http-semantics",
+        anchor: "Safe versus idempotent HTTP methods and which requests can be retried",
+      },
       {
         id: "sd-l1-idempotency-retries",
         anchor: "Idempotency keys, the thing that makes a retry safe to send",
