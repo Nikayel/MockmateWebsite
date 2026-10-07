@@ -324,6 +324,7 @@ export default function SessionDetailPage() {
           {/* Note: Legacy sessions may not have feedback_status, treat completed_at + feedback as complete */}
           {session.feedback && session.completed_at ? (
             <PracticeFeedback
+              feedbackSurface="saved_session"
               feedback={session.feedback}
               performanceScore={session.performance_score ?? 0}
               technicalScore={session.technical_score ?? session.mastery_score}

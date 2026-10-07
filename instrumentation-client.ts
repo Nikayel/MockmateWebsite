@@ -41,6 +41,10 @@ import posthog from "posthog-js"
 import { hasAnalyticsConsent } from "@/components/CookieConsent"
 import { COOKIELESS_UNTIL_CONSENT, applyPostHogConsent } from "@/lib/posthog-consent"
 import { dropUnattributableExceptions } from "@/lib/posthog-exception-filter"
+import { captureAttribution } from "@/lib/attribution"
+
+// Save the actual entry URL before hydration or client-side navigation.
+captureAttribution()
 
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY
 

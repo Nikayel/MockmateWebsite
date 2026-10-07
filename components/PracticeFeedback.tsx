@@ -6,6 +6,7 @@ import { getLetterGrade } from "@/lib/constants"
 import { ScoreDisplay, FeedbackSections } from "@/components/practice"
 import type { ChatMessage } from "@/lib/types"
 import type { SessionComplexityAnalysis } from "@/lib/rag/knowledge-base/types"
+import { useFeedbackViewAnalytics } from "@/lib/hooks/useFeedbackViewAnalytics"
 
 interface AlternativeApproach {
   name: string
@@ -42,6 +43,7 @@ interface PracticeFeedbackProps {
   elapsedTime?: number
   userId?: string
   sessionId?: string
+  feedbackSurface?: "interview" | "saved_session"
   problemType?: string
   difficulty?: string
   problemTitle?: string
@@ -90,6 +92,7 @@ export default function PracticeFeedback({
   elapsedTime = 0,
   userId,
   sessionId,
+  feedbackSurface = "interview",
   problemType,
   problemTitle,
   code,
@@ -104,6 +107,13 @@ export default function PracticeFeedback({
   afterScore,
   feedbackPending = false,
 }: PracticeFeedbackProps) {
+  useFeedbackViewAnalytics({
+    sessionId,
+    feedbackReady: !feedbackPending && Boolean(feedback.trim()),
+    surface: feedbackSurface,
+    problemType,
+    language,
+  })
   // Parse feedback text, then override with structured data if available from API
   const parsedSections = parseFeedback(feedback)
 

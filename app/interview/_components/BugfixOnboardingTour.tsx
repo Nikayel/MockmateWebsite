@@ -34,7 +34,6 @@ function getTargetRect(target: string): DOMRect | null {
   // tour advances past the step instead of spotlighting an empty corner of the screen.
   if (rect.width === 0 && rect.height === 0) return null
 
-  element.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" })
   return rect
 }
 
@@ -280,11 +279,15 @@ export function BugfixOnboardingTour({
     if (!isTourActive) return
 
     let cancelled = false
+    let reportedView = false
+    let reportedMissing = false
     const updateTarget = () => {
       if (cancelled) return
       const nextRect = getTargetRect(step.target)
 
       if (!nextRect) {
+        if (reportedMissing) return
+        reportedMissing = true
         trackEvent("bugfix_tour_target_missing", {
           scenario_id: scenarioId,
           step_id: step.id,
@@ -297,15 +300,26 @@ export function BugfixOnboardingTour({
       }
 
       setTargetRect(nextRect)
-      trackEvent("bugfix_tour_step_viewed", {
-        scenario_id: scenarioId,
-        step_id: step.id,
-        step_index: stepIndex + 1,
-        version: BUGFIX_TOUR_VERSION,
-      })
+      // Scroll/resize updates geometry, not the number of times a step is seen.
+      if (!reportedView) {
+        reportedView = true
+        trackEvent("bugfix_tour_step_viewed", {
+          scenario_id: scenarioId,
+          step_id: step.id,
+          step_index: stepIndex + 1,
+          version: BUGFIX_TOUR_VERSION,
+        })
+      }
     }
 
-    const timeoutId = window.setTimeout(updateTarget, 180)
+    const timeoutId = window.setTimeout(() => {
+      updateTarget()
+      // Scroll once on entering the step; scrolling inside updateTarget would
+      // feed its own scroll listener and repeatedly restart the animation.
+      document
+        .querySelector<HTMLElement>(`[data-bugfix-tour="${step.target}"]`)
+        ?.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" })
+    }, 180)
     window.addEventListener("resize", updateTarget)
     window.addEventListener("scroll", updateTarget, true)
 
