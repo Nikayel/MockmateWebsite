@@ -15,7 +15,10 @@ function installDom(search: string, referrer = "") {
       for (const k of Object.keys(store)) delete store[k]
     },
   }
-  vi.stubGlobal("window", { location: { search, pathname: "/" }, localStorage })
+  vi.stubGlobal("window", {
+    location: { search, pathname: "/learn/python/lists", hostname: "www.codesparring.dev" },
+    localStorage,
+  })
   vi.stubGlobal("document", { referrer })
   return store
 }
@@ -95,20 +98,90 @@ describe("attribution", () => {
     expect(getAttribution()?.source).toBe("flyer")
   })
 
-  it("does nothing when there are no attribution params", () => {
+  it("captures an untagged direct landing", () => {
     installDom("?page=2&sort=asc")
     captureAttribution()
-    expect(getAttribution()).toBeNull()
+    expect(getAttribution()).toMatchObject({
+      source: "direct",
+      medium: "none",
+      landingPage: "/learn/python/lists",
+    })
   })
 
   it("flattens attribution into analytics params", () => {
     installDom("?utm_source=google&utm_medium=cpc")
     captureAttribution()
-    expect(getAttributionParams()).toEqual({ utm_source: "google", utm_medium: "cpc" })
+    expect(getAttributionParams()).toEqual({
+      utm_source: "google",
+      utm_medium: "cpc",
+      acquisition_source: "google",
+      acquisition_medium: "cpc",
+      acquisition_landing_page: "/learn/python/lists",
+    })
   })
 
-  it("returns empty params when no attribution exists", () => {
-    installDom("")
+  it("returns empty params on the server", () => {
+    vi.stubGlobal("window", undefined)
+    expect(getAttributionParams()).toEqual({})
+  })
+
+  it("captures Google search before the first event, without leaking referrer queries", () => {
+    installDom("", "https://www.google.com/search?q=private+query")
+    expect(getAttributionParams()).toMatchObject({
+      acquisition_source: "google",
+      acquisition_medium: "organic",
+      acquisition_landing_page: "/learn/python/lists",
+      acquisition_referrer: "https://www.google.com",
+    })
+    expect(JSON.stringify(getAttribution())).not.toContain("private")
+  })
+
+  it("does not replace an organic first touch with a later campaign", () => {
+    installDom("", "https://www.google.co.uk/search?q=lists")
+    captureAttribution()
+    window.location.search = "?utm_source=reddit&utm_medium=paid"
+    captureAttribution()
+    expect(getAttribution()).toMatchObject({ source: "google", medium: "organic" })
+  })
+
+  it("keeps tagged paid traffic distinct from an organic referrer", () => {
+    installDom("?utm_source=google&utm_medium=cpc", "https://www.google.com/")
+    captureAttribution()
+    expect(getAttribution()).toMatchObject({ source: "google", medium: "cpc" })
+  })
+
+  it("captures external referral domains", () => {
+    installDom("", "https://www.reddit.com/r/programming?secret=hidden")
+    captureAttribution()
+    expect(getAttribution()).toMatchObject({
+      source: "reddit.com",
+      medium: "referral",
+      referrer: "https://www.reddit.com",
+    })
+  })
+
+  it.each(["https://codesparring.dev/pricing", "invalid", "javascript:alert(1)"])(
+    "treats internal or invalid referrers as direct: %s",
+    (referrer) => {
+      installDom("", referrer)
+      captureAttribution()
+      expect(getAttribution()).toMatchObject({ source: "direct", medium: "none" })
+      expect(getAttribution()?.referrer).toBeUndefined()
+    }
+  )
+
+  it("does not mistake a lookalike Google hostname for organic search", () => {
+    installDom("", "https://google.com.example.org/")
+    captureAttribution()
+    expect(getAttribution()?.medium).toBe("referral")
+  })
+
+  it("remains safe when browser storage is blocked", () => {
+    installDom("", "https://www.google.com/")
+    window.localStorage.setItem = () => {
+      throw new Error("blocked")
+    }
+    expect(() => captureAttribution()).not.toThrow()
     expect(getAttributionParams()).toEqual({})
   })
 

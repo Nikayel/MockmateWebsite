@@ -1,5 +1,5 @@
 /**
- * First-touch marketing attribution (UTM capture).
+ * First-touch marketing attribution (campaign tags and untagged landings).
  *
  * Captures utm_* params + referrer on the user's first landing and persists them
  * so every later analytics event can be tied back to the channel that produced it
@@ -12,10 +12,9 @@
  *  - ?ref=<code>     maps to source "referral", campaign=<code>
  * Explicit utm_* params always win over src/ref when both are present.
  */
+import { getReferrerAttribution } from "./referrer-attribution"
 
 const STORAGE_KEY = "cs_attribution"
-
-const UTM_PARAMS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"] as const
 
 // Cap untrusted UTM values so a crafted long query param can't bloat localStorage.
 const MAX_VALUE_LENGTH = 200
@@ -38,19 +37,17 @@ export interface Attribution {
 
 /**
  * Capture first-touch attribution from the current URL. Safe to call on every
- * page load — it no-ops when there are no utm_*, ?src=, or ?ref= params, or if
- * attribution already exists. Client-only.
+ * page load — it no-ops if attribution already exists. Untagged landings use
+ * the external referrer (organic search / referral), or direct. Client-only.
  */
 export function captureAttribution(): void {
   if (typeof window === "undefined") return
   try {
     const params = new URLSearchParams(window.location.search)
-    const hasUtm = UTM_PARAMS.some((key) => params.get(key))
     // Lighter-weight campaign signals: campus/QR links (?src=) and referral share
     // URLs (?ref=). Present on landings that carry no utm_* params at all.
     const src = clean(params.get("src"))
     const ref = clean(params.get("ref"))
-    if (!hasUtm && !src && !ref) return
     // First-touch wins: don't overwrite an existing source.
     if (window.localStorage.getItem(STORAGE_KEY)) return
 
@@ -64,14 +61,24 @@ export function captureAttribution(): void {
     if (!medium && src) medium = "campaign"
     if (!campaign && ref) campaign = ref
 
+    const inferred = getReferrerAttribution(
+      typeof document !== "undefined" ? document.referrer : "",
+      window.location.hostname
+    )
+    // Campaign tags take precedence over inferred organic/referral/direct.
+    if (!source) {
+      source = inferred.source
+      if (!medium) medium = inferred.medium
+    }
+
     const attribution: Attribution = {
       source,
       medium,
       campaign,
       term: clean(params.get("utm_term")),
       content: clean(params.get("utm_content")),
-      referrer: typeof document !== "undefined" ? document.referrer || undefined : undefined,
-      landingPage: window.location.pathname,
+      referrer: inferred.referrer,
+      landingPage: window.location.pathname.slice(0, MAX_VALUE_LENGTH),
       capturedAt: new Date().toISOString(),
     }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(attribution))
@@ -98,6 +105,9 @@ export function getAttribution(): Attribution | null {
  * empty object when there's no attribution, so it's safe to spread.
  */
 export function getAttributionParams(): Record<string, string> {
+  // Also safe before React's AttributionCapture effect: the first named event
+  // must carry the original landing, even when it fires during hydration.
+  captureAttribution()
   const attribution = getAttribution()
   if (!attribution) return {}
   const params: Record<string, string> = {}
@@ -106,5 +116,9 @@ export function getAttributionParams(): Record<string, string> {
   if (attribution.campaign) params.utm_campaign = attribution.campaign
   if (attribution.term) params.utm_term = attribution.term
   if (attribution.content) params.utm_content = attribution.content
+  if (attribution.source) params.acquisition_source = attribution.source
+  if (attribution.medium) params.acquisition_medium = attribution.medium
+  if (attribution.landingPage) params.acquisition_landing_page = attribution.landingPage
+  if (attribution.referrer) params.acquisition_referrer = attribution.referrer
   return params
 }
