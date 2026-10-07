@@ -82,6 +82,7 @@ interface InterviewFeedbackViewProps {
   efficiencyScore: PracticeFeedbackProps["efficiencyScore"]
   elapsedTime: PracticeFeedbackProps["elapsedTime"]
   userId: PracticeFeedbackProps["userId"]
+  sessionId?: PracticeFeedbackProps["sessionId"]
   problemType: PracticeFeedbackProps["problemType"]
   difficulty: PracticeFeedbackProps["difficulty"]
   problemTitle: PracticeFeedbackProps["problemTitle"]
@@ -146,6 +147,7 @@ export function InterviewFeedbackView({
   efficiencyScore,
   elapsedTime,
   userId,
+  sessionId,
   problemType,
   difficulty,
   problemTitle,
@@ -197,6 +199,7 @@ export function InterviewFeedbackView({
       <ErrorBoundary>
         <PracticeFeedback
           feedback={feedback}
+          sessionId={sessionId}
           performanceScore={performanceScore}
           technicalScore={technicalScore}
           scoreBreakdown={scoreBreakdown}

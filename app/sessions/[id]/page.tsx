@@ -282,6 +282,8 @@ export default function SessionDetailPage() {
           session.completed_at &&
           (feedbackStatus === "complete" || !feedbackStatus) ? (
             <PracticeFeedback
+              sessionId={session.id}
+              feedbackSurface="saved_session"
               feedback={session.feedback}
               performanceScore={session.performance_score || 0}
               technicalScore={session.technical_score ?? session.mastery_score}

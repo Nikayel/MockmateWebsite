@@ -2278,6 +2278,7 @@ function InterviewPageContent() {
                   efficiencyScore={efficiencyMetrics?.efficiencyScore}
                   elapsedTime={elapsedTime}
                   userId={user?.id}
+                  sessionId={currentSessionId ?? undefined}
                   problemType={selectedScenario?.type}
                   difficulty={selectedScenario?.difficulty}
                   problemTitle={selectedScenario?.title}
