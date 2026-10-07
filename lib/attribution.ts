@@ -94,7 +94,15 @@ export function getAttribution(): Attribution | null {
   if (typeof window === "undefined") return null
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as Attribution) : null
+    if (!raw) return null
+    const attribution = JSON.parse(raw) as Attribution
+    // Older cached first touches stored full URLs. Sanitize on read too, so
+    // attaching acquisition_referrer never forwards a historic query string.
+    return {
+      ...attribution,
+      referrer: getReferrerAttribution(attribution.referrer ?? "", window.location.hostname)
+        .referrer,
+    }
   } catch {
     return null
   }
