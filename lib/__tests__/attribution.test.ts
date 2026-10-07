@@ -144,6 +144,21 @@ describe("attribution", () => {
     expect(getAttribution()).toMatchObject({ source: "google", medium: "organic" })
   })
 
+  it("sanitizes legacy stored referrers without replacing the first touch", () => {
+    const store = installDom("?utm_source=new-campaign")
+    store.cs_attribution = JSON.stringify({
+      source: "old-campaign",
+      referrer: "https://www.google.com/search?q=private-query#private-fragment",
+      landingPage: "/learn/python/lists",
+    })
+    expect(getAttributionParams()).toMatchObject({
+      acquisition_source: "old-campaign",
+      acquisition_referrer: "https://www.google.com",
+    })
+    expect(JSON.stringify(getAttributionParams())).not.toContain("private")
+    expect(getAttribution()?.referrer).toBe("https://www.google.com")
+  })
+
   it("keeps tagged paid traffic distinct from an organic referrer", () => {
     installDom("?utm_source=google&utm_medium=cpc", "https://www.google.com/")
     captureAttribution()
