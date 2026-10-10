@@ -1,6 +1,7 @@
 export interface NextPracticeEntry {
   sourceSessionId: string
   scenarioId: string
+  returnSource?: "feedback" | "dashboard" | "reminder"
 }
 
 /** Capture before the interview adds its new session ID to the URL. */
@@ -19,7 +20,14 @@ export function getNextPracticeEntry(
   const sourceSessionId = params.get("fromSession")
   const validId = (value: string | null): value is string =>
     Boolean(value && value.trim() === value && /^[^/\x00-\x1f]{1,200}$/.test(value))
-  return validId(scenarioId) && validId(sourceSessionId) ? { sourceSessionId, scenarioId } : null
+  const entry = params.get("return")
+  return validId(scenarioId) && validId(sourceSessionId)
+    ? {
+        sourceSessionId,
+        scenarioId,
+        ...(entry === "dashboard" || entry === "reminder" ? { returnSource: entry } : {}),
+      }
+    : null
 }
 
 export function isNextPracticeEntry(params: Pick<URLSearchParams, "get"> | null): boolean {

@@ -205,6 +205,7 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
             session_id: sessionId,
             sessionId, // Joins the existing session_complete event's contract.
             recommendation_source: "feedback",
+            return_source: opts.nextPracticeEntry.returnSource ?? "feedback",
           })
         }
 

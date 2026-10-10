@@ -132,7 +132,6 @@ describe("exact next practice", () => {
       [
         "difficulty",
         "estimatedMinutes",
-        "feedbackNote",
         "focus",
         "focusSource",
         "href",

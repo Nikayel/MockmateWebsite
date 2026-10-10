@@ -55,22 +55,43 @@ Opening the exact task uses full navigation, preserves language and source-sessi
 attribution, and neither restores the old session nor auto-starts. An accepted start
 clears prior feedback/tests. Denied starts cannot emit successful-start analytics.
 
-## Compatibility and deprecation
+## Saving and returning
 
-Old learning/similar-problem widgets, the unmounted smart widget/hook, unused
-weighted recommendation-agent modules, and the unused spaced-repetition RAG wrapper
-have been removed. Active FSRS and scheduling remain separate.
+`PracticeSaveControls` provides Save for later and an explicit reminder form. Ignoring the card
+or opening the form creates no saved task or email job. One task is stored per account in
+`practice_plans/{uid}` through the authenticated `/api/practice-plan` API. The server recomputes
+the owned recommendation and does not trust a client-supplied task description or user ID.
 
-Public recommendation actions on `/api/rag` and `/api/rag/v2` retain their existing
-payloads with `Deprecation`, successor `Link`, and private/no-store headers.
-Do not remove them without external-caller verification and a migration/sunset.
-Non-recommendation RAG behavior is not deprecated.
+The client confirms persistence before showing success. Writes have a 15-second deadline,
+block double clicks, preserve the existing task on failure, and ignore stale reads and responses
+from a prior identity. Identical lost-response retries reuse the saved revision; transactions
+reject an older conflicting save or removal. Opening practice remains available during save errors.
+
+`SavedPracticeCard` resumes the exact scenario and language from the dashboard. Completion
+cancels the pending reminder and shows concrete debugging evidence or actual score pairs;
+score pairs are explicitly labeled as different exercises. No improvement is invented. Free
+accounts see the existing Pro company/role roadmap offer after completing the follow-up task.
+
+Reminders run inside the existing cron-job.org `email-notifications` job. See
+[CRON-SCHEDULE.md](CRON-SCHEDULE.md) for delivery timing, bounded retries, opt-outs, and
+uncertain-delivery handling. No new AI call is introduced. Account erasure includes the saved plan.
+
+## Compatibility
+
+The two replaced learning/similar-problem widgets are removed. Existing legacy recommendation
+APIs and the active FSRS/review scheduler retain their existing behavior and entitlements.
 
 ## Measurement
 
 `next_practice_impression`, `next_practice_click`, and `next_practice_started`
 carry bounded identifiers/categories and `recommendation_source: feedback`, not
 raw code, chat, or feedback. Existing consent gates still apply.
+
+Saved-task events are `practice_plan_saved`, `practice_plan_save_failed`,
+`practice_plan_removed`, `practice_plan_return_viewed`, `practice_plan_return_clicked`,
+`practice_plan_completed`, and `practice_plan_pro_cta_clicked`. Server delivery emits
+`practice_reminder_sent` or `practice_reminder_failed`. Reminder clicks retain the exact
+source/scenario attribution with `return=reminder`; dashboard clicks use `return=dashboard`.
 
 Join accepted starts to `session_complete.sessionId` and to saved completion records.
 Deduplicate impressions across reloads. Source URL attribution is client-supplied,
@@ -80,7 +101,7 @@ Retention uplift must be measured; implementation alone does not establish it.
 
 ## Release checklist
 
-The implementation is local; this guide does not certify a production deployment.
+Use these checks before each production release; local fixtures do not certify live credentials or external scheduler configuration.
 
 - Run recommendation selector/service/API/hook/card tests.
 - Run `pnpm test:integration` against Firestore emulators.
@@ -92,5 +113,4 @@ The implementation is local; this guide does not certify a production deployment
   with real free and paid accounts on a preview, including exhausted allowance.
 - Follow the normal release workflow and verify the deployed journey afterward.
 
-Reminder scheduling, dashboard recommendations, due-date cards, and improvement
-comparisons are separate future features, not part of this engine.
+The narrative-feedback recovery worker and its new AI call are outside this release.

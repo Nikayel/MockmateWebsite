@@ -219,6 +219,7 @@ describe("recommended task start", () => {
       session_id: "destination-session",
       sessionId: "destination-session",
       recommendation_source: "feedback",
+      return_source: "feedback",
     })
     expect(opts.setIsInterviewStarted).toHaveBeenCalledWith(true)
     expect(opts.setCode).toHaveBeenCalledWith(

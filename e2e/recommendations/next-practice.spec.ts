@@ -87,3 +87,93 @@ test.describe("post-feedback recommendation", () => {
     }
   })
 })
+
+test.describe("saved task return journey", () => {
+  test("ignoring the card performs no writes; saving survives navigation and opens the exact task", async ({
+    page,
+  }) => {
+    const writes: string[] = []
+    page.on("request", (request) => {
+      if (request.url().includes("/api/practice-plan") && request.method() !== "GET")
+        writes.push(request.method())
+    })
+    await page.goto("/")
+    await expect(page.getByRole("button", { name: "Save for later" })).toBeVisible()
+    expect(writes).toEqual([])
+    const href = await page.getByRole("link", { name: /open practice/i }).getAttribute("href")
+    await page.getByRole("button", { name: "Save for later" }).click()
+    await expect(
+      page.getByText("Saved to your dashboard. No email reminder scheduled.")
+    ).toBeVisible()
+    expect(writes).toEqual(["POST"])
+    await page.goto("/dashboard")
+    const link = page.getByRole("link", { name: "Open saved practice" })
+    await expect(link).toHaveAttribute("href", `${href}&return=dashboard`)
+    await link.click()
+    await expect(page.getByText("Selected language: python")).toBeVisible()
+    await expect(page.getByText(/has not started a session/)).toBeVisible()
+  })
+  test("shows a failed save without blocking practice and lets the user retry", async ({
+    page,
+  }) => {
+    await page.goto("/?state=save_failure")
+    await page.getByRole("button", { name: "Save for later" }).click()
+    await expect(page.getByRole("alert")).toContainText("couldn't confirm")
+    await expect(page.getByRole("link", { name: /open practice/i })).toBeVisible()
+    await expect(
+      page.getByText("Saved to your dashboard. No email reminder scheduled.")
+    ).not.toBeVisible()
+    await page.goto("/")
+    await page.getByRole("button", { name: "Save for later" }).click()
+    await expect(
+      page.getByText("Saved to your dashboard. No email reminder scheduled.")
+    ).toBeVisible()
+  })
+  test("requires an explicit reminder save and cancellation removes the schedule", async ({
+    page,
+  }) => {
+    const writes: unknown[] = []
+    page.on("request", (request) => {
+      if (request.url().includes("/api/practice-plan") && request.method() === "POST")
+        writes.push(request.postDataJSON())
+    })
+    await page.goto("/")
+    await page.getByRole("button", { name: "Remind me", exact: true }).click()
+    await expect(page.getByLabel("Email me after this time")).toBeVisible()
+    expect(writes).toEqual([])
+    await page.getByRole("button", { name: "Save and schedule reminder" }).click()
+    await expect(page.getByText(/Saved. We'll email you after/)).toBeVisible()
+    expect(writes[0]).toMatchObject({ reminderAt: expect.any(String) })
+    await page.getByRole("button", { name: "Save without reminder" }).click()
+    await expect(
+      page.getByText("Saved to your dashboard. No email reminder scheduled.")
+    ).toBeVisible()
+    expect(writes[1]).toMatchObject({ reminderAt: null })
+  })
+  test("preserves the saved task when removal fails and shows honest progress before Pro", async ({
+    page,
+  }) => {
+    await page.goto("/")
+    await page.getByRole("button", { name: "Save for later" }).click()
+    await expect(
+      page.getByText("Saved to your dashboard. No email reminder scheduled.")
+    ).toBeVisible()
+    await page.goto("/dashboard?state=remove_failure")
+    await page.getByRole("button", { name: "Remove saved task" }).click()
+    await expect(page.getByRole("alert")).toContainText("couldn't confirm")
+    await expect(page.getByRole("link", { name: "Open saved practice" })).toBeVisible()
+    await expect(page.getByRole("link", { name: /Explore Pro/ })).not.toBeVisible()
+    await page.goto("/dashboard?state=complete")
+    await expect(page.getByText(/These were different exercises/)).toBeVisible()
+    await expect(page.getByRole("link", { name: /Explore Pro/ })).toHaveAttribute(
+      "href",
+      "/upgrade?source=practice-plan"
+    )
+    await expect(page.getByRole("link", { name: /Review feedback/ })).toHaveAttribute(
+      "href",
+      "/sessions/completed"
+    )
+    await page.getByRole("button", { name: "Remove saved task" }).click()
+    await expect(page.getByRole("region", { name: "Saved next practice" })).not.toBeVisible()
+  })
+})

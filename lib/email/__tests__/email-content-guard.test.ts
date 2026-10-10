@@ -22,6 +22,7 @@ const ROOT = process.cwd()
 /** Every file whose string literals reach a user's inbox or notification tray. */
 const USER_FACING_MESSAGE_FILES = [
   "lib/email/templates.ts",
+  "lib/practice-plan/reminder-email.ts",
   "lib/email/notifications.ts",
   "app/api/email/welcome/route.ts",
   "app/api/cron/email-notifications/route.ts",

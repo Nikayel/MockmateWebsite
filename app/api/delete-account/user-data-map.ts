@@ -75,6 +75,7 @@ export const USER_KEYED_DOCUMENTS: readonly UserKeyedDocument[] = [
     note: "Per-session scoring summaries, usage rollups (billing-period + daily), and Learn time rollups (per-lesson + per-day) live here, not at the top level.",
   },
   { collection: "user_learning_state" },
+  { collection: "practice_plans", note: "Saved next task and its explicitly requested reminder." },
   {
     collection: "problem_mastery",
     subcollections: ["problems"],

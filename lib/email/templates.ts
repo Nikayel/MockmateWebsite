@@ -36,7 +36,7 @@ function accountPreferencesUrl(): string {
 }
 
 /** Escape user-controlled text before interpolating it into HTML. */
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -50,7 +50,7 @@ function firstNameOf(userName: string | undefined): string {
 }
 
 // Clean email wrapper with minimal styling
-const emailWrapper = (
+export const emailWrapper = (
   content: string,
   emailType: EmailType = "transactional",
   options: EmailRenderOptions = {}

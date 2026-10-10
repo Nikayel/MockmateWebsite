@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 }))
 vi.mock("@/lib/hooks/useNextPractice", () => ({ useNextPractice: () => mocks }))
 vi.mock("@/lib/analytics", () => ({ trackEvent: mocks.track }))
+vi.mock("../PracticeSaveControls", () => ({ PracticeSaveControls: () => null }))
 import { NextPracticeCard } from "../NextPracticeCard"
 beforeEach(() => {
   vi.clearAllMocks()

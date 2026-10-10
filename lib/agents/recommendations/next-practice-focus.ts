@@ -43,11 +43,12 @@ export function getNextPracticeFocus(session: InterviewSession): PracticeFocus {
         entry.score < 70
     )
     .sort((a, b) => a.score - b.score)[0]
-  if (weakest) return { focus: goals[weakest.key], focusSource: "score-breakdown", feedbackNote }
+  const optionalNote = feedbackNote ? { feedbackNote } : {}
+  if (weakest) return { focus: goals[weakest.key], focusSource: "score-breakdown", ...optionalNote }
   return {
     focus:
       "Try a different problem, explain your approach, and check your result before submitting.",
     focusSource: "transfer",
-    feedbackNote,
+    ...optionalNote,
   }
 }

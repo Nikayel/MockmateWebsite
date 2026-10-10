@@ -8,6 +8,7 @@
  * 4. Roadmap-based reminders (interview countdown, behind schedule, daily)
  * 5. Streak at-risk alerts (in-app)
  * 6. Subscription expiry checks
+ * 7. Explicitly requested saved-practice reminders
  *
  * IMPORTANT: This cron respects each user's timezone!
  * Emails are only sent during 9 AM - 9 PM in the USER'S local time.
@@ -42,6 +43,7 @@ import {
 import type { Profile, UserLearningState, ProblemMasteryRecord } from "@/lib/types"
 import { checkStreakAtRisk, sendDailyReminderIfNeeded } from "@/lib/services/session-notifications"
 import { updateQuotaToFree, resetYearlySubscriberQuota } from "@/lib/quota/yearly-quota"
+import { processPracticeReminders } from "@/lib/practice-plan/reminder-worker"
 
 const db = adminDb
 
@@ -141,7 +143,7 @@ function canSendToUserTimezone(profile: Profile): {
 
 export async function GET(request: NextRequest) {
   try {
-    // Verify the request is from Vercel Cron - ALWAYS require secret
+    // Authenticate the external cron-job.org request.
     const auth = verifyCronRequest(request)
     if (!auth.ok) {
       if (auth.status === 500) {
@@ -159,11 +161,18 @@ export async function GET(request: NextRequest) {
       roadmapEmails: { sent: 0, skipped: 0, failed: 0, skippedTimezone: 0 },
       subscriptionExpiry: { reminders7d: 0, reminders1d: 0, downgrades: 0, quotaResets: 0 },
       streakAlerts: { sent: 0, skipped: 0 },
+      practiceReminders: { sent: 0, skipped: 0, failed: 0, uncertain: 0 },
       errors: [] as string[],
     }
 
     // Get current time
     const now = new Date()
+    try {
+      results.practiceReminders = await processPracticeReminders(now)
+    } catch (error) {
+      logger.error("Saved practice reminder drain failed", { error })
+      results.errors.push("Saved practice reminders could not be processed")
+    }
 
     // NOTE: We no longer skip based on UTC time!
     // Each user's timezone is checked individually before sending.

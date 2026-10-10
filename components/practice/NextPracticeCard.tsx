@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { useNextPractice } from "@/lib/hooks/useNextPractice"
 import { trackEvent } from "@/lib/analytics"
 import { getTypeConfig } from "@/components/interview/scenario-display"
+import { PracticeSaveControls } from "./PracticeSaveControls"
 
 export function NextPracticeCard({ sessionId }: { sessionId: string }) {
   const { result, retry } = useNextPractice(sessionId)
@@ -71,6 +72,10 @@ export function NextPracticeCard({ sessionId }: { sessionId: string }) {
               Open practice <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </a>
           </Button>
+          <PracticeSaveControls
+            sourceSessionId={sessionId}
+            recommendation={result.recommendation}
+          />
           <p className="text-muted-foreground mt-2 text-xs leading-5">
             Opening uses no sessions. Normal limits apply when you start.
           </p>

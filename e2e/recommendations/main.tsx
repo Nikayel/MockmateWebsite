@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client"
+import { SavedPracticeCard } from "@/components/dashboard/SavedPracticeCard"
 import { ScoreDisplay } from "@/components/practice/ScoreDisplay"
 import { FeedbackSections } from "@/components/practice/FeedbackSections"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -29,6 +30,8 @@ createRoot(document.getElementById("root")!).render(
           <p>Selected language: {params.get("language")}</p>
           <p>This task is selected. Opening it has not started a session.</p>
         </section>
+      ) : window.location.pathname === "/dashboard" ? (
+        <SavedPracticeCard />
       ) : (
         <>
           <h1 className="text-xl font-semibold">Interview feedback</h1>

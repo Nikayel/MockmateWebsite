@@ -38,6 +38,7 @@ import { PRICING_CONFIG, type SubscriptionTier } from "@/lib/config"
 import { SparraLoader } from "@/components/brand/SparraLoader"
 import { resolveFeedbackGenerationStatus } from "@/lib/feedback/generation-stalled"
 import { shouldShowProfilePersonalization } from "@/lib/onboarding/profile-personalization"
+import { SavedPracticeCard } from "@/components/dashboard/SavedPracticeCard"
 
 const InitialInterviewOnboarding = dynamic(
   () =>
@@ -434,6 +435,8 @@ export default function DashboardPage() {
               </Button>
             </Link>
           </div>
+
+          <SavedPracticeCard isPro={isPro} />
 
           {shouldShowProfilePersonalization(profile, completedSessions.length) && (
             <div className="mb-6 sm:mb-8">

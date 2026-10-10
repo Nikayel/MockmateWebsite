@@ -16,7 +16,7 @@
       "maxDuration": 30
     },
     "app/api/cron/email-notifications/route.ts": {
-      "maxDuration": 30
+      "maxDuration": 120
     }
   }
 }
