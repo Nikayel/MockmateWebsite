@@ -103,6 +103,38 @@ beforeEach(() => {
 })
 
 describe("useSessionReopen when the submitted session is already on screen", () => {
+  it("selects the exact recommended task and language without starting or restoring old code", async () => {
+    const opts = buildOpts({
+      searchParams: new URLSearchParams(
+        "scenario=dsa-two-sum&source=next-practice&fromSession=old&language=python"
+      ),
+    })
+    renderHook(() => useSessionReopen(opts as never))
+    await flush()
+    expect(opts.setSelectedScenario).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "dsa-two-sum" })
+    )
+    expect(opts.setSelectedLanguage).toHaveBeenCalledWith("python")
+    expect(opts.setShowOptimalApproach).toHaveBeenCalledWith(false)
+    expect(opts.setShowScenarioBrowser).toHaveBeenCalledWith(false)
+    expect(opts.startInterview).not.toHaveBeenCalled()
+    expect(opts.setCode).not.toHaveBeenCalled()
+    expect(opts.setIsInterviewStarted).not.toHaveBeenCalled()
+    expect(getSessionState).not.toHaveBeenCalled()
+  })
+
+  it("ignores an unsupported recommendation language instead of setting invalid editor state", async () => {
+    const opts = buildOpts({
+      searchParams: new URLSearchParams(
+        "scenario=dsa-two-sum&source=next-practice&fromSession=old&language=sql"
+      ),
+    })
+    renderHook(() => useSessionReopen(opts as never))
+    await flush()
+    expect(opts.setSelectedLanguage).not.toHaveBeenCalled()
+    expect(opts.startInterview).not.toHaveBeenCalled()
+  })
+
   it("leaves the page alone instead of redirecting the fresh convert away", async () => {
     const opts = buildOpts({ isShowingPostSubmitSession: () => true })
 

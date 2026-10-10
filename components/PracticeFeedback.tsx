@@ -92,14 +92,12 @@ export default function PracticeFeedback({
   sessionId,
   feedbackSurface = "interview",
   problemType,
-  difficulty,
   problemTitle,
   code,
   language = "javascript",
   chatMessages,
   interviewerMessages,
   onExport,
-  onNewProblem,
   onClose,
   complexityAnalysis,
   alternativeApproaches,
@@ -247,12 +245,8 @@ export default function PracticeFeedback({
         language={language}
         problemType={problemType}
         userId={userId}
-        difficulty={difficulty}
-        problemTitle={problemTitle}
-        feedback={feedback}
-        overallScore={overallScore}
+        sessionId={sessionId}
         constitutionalAICritique={constitutionalAICritique}
-        onNewProblem={onNewProblem}
         chatMessages={chatMessages}
         interviewerMessages={interviewerMessages}
         complexityAnalysis={complexityAnalysis}

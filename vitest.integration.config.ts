@@ -27,6 +27,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": resolve(__dirname, "./"),
+      // Next.js uses an empty marker in server code; the database remains real.
+      "server-only": resolve(__dirname, "node_modules/server-only/empty.js"),
     },
   },
 })

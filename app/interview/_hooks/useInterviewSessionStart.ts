@@ -35,6 +35,7 @@ import type {
 import { isUsageBlocked } from "./useGuestQuota"
 import type { UsageLimit } from "./useGuestQuota"
 import type { HintFeedbackValue } from "./useInterviewMetrics"
+import type { NextPracticeEntry } from "@/lib/interview/next-practice-entry"
 
 type ScoreBreakdown = {
   understandingScore?: number
@@ -52,6 +53,7 @@ export interface UseInterviewSessionStartOptions {
   guestId: string | null
   usageLimit: UsageLimit | null
   refreshUsageLimit: (uid: string) => Promise<void>
+  nextPracticeEntry?: NextPracticeEntry | null
 
   // Page state reads
   selectedScenario: Scenario | null
@@ -103,6 +105,7 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
   // second session and consume quota twice. `isStarting` mirrors it for the UI so
   // the button can show a loading and disabled state while the start is in flight.
   const startingRef = useRef(false)
+  const attributedRef = useRef(false)
   const [isStarting, setIsStarting] = useState(false)
 
   const runStartSequence = async (
@@ -165,13 +168,15 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
     opts.setTargetCompany(effectiveTargetCompany)
 
     // Check usage limit before starting - redirect to limit page (skip for DSA questions)
-    if (isUsageBlocked(!!opts.user, opts.usageLimit, scenario.type)) {
+    // A recommendation uses the authoritative start check below. The overview
+    // may be stale and does not represent paid redo eligibility for this task.
+    const fromNextPractice = opts.nextPracticeEntry?.scenarioId === scenario.id
+    if (!fromNextPractice && isUsageBlocked(!!opts.user, opts.usageLimit, scenario.type)) {
       opts.router.push("/limit-reached")
       return
     }
 
-    // Create session and increment usage when starting interview
-    // DSA questions don't count against session limit
+    // The server decides whether this start spends quota or is an eligible redo.
     if (opts.user) {
       try {
         // Create session document first
@@ -187,7 +192,22 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
           scenarioPattern,
           effectiveTargetCompany // Pass target company for RAG + analytics
         )
+        const result = await recordSessionStart(opts.user.id, scenario.id)
+        if (!result.success) throw new Error("Session limit exceeded")
         opts.setCurrentSessionId(sessionId)
+
+        if (fromNextPractice && opts.nextPracticeEntry && !attributedRef.current) {
+          attributedRef.current = true
+          trackEvent("next_practice_started", {
+            source_session_id: opts.nextPracticeEntry.sourceSessionId,
+            scenario_id: scenario.id,
+            scenario_type: scenario.type,
+            session_id: sessionId,
+            sessionId, // Joins the existing session_complete event's contract.
+            recommendation_source: "feedback",
+            return_source: opts.nextPracticeEntry.returnSource ?? "feedback",
+          })
+        }
 
         // GA4 session_start (the /api/admin/analytics dashboard queries this name)
         trackSessionStart({
@@ -199,31 +219,32 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
         })
 
         // Initialize session metrics tracking (required for completion tracking)
-        const token = await opts.firebaseUser?.getIdToken()
-        if (token) {
-          fetch("/api/session/metrics", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              event: "session_start",
-              sessionId,
-              data: {
-                scenarioId: scenario.id,
-                scenarioTitle: scenario.title,
-                pattern: ("pattern" in scenario ? scenario.pattern : scenario.type) || "unknown",
-                difficulty: scenario.difficulty,
-                scenarioType: scenario.type,
-                hintsTotal: (scenario as any).hints?.length || 3,
+        void opts.firebaseUser
+          ?.getIdToken()
+          .then((token) => {
+            return fetch("/api/session/metrics", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
               },
-            }),
-          }).catch((err) => console.error("Session metrics init failed:", err))
-        }
+              body: JSON.stringify({
+                event: "session_start",
+                sessionId,
+                data: {
+                  scenarioId: scenario.id,
+                  scenarioTitle: scenario.title,
+                  pattern: ("pattern" in scenario ? scenario.pattern : scenario.type) || "unknown",
+                  difficulty: scenario.difficulty,
+                  scenarioType: scenario.type,
+                  hintsTotal: (scenario as any).hints?.length || 3,
+                },
+              }),
+            })
+          })
+          .catch((err) => console.error("Session metrics init failed:", err))
 
-        // Record session start (paid redo, free open, or 1 session of quota)
-        const result = await recordSessionStart(opts.user.id, scenario.id)
+        // Explain the metering result from the accepted server start.
         if (result.freeRetry) {
           toast.success("Redo session. This doesn't use one of your monthly sessions.")
         } else if (result.usedPaidSession && result.freeOpensRemaining > 0) {
@@ -234,12 +255,18 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
           )
         }
         // Refresh usage limit
-        await opts.refreshUsageLimit(opts.user.id)
+        void opts
+          .refreshUsageLimit(opts.user.id)
+          .catch((error) => console.error("Allowance refresh failed:", error))
       } catch (error) {
         console.error("Error creating session:", error)
-        toast.error("Session tracking error", {
-          description: "Your progress will still be saved locally. You can continue the interview.",
+        toast.error("We couldn’t start this session", {
+          description:
+            error instanceof Error && error.message === "Session limit exceeded"
+              ? "Your current allowance is used. Choose an eligible redo or wait for it to renew."
+              : "Please try again. Your interview has not started.",
         })
+        return
       }
     } else if (opts.isGuestMode && opts.guestId) {
       // Guest user - create session via API

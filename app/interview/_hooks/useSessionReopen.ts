@@ -5,13 +5,18 @@ import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.
 import { toast } from "sonner"
 import type { User } from "@/lib/types"
 import { trackEvent } from "@/lib/analytics"
+import { isNextPracticeEntry } from "@/lib/interview/next-practice-entry"
 import { requestsInterviewWork } from "@/components/interview/interview-track-browsing"
 import { useInterviewStore, type InterviewTargetCompany } from "@/lib/stores"
 import { getScenarioById } from "@/lib/scenarios/index"
 import type { Scenario } from "@/lib/scenarios/types"
 import { getSessionState, findLatestSubmittedSession } from "@/lib/firestore-helpers"
 import { createBugfixEvidenceEvent, type BugfixEvidenceEvent } from "@/lib/bugfix"
-import { getBugfixScenarioLanguage, type EditorLanguage } from "../_utils/language"
+import {
+  EDITOR_LANGUAGES,
+  getBugfixScenarioLanguage,
+  type EditorLanguage,
+} from "../_utils/language"
 import {
   isWorkspaceScenario,
   toWorkspaceContextFiles,
@@ -277,6 +282,7 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
       const scenarioId = opts.searchParams?.get("scenario")
       const fromRoadmap = opts.searchParams?.get("roadmap") === "true"
       const fromPractice = opts.searchParams?.get("practice") === "true"
+      const fromNextPractice = isNextPracticeEntry(opts.searchParams)
       const isPostInterviewResume = opts.searchParams?.get("postInterview") === "true"
 
       // Case 1: Reopening an existing session
@@ -525,8 +531,8 @@ Let's continue!`
           toast.error("Scenario not found")
         }
       }
-      // Case 2: Starting fresh from roadmap or practice (scenario only, no session)
-      else if (scenarioId && !sessionId && (fromRoadmap || fromPractice)) {
+      // Case 2: Select an exact scenario. Only roadmap entry auto-starts a session.
+      else if (scenarioId && !sessionId && (fromRoadmap || fromPractice || fromNextPractice)) {
         const scenario = await getScenarioById(scenarioId)
         if (scenario) {
           // Check if there's already an evaluating session for this scenario
@@ -544,6 +550,11 @@ Let's continue!`
           }
 
           // Select the scenario and hide browser to show the problem view
+          if (fromNextPractice) {
+            const language = opts.searchParams?.get("language")
+            const editorLanguage = EDITOR_LANGUAGES.find((supported) => supported === language)
+            if (editorLanguage) opts.setSelectedLanguage(editorLanguage)
+          }
           opts.setSelectedScenario(scenario)
           opts.setShowOptimalApproach(false) // Reset optimal approach visibility
           opts.setShowScenarioBrowser(false)

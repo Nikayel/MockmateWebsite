@@ -64,6 +64,8 @@ export interface EmailRecipient {
 }
 
 export interface SendEmailOptions {
+  /** Durable reminder jobs must not replay ambiguous network deliveries. */
+  singleAttempt?: boolean
   to: EmailRecipient[]
   subject: string
   htmlContent: string
@@ -83,6 +85,8 @@ export interface EmailResult {
   success: boolean
   messageId?: string
   error?: string
+  deliveryUncertain?: boolean
+  retryable?: boolean
 }
 
 /**
@@ -100,10 +104,10 @@ export async function sendEmail(options: SendEmailOptions): Promise<EmailResult>
   // Check if API key is configured
   if (!process.env.BREVO_API_KEY) {
     console.warn("[Brevo] API key not configured, skipping email send")
-    return { success: false, error: "BREVO_API_KEY not configured" }
+    return { success: false, error: "BREVO_API_KEY not configured", retryable: true }
   }
 
-  const MAX_RETRIES = 3
+  const MAX_RETRIES = options.singleAttempt ? 1 : 3
   const INITIAL_DELAY_MS = 1000
   let lastError: any
 
@@ -184,6 +188,14 @@ export async function sendEmail(options: SendEmailOptions): Promise<EmailResult>
   return {
     success: false,
     error: lastError?.body?.message || lastError?.message || "Unknown error",
+    ...(options.singleAttempt
+      ? {
+          deliveryUncertain:
+            (!lastError?.statusCode && !lastError?.response?.statusCode) ||
+            (lastError?.statusCode || lastError?.response?.statusCode) >= 500,
+          retryable: (lastError?.statusCode || lastError?.response?.statusCode) === 429,
+        }
+      : {}),
   }
 }
 
