@@ -73,6 +73,7 @@ import { useInterviewChat } from "./_hooks/useInterviewChat"
 import { useInterviewProactiveAI } from "./_hooks/useInterviewProactiveAI"
 import { useInterviewMetrics } from "./_hooks/useInterviewMetrics"
 import { useInterviewSessionStart } from "./_hooks/useInterviewSessionStart"
+import { getNextPracticeEntry } from "@/lib/interview/next-practice-entry"
 import { useInterviewSessionReset } from "./_hooks/useInterviewSessionReset"
 import { useSessionReopen } from "./_hooks/useSessionReopen"
 import { useRedirectSignInReturn } from "./_hooks/useRedirectSignInReturn"
@@ -104,6 +105,7 @@ const ScenarioBrowser = nextDynamic(
 function InterviewPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const nextPracticeEntryRef = useRef(getNextPracticeEntry(searchParams))
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const {
     markQuestionCompleted,
@@ -1112,6 +1114,7 @@ function InterviewPageContent() {
   })
 
   const { startInterview, isStarting } = useInterviewSessionStart({
+    nextPracticeEntry: nextPracticeEntryRef.current,
     router,
     user,
     firebaseUser,

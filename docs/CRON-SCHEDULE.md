@@ -19,7 +19,7 @@ Every job is expected to be registered on cron-job.org with these schedules:
 | `subscription-expiry` | `0 9 * * *` daily | Expired yearly plans keep Pro access forever, and the 7-day / 1-day expiry reminder emails never send. |
 | `expire-referral-rewards` | `30 9 * * *` daily | Pending referral rewards never expire, so the advertised ledger drifts from the stated 90-day policy. |
 | `guest-session-cleanup` | `0 10 * * *` daily | Guest session documents (code, transcript, feedback) accumulate in Firestore forever. Cost and privacy both grow without bound. |
-| `email-notifications` | every 3 hours | Welcome, inactivity, spaced-repetition, and roadmap emails stop. |
+| `email-notifications` | every 3 hours | Welcome, inactivity, spaced-repetition, roadmap, and explicitly requested saved-practice reminders stop. |
 
 ## Duplicate runs are safe
 
@@ -46,3 +46,22 @@ cron-job.org records each execution's status code on the job's history page. A r
 means the configured `CRON_SECRET` header does not match; 500 with "Server misconfiguration" means
 the env var is unset in Vercel. For `aggregate-usage` specifically, a fresh
 `config/cost_averages.calculatedAt` in Firestore is the ground truth that the hourly job is alive.
+
+## Saved-practice reminders
+
+The existing `email-notifications` endpoint drains `practice_plans` first. No new schedule
+or Vercel Cron is required. A due date exists only after the user explicitly saves a reminder.
+Delivery happens after the selected time on a scheduled run, subject to quiet hours, email
+preferences, and the shared send limits. The UI does not promise delivery at the exact minute.
+
+Each drain scans at most 20 due plans, sends sequentially, and stops starting new work after
+40 seconds. Provider requests are bounded to 15 seconds. The existing function has a 120-second
+execution ceiling to leave room for the other email processors. The external scheduler's request
+timeout is separate from this ceiling; check its execution history when investigating timeouts.
+
+A transactional sending lease prevents two runs from delivering the same saved revision.
+Known non-delivery failures retry at most three attempts with 3/6-hour backoff. An ambiguous
+network response or expired sending lease becomes `uncertain` and is not automatically sent again.
+Failed deliveries reach the logger and `practice_reminder_failed` analytics. The saved task remains
+available on the dashboard. Removing/replacing a task cancels its pending reminder; completion,
+account deletion, and email opt-outs also suppress delivery.
