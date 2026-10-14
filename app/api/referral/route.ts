@@ -1,88 +1,25 @@
-/**
- * Referral API
- *
- * User-facing endpoint for getting referral code and stats.
- */
-
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth } from "@/lib/auth-helpers"
-import { getUserReferralCode, getUserReferralStats, recordReferral } from "@/lib/referrals"
-import { promoCodeRateLimit } from "@/lib/rate-limiting"
-import { getAppBaseUrl } from "@/lib/site-url"
-import { logger } from "@/lib/logger"
 
-/**
- * GET /api/referral
- *
- * Get user's referral code and stats
- */
-export async function GET(request: NextRequest) {
+// Retain an authenticated tombstone for older clients and shared links. New
+// enrollment is paused; existing rewards remain available to admin bookkeeping.
+async function referralUnavailable(request: NextRequest) {
   const authResult = await verifyAuth(request)
   if (!authResult.authenticated || !authResult.userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401, headers: { "Cache-Control": "no-store" } }
+    )
   }
 
-  try {
-    const stats = await getUserReferralStats(authResult.userId)
-
-    // Generate shareable URL from the canonical site base so a missing/renamed
-    // env var can't send referrals to a dead domain.
-    const baseUrl = getAppBaseUrl()
-    const shareUrl = `${baseUrl}?ref=${stats.referralCode}`
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        ...stats,
-        shareUrl,
-      },
-    })
-  } catch (error) {
-    logger.error("[Referral API] Error getting referral stats", { error })
-    return NextResponse.json({ error: "Failed to get referral data" }, { status: 500 })
-  }
+  return NextResponse.json(
+    {
+      error: "The referral program is currently unavailable.",
+      code: "REFERRAL_PROGRAM_UNAVAILABLE",
+    },
+    { status: 410, headers: { "Cache-Control": "no-store" } }
+  )
 }
 
-/**
- * POST /api/referral
- *
- * Record a referral (called during signup with referral code)
- *
- * Body:
- * - referralCode: string
- */
-export async function POST(request: NextRequest) {
-  // Apply rate limiting to prevent brute-force attacks on referral codes
-  const rateLimitResponse = await promoCodeRateLimit(request)
-  if (rateLimitResponse) {
-    return rateLimitResponse
-  }
-
-  const authResult = await verifyAuth(request)
-  if (!authResult.authenticated || !authResult.userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
-  try {
-    const body = await request.json()
-    const { referralCode } = body
-
-    if (!referralCode || typeof referralCode !== "string") {
-      return NextResponse.json({ error: "referralCode is required" }, { status: 400 })
-    }
-
-    const success = await recordReferral(authResult.userId, referralCode)
-
-    if (!success) {
-      return NextResponse.json({ error: "Invalid or already used referral code" }, { status: 400 })
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: "Referral recorded",
-    })
-  } catch (error) {
-    logger.error("[Referral API] Error recording referral", { error })
-    return NextResponse.json({ error: "Failed to record referral" }, { status: 500 })
-  }
-}
+export const GET = referralUnavailable
+export const POST = referralUnavailable

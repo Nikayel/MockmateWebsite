@@ -10,7 +10,6 @@ import { AnnouncementProvider } from "@/components/announcements"
 import { CookieConsent } from "@/components/CookieConsent"
 import { ConsentAnalytics } from "@/components/ConsentAnalytics"
 import { PerformancePolyfill } from "@/components/performance-polyfill"
-import { ReferralCapture } from "@/components/ReferralCapture"
 import { AttributionCapture } from "@/components/AttributionCapture"
 import { ClientErrorReporter } from "@/components/monitoring/ClientErrorReporter"
 import {
@@ -205,7 +204,6 @@ html {
           Skip to main content
         </a>
         <PerformancePolyfill />
-        <ReferralCapture />
         <AttributionCapture />
         <ClientErrorReporter />
         {/* disableTransitionOnChange intentionally omitted. The light↔dark

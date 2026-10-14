@@ -77,21 +77,6 @@ const MetricsOverview = dynamic(
   }
 )
 
-const ReferralWidget = dynamic(
-  () => import("@/components/dashboard/ReferralWidget").then((mod) => mod.ReferralWidget),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="border-border/50 bg-card/50 rounded-xl border p-4">
-        <div className="animate-pulse space-y-3">
-          <div className="bg-muted h-4 w-1/3 rounded"></div>
-          <div className="bg-muted h-8 w-full rounded"></div>
-        </div>
-      </div>
-    ),
-  }
-)
-
 // Sentinel returned by the sessions query when it throws, so a failed fetch is
 // distinguishable from a genuinely empty (first-time user) result.
 const SESSIONS_FETCH_ERROR = "sessions-fetch-error" as const
@@ -614,7 +599,7 @@ export default function DashboardPage() {
 
           {/* Main Content - Responsive 2-column */}
           <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-5">
-            {/* Left column - Recent Activity + Referral Widget */}
+            {/* Left column - Recent Activity */}
             <div className="space-y-4 lg:col-span-3">
               {/* Recent Activity */}
               <div
@@ -787,9 +772,6 @@ export default function DashboardPage() {
                   </div>
                 )}
               </div>
-
-              {/* Referral Widget - below Recent Activity */}
-              <ReferralWidget />
             </div>
 
             {/* Metrics Overview - 2 cols on lg */}
