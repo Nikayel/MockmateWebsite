@@ -174,8 +174,8 @@ jobs:
       - name: Install Playwright chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Guest trial e2e (built server)
-        run: npx playwright test e2e/guest-trial-journey.spec.ts
+      - name: Guest trial and secondary navigation e2e (built server)
+        run: npx playwright test e2e/guest-trial-journey.spec.ts e2e/secondary-navigation.spec.ts
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:4256
 
