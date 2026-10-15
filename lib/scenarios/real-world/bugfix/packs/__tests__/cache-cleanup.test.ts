@@ -80,6 +80,21 @@ describe("cache cleanup executable contract", () => {
     expect(runCachePack(wrong)).not.toBe(pack.expectedOutput)
   })
 
+  it("also accepts a correct guarded-index patch, without requiring the reference's approach", () => {
+    const guarded = {
+      ...pack,
+      srcFiles: pack.srcFiles.map((file) => ({
+        ...file,
+        content: file.content.replace(
+          "        index += 1",
+          "        else:\n            index += 1"
+        ),
+      })),
+    }
+    expect(runCachePack(guarded, undefined, true)).toBe(pack.expectedOutput)
+    expect(runCachePack(guarded, "a,one,1\na,two,2\na,three,3\n")).toBe(header + "a: 0\n")
+  })
+
   it("rejects leaving every entry resident", () => {
     expect(
       runCachePack(withSweep(pack, "def evict_expired(entries, now):\n    return entries\n\n"))

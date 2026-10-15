@@ -65,13 +65,16 @@ entries are adjacent in a namespace's entry list:
    two rows, not touch `sessions`, and again cannot explain the inflation.
 
 ## Complexity
-Parsing and building the cache are O(n) in the number of log rows. The corrected
-sweep is O(m) per namespace over its m entries (the shipped pop-in-a-loop is
-O(m^2) in the worst case, an incidental cost of the same defect). Output sorts
-only the handful of namespaces, O(k log k) with k namespaces. Time O(n) plus the
-namespace sort, or O(n + k log k) overall; space O(n) for the parsed entries
-and latest-entry store. Do not require a class redesign: the existing
-`CacheStore` is sufficient for both tickets.
+Parsing and building the cache are O(n) in the number of log rows. The
+survivor-list reference sweep is O(m) per namespace over its m entries. Output
+sorts the k namespace names, adding O(k log k): total O(n + k log k), space O(n).
+
+The alternative guarded-index fix is also correct, but repeated `list.pop`
+operations still shift later elements. Its sweep can take O(m^2) per namespace,
+or O(n^2 + k log k) overall in the worst case. Grade the complexity of the
+candidate's actual implementation, not the reference implementation. A correct
+minimal patch need not also be a performance rewrite. Do not require a class
+redesign: the existing `CacheStore` is sufficient for both tickets.
 
 ## Phase-2 adaptation path
 Ops asks that pinned entries survive the sweep even when expired. The `pinned`

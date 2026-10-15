@@ -16,9 +16,9 @@
     }
   ],
   "complexityAnswer": {
-    "time": "O(n + k log k), for n writes and k namespaces",
+    "time": "Survivor-list fix: O(n + k log k). Guarded-index pop fix: O(n^2 + k log k) worst case. Grade the chosen implementation.",
     "space": "O(n)",
-    "dominantCost": "a single linear pass to parse and bucket the n log rows, then a linear sweep per namespace; the only sort is over the handful of namespaces for output ordering (O(k log k), k namespaces)"
+    "dominantCost": "With a survivor list: linear parsing, writes and sweeping plus the O(k log k) namespace sort. With a guarded-index pop fix: repeated list shifts can dominate at quadratic cost."
   },
   "debriefRubric": [
     "Reproduced with the run command and diffed against the oracle before opening the source.",
@@ -26,7 +26,7 @@
     "Shipped a minimal fix (iterate a snapshot / build a new list, or guard the index advance) rather than rewriting the sweep.",
     "Tested the `<=` expiry boundary against the contract (catalog's c-1 at exactly now) and cleared it instead of chasing it.",
     "Tested the field strip normalization against the contract and cleared it instead of chasing it.",
-    "Complexity: identified the linear parse and per-namespace sweep as O(n) and noted the only sort is over the namespaces.",
+    "Complexity: traced the chosen implementation. A survivor-list sweep is linear; a guarded-index pop sweep can be quadratic because each removal shifts entries. Include the O(k log k) namespace sort, and accept an accurate explanation of either correct patch.",
     "Phase-2: adapted evict_expired to exempt pinned entries, recognizing the pinned flag was already parsed and thrown away, instead of rewriting.",
     "Recommend exactly one drill: for a weak sweep pass, a mutation-during-iteration drill; for a weak phase-2, an adapt-vs-rewrite drill."
   ]
