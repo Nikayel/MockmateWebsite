@@ -55,6 +55,7 @@ describe("capturePostHogServerEvent", () => {
   })
 
   afterEach(() => {
+    vi.unstubAllEnvs()
     if (ORIGINAL_KEY === undefined) delete process.env.NEXT_PUBLIC_POSTHOG_KEY
     else process.env.NEXT_PUBLIC_POSTHOG_KEY = ORIGINAL_KEY
   })
@@ -134,5 +135,36 @@ describe("capturePostHogServerEvent", () => {
 
     expect(construct).toHaveBeenCalledTimes(1)
     expect(capture).toHaveBeenCalledTimes(3)
+  })
+
+  it.each(["production", "preview", "development"])(
+    "labels %s events without trusting caller-supplied deployment context",
+    async (environment) => {
+      vi.stubEnv("VERCEL_ENV", environment)
+      const { capturePostHogServerEvent } = await loadWithKey("phc_test")
+      capturePostHogServerEvent("ai_chat", {
+        userId: "uid_1",
+        deployment_environment: "spoofed",
+      })
+      expect(capture).toHaveBeenCalledWith(
+        expect.objectContaining({
+          properties: expect.objectContaining({
+            deployment_environment: environment,
+            event_source: "server",
+          }),
+        })
+      )
+    }
+  )
+
+  it("does not label a local production build as a production deployment", async () => {
+    vi.stubEnv("VERCEL_ENV", undefined)
+    const { capturePostHogServerEvent } = await loadWithKey("phc_test")
+    capturePostHogServerEvent("ai_chat", {})
+    expect(capture).toHaveBeenCalledWith(
+      expect.objectContaining({
+        properties: expect.objectContaining({ deployment_environment: "local" }),
+      })
+    )
   })
 })

@@ -80,7 +80,14 @@ export function capturePostHogServerEvent(
     posthog.capture({
       distinctId,
       event: eventName,
-      properties: userId ? properties : { ...properties, $process_person_profile: false },
+      properties: {
+        ...properties,
+        // Server events have no browser hostname. Label the actual deployment
+        // rather than treating every hostless event as production.
+        deployment_environment: process.env.VERCEL_ENV ?? "local",
+        event_source: "server",
+        ...(!userId ? { $process_person_profile: false } : {}),
+      },
     })
 
     keepAliveUntilSettled(posthog.flush())
