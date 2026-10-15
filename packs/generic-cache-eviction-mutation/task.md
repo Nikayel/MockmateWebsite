@@ -1,46 +1,66 @@
-# Cache eviction report: live entries per namespace
+# Cache cleanup: reconcile the overnight report
 
-## Who reads this
-The capacity-planning on-call reads this report every morning. It replays the
-previous day's cache write log, runs the eviction sweep at a fixed checkpoint,
-and reports how many entries are still live in each namespace, so they can size
-the memory each namespace needs. This morning one namespace's live count reads
-higher than the cache's own metrics endpoint, and the report is not trusted
-until the two agree.
+## The ticket
+Our application caches search results, feeds, catalog pages, and login sessions.
+Operations replays yesterday's cache writes and runs cleanup at a fixed checkpoint
+to check how many entries remain. This morning, one namespace's count is higher
+than the cache metrics captured at that same checkpoint. The other counts agree.
 
-## The program
-`cache_sweep.py` reads a cache write log and prints the number of live (not yet
-expired) entries per namespace, with namespaces listed in alphabetical order.
+Restore the report's accuracy without changing its format or the input contract.
+You are working on a local replay, not a running Redis service. No setup, network,
+framework, or additional Python packages are needed.
 
-Each row of the log is a cache write: `namespace,key,expires_at[,pinned]`. The
-`expires_at` is an absolute epoch second. The sweep runs at a fixed checkpoint
-`now = 1700000000`; an entry is expired when its `expires_at` is at or before
-`now`. The log is not grouped by namespace and is not sorted by expiry.
+## Enough context to get started
+- A **key** identifies one cached entry, such as a search result or login session.
+- A **namespace** groups keys for one application feature. The same key text in
+  two namespaces represents two independent entries.
+- **Expiry** is the time after which an entry should no longer remain in the cache.
+  Here, times are integer epoch seconds; compare them as numbers, not dates.
+- A **sweep** is one cleanup pass at a given time. This job always uses
+  `now = 1700000000`, so each run is reproducible.
 
-## Data contract (all of this is intended; the correct output tolerates it)
-- Lines starting with `#` are comments and are ignored.
-- Columns are comma-separated: `namespace,key,expires_at`, with an optional
-  fourth column `pinned`. Surrounding whitespace on any field is trimmed, so
-  ` feed ` and `feed` are the same namespace.
-- `expires_at` is an integer epoch second. An entry is expired when
-  `expires_at <= now`, where `now = 1700000000`; an entry whose `expires_at`
-  equals `now` exactly is expired.
-- A row with fewer than three fields, more than four fields, or a non-integer
-  `expires_at` is malformed and is skipped.
-- The same key may be written more than once for a namespace; a later write
-  refreshes that key's `expires_at` in place (last write wins), and duplicate
-  deliveries of the same write are therefore harmless.
-- Writes for different namespaces are interleaved and arrive out of order; a
-  key first seen as expired may be refreshed to a later expiry by a subsequent
-  write.
+## The small codebase
+| File | Responsibility |
+| --- | --- |
+| `src/cache_sweep.py` | Entry point: read writes, update the store, sweep, print. |
+| `src/log_reader.py` | Parse rows into entry dictionaries and skip malformed input. |
+| `src/cache_store.py` | Own the latest entries and apply cleanup to stored state. |
+| `src/reporting.py` | Format counts for operations. |
+| `fixtures/input.txt` | A small write log, including refreshes and malformed rows. |
 
-## Run it
-```
+`CacheStore` is an ordinary Python class holding dictionaries in memory. `write`
+records an entry, `sweep` updates the stored entries, and `counts` reads their
+current sizes. You do not need to design a new class or change every file.
+
+## Run and investigate
+```text
 python3 src/cache_sweep.py fixtures/input.txt
 ```
 
+Run once before editing. Compare the actual report with the expected report below,
+then follow the data through the modules. Use the editor tabs to inspect files;
+the fixture and expected-output file are read-only. Explain what evidence supports
+your hypothesis, make a focused change, and run again to verify it.
+
+## Data contract
+- Blank lines and lines starting with `#` are ignored.
+- Columns are `namespace,key,expires_at[,pinned]`, separated by commas. Surrounding
+  whitespace on each field is trimmed: ` feed ` and `feed` name one namespace.
+- `expires_at` is an integer. An entry is expired when `expires_at <= now`, including
+  an entry whose expiry equals the checkpoint exactly.
+- A row with fewer than three columns, more than four columns, or a non-integer
+  expiry is malformed and skipped.
+- Replay writes in arrival order, not expiry order. A later write for the same
+  namespace and key replaces the entire previous entry, including its metadata.
+- Interleaved namespaces and duplicate deliveries are valid. Each namespace/key
+  pair occupies one slot; a previously expired key can be refreshed by a later write.
+- The optional fourth field is recorded as metadata (`pinned` is true only for the
+  literal value `pinned`). For this ticket, expiry determines which entries remain.
+- Include every namespace seen in a usable row, even if its count becomes zero.
+  Print namespaces alphabetically; an empty feed prints only the header.
+
 ## Expected output
-```
+```text
 === Live entries by namespace ===
 catalog: 2
 feed: 2
@@ -48,4 +68,11 @@ search: 3
 sessions: 2
 ```
 
-`tests/expected_output.txt` is the oracle. Do not edit it to make the run pass.
+`tests/expected_output.txt` is the public expected report. Do not hard-code it or
+change reporting rules to match this one fixture. The cleanup must also work for
+other valid write logs under the same contract.
+
+## Before handing it back
+Verify the report, explain the root cause in your own words, and describe one
+small regression case that would have caught it. Keep unrelated parsing and
+formatting behavior intact.

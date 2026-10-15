@@ -2,13 +2,19 @@
 
 Never candidate-visible. Compiles into `lib/scenarios/sealed/generic-cache-eviction-mutation.server.ts`.
 
-## Bug (src/cache_sweep.py, in `evict_expired()`)
+## Bug (src/cache_store.py, in `evict_expired()`)
 The sweep walks the entry list by index and calls `entries.pop(index)` when an
 entry is expired, then advances `index += 1` unconditionally. Popping shifts
 every later entry down one slot, so the entry that slides into the just-vacated
 slot is never examined. When two expired entries are adjacent in a namespace's
 list, the second one is stepped over and survives the sweep, so that namespace
 reports one too many live entries.
+
+Follow the entry point through `log_reader.read_events`, `CacheStore.write`,
+`CacheStore.sweep`, and `reporting.format_report`. The parser and formatting
+modules preserve the contract; `sweep` passes each namespace's entries through
+`evict_expired` and writes the survivors back to the store. The list returned
+by that function determines both the retained state and the report.
 
 ## Minimal fix
 Iterate a snapshot instead of mutating the list under the index, i.e. build the
@@ -63,7 +69,9 @@ Parsing and building the cache are O(n) in the number of log rows. The corrected
 sweep is O(m) per namespace over its m entries (the shipped pop-in-a-loop is
 O(m^2) in the worst case, an incidental cost of the same defect). Output sorts
 only the handful of namespaces, O(k log k) with k namespaces. Time O(n) plus the
-small namespace sort; space O(n) for the parsed entries.
+namespace sort, or O(n + k log k) overall; space O(n) for the parsed entries
+and latest-entry store. Do not require a class redesign: the existing
+`CacheStore` is sufficient for both tickets.
 
 ## Phase-2 adaptation path
 Ops asks that pinned entries survive the sweep even when expired. The `pinned`

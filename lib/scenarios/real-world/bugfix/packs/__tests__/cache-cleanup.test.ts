@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import { genericCacheEvictionMutationPack as pack } from "../generic-cache-eviction-mutation"
 import { sealed } from "@/lib/scenarios/sealed/generic-cache-eviction-mutation.server"
 import { FIXED_SWEEP, PINNED_SWEEP, runCachePack, withSweep } from "./cache-cleanup-fixture"
+import { packToScenario } from "@/lib/bugfix/packs/scenario"
 
 const fixed = withSweep(pack, FIXED_SWEEP)
 const extended = withSweep(pack, PINNED_SWEEP)
@@ -10,6 +11,30 @@ const header = "=== Live entries by namespace ===\n"
 const phase2Fixture = pack.fixtures[0].content + sealed.phase2.fixturePatch
 
 describe("cache cleanup executable contract", () => {
+  it("opens the editable store while retaining the four-module program and stable scenario id", () => {
+    const scenario = packToScenario(pack)
+    expect(pack.srcFiles.map((file) => file.path)).toEqual([
+      "src/cache_store.py",
+      "src/cache_sweep.py",
+      "src/log_reader.py",
+      "src/reporting.py",
+    ])
+    expect(scenario.workspace.primaryFilePath).toBe("src/cache_store.py")
+    expect(scenario.expectedTouchedFiles).toEqual(["src/cache_store.py"])
+    expect(scenario.id).toBe("generic-cache-eviction-mutation")
+    expect(
+      pack.srcFiles.reduce((total, file) => total + file.content.split("\n").length, 0)
+    ).toBeLessThanOrEqual(200)
+  })
+
+  it("does not expose the follow-up ticket or sealed diagnosis in the initial workspace", () => {
+    const initial = JSON.stringify(packToScenario(pack))
+    expect(initial).not.toContain(sealed.phase2.specPatch)
+    expect(initial).not.toContain(sealed.phase2.fixturePatch)
+    expect(initial).not.toContain(sealed.bugSummary)
+    expect(sealed.bugLocation).toContain("src/cache_store.py")
+  })
+
   it("reproduces the incident, rather than starting already solved", () => {
     expect(runCachePack(pack)).toBe(sealed.buggyOutput)
     expect(runCachePack(pack)).not.toBe(pack.expectedOutput)
@@ -66,5 +91,32 @@ describe("cache cleanup executable contract", () => {
       "a,pinned,1,pinned\na,ordinary,1\na,live,1700000001\na,refresh,1,pinned\na,refresh,2\n"
     expect(runCachePack(extended, input)).toBe(header + "a: 2\n")
     expect(runCachePack(extended)).toBe(pack.expectedOutput)
+  })
+
+  it("updates stored state, permits another sweep and write, and isolates replay instances", () => {
+    const probe = `from cache_store import CacheStore
+from log_reader import read_events
+store = CacheStore()
+for event in read_events("fixtures/input.txt"):
+    store.write(event)
+store.sweep(1700000000)
+first = store.counts()
+store.sweep(1700000000)
+assert store.counts() == first
+assert first["sessions"] == 2
+store.write({"namespace": "sessions", "key": "new", "expires_at": 1700000100, "pinned": False})
+assert store.counts()["sessions"] == 3
+store.sweep(1700000100)
+assert store.counts()["sessions"] == 2
+assert CacheStore().counts() == {}
+print("state verified")
+`
+    const probing = {
+      ...fixed,
+      srcFiles: fixed.srcFiles.map((file) =>
+        file.path === "src/cache_sweep.py" ? { ...file, content: probe } : file
+      ),
+    }
+    expect(runCachePack(probing, undefined, true)).toBe("state verified\n")
   })
 })
