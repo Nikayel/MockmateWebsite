@@ -856,8 +856,9 @@ alone. Keep existing free recommendations and first-roadmap entitlements intact.
 
 ### SEO-41 — One useful flagship debugging asset, not a bulk page expansion
 
-**Evidence.** The public bank contains 24 bugfix scenarios; 14 are single-source-file
-packs. The bookclub scenario already provides a deeper multi-module alternative.
+**Evidence.** Before the flagship expansion, the public bank contained 24 bugfix
+scenarios, including 14 single-source-file packs. The bookclub scenario already
+provided a deeper multi-module alternative.
 File count alone is not evidence of realistic reasoning or willingness to pay.
 
 **Do.** Choose one deeper incident with real module boundaries, logs, contracts,
@@ -865,7 +866,22 @@ regression tests, a minimal repair, and a readable public sample debrief. Keep t
 15-minute introductory incident separate. Test the value with actual learners;
 share the asset through deliberately chosen channels rather than bulk posting.
 
-**Accept.** Starter fails, reference passes, hidden checks remain private, known-bad
-repairs fail, and browser performance stays usable. Observe first completion,
+**Accept.** Starter fails, reference passes, sealed solutions and unreleased follow-up
+data remain private, known-bad repairs fail, and browser performance stays usable. Observe first completion,
 return practice, and paid-interest counts. Any new premium content gate or price
 requires an explicit packaging decision; this ticket does not introduce one.
+
+**Implementation — 2026-10-15.** Main commit `d9e4f6d8` completes the cache-cleanup
+flagship (`generic-cache-eviction-mutation`): four Python modules, a plain-language
+incident contract, an existing stateful class, and a gated pinned-entry follow-up.
+The debugging browser places it directly after the 15-minute warm-up; Python-only
+filters put it first. Difficulty and existing access limits are unchanged. The
+scenario opens on its entry point, not the fault location. The browser runner now
+supports sibling imports and restores its interpreter arguments/import paths.
+
+Authoring checks execute the starter, two valid fixes, invalid repairs, alternate
+inputs and the follow-up. Runtime grading still uses the pack's stdout oracle;
+this is not a new private hidden-test grader. Browser checks exercise the real
+Python worker and readable card/list layouts. No new acquisition page, public
+sample debrief, distribution campaign, learner validation or retention lift is
+claimed: those parts of this ticket remain open.
