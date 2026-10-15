@@ -50,7 +50,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
         }
       }}
       aria-pressed={isSelected}
-      className={`group focus-visible:ring-accent/50 flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none sm:gap-4 sm:px-4 ${
+      className={`group focus-visible:ring-accent/50 grid cursor-pointer grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none sm:flex sm:gap-4 sm:px-4 ${
         isSelected
           ? "border-accent/50 bg-accent/5"
           : "border-border bg-card hover:border-accent/40 hover:bg-accent/5"
@@ -75,8 +75,10 @@ export const ScenarioListRow = memo(function ScenarioListRow({
 
       {/* Title + meta (the flexible, truncating column) */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="text-foreground truncate font-medium">{scenario.title}</span>
+        <span className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
+          <span className="text-foreground line-clamp-2 w-full font-medium sm:line-clamp-none sm:w-auto sm:truncate">
+            {scenario.title}
+          </span>
           <ScenarioLanguageTags scenario={scenario} compact className="shrink-0" />
           {/* Same progression cue as the card view. */}
           {discoveryLabel && (
@@ -85,8 +87,10 @@ export const ScenarioListRow = memo(function ScenarioListRow({
             </span>
           )}
         </span>
-        <span className="text-muted-foreground flex items-center gap-2 truncate text-xs">
-          <span className="sm:hidden">{typeConfig.label}</span>
+        <span className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+          <span className="capitalize sm:hidden">
+            {scenario.difficulty} · {scenario.estimatedTime} min
+          </span>
           <span className="hidden items-center gap-1 sm:inline-flex">
             <Clock className="h-3 w-3" aria-hidden="true" />
             {scenario.estimatedTime} min
@@ -113,7 +117,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
       </div>
 
       {/* Difficulty */}
-      <div className="flex w-[72px] flex-shrink-0 items-center gap-1.5">
+      <div className="hidden w-[72px] flex-shrink-0 items-center gap-1.5 sm:flex">
         <span
           className={`h-2 w-2 rounded-full ${difficultyColorClass(scenario.difficulty, "dot")}`}
           aria-hidden="true"
