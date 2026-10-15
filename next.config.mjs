@@ -93,6 +93,11 @@ const nextConfig = {
         source: '/:path*',
         headers: [
           {
+            // Static discovery metadata for agents; no proxy or function invocation.
+            key: 'Link',
+            value: '</llms.txt>; rel="describedby"'
+          },
+          {
             key: 'X-DNS-Prefetch-Control',
             value: 'on'
           },
