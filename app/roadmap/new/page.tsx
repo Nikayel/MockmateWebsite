@@ -20,10 +20,14 @@ import { useRoadmapStore } from "@/lib/stores/roadmap-store"
 import { getCompanyById } from "@/lib/data/company-questions"
 import type { CompanyId } from "@/lib/data/company-questions/types"
 import { useAuth } from "@/lib/auth-context"
+import { RoadmapUpgradePrompt } from "@/components/roadmap/RoadmapUpgradePrompt"
+import { roadmapUpgradeReason } from "@/lib/roadmap/upgrade-gate"
+import { trackRoadmapFlow } from "@/lib/roadmap/funnel"
 import {
   clearPendingWizard,
   loadPendingWizard,
   savePendingWizard,
+  type PendingWizard,
 } from "@/lib/roadmap/pending-wizard"
 
 type Step = "company" | "date" | "assessment" | "generating"
@@ -38,6 +42,14 @@ export default function NewRoadmapPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { user, firebaseUser, loading: authLoading } = useAuth()
+  const lastGenerationRef = useRef<PendingWizard | null>(null)
+  const viewTrackedRef = useRef(false)
+
+  useEffect(() => {
+    if (viewTrackedRef.current) return
+    viewTrackedRef.current = true
+    trackRoadmapFlow("view")
+  }, [])
 
   const {
     selectedCompany,
@@ -68,6 +80,11 @@ export default function NewRoadmapPage() {
       // must not re-save, or it would loop forever (see the PRO_REQUIRED branch).
       fromResume: boolean
     ) => {
+      lastGenerationRef.current = {
+        companyId,
+        interviewDate: interviewDate.toISOString(),
+        result,
+      }
       if (!firebaseUser) {
         setError(AUTH_REQUIRED_ERROR)
         setStep("assessment")
@@ -77,6 +94,7 @@ export default function NewRoadmapPage() {
       setStep("generating")
       setIsGenerating(true)
       setError(null)
+      trackRoadmapFlow("generation_requested")
 
       try {
         // Get Firebase ID token for authentication
@@ -107,7 +125,8 @@ export default function NewRoadmapPage() {
             .json()
             .catch(() => ({ error: "Failed to create roadmap" }))
           // Handle Pro-only feature restriction - stay on generating step and show upgrade prompt
-          if (errorData.code === "PRO_REQUIRED") {
+          const upgradeReason = roadmapUpgradeReason(errorData.code)
+          if (upgradeReason) {
             // The walk is done and only the plan is gated: keep the finished walk through the
             // upgrade round trip the same way savePendingWizard keeps it through sign-in.
             // Only on a DIRECT wall hit, though. A resumed walk that walls again must not
@@ -122,9 +141,8 @@ export default function NewRoadmapPage() {
                 result,
               })
             }
-            // Brief delay so user sees the generation started
-            await new Promise((resolve) => setTimeout(resolve, 1500))
-            setError("PRO_REQUIRED")
+            trackRoadmapFlow("paywall_viewed", upgradeReason)
+            setError(errorData.code)
             setIsGenerating(false)
             // Stay on generating step - don't go back to assessment
             return
@@ -157,6 +175,7 @@ export default function NewRoadmapPage() {
 
         // The walk is spent the moment it becomes a roadmap.
         clearPendingWizard()
+        trackRoadmapFlow("generation_succeeded")
 
         // Set active roadmap in store
         setActiveRoadmap(roadmap)
@@ -164,6 +183,7 @@ export default function NewRoadmapPage() {
         // Navigate to roadmap view
         router.push("/roadmap")
       } catch (err) {
+        trackRoadmapFlow("generation_failed")
         console.error("Error generating roadmap:", err)
         setError(err instanceof Error ? err.message : "Failed to generate roadmap")
         setStep("assessment")
@@ -243,6 +263,7 @@ export default function NewRoadmapPage() {
 
   const handleAssessmentComplete = async (result: AssessmentResult) => {
     if (!selectedCompany || !selectedDate) return
+    trackRoadmapFlow("assessment_completed")
 
     if (!user?.id || !firebaseUser) {
       // The walk is finished; only the account is missing. Save it so the sign-in round trip
@@ -275,11 +296,16 @@ export default function NewRoadmapPage() {
     error?.toLowerCase().includes("rate") ||
     error?.toLowerCase().includes("limit") ||
     error?.toLowerCase().includes("too many")
-  const isProRequired = error === "PRO_REQUIRED"
+  const upgradeReason = roadmapUpgradeReason(error)
+  const isProRequired = upgradeReason !== null
   // The signed-out branch of handleAssessmentComplete. The banner must carry a way to sign in:
   // steps 1-3 need no auth, so a signed-out visitor genuinely reaches this error, and a message
   // with no affordance strands them at the end of the wizard.
   const isAuthRequired = error === AUTH_REQUIRED_ERROR
+  const handleUpgradeClick = () => {
+    if (lastGenerationRef.current) savePendingWizard(lastGenerationRef.current)
+    if (upgradeReason) trackRoadmapFlow("upgrade_clicked", upgradeReason)
+  }
 
   return (
     <div className="bg-background min-h-screen">
@@ -326,7 +352,8 @@ export default function NewRoadmapPage() {
                 </p>
                 <div className="flex flex-wrap gap-3">
                   <Link
-                    href="/upgrade"
+                    href="/upgrade?source=roadmap"
+                    onClick={handleUpgradeClick}
                     className="inline-flex items-center gap-2 rounded-lg bg-yellow-500 px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-yellow-400"
                   >
                     Upgrade to Pro
@@ -463,70 +490,21 @@ export default function NewRoadmapPage() {
                   animate={{ opacity: 1, scale: 1 }}
                   className="py-16 text-center"
                 >
-                  {isProRequired ? (
-                    // Show Pro upgrade prompt on generating step
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mx-auto max-w-lg"
-                    >
-                      <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-orange-500">
-                        <Crown className="h-10 w-10 text-white" />
-                      </div>
-                      <h2 className="text-foreground mb-3 text-2xl font-bold">
-                        Unlock Your Personalized Roadmap
-                      </h2>
-                      <p className="text-muted-foreground mx-auto mb-6 max-w-md">
-                        We've analyzed {companyData?.name || "your target company"}'s interview
-                        patterns and prepared a custom study plan. Upgrade to Pro to access your
-                        personalized roadmap with:
-                      </p>
-                      <div className="mx-auto mb-8 grid max-w-md grid-cols-1 gap-3 text-left sm:grid-cols-2">
-                        <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                          <span className="text-green-500">✓</span> Company-specific questions
-                        </div>
-                        <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                          <span className="text-green-500">✓</span> Daily practice schedules
-                        </div>
-                        <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                          <span className="text-green-500">✓</span> Spaced repetition tracking
-                        </div>
-                        <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                          <span className="text-green-500">✓</span> Pattern mastery insights
-                        </div>
-                      </div>
-                      <div className="flex flex-col justify-center gap-3 sm:flex-row">
-                        <Link
-                          href="/upgrade"
-                          className="bg-accent text-accent-foreground hover:bg-accent/90 inline-flex items-center justify-center gap-2 rounded-lg px-6 py-3 font-semibold shadow-lg transition-all"
-                        >
-                          Upgrade to Pro
-                          <ArrowRight className="h-4 w-4" />
-                        </Link>
-                        <Link
-                          href="/dashboard"
-                          className="text-muted-foreground hover:text-foreground inline-flex items-center justify-center px-6 py-3 transition-colors"
-                        >
-                          Continue with Free
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            // The quiet exit from the wall: abandon the parked walk (saved
-                            // answers included) and hand back a blank wizard. Without it,
-                            // the saved walk's only outcomes are upgrade or leave-and-wall-
-                            // again on the next visit inside the TTL.
-                            clearPendingWizard()
-                            resetWizard()
-                            setError(null)
-                            setStep("company")
-                          }}
-                          className="text-muted-foreground hover:text-foreground inline-flex items-center justify-center px-6 py-3 transition-colors"
-                        >
-                          Start over
-                        </button>
-                      </div>
-                    </motion.div>
+                  {upgradeReason ? (
+                    <RoadmapUpgradePrompt
+                      reason={upgradeReason}
+                      companyName={companyData?.name || "your target company"}
+                      // A passive resume is single-shot. Only an intentional upgrade
+                      // click parks the assessment again for the payment round trip.
+                      onUpgrade={handleUpgradeClick}
+                      onStartOver={() => {
+                        clearPendingWizard()
+                        lastGenerationRef.current = null
+                        resetWizard()
+                        setError(null)
+                        setStep("company")
+                      }}
+                    />
                   ) : (
                     // Show loading state
                     <>

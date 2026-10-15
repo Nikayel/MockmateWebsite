@@ -24,9 +24,12 @@ import { isPaidTier } from "@/lib/pricing"
 import { ROADMAP_FEATURE_COPY } from "@/lib/pricing-features"
 import type { SubscriptionTier } from "@/lib/config"
 import { SparraLoader } from "@/components/brand/SparraLoader"
+import { normalizeUpgradeSource, upgradePath } from "@/lib/billing/upgrade-entry"
 
 function UpgradePageContent() {
   const searchParams = useSearchParams()
+  const upgradeSource = normalizeUpgradeSource(searchParams?.get("source"))
+  const entryBilling = searchParams?.get("billing") === "monthly" ? "monthly" : "yearly"
   const router = useRouter()
   const { user, firebaseUser, loading: authLoading, initialized } = useAuth()
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -54,8 +57,12 @@ function UpgradePageContent() {
   useEffect(() => {
     if (!mounted || !initialized || viewPricingTracked.current) return
     viewPricingTracked.current = true
-    trackUpgradeFlow({ userId: user?.id ?? "anonymous", step: "view_pricing" })
-  }, [mounted, initialized, user?.id])
+    trackUpgradeFlow({
+      userId: user?.id ?? "anonymous",
+      step: "view_pricing",
+      source: upgradeSource,
+    })
+  }, [mounted, initialized, user?.id, upgradeSource])
 
   useEffect(() => {
     if (authLoading || !initialized) return
@@ -79,6 +86,7 @@ function UpgradePageContent() {
 
           toast.success("Payment successful! Syncing your account...")
 
+          let resumeRoadmap = false
           if (sessionId) {
             let syncSuccess = false
             let attempts = 0
@@ -108,6 +116,7 @@ function UpgradePageContent() {
 
                   if (syncData.profile?.subscription_tier === "pro") {
                     syncSuccess = true
+                    resumeRoadmap = upgradeSource === "roadmap"
                     setProfile(
                       (prev) =>
                         ({
@@ -119,13 +128,18 @@ function UpgradePageContent() {
                     // Conversion: confirmed Pro after Stripe checkout. Derive the
                     // transaction value from the synced plan so GA4 revenue is accurate.
                     const purchasedYearly = syncData.profile?.subscription_type === "yearly"
-                    trackUpgradeFlow({ userId: currentUserId, step: "complete_checkout" })
+                    trackUpgradeFlow({
+                      userId: currentUserId,
+                      step: "complete_checkout",
+                      source: upgradeSource,
+                    })
                     trackPurchase({
                       userId: currentUserId,
                       tier: "pro",
                       value: purchasedYearly ? proPricing.yearly.price : proPricing.monthly.price,
                       currency: "USD",
                       platform: "website",
+                      source: upgradeSource,
                     })
 
                     toast.success("You're now a Pro member!")
@@ -147,10 +161,10 @@ function UpgradePageContent() {
             }
           }
 
-          router.replace("/account")
+          router.replace(resumeRoadmap ? "/roadmap/new" : "/account")
         } else if (canceled === "true") {
           toast.info("Payment canceled. You can try again anytime.")
-          router.replace("/upgrade")
+          router.replace(upgradePath(upgradeSource, entryBilling))
         }
       } catch {
         // Error handling search params
@@ -168,6 +182,8 @@ function UpgradePageContent() {
     initialized,
     proPricing.monthly.price,
     proPricing.yearly.price,
+    upgradeSource,
+    entryBilling,
   ])
 
   useEffect(() => {
@@ -194,7 +210,12 @@ function UpgradePageContent() {
     // click_upgrade fires before the guards: the step means "pressed the
     // button", including the anonymous and already-Pro presses the later
     // steps never see. It was defined in the union with zero call sites.
-    trackUpgradeFlow({ userId: user?.id ?? "anonymous", step: "click_upgrade", tier: planType })
+    trackUpgradeFlow({
+      userId: user?.id ?? "anonymous",
+      step: "click_upgrade",
+      tier: planType,
+      source: upgradeSource,
+    })
 
     if (isProUser) {
       toast.success("You're already on Pro!")
@@ -203,12 +224,17 @@ function UpgradePageContent() {
     }
 
     if (!user || !firebaseUser) {
-      window.location.href = "/login?redirect=upgrade"
+      window.location.href = `/login?redirect=${encodeURIComponent(upgradePath(upgradeSource, planType))}`
       return
     }
 
     setLoading(planType)
-    trackUpgradeFlow({ userId: user.id, step: "start_checkout", tier: planType })
+    trackUpgradeFlow({
+      userId: user.id,
+      step: "start_checkout",
+      tier: planType,
+      source: upgradeSource,
+    })
     reportFunnelEvent("checkout_start")
     try {
       const idToken = await firebaseUser.getIdToken()
@@ -222,6 +248,7 @@ function UpgradePageContent() {
         body: JSON.stringify({
           platform: "website",
           planType: planType,
+          source: upgradeSource,
         }),
       })
 

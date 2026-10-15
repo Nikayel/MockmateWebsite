@@ -17,6 +17,7 @@ import { sensitiveOperationRateLimit } from "@/lib/rate-limiting"
 // the post-payment sync never ran. getAppBaseUrl falls back to the canonical
 // SITE_ORIGIN instead, so the worst case is the right site.
 import { getAppBaseUrl } from "@/lib/site-url"
+import { checkoutReturnPaths, normalizeUpgradeSource } from "@/lib/billing/upgrade-entry"
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY environment variable is required")
@@ -70,7 +71,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
-    const { platform, planType } = await request.json()
+    const { platform, planType, source } = await request.json()
+    const upgradeSource = normalizeUpgradeSource(source)
 
     // Use the authenticated userId, not from request body
     const userId = authenticatedUserId
@@ -233,6 +235,7 @@ export async function POST(request: NextRequest) {
     // Create checkout session
     // Yearly plans use one-time payment, monthly uses subscription
     const isSubscription = planType === "monthly"
+    const returnPaths = checkoutReturnPaths(upgradeSource, planType)
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: isSubscription ? "subscription" : "payment",
@@ -243,13 +246,14 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${getAppBaseUrl()}/upgrade?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${getAppBaseUrl()}/upgrade?canceled=true`,
+      success_url: `${getAppBaseUrl()}${returnPaths.success}`,
+      cancel_url: `${getAppBaseUrl()}${returnPaths.canceled}`,
       client_reference_id: userId,
       metadata: {
         userId,
         platform: platform || "website",
         planType: planType,
+        upgradeSource,
       },
       // Enable promotion code input in Stripe Checkout UI
       allow_promotion_codes: true,

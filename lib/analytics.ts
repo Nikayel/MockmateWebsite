@@ -14,6 +14,7 @@ import { logEvent as firebaseLogEvent } from "firebase/analytics"
 import posthog from "posthog-js"
 import { hasAnalyticsConsent } from "@/components/CookieConsent"
 import { getAttributionParams } from "./attribution"
+import type { UpgradeSource } from "@/lib/billing/upgrade-entry"
 
 /**
  * Check if analytics tracking is allowed based on user consent
@@ -196,6 +197,7 @@ export function trackPurchase(params: {
   value: number
   currency: string
   platform: string
+  source?: UpgradeSource
 }) {
   trackEvent("purchase", params)
 }
@@ -218,6 +220,7 @@ export function trackUpgradeFlow(params: {
   userId: string
   step: "view_pricing" | "click_upgrade" | "start_checkout" | "complete_checkout"
   tier?: string
+  source?: UpgradeSource
 }) {
   trackEvent("upgrade_flow", params)
 }
