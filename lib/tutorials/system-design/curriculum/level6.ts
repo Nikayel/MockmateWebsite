@@ -2958,6 +2958,18 @@ The three are not equal in price. The first two cost nothing at runtime and noth
 const retriesDlqBackpressureTeach = `
 ## Failure handling decides whether your pipeline degrades or wedges
 
+**The short answer:** retries are for failures likely to clear; a dead-letter queue (DLQ) is for a
+message that cannot be processed yet or ever; backpressure keeps a slow consumer from accepting more
+work than it can safely hold. They solve different failure modes, and one does not replace the others.
+
+| Mechanism | Use it for | What it does | What to watch |
+| --- | --- | --- | --- |
+| Retry with capped backoff and jitter | A transient timeout, 5xx, or 429 | Delays another attempt while the dependency recovers | Attempt count and retry volume |
+| DLQ / dead-letter topic | A permanent error or exhausted retries | Preserves the failed message for alerting, inspection, and redrive | DLQ depth and age |
+| Backpressure | The consumer is slower than the producer | Bounds in-flight work and lets a durable buffer absorb lag | Consumer lag, queue depth, and memory |
+
+This lesson assumes the at-least-once world described in [delivery semantics](/learn/system-design/event-driven/sd-l6-delivery-semantics): a retry or redelivery can run a side effect twice, so the consumer still needs an idempotency key or a naturally idempotent operation. The [consumer-groups lesson](/learn/system-design/event-driven/sd-l6-consumer-groups) explains why adding consumers increases throughput only up to the partition count.
+
 A consumer that calls anything flaky (a third-party API, a downstream service) will hit failures. How you handle those failures decides whether your pipeline degrades gracefully or wedges completely.
 
 **Retries with backoff and jitter.** Transient failures (a 503, a timeout, a throttle) should be retried, but naively retrying immediately in a tight loop turns a downstream blip into a self-inflicted DDoS. Use **exponential backoff** (wait 1s, 2s, 4s, 8s) plus **jitter** (randomize the delay) so a fleet of consumers that all failed at once do not retry in a synchronized thundering herd. Cap the attempts (say 5) so a permanently broken message does not retry forever.

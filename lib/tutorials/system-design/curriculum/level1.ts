@@ -3579,22 +3579,57 @@ and webhooks for server-to-server async.
 `.trim()
 
 const httpSemanticsTeach = `
-## Decades of distributed-systems thinking, already encoded
+## HTTP semantics: the quick answer
+
+Use the method's semantics to decide what a client may repeat and what a cache may reuse. **Safe**
+means the request asks for no application state change; **idempotent** means repeating the same
+request has the same intended final effect; **cacheable** means the method and response rules permit
+a cache to reuse the response. They overlap, but they are not synonyms: \`PUT\` is idempotent without
+being safe, while a safe method is not automatically cacheable.
+
+| Method | Safe? | Idempotent? | Cacheability to design for | Retry posture |
+| --- | --- | --- | --- | --- |
+| \`GET\`, \`HEAD\` | Yes | Yes | The normal cache path; use freshness and validators | Automatic retry is generally safe |
+| \`PUT\`, \`DELETE\` | No | Yes | Responses are not cacheable | Retry the same request when the operation is intended to be idempotent |
+| \`POST\` | No | No by default | Possible only with explicit response caching rules; most caches do not use it | Do not blindly retry; use an idempotency key or reconciliation |
+| \`PATCH\` | No | Depends on the patch | Usually not the default cache path | Retry only after the operation is made demonstrably idempotent |
+
+**Interview answer:** retry \`GET\`/safe reads, make \`PUT\` and \`DELETE\` retries conditional on their
+documented semantics, and protect order/payment \`POST\` calls with an idempotency key. Cache a fresh
+\`GET\` response with \`Cache-Control\`; revalidate it with \`ETag\` and \`If-None-Match\`; protect a
+write with \`If-Match\` and return \`412 Precondition Failed\` on a stale version. For a deeper view of
+the hop and cache where a request can stop, see [End-to-End Request Lifecycle](/learn/system-design/foundations/sd-l1-request-lifecycle).
+
+### Decades of distributed-systems thinking, already encoded
 
 HTTP already encodes decades of distributed-systems thinking about safety, idempotency, caching, and
 concurrency. Using its semantics correctly gets you free caching and safe retries; ignoring them
 silently loses data.
 
-### Methods: safe and idempotent are orthogonal
+### Methods: safe and idempotent mean different things
 
-Safe means read-only (no server state change): \`GET\` and \`HEAD\`. Idempotent means repeating it
-lands the same final state: \`GET\`, \`HEAD\`, \`PUT\`, \`DELETE\`. \`POST\` is neither safe nor
-idempotent, \`PATCH\` generally is not idempotent. This directly drives retry behavior: an
-intermediary or client can safely auto-retry \`GET\`/\`PUT\`/\`DELETE\` after a network blip, but
-must not blindly auto-retry \`POST\` (that is what idempotency keys are for). Safety and
-cacheability are related but not the same property: \`GET\` and \`HEAD\` are the reliably cacheable
-methods, while \`OPTIONS\` and \`TRACE\` are safe but not cacheable, and \`POST\` is cacheable only
-when the response carries explicit freshness information.
+Safe means the client asks for no state change: \`GET\`, \`HEAD\`, \`OPTIONS\`, and \`TRACE\`.
+Logging and other incidental server-side effects may still occur. All safe methods are also
+idempotent: repeating them has the same intended effect. \`PUT\` and \`DELETE\` are idempotent too,
+but are not safe because they request a change. \`POST\` is neither safe nor idempotent by default, while \`PATCH\` depends on the
+operation. This directly drives retry behavior: an intermediary or client can safely repeat an
+idempotent request after a network blip, but should not blindly retry a non-idempotent \`POST\`.
+Caching is a third axis: HTTP defines caching semantics for \`GET\`, \`HEAD\`, and \`POST\`, but most
+implementations primarily cache \`GET\` and \`HEAD\`; a response still needs freshness and other
+cache rules. See [idempotency and retries](/learn/system-design/foundations/sd-l1-idempotency-retries)
+for the backoff and retry-budget policy around this semantic choice.
+
+### A retry whose outcome is ambiguous
+
+Imagine \`POST /v1/orders\` charges a card and creates an order. The server commits the order, then
+the connection drops before the client receives \`201 Created\`. Retrying the POST can charge twice,
+even though the client saw an error. Send an idempotency key such as
+\`Idempotency-Key: checkout-8f2...\`; the server atomically reserves the key, rejects reuse with a
+different payload, and returns the stored result for a completed replay. Concurrent retries must
+not run the charge again; the payment provider also needs the same idempotency protection. If the
+key is absent, reconcile by looking up the order or
+payment before trying again. A retry policy still needs a timeout, backoff, jitter, and a bounded
+budget; semantics make a retry safe, not magically successful.
 
 \`\`\`cswidget
 {
@@ -6842,6 +6877,8 @@ export const systemDesignLevel1: DesignLevel = {
           title: "HTTP Semantics: Methods, Status Codes & Caching Headers",
           summary:
             "Use safe/idempotent method semantics to drive retries and caching, conditional GETs with ETag for cheap 304s, and ETag + If-Match for optimistic concurrency.",
+          seoDescription:
+            "Compare safe and idempotent HTTP methods, retry POST with idempotency keys, and use Cache-Control and ETags to prevent stale reads and lost updates.",
           estimatedMinutes: 30,
           difficulty: "medium",
           skills: ["http", "api-design", "caching", "concurrency"],
