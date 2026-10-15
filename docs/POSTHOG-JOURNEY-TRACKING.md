@@ -37,7 +37,33 @@ reports one view and scrolls once. The SDK rate limit stays enabled.
 
 ## Release scope
 
-Production's next-practice feature is separate from this instrumentation fix.
-Its event calls exist on staging, but the feature must be released before those
-events can appear from production usage. Cookieless anonymous IDs rotate daily;
-cross-day return reporting should use identified users.
+Saved next practice has its own measurement contract in `RECOMMENDATION-ENGINE.md`.
+Cookieless anonymous IDs rotate daily; cross-day return reporting should use
+identified users. Event capture is not proof of a durable save or completed payment.
+
+## Roadmap and paid conversion
+
+The roadmap release tracks `roadmap_flow` with bounded `step` values: `view`,
+`assessment_completed`, `generation_requested`, `generation_succeeded`,
+`generation_failed`, `paywall_viewed`, and `upgrade_clicked`. `generation_requested`
+means an API attempt, not proof an LLM call occurred. Paywall events include
+`gate_reason: pro_required | free_roadmap_used`; auth, rate-limit, inactive-subscription,
+and in-progress errors must not become sales prompts.
+
+No assessment answers, interview dates, code, or API error messages are sent in
+these events. Existing PostHog/GA4 consent behavior is unchanged.
+
+`upgrade_flow` and browser `purchase` events carry the allowlisted `source`:
+`roadmap`, `practice-plan`, or `direct`. Other query values become `direct`.
+The same coarse source is stored as Stripe Checkout metadata `upgradeSource`.
+It is attribution, not an authorization signal or proof of causal purchase intent.
+
+Source and chosen billing period survive sign-in and checkout cancellation. A
+server-verified Pro sync returns a roadmap buyer to `/roadmap/new`, where the
+existing single-shot assessment resume runs. Only an intentional upgrade click
+re-saves a consumed assessment, so passive visits cannot create a gate/retry loop.
+
+Use Stripe's reconciled payment records for actual purchases, discounts, refunds,
+and revenue. Browser capture can be blocked, replayed, or missed when a buyer does
+not return; its configured list-price value is not a financial ledger. Historical
+events without source cannot establish which feature caused an upgrade.

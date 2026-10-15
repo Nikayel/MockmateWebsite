@@ -819,3 +819,53 @@ outgoing prerequisite links, and the existing tracked system-design practice CTA
 resolve, and the initial public HTML contains the explanations and practice link. Capture current
 page-filtered queries after deployment; use the same measurement rules as SEO-37. GSC overview's
 weekly percentage alone does not establish search intent, durable growth, or a content win.
+
+## Next execution priorities — 2026-10-15
+
+SEO-01/03/04/06/07/08/26/35/36 have closure notes above. Do not reopen them as
+unshipped work from their original descriptions. SEO-37/38's code was still on
+staging before this release; promotion is not evidence of ranking or revenue lift.
+
+### SEO-39 — Refresh demand and indexing evidence before another content sweep
+
+**Evidence.** The original baseline is from August. The GSC Wizard connector now
+refuses reads because its subscription is inactive; no current GSC comparison was
+obtained. Product pageviews are not a replacement for search impressions or ranks.
+
+**Do.** Restore authorized Search Console access or export directly from Google.
+Compare equal settled 28-day windows by query, page, device, and brand. Recheck
+SEO-14/31 duplicate-intent and crawl hypotheses; do not treat them as current facts.
+
+**Accept.** Choose the next three content changes from a fresh query-to-page table
+with explicit windows and acceptance criteria. No new API subscription or paid
+campaign is authorized by this ticket.
+
+### SEO-40 — Connect debugging search intent to a first completed round
+
+**Evidence.** The debugging acquisition page uses a shared CTA that points to bare
+`/interview`, rather than preserving a debugging lane. Traffic alone does not show
+that a visitor reached the promised task or completed it.
+
+**Do.** Audit the signed-out and signed-in landing-to-workspace paths. Preserve the
+debugging intent, offer the short onboarding incident, and keep an explicit Start
+before spending allowance. Do not make a bigger exercise the first-session gate.
+
+**Accept.** Browser tests cover new and returning users, no automatic quota spend,
+and failure recovery. Measure accepted starts and saved completions, not CTA clicks
+alone. Keep existing free recommendations and first-roadmap entitlements intact.
+
+### SEO-41 — One useful flagship debugging asset, not a bulk page expansion
+
+**Evidence.** The public bank contains 24 bugfix scenarios; 14 are single-source-file
+packs. The bookclub scenario already provides a deeper multi-module alternative.
+File count alone is not evidence of realistic reasoning or willingness to pay.
+
+**Do.** Choose one deeper incident with real module boundaries, logs, contracts,
+regression tests, a minimal repair, and a readable public sample debrief. Keep the
+15-minute introductory incident separate. Test the value with actual learners;
+share the asset through deliberately chosen channels rather than bulk posting.
+
+**Accept.** Starter fails, reference passes, hidden checks remain private, known-bad
+repairs fail, and browser performance stays usable. Observe first completion,
+return practice, and paid-interest counts. Any new premium content gate or price
+requires an explicit packaging decision; this ticket does not introduce one.
