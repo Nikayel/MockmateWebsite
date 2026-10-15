@@ -7,7 +7,7 @@ import { useShallow } from "zustand/react/shallow"
 
 import { useScenarioFilters } from "@/lib/hooks/useScenarioFilters"
 import { getScenarioLanguages, SCENARIO_LANGUAGES, scenarios, type Scenario } from "@/lib/scenarios"
-import { STARTER_SCENARIO_ID } from "./scenario-card-meta"
+import { prioritizeDebuggingScenarios } from "./scenario-discovery"
 import { useInterviewStore, type UsageLimit } from "@/lib/stores"
 
 import { DSARoadmap } from "./DSARoadmap"
@@ -117,16 +117,12 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
 
   // Narrowed to the track before anything renders it, so a track can never show another track's
   // problems whatever the shared filter store holds. Memoized because ScenarioList resets its
-  // progressive reveal whenever this array's identity changes. The starter scenario is pinned
-  // to the front when present: the bugfix bank otherwise leads with its heaviest
-  // webhook/billing titles, and a first-time visitor's first click should land on the designed
-  // 15-minute warm-up, not whatever the registry happens to list first.
+  // progressive reveal whenever this array's identity changes. Debugging leads with the
+  // warm-up, then the fix-and-extend flagship. Pin only results that survived the filters.
   const trackScenarios = useMemo(() => {
     if (!track) return []
     const list = scenariosInTrack(track, filteredScenarios)
-    const starterIndex = list.findIndex((scenario) => scenario.id === STARTER_SCENARIO_ID)
-    if (starterIndex <= 0) return list
-    return [list[starterIndex], ...list.slice(0, starterIndex), ...list.slice(starterIndex + 1)]
+    return track.id === "debugging" ? prioritizeDebuggingScenarios(list) : list
   }, [track, filteredScenarios])
 
   // Counted off the full registry rather than the filtered view: the header states how big the

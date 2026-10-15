@@ -10,7 +10,8 @@ import { PRICING_CONFIG } from "@/lib/config"
 import type { UsageLimit } from "@/lib/stores"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { getScenarioLabLink } from "@/lib/labs/lab-links"
-import { getScenarioCardContext, STARTER_SCENARIO_ID } from "./scenario-card-meta"
+import { getScenarioCardContext } from "./scenario-card-meta"
+import { getScenarioDiscoveryLabel } from "./scenario-discovery"
 import { ScenarioLanguageTags } from "./ScenarioLanguageTags"
 
 interface ScenarioCardProps {
@@ -43,6 +44,7 @@ export const ScenarioCard = memo(function ScenarioCard({
   const TypeIcon = TYPE_ICONS[scenario.type] ?? Cpu
   const { typeLabel, contextLine, signal } = getScenarioCardContext(scenario)
   const labLink = getScenarioLabLink(scenario.id)
+  const discoveryLabel = getScenarioDiscoveryLabel(scenario.id, isCompleted)
   const isLocked = !!(usageLimit && usageLimit.allowed === false && scenario.type !== "dsa")
   const companies = scenario.companies.slice(0, 2).join(", ")
   const extraCompanies = scenario.companies.length > 2 ? ` +${scenario.companies.length - 2}` : ""
@@ -82,11 +84,10 @@ export const ScenarioCard = memo(function ScenarioCard({
             {scenario.difficulty}
           </span>
           <ScenarioLanguageTags scenario={scenario} />
-          {/* The designed first rep gets a quiet invitation; once solved, the
-              Solved chip carries the story instead. */}
-          {scenario.id === STARTER_SCENARIO_ID && !isCompleted && (
+          {/* Quiet progression cue, shared with list view; solved status replaces it. */}
+          {discoveryLabel && (
             <span className="bg-accent/10 text-accent-strong rounded-full px-2 py-0.5 text-[11px] font-medium">
-              Start here
+              {discoveryLabel}
             </span>
           )}
         </div>

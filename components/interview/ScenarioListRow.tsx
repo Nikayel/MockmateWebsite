@@ -8,7 +8,7 @@ import type { Scenario } from "@/lib/scenarios"
 import type { UsageLimit } from "@/lib/stores"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { getTypeConfig } from "./scenario-display"
-import { STARTER_SCENARIO_ID } from "./scenario-card-meta"
+import { getScenarioDiscoveryLabel } from "./scenario-discovery"
 import { ScenarioLanguageTags } from "./ScenarioLanguageTags"
 
 interface ScenarioListRowProps {
@@ -35,6 +35,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
   onStart,
 }: ScenarioListRowProps) {
   const typeConfig = getTypeConfig(scenario.type)
+  const discoveryLabel = getScenarioDiscoveryLabel(scenario.id, isCompleted)
   const isLocked = !!(usageLimit && usageLimit.allowed === false && scenario.type !== "dsa")
 
   return (
@@ -77,10 +78,10 @@ export const ScenarioListRow = memo(function ScenarioListRow({
         <span className="flex min-w-0 items-center gap-2">
           <span className="text-foreground truncate font-medium">{scenario.title}</span>
           <ScenarioLanguageTags scenario={scenario} compact className="shrink-0" />
-          {/* Same starter chip as the card view; the title truncates, the chip does not. */}
-          {scenario.id === STARTER_SCENARIO_ID && !isCompleted && (
+          {/* Same progression cue as the card view. */}
+          {discoveryLabel && (
             <span className="bg-accent/10 text-accent-strong flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium">
-              Start here
+              {discoveryLabel}
             </span>
           )}
         </span>
