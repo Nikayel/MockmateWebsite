@@ -111,6 +111,10 @@ export interface BugfixPack {
   taskMd: string
   /** The working-looking (buggy) source, 1–2 files, 60–120 lines total. */
   srcFiles: PackSourceFile[]
+  /** Entry point shown first; defaults to the first source file for older packs. */
+  primaryFilePath?: string
+  /** Authoring/scoring expectation, not a restriction on which source files can be edited. */
+  expectedTouchedFiles?: string[]
   /** Input fixtures the candidate runs against. */
   fixtures: PackFixtureFile[]
   /** e.g. "python3 src/main.py fixtures/input.txt". */

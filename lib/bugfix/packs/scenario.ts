@@ -102,7 +102,7 @@ function packWorkspaceFiles(pack: BugfixPack): WorkspaceScenarioFile[] {
 }
 
 export function packToScenario(pack: BugfixPack): BugFixScenario {
-  const primaryFilePath = pack.srcFiles[0]?.path ?? "src/main.py"
+  const primaryFilePath = pack.primaryFilePath ?? pack.srcFiles[0]?.path ?? "src/main.py"
   const editableFilePaths = pack.srcFiles.map((file) => file.path)
 
   return {
@@ -151,7 +151,7 @@ export function packToScenario(pack: BugfixPack): BugFixScenario {
       "minimal fix",
       "re-verification",
     ],
-    expectedTouchedFiles: [primaryFilePath],
+    expectedTouchedFiles: pack.expectedTouchedFiles ?? [primaryFilePath],
     rootCauseRubric: [
       "Reproduces and localizes the wrong section before editing.",
       "States the single root cause in one sentence.",
@@ -280,6 +280,19 @@ export function validatePackQuality(
 
   if (pack.srcFiles.length === 0) {
     issues.push({ field: "srcFiles", message: "A pack must ship at least one source file." })
+  }
+  const sourcePaths = new Set(pack.srcFiles.map((file) => file.path))
+  if (pack.primaryFilePath && !sourcePaths.has(pack.primaryFilePath)) {
+    issues.push({
+      field: "primaryFilePath",
+      message: "Primary file must be an authored source file.",
+    })
+  }
+  if (pack.expectedTouchedFiles?.some((path) => !sourcePaths.has(path))) {
+    issues.push({
+      field: "expectedTouchedFiles",
+      message: "Expected touched files must be authored source files.",
+    })
   }
   if (pack.fixtures.length === 0) {
     issues.push({ field: "fixtures", message: "A pack must ship at least one fixture." })

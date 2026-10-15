@@ -38,7 +38,7 @@ python3 src/cache_sweep.py fixtures/input.txt
 ```
 
 Run once before editing. Compare the actual report with the expected report below,
-then follow the data through the modules. Use the editor tabs to inspect files;
+then follow the data through the modules. Use the file explorer to inspect files;
 the fixture and expected-output file are read-only. Explain what evidence supports
 your hypothesis, make a focused change, and run again to verify it.
 

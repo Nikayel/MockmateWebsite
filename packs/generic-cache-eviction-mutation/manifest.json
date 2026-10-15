@@ -15,6 +15,8 @@
   "difficulty": 2,
   "est_minutes": 45,
   "run_cmd": "python3 src/cache_sweep.py fixtures/input.txt",
+  "primary_file": "src/cache_sweep.py",
+  "expected_touched_files": ["src/cache_store.py"],
   "expected_output": "=== Live entries by namespace ===\ncatalog: 2\nfeed: 2\nsearch: 3\nsessions: 2\n",
   "buggy_output": "=== Live entries by namespace ===\ncatalog: 2\nfeed: 2\nsearch: 3\nsessions: 3\n",
   "bug_class": "mutation-during-iteration",

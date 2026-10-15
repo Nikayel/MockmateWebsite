@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import { genericCacheEvictionMutationPack as pack } from "../generic-cache-eviction-mutation"
 import { sealed } from "@/lib/scenarios/sealed/generic-cache-eviction-mutation.server"
 import { FIXED_SWEEP, PINNED_SWEEP, runCachePack, withSweep } from "./cache-cleanup-fixture"
-import { packToScenario } from "@/lib/bugfix/packs/scenario"
+import { packToScenario, validatePackQuality } from "@/lib/bugfix/packs/scenario"
 
 const fixed = withSweep(pack, FIXED_SWEEP)
 const extended = withSweep(pack, PINNED_SWEEP)
@@ -11,7 +11,7 @@ const header = "=== Live entries by namespace ===\n"
 const phase2Fixture = pack.fixtures[0].content + sealed.phase2.fixturePatch
 
 describe("cache cleanup executable contract", () => {
-  it("opens the editable store while retaining the four-module program and stable scenario id", () => {
+  it("opens the entry point without pointing directly at the defective module", () => {
     const scenario = packToScenario(pack)
     expect(pack.srcFiles.map((file) => file.path)).toEqual([
       "src/cache_store.py",
@@ -19,12 +19,21 @@ describe("cache cleanup executable contract", () => {
       "src/log_reader.py",
       "src/reporting.py",
     ])
-    expect(scenario.workspace.primaryFilePath).toBe("src/cache_store.py")
+    expect(scenario.workspace.primaryFilePath).toBe("src/cache_sweep.py")
     expect(scenario.expectedTouchedFiles).toEqual(["src/cache_store.py"])
     expect(scenario.id).toBe("generic-cache-eviction-mutation")
     expect(
       pack.srcFiles.reduce((total, file) => total + file.content.split("\n").length, 0)
     ).toBeLessThanOrEqual(200)
+  })
+
+  it("rejects stale entry-point and touched-file metadata", () => {
+    expect(validatePackQuality({ ...pack, primaryFilePath: "src/missing.py" })).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: "primaryFilePath" })])
+    )
+    expect(validatePackQuality({ ...pack, expectedTouchedFiles: ["src/missing.py"] })).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: "expectedTouchedFiles" })])
+    )
   })
 
   it("does not expose the follow-up ticket or sealed diagnosis in the initial workspace", () => {

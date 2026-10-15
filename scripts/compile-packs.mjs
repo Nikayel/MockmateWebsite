@@ -108,6 +108,10 @@ function clientModule(pack) {
     estMinutes: manifest.est_minutes,
     taskMd: pack.taskMd,
     srcFiles: pack.srcFiles,
+    ...(manifest.primary_file ? { primaryFilePath: manifest.primary_file } : {}),
+    ...(manifest.expected_touched_files
+      ? { expectedTouchedFiles: manifest.expected_touched_files }
+      : {}),
     fixtures: pack.fixtures,
     runCmd: manifest.run_cmd,
     expectedOutput: manifest.expected_output,
@@ -184,9 +188,7 @@ export default bugfixPackScenarios
 }
 
 function sealedRegistryModule(ids) {
-  const loaders = ids
-    .map((id) => `  "${id}": () => import("./${id}.server"),`)
-    .join("\n")
+  const loaders = ids.map((id) => `  "${id}": () => import("./${id}.server"),`).join("\n")
   return `${GENERATED}
 /**
  * Sealed-pack registry (SERVER-ONLY). The ONLY loader for per-pack sealed modules;
