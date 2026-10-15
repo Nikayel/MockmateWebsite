@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest"
+import { execFileSync } from "node:child_process"
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { buildPackOracleEntrypoint, decodePackStdout, parseRunCmd } from "../pack-oracle-runner"
 
 describe("parseRunCmd", () => {
@@ -32,6 +36,58 @@ describe("buildPackOracleEntrypoint", () => {
     expect(entry).toContain('["src/main.py","fixtures/input.txt"]')
     expect(entry).toContain("__PACK_STDOUT__:")
     expect(entry).toContain("contextlib.redirect_stdout")
+  })
+
+  it("resolves sibling imports like a normal Python script and restores interpreter state", () => {
+    const root = mkdtempSync(join(tmpdir(), "pack-imports-"))
+    try {
+      mkdirSync(join(root, "src"))
+      writeFileSync(join(root, "src/cache_store.py"), "def count():\n    return 2\n")
+      writeFileSync(join(root, "src/main.py"), "from cache_store import count\nprint(count())\n")
+      const entry = buildPackOracleEntrypoint("python3 src/main.py")
+      const driver = `import sys
+previous_path = list(sys.path)
+previous_argv = sys.argv
+${entry}
+assert sys.path == previous_path, "wrapper leaked script import paths"
+assert sys.argv is previous_argv, "wrapper leaked script arguments"
+`
+      const stdout = execFileSync("python3", ["-c", driver], {
+        cwd: root,
+        encoding: "utf8",
+        timeout: 5000,
+      })
+      expect(decodePackStdout(stdout.split("\n"))).toBe("2\n")
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it("restores interpreter state when the learner's program raises", () => {
+    const root = mkdtempSync(join(tmpdir(), "pack-crash-"))
+    try {
+      writeFileSync(join(root, "main.py"), 'raise ValueError("learner error")\n')
+      const entry = buildPackOracleEntrypoint("python3 main.py fixture.txt")
+      const driver = `import sys
+previous_path = list(sys.path)
+previous_argv = sys.argv
+try:
+${entry
+  .split("\n")
+  .map((line) => "    " + line)
+  .join("\n")}
+except ValueError:
+    pass
+assert sys.path == previous_path
+assert sys.argv is previous_argv
+print("restored")
+`
+      expect(
+        execFileSync("python3", ["-c", driver], { cwd: root, encoding: "utf8", timeout: 5000 })
+      ).toBe("restored\n")
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })
 
