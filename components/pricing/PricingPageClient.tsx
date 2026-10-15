@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useRef, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
@@ -94,6 +94,15 @@ export function PricingPageClient({ faqs, courses, children }: PricingPageClient
   const prefersReducedMotion = useReducedMotion()
   const radioRefs = useRef<(HTMLButtonElement | null)[]>([])
   const proPricing = getProPricing("website")
+  const viewTracked = useRef(false)
+
+  useEffect(() => {
+    if (viewTracked.current) return
+    viewTracked.current = true
+    // Public pricing visitors matter too; /upgrade's view_pricing event only
+    // covers people who already chose to continue toward checkout.
+    trackEvent("pricing_viewed", { billing_period: "yearly" })
+  }, [])
 
   const currentProPrice = billingPeriod === "yearly" ? proPricing.yearly : proPricing.monthly
   const freeFeatures = buildFreeFeatures(totalLessonCount(courses))
