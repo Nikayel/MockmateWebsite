@@ -190,7 +190,7 @@ export function CookieConsent() {
                   We use cookies and similar technologies to improve your experience, analyze
                   traffic, and personalize content. By clicking "Accept All", you consent to our use
                   of cookies.{" "}
-                  <Link href="/legal" className="text-[#c4703f] hover:underline">
+                  <Link href="/legal" prefetch={false} className="text-[#c4703f] hover:underline">
                     Learn more
                   </Link>
                 </p>

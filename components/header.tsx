@@ -138,6 +138,8 @@ const APP_NAV: AppNavItem[] = [
 // destination stays reachable on every viewport. Labels are concrete
 // goal-oriented words (research: users scan for their task, not org-chart terms
 // like "Platform").
+// These exploration links opt out of speculative prefetch in both renderers;
+// the homepage's primary practice CTAs and signed-in app nav retain defaults.
 const MARKETING_NAV: MarketingNavItem[] = [
   {
     label: "How it works",
@@ -224,6 +226,7 @@ export function Header() {
   const authSlot = (mobile: boolean) => (
     <Link
       href="/login"
+      prefetch={false}
       onClick={mobile ? () => setIsMobileMenuOpen(false) : undefined}
       className={
         mobile
@@ -253,6 +256,7 @@ export function Header() {
           <div className="flex h-14 items-center justify-between gap-4 font-[var(--font-geist)]">
             <Link
               href={showAppNav ? "/dashboard" : "/"}
+              prefetch={showAppNav ? undefined : false}
               className="group flex items-center gap-2"
               onClick={() => {
                 // For logged-out users already on the home route, scroll back to
@@ -364,6 +368,7 @@ export function Header() {
                     <Link
                       key={item.href}
                       href={item.href}
+                      prefetch={false}
                       className={marketingTabClass(item.isActive(pathname))}
                     >
                       {item.label}
@@ -371,7 +376,7 @@ export function Header() {
                   ))}
                   <ThemeToggle />
                   {/* Join us — quiet text link, de-emphasized vs the accent Sign-in CTA. */}
-                  <Link href="/careers" className={marketingTabClass(false)}>
+                  <Link href="/careers" prefetch={false} className={marketingTabClass(false)}>
                     Join us
                   </Link>
                   {authSlot(false)}
@@ -482,6 +487,7 @@ export function Header() {
                       <Link
                         key={item.href}
                         href={item.href}
+                        prefetch={false}
                         className={`focus-visible:ring-accent/50 cursor-pointer rounded-sm text-[15px] transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none ${
                           item.isActive(pathname)
                             ? "text-foreground font-medium"
@@ -498,6 +504,7 @@ export function Header() {
                     </div>
                     <Link
                       href="/careers"
+                      prefetch={false}
                       className="hover:text-accent text-muted-foreground cursor-pointer text-sm transition-colors duration-300"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >

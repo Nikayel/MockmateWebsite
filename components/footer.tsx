@@ -69,6 +69,8 @@ export const FOOTER_GUIDE_LINKS: readonly FooterTrackLink[] = [
 ]
 
 export function Footer() {
+  // Keep crawlable anchors and client navigation, but do not fetch the whole
+  // site just because its secondary destinations enter the viewport.
   return (
     <footer className="bg-background border-border border-t">
       <div className="container mx-auto px-4 py-12">
@@ -137,6 +139,7 @@ export function Footer() {
                       puts it one hop from every page instead. */}
                   <Link
                     href="/labs"
+                    prefetch={false}
                     className="text-muted-foreground hover:text-foreground transition-colors"
                   >
                     Case Labs
@@ -153,6 +156,7 @@ export function Footer() {
                 <li>
                   <Link
                     href="/blog"
+                    prefetch={false}
                     className="text-muted-foreground hover:text-foreground transition-colors"
                   >
                     Blog
@@ -176,6 +180,7 @@ export function Footer() {
                 <li>
                   <Link
                     href={LEARN_HUB_PATH}
+                    prefetch={false}
                     className="text-muted-foreground hover:text-foreground transition-colors"
                   >
                     All courses
@@ -185,6 +190,7 @@ export function Footer() {
                   <li key={track.href}>
                     <Link
                       href={track.href}
+                      prefetch={false}
                       className="text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {track.label}
@@ -194,6 +200,7 @@ export function Footer() {
                 <li>
                   <Link
                     href={LEARN_ALL_LESSONS_PATH}
+                    prefetch={false}
                     className="text-muted-foreground hover:text-foreground transition-colors"
                   >
                     Lesson index
@@ -211,6 +218,7 @@ export function Footer() {
                   <li key={guide.href}>
                     <Link
                       href={guide.href}
+                      prefetch={false}
                       className="text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {guide.label}
@@ -262,6 +270,7 @@ export function Footer() {
                       page belongs, so it costs nothing to give it the one link it needs. */}
                   <Link
                     href="/referral-terms"
+                    prefetch={false}
                     className="text-muted-foreground hover:text-foreground transition-colors"
                   >
                     Referral Terms

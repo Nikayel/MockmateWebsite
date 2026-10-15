@@ -245,6 +245,7 @@ export function ProblemTeaser() {
               </p>
               <Link
                 href="/why-codesparring"
+                prefetch={false}
                 className="text-accent hover:text-accent/80 group inline-flex items-center gap-1.5 text-sm transition-colors"
               >
                 Learn the science
