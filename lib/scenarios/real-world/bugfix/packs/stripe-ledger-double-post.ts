@@ -6,7 +6,7 @@ export const stripeLedgerDoublePostPack: BugfixPack = {
   "id": "stripe-ledger-double-post",
   "title": "Overlapping settlement batches over-credit one account's balance",
   "summary": "The nightly ledger posting job reports one account's balance higher than the ledger of record, and that account's payout is held until the number reconciles.",
-  "task": "Report each account's balance in cents (charges minus refunds) from the settlement feed so the treasury on-call can reconcile it with the ledger of record and release the payout.",
+  "task": "Investigate an overstated account balance and reconcile the settlement report with the ledger.",
   "company": {
     "tag": "stripe-bug-squash",
     "roundName": "Bug squash round",

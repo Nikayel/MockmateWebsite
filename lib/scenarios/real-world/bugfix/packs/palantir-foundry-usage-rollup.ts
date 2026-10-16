@@ -6,7 +6,7 @@ export const palantirFoundryUsageRollupPack: BugfixPack = {
   "id": "palantir-foundry-usage-rollup",
   "title": "Foundry usage rollup bills one account too much",
   "summary": "The nightly Foundry usage rollup reports higher compute-seconds than the dashboard for one account, and billing is paused until it is trusted.",
-  "task": "Bill each account for the compute-seconds it used tonight, so the nightly total matches the metering dashboard finance reconciles against.",
+  "task": "Investigate an overstated compute-usage total and restore an accurate nightly billing report.",
   "company": {
     "tag": "palantir-fdse",
     "roundName": "Re-engineering / debugging round",

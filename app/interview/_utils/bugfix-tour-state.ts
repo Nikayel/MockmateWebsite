@@ -27,8 +27,8 @@ export const TOUR_STEPS: BugfixTourStep[] = [
     target: "incident-report",
     panel: "problem",
     title: "Start with the incident",
-    body: "Read the report like a production ticket. Look for symptoms, affected behavior, and what fixed should mean.",
-    action: "Read the report, then go to the workspace files.",
+    body: "Read the goal, then open task.md for the full incident, requirements, and completion criteria.",
+    action: "Open task.md and read the assignment.",
   },
   {
     // The explorer lives in the problem panel, beneath the brief. On mobile only

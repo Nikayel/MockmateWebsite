@@ -6,7 +6,7 @@ export const datadogEndpointLatencyPeakPack: BugfixPack = {
   "id": "datadog-endpoint-latency-peak",
   "title": "Peak latency report overstates one endpoint",
   "summary": "The per-endpoint peak latency report shows one endpoint far slower than its own traces support, and a latency regression review is stuck on the discrepancy.",
-  "task": "Report each endpoint's slowest request latency in milliseconds and how many requests it saw, so the performance reviewer can sign off on the latency regression.",
+  "task": "Investigate overstated peak latency and restore accurate per-endpoint reporting.",
   "company": {
     "tag": "datadog-debugging",
     "roundName": "Debugging pairing round",

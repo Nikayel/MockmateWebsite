@@ -133,7 +133,7 @@ export const bugfixApiRateLimiterWorkspaceScenario: BugFixScenario = {
   companies: ["Generic"],
   description:
     "The API gateway lets a traffic spike reserve more requests than a customer's plan allows, and two accounts blew past their quota during this week's spikes.",
-  task: "Cap a burst at the client's remaining capacity in the rolling window, so requests arriving all at once can never reserve more than the plan limit allows.",
+  task: "Investigate why traffic bursts exceed a customer's plan limit and restore reliable quota enforcement.",
   // Grounded in the scenario's own second visible test, "a burst is capped at
   // the plan limit": 10 requests at now=1000 against limit 5 on an empty store.
   // The test expects 5; the starter's burst path returns 10.

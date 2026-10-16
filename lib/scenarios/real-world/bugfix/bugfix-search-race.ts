@@ -185,7 +185,7 @@ export const bugfixSearchRaceScenario: BugFixScenario = {
   companies: ["Generic"],
   description:
     "A reservation support console sometimes shows the previous caller's booking after an agent searches a new ref, and an agent acted on the wrong reservation before catching it.",
-  task: "Ensure the panel ends up showing the reservations for the booking ref the agent searched most recently, even when an earlier lookup's response arrives after it.",
+  task: "Investigate why reservation searches show the wrong guest and restore reliable results for the current search.",
   // Grounded in the scenario's own second visible test: BK-1024 and BK-2048
   // overlap and BK-1024 resolves last. The starter applies each response the
   // moment it lands, so shownRef ends on BK-1024 where the test asserts BK-2048.

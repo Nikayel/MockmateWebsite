@@ -122,7 +122,7 @@ export const bugfixEventAggregationRetriesScenario: BugFixScenario = {
   companies: ["Generic"],
   description:
     "A customer analytics report shows one account with far more delivery events than its raw log supports, after the ingestion queue moved to at-least-once delivery.",
-  task: "Count each of an account's real events once in its sent and opened totals, no matter how many times the queue delivers the same event or in what order batches arrive.",
+  task: "Investigate inflated delivery-event totals and make the customer report agree with the underlying events.",
   // Grounded in the scenario's own first visible test, "a redelivered event
   // counts once": e1 arrives twice for acct_1 and e2 once. The starter adds
   // every delivery it is handed, so it reports sent: 2 where the test asserts

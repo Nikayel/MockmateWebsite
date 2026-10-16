@@ -269,9 +269,8 @@ export interface BugFixScenario extends BaseScenario {
    */
   pack?: BugfixPackRuntime
   /**
-   * One imperative sentence: the first thing the candidate reads, and the answer
-   * to "what do I actually do?". Lives outside `problemStatement` so the brief can
-   * show the task without the surrounding incident narrative.
+   * One high-level instruction for the problem panel. The full public assignment
+   * remains in problemStatement/task.md for the candidate and interviewer.
    */
   task?: string
   /** Expected vs actual as two comparable values. Symptom-level only. */
@@ -341,6 +340,8 @@ export interface SystemDesignScenario extends BaseScenario {
 
 export interface AddFunctionalityScenario extends BaseScenario {
   type: "add-functionality"
+  /** Short, candidate-facing goal; the complete assignment lives in task.md. */
+  task?: string
   problemStatement: string
   featureRequirements: string[]
   existingCode: {

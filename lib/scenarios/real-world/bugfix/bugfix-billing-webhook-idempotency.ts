@@ -132,7 +132,7 @@ export const bugfixBillingWebhookIdempotencyScenario: BugFixScenario = {
   companies: ["Stripe"],
   description:
     "Paid accounts got double monthly credits after a webhook replay, and one account was downgraded even though a later upgrade had already been applied.",
-  task: "Apply each subscription event to an account at most once, and leave the account in the state of its newest applied event even when an older event arrives later.",
+  task: "Investigate duplicate credits and unexpected plan changes after webhook replays, and restore correct account entitlements.",
   // Grounded in the scenario's own first visible test, "a duplicate event grants
   // credits once": evt_1 carries a 100-credit grant and is delivered twice. The
   // starter grants on both deliveries, so acct_1 ends at 200 credits where the

@@ -6,6 +6,7 @@
  */
 
 import type { AddFunctionalityScenario } from "../types"
+import { withWorkspaceTaskDocument } from "../workspace-assignment"
 import { digestSchedulerScenario } from "./add-feature-digest-scheduler"
 import { supportTicketSearchScenario } from "./add-feature-support-ticket-search"
 import { dispatch911Scenario } from "./add-feature-911-dispatch"
@@ -18,6 +19,6 @@ export const addFunctionalityScenarios: AddFunctionalityScenario[] = [
   digestSchedulerScenario,
   dispatch911Scenario,
   ontologyOrgScenario,
-]
+].map(withWorkspaceTaskDocument)
 
 export default addFunctionalityScenarios

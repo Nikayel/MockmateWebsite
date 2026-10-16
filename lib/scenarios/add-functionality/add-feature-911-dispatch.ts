@@ -41,6 +41,7 @@ export const dispatch911Scenario: AddFunctionalityScenario = {
     "Extend a 911 dispatch system to recommend the top responders for an incident under capability, availability, stale-GPS, and ranking constraints.",
   tags: ["python", "backend", "ranking", "real-codebase", "case-lab"],
   estimatedTime: 45,
+  task: "Complete the responder recommender so dispatchers receive suitable nearby units, and connect it to the service response.",
   problemStatement: `Dispatchers currently pick responders by hand. Finish the recommender so it returns the top_k closest *available* responders that have the incident's required capability and whose GPS is fresh.
 
 The geo helper is read-only; implement \`recommend_responders\` and wire the service wrapper to report a count alongside the recommendations.`,

@@ -7,11 +7,10 @@ import { Badge } from "@/components/ui/badge"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import type { Scenario } from "@/lib/scenarios"
-import type { BugSymptom, BugFixScenario } from "@/lib/scenarios/types"
-import { resolveReporterNote } from "@/lib/scenarios/bugfix-quality"
+import { TASK_DOCUMENT_PATH } from "@/lib/scenarios/workspace-assignment"
 import type { GuidedLabConfig } from "@/lib/bugfix/guided-lab/types"
 import type { WorkspaceContextFile } from "../_types"
-import { BugfixBrief } from "./_sub/BugfixBrief"
+import { WorkspaceTaskBrief } from "./_sub/WorkspaceTaskBrief"
 import { ProblemHintSection } from "./_sub/ProblemHintSection"
 import { WorkspaceFileViewer } from "./_sub/WorkspaceFileViewer"
 import { WorkspaceFilesPanel } from "./_sub/WorkspaceFilesPanel"
@@ -26,12 +25,6 @@ type ScenarioPanelDetails = Scenario & {
     space: string
     time: string
   }
-  reproductionSteps?: string[]
-  successCriteria?: string[]
-  task?: string
-  symptom?: BugSymptom
-  userReport?: string
-  visibleLogs?: string[]
   guidedLab?: GuidedLabConfig
 }
 
@@ -40,7 +33,7 @@ export interface ProblemColumnCtx {
   /** Path of the file open in the editor, so the tree can mark it active. */
   activeWorkspacePath: string | null
   /** Opens a file in the editor. Also records bugfix file-inspection evidence. */
-  onWorkspaceFileSelect: (file: WorkspaceContextFile) => void
+  onWorkspaceFileSelect: (file: WorkspaceContextFile, options?: { readable?: boolean }) => void
   elapsedTime: number
   fetchRAGHints: () => Promise<void>
   fileInputRef: RefObject<HTMLInputElement | null>
@@ -101,20 +94,19 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
   } = ctx
   const isBugfix = selectedScenario?.type === "bugfix"
   const scenarioDetails = selectedScenario as ScenarioPanelDetails | null
-  const reproductionSteps = scenarioDetails?.reproductionSteps ?? []
-  const successCriteria = scenarioDetails?.successCriteria ?? []
-  const visibleLogs = scenarioDetails?.visibleLogs ?? []
   const guidedLab = scenarioDetails?.guidedLab
-
-  // Only the scenarios that actually authored a report get one quoted; see resolveReporterNote.
-  const reporterNote =
-    isBugfix && selectedScenario
-      ? resolveReporterNote(selectedScenario as BugFixScenario)
-      : undefined
+  const isDebuggingTask = isBugfix || selectedScenario?.type === "add-functionality"
+  const taskFile = isDebuggingTask
+    ? (workspaceContext.find((file) => file.path === TASK_DOCUMENT_PATH && file.role === "docs") ??
+      selectedScenario?.workspace?.files.find(
+        (file) => file.path === TASK_DOCUMENT_PATH && file.role === "docs" && !file.hidden
+      ))
+    : undefined
 
   // The explorer only earns its own region when there is a real codebase behind it.
   // Upload-style scenarios keep the inline uploader at the foot of the brief.
   const showFileTree = isWorkspaceScenario(selectedScenario) && workspaceContext.length > 0
+  const initialBriefSize = taskFile && !guidedLab ? 48 : 62
 
   return (
     <>
@@ -140,7 +132,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
             and a deep tree never buries the task. */}
         <CardContent className="min-h-0 flex-1 overflow-hidden p-0">
           <ResizablePanelGroup direction="vertical" className="h-full">
-            <ResizablePanel defaultSize={showFileTree ? 62 : 100} minSize={30}>
+            <ResizablePanel defaultSize={showFileTree ? initialBriefSize : 100} minSize={30}>
               <div className="h-full space-y-5 overflow-y-auto px-4 pb-4">
                 {guidedLab && selectedScenario && (
                   <div className="border-border/60 bg-muted/20 rounded-lg border p-3">
@@ -149,28 +141,10 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                 )}
                 {selectedScenario && (
                   <>
-                    {/* Bug-fix: one brief, single source of truth. Everything else keeps
-                  the classic Description block. */}
-                    {isBugfix ? (
-                      <BugfixBrief
-                        title={selectedScenario.title}
-                        reproductionSteps={reproductionSteps}
-                        visibleLogs={visibleLogs}
-                        task={scenarioDetails?.task}
-                        symptom={scenarioDetails?.symptom}
-                        acceptance={successCriteria}
-                        reporterNote={reporterNote}
-                        report={
-                          realInterviewMode && scenarioDetails?.fuzzyStatement
-                            ? scenarioDetails.fuzzyStatement
-                            : selectedScenario.problemStatement
-                        }
-                        fallbackStatement={
-                          realInterviewMode && scenarioDetails?.fuzzyStatement
-                            ? scenarioDetails.fuzzyStatement
-                            : selectedScenario.problemStatement
-                        }
-                        isFuzzy={Boolean(realInterviewMode && scenarioDetails?.fuzzyStatement)}
+                    {isDebuggingTask && taskFile ? (
+                      <WorkspaceTaskBrief
+                        summary={selectedScenario.task ?? selectedScenario.description}
+                        onOpenTask={() => onWorkspaceFileSelect(taskFile, { readable: true })}
                       />
                     ) : (
                       <div className="space-y-2">
@@ -396,7 +370,7 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
             {showFileTree && (
               <>
                 <ResizableHandle withHandle />
-                <ResizablePanel defaultSize={38} minSize={12} collapsible>
+                <ResizablePanel defaultSize={100 - initialBriefSize} minSize={12} collapsible>
                   <WorkspaceFilesPanel
                     files={workspaceContext}
                     activePath={activeWorkspacePath}

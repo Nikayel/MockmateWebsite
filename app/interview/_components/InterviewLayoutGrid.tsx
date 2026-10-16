@@ -45,6 +45,8 @@ interface InterviewLayoutGridProps {
   // EditorColumn
   activePanel: EditorColumnProps["activePanel"]
   activeWorkspaceFile: EditorColumnProps["activeWorkspaceFile"]
+  documentPreviewPath?: EditorColumnProps["documentPreviewPath"]
+  onDocumentPreviewChange?: EditorColumnProps["onDocumentPreviewChange"]
   selectedLanguage: EditorColumnProps["selectedLanguage"]
   editorLanguage: EditorColumnProps["editorLanguage"]
   code: EditorColumnProps["code"]
@@ -115,6 +117,8 @@ export function InterviewLayoutGrid({
   problemCtx,
   activePanel,
   activeWorkspaceFile,
+  documentPreviewPath,
+  onDocumentPreviewChange,
   selectedLanguage,
   editorLanguage,
   code,
@@ -324,6 +328,8 @@ export function InterviewLayoutGrid({
           activePanel={activePanel}
           selectedScenario={selectedScenario}
           activeWorkspaceFile={activeWorkspaceFile}
+          documentPreviewPath={documentPreviewPath}
+          onDocumentPreviewChange={onDocumentPreviewChange}
           selectedLanguage={selectedLanguage}
           editorLanguage={editorLanguage}
           code={code}

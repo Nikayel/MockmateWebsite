@@ -6,7 +6,7 @@ export const stripePayoutBatchMutationPack: BugfixPack = {
   "id": "stripe-payout-batch-mutation",
   "title": "Nightly payout run under-schedules one merchant's settlement",
   "summary": "The nightly settlement report schedules atlas_supply below their pending ledger, so their payout is held until the number reconciles.",
-  "task": "Report each merchant's total across tonight's batches, so the payments on-call knows how much money leaves the platform for that merchant.",
+  "task": "Investigate the merchant's underscheduled payout and restore accurate settlement totals.",
   "company": {
     "tag": "stripe-bug-squash",
     "roundName": "Bug squash round",

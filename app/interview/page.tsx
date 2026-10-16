@@ -367,6 +367,7 @@ function InterviewPageContent() {
   // Workspace context
   const [workspaceContext, setWorkspaceContext] = useState<WorkspaceContextFile[]>([])
   const [activeWorkspacePath, setActiveWorkspacePath] = useState<string | null>(null)
+  const [documentPreviewPath, setDocumentPreviewPath] = useState<string | null>(null)
   const [bugfixEvidenceEvents, setBugfixEvidenceEvents] = useState<BugfixEvidenceEvent[]>([])
   const recordedBugfixEditPathsRef = useRef<Set<string>>(new Set())
   const chatWorkspaceContext = useMemo(
@@ -490,12 +491,22 @@ function InterviewPageContent() {
    * useInterviewModes so it can reveal the editor panel on file-select.
    */
   const handleEditorFileSelect = useCallback(
-    (file: WorkspaceContextFile) => {
+    (file: WorkspaceContextFile, options?: { readable?: boolean }) => {
       // The file tree lives in the problem panel now. On mobile only one panel shows at a
       // time, so opening a file must also reveal the editor — otherwise the tap silently
       // swaps the editor's contents behind the problem panel and nothing appears to happen.
       // On desktop every panel is visible, so this is a no-op there.
       setActivePanel("editor")
+      setDocumentPreviewPath(options?.readable ? file.path : null)
+      // Older saved workspaces predate task.md. Add the public document on demand
+      // while retaining every saved source file and edit.
+      if (options?.readable && file.role === "docs") {
+        setWorkspaceContext((current) =>
+          current.some((entry) => entry.path === file.path)
+            ? current
+            : [...current, { ...file, originalContent: file.content }]
+        )
+      }
       if (file.path !== activeWorkspacePath) {
         setActiveWorkspacePath(file.path)
         setCode(file.content || "")
@@ -509,6 +520,11 @@ function InterviewPageContent() {
       }
     },
     [activeWorkspacePath, recordBugfixEvidence, selectedScenario?.type, setActivePanel]
+  )
+
+  const handleDocumentPreviewChange = useCallback(
+    (preview: boolean) => setDocumentPreviewPath(preview ? activeWorkspacePath : null),
+    [activeWorkspacePath]
   )
 
   // Experience level from roadmap (for level-appropriate interviewer questions)
@@ -2133,6 +2149,8 @@ function InterviewPageContent() {
               problemCtx={problemCtx}
               activePanel={activePanel}
               activeWorkspaceFile={activeWorkspaceFile}
+              documentPreviewPath={documentPreviewPath}
+              onDocumentPreviewChange={handleDocumentPreviewChange}
               selectedLanguage={selectedLanguage}
               editorLanguage={editorLanguage}
               code={code}

@@ -15,6 +15,7 @@ export const digestSchedulerScenario: AddFunctionalityScenario = {
   description: "Add digest notification scheduling with quiet hours and deduplication",
   tags: ["python", "backend", "notifications", "scheduling", "real-codebase"],
   estimatedTime: 60,
+  task: "Add notification digests that follow user preferences and produce reliable jobs when the worker retries.",
   problemStatement: `The notifications service needs a digest scheduler so users are not emailed for every event. Implement scheduled digest creation using user preferences, quiet hours, unread notifications, and deterministic deduplication.
 
 Wire the feature through the service and keep the existing repository contract unchanged.`,

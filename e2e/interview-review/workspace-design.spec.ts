@@ -99,14 +99,16 @@ test("workspace settings remain keyboard accessible and restore focus after grad
   await expect(settings).toBeFocused()
 })
 
-test("Sparra tabs preserve the brief, its checklist, conversation and draft", async ({
+test("Sparra tabs preserve the brief, task preview, conversation and draft", async ({
   page,
 }, testInfo) => {
   await page.goto("/?view=workspace&theme=light")
   const sparra = page.getByRole("tab", { name: "Sparra coding partner" })
   const problem = page.getByRole("tab", { name: "Problem", exact: true })
-  const checkbox = page.getByRole("checkbox").first()
-  await checkbox.check()
+  const task = page.getByRole("button", { name: "Open task.md", exact: true })
+  await task.click()
+  const preview = page.getByRole("article", { name: "task.md preview" })
+  await expect(preview).toBeVisible()
   // Tabs use manual activation: arrows move focus, Enter changes the panel.
   await problem.focus()
   await page.keyboard.press("ArrowRight")
@@ -122,7 +124,8 @@ test("Sparra tabs preserve the brief, its checklist, conversation and draft", as
   )
   await input.fill("Keep this draft")
   await problem.click()
-  await expect(checkbox).toBeChecked()
+  await expect(task).toBeVisible()
+  await expect(preview).toBeVisible()
   await sparra.click()
   await expect(input).toHaveValue("Keep this draft")
   await expect(page.getByRole("log", { name: "Sparra messages" })).toContainText(
@@ -131,7 +134,8 @@ test("Sparra tabs preserve the brief, its checklist, conversation and draft", as
   await page.screenshot({ path: testInfo.outputPath("workspace-partner-light.png") })
   await input.press("Escape")
   await expect(problem).toBeFocused()
-  await expect(checkbox).toBeChecked()
+  await expect(task).toBeVisible()
+  await expect(preview).toBeVisible()
 })
 
 test("editor menu resets only the requested scope", async ({ page }) => {
@@ -154,6 +158,12 @@ test("workspace color pairs meet text contrast in both themes", async ({ page })
   await page.emulateMedia({ reducedMotion: "reduce" })
   for (const theme of ["light", "dark"]) {
     await page.goto(`/?view=workspace&theme=${theme}`)
+    const taskButton = page.getByRole("button", { name: "Open task.md", exact: true })
+    await taskButton.hover()
+    const taskHover = await taskButton.evaluate((button) => {
+      const style = getComputedStyle(button)
+      return { foreground: style.color, background: style.backgroundColor }
+    })
     const micButton = page.getByRole("button", { name: "Start voice answer" })
     const hoverFill = await micButton.evaluate((button) => {
       const sample = document.createElement("span")
@@ -168,7 +178,7 @@ test("workspace color pairs meet text contrast in both themes", async ({ page })
     const ratios = await page
       .locator(".interview-workspace")
       .first()
-      .evaluate((surface) => {
+      .evaluate((surface, taskHover) => {
         const sample = document.createElement("span")
         surface.appendChild(sample)
         const luminance = (color: string) => {
@@ -209,9 +219,13 @@ test("workspace color pairs meet text contrast in both themes", async ({ page })
         })
         const mic = getComputedStyle(surface.querySelector('[aria-label="Start voice answer"]')!)
         ratios.push({ pair: "mic hover", ratio: contrast(mic.color, mic.backgroundColor) })
+        ratios.push({
+          pair: "task hover",
+          ratio: contrast(taskHover.foreground, taskHover.background),
+        })
         sample.remove()
         return ratios
-      })
+      }, taskHover)
     for (const { pair, ratio } of ratios)
       expect(ratio, `${theme}: ${pair}`).toBeGreaterThanOrEqual(4.5)
   }

@@ -6,7 +6,7 @@ export const datadogAlertDedupOrderPack: BugfixPack = {
   "id": "datadog-alert-dedup-order",
   "title": "Alert-incident rollup hides a monitor's second page in an interleaved feed",
   "summary": "The per-monitor alert-incident rollup an on-call engineer reads reports one monitor firing fewer times than the metering dashboard, hiding a real second incident that already paged.",
-  "task": "Report how many separate times each prod monitor paged during the shift, so the rollup agrees with the metering dashboard the on-call engineer compares it against.",
+  "task": "Investigate the missing alert incident and make the monitor rollup agree with the dashboard.",
   "company": {
     "tag": "datadog-debugging",
     "roundName": "Debugging pairing round",

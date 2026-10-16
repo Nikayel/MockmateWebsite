@@ -149,6 +149,7 @@ export const ontologyOrgScenario: AddFunctionalityScenario = {
     "Learn a small unfamiliar Ontology API (objects, properties, typed links) cold, then implement three org-chart queries of increasing difficulty against it.",
   tags: ["python", "learning-round", "ontology", "graph-traversal", "real-codebase", "case-lab"],
   estimatedTime: 40,
+  task: "Learn the unfamiliar Ontology API, implement the org-chart queries, and complete the summary report.",
   problemStatement: `You are handed a tiny slice of a company Ontology in \`src/ontology.py\` (read-only): objects have a type, a primary key, and properties, and you navigate typed links from one object to another. You have never seen this API. Learn it from the file, then implement three queries in \`src/analysis.py\` and wire the \`src/report.py\` summary.
 
 The three queries climb in difficulty: count a team's members (filter), list a manager's direct reports (one hop, sorted), and total headcount under a manager (follow the reporting chain all the way down).`,

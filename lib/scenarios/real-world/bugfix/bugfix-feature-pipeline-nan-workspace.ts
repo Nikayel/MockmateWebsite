@@ -130,7 +130,7 @@ export const bugfixFeaturePipelineNanWorkspaceScenario: BugFixScenario = {
   companies: ["Generic"],
   description:
     "A model scoring job stopped erroring after the feature builder was hardened, but accounts migrated from the legacy CRM now score like empty users even though their history exists.",
-  task: "Substitute the feature's configured default from the model contract for any value that is missing, null, non-numeric, or non-finite, keeping feature order intact.",
+  task: "Investigate incorrect scores for migrated accounts and restore feature values that match the model contract.",
   // Grounded in the scenario's own second visible test, "a nulled income falls
   // back to its configured default": {"age": 29, "income": None,
   // "sessions_30d": 2} asserts [29.0, 50000.0, 2.0], but the starter returns

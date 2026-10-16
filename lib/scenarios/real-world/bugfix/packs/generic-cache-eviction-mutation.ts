@@ -7,7 +7,7 @@ export const genericCacheEvictionMutationPack: BugfixPack = {
   title: "Cache cleanup: reconcile the overnight report",
   summary:
     "The overnight cache report disagrees with the morning metrics in both directions. Trace a small Python service, reconcile the counts, and verify its replay checks before operations plans capacity.",
-  task: "Report each namespace's live count at the sweep checkpoint so the capacity-planning on-call can size memory from a report that agrees with the cache's own metrics endpoint.",
+  task: "Investigate the overnight cache-count discrepancies and restore an accurate report across the replay checks.",
   company: {
     tag: "generic-fdse",
     roundName: "Debugging round",

@@ -6,7 +6,7 @@ export const palantirOntologyLinkRollupPack: BugfixPack = {
   "id": "palantir-ontology-link-rollup",
   "title": "Ontology link report undercounts one object type",
   "summary": "The ontology link report shows fewer active links for one object type than the graph explorer does, and a data-quality review is blocked until the counts reconcile.",
-  "task": "Report, for each object type, how many active links came from the graph, so the rollup reconciles with the graph explorer the data-quality reviewer signs off against.",
+  "task": "Investigate missing active links and make the report agree with the graph explorer.",
   "company": {
     "tag": "palantir-fdse",
     "roundName": "Re-engineering / debugging round",

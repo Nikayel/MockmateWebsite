@@ -116,7 +116,7 @@ export const bugfixCommentThreadMergeScenario: BugFixScenario = {
   companies: ["Generic"],
   description:
     "A collaborative editor's comment sidebar sometimes reports one more unresolved thread than the document actually has, and a reviewer held a doc open believing a comment was still unresolved.",
-  task: "Merge each incoming thread into the existing thread that shares its id, updating it in place so no thread is duplicated and the unresolved badge matches the open comments.",
+  task: "Investigate duplicated comments and an inflated unresolved badge, and restore accurate thread updates.",
   // Grounded in the scenario's own first visible test, "resolving the root
   // thread does not duplicate it": t1 and t2 both open, incoming resolves t1.
   // The starter appends the resolved t1 as a third thread instead of updating the

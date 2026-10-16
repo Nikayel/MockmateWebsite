@@ -489,7 +489,7 @@ export const bugfixBookclubReadingStreakWorkspaceScenario: BugFixScenario = {
   companies: ["Generic"],
   description:
     "Fix a reading-streak calculation and a history ordering in a small layered reading-tracker app",
-  task: "Count the reading streak as the consecutive days, ending today, on which the member finished a book, and list the reading history most recently finished first.",
+  task: "Investigate incorrect reading streaks and history order while preserving the profile statistics that already work.",
   // Grounded in the scenario's own visible streak test (tests/test_streak.py,
   // "current streak counts consecutive finished days"): calculate_streak(1, TODAY)
   // asserts 3 for Alex on 2026-06-28. The starter returns 0, while the same

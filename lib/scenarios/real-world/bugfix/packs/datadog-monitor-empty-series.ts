@@ -6,7 +6,7 @@ export const datadogMonitorEmptySeriesPack: BugfixPack = {
   "id": "datadog-monitor-empty-series",
   "title": "Monitor board reads OK for a series whose exporter went silent",
   "summary": "The monitor status board on-call watches during an incident reports OK for a series that sent no samples all window, so a blind monitor is indistinguishable from a healthy one and on-call stopped trusting the board.",
-  "task": "Report each monitored series' status for the fixed evaluation window from the collector feed, so on-call can trust the board during an incident.",
+  "task": "Investigate why a silent monitored series appears healthy and restore trustworthy status reporting.",
   "company": {
     "tag": "datadog-debugging",
     "roundName": "Debugging pairing round",

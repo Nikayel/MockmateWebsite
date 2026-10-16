@@ -155,20 +155,6 @@
   color: var(--foreground);
 }
 
-.workspace-brief h2 {
-  font-size: 1rem;
-  line-height: 1.5;
-}
-
-.workspace-brief h3 {
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-
-.workspace-brief h2:first-child {
-  margin-top: 0;
-}
-
 /* Focus keeps controls readable and reachable with a keyboard, without a vignette. */
 .focus-mode-active .interview-workspace .focus-header {
   opacity: 1;

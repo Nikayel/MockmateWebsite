@@ -6,14 +6,9 @@ import { Badge } from "@/components/ui/badge"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import type { Scenario } from "@/lib/scenarios"
-import type { BugSymptom } from "@/lib/scenarios/types"
-import { BugfixBrief } from "./_sub/BugfixBrief"
 
 type PeekScenarioDetails = Scenario & {
   fuzzyStatement?: string
-  successCriteria?: string[]
-  symptom?: BugSymptom
-  task?: string
 }
 
 interface FocusProblemPeekProps {
@@ -64,24 +59,10 @@ export const FocusProblemPeek = memo(function FocusProblemPeek({
             </Badge>
           </div>
           <div className="max-h-[calc(60vh-60px)] overflow-y-auto p-4">
-            {/* Focus mode hides the brief column, so this peek is the only place
-                the task is readable. Show the same distilled brief rather than the
-                full narrative the redesign exists to collapse. */}
-            {scenario.type === "bugfix" ? (
-              <BugfixBrief
-                task={peekDetails.task}
-                symptom={peekDetails.symptom}
-                acceptance={peekDetails.successCriteria}
-                report={statement}
-                fallbackStatement={statement}
-                isFuzzy={Boolean(realInterviewMode && peekDetails.fuzzyStatement)}
-              />
-            ) : (
-              <MarkdownRenderer
-                content={statement}
-                className="text-foreground text-sm leading-relaxed"
-              />
-            )}
+            <MarkdownRenderer
+              content={statement}
+              className="text-foreground text-sm leading-relaxed"
+            />
             {scenario.type === "dsa" && scenario.examples && scenario.examples.length > 0 && (
               <div className="mt-4 space-y-3">
                 <h4 className="text-accent text-xs font-semibold tracking-wide uppercase">

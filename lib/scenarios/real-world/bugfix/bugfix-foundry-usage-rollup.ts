@@ -162,7 +162,7 @@ export const bugfixFoundryUsageRollupScenario: BugFixScenario = {
   companies: ["Palantir"],
   description:
     "A metered compute-usage rollup overbills several accounts for compute-seconds after a backfill replayed a transform's backup build into the pipeline.",
-  task: "Meter each distinct event id once per account, even when the same id arrives on both the primary and the backup stream.",
+  task: "Investigate inflated compute-usage bills after a replay and restore accurate account totals.",
   // Grounded in the scenario's own first visible test: evt_1 at 5s on both
   // streams. The starter dedupes each stream in isolation and then sums, so it
   // reports 10s / 2 events where the test expects 5s / 1.

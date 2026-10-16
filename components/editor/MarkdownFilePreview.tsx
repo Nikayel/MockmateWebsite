@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import "./markdown-file-preview.css"
@@ -7,12 +8,24 @@ import "./markdown-file-preview.css"
 interface MarkdownFilePreviewProps {
   fileName: string
   content: string
+  focusOnOpen?: boolean
 }
 
 /** Plain GFM for repository files, without lesson-only widgets or source transformations. */
-export default function MarkdownFilePreview({ fileName, content }: MarkdownFilePreviewProps) {
+export default function MarkdownFilePreview({
+  fileName,
+  content,
+  focusOnOpen = false,
+}: MarkdownFilePreviewProps) {
+  const articleRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (focusOnOpen) articleRef.current?.focus({ preventScroll: true })
+  }, [fileName, focusOnOpen])
+
   return (
     <article
+      ref={articleRef}
+      tabIndex={-1}
       aria-label={`${fileName} preview`}
       className="markdown-file-preview text-foreground mx-auto max-w-3xl p-5 sm:p-8"
     >

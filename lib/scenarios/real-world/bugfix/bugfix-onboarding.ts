@@ -242,7 +242,7 @@ Finance support approves a manual invoice adjustment when the review queue shows
     },
   ],
   expectedTouchedFiles: ["src/reconciliation.js"],
-  task: "Explain an adjustment only with two distinct open ledger rows that sum to it, even when a reconciled row would complete the sum.",
+  task: "Investigate an incorrect adjustment match and restore reliable reconciliation for finance support.",
   // Grounded in the scenario's own second visible test, "does not explain an
   // adjustment with a row that was already reconciled": inv_9101 (2600, open)
   // and inv_9102 (2400, reconciled) against a 5000 adjustment. The starter

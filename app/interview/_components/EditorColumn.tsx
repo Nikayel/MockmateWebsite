@@ -36,6 +36,8 @@ interface EditorColumnProps {
   activePanel: "problem" | "editor" | "chat"
   selectedScenario: Scenario | null
   activeWorkspaceFile: WorkspaceContextFile | null | undefined
+  documentPreviewPath?: string | null
+  onDocumentPreviewChange?: (preview: boolean) => void
   selectedLanguage: EditorLanguage
   editorLanguage: string
   code: string
@@ -69,6 +71,8 @@ export const EditorColumn = memo(function EditorColumn({
   activePanel,
   selectedScenario,
   activeWorkspaceFile,
+  documentPreviewPath,
+  onDocumentPreviewChange,
   selectedLanguage,
   editorLanguage,
   code,
@@ -153,7 +157,14 @@ export const EditorColumn = memo(function EditorColumn({
   const editorSurface = (
     <>
       <ErrorBoundary>
-        <MarkdownFileView fileName={activeWorkspaceFile?.path ?? ""} content={code}>
+        <MarkdownFileView
+          fileName={activeWorkspaceFile?.path ?? ""}
+          content={code}
+          preview={
+            onDocumentPreviewChange ? documentPreviewPath === activeWorkspaceFile?.path : undefined
+          }
+          onPreviewChange={onDocumentPreviewChange}
+        >
           <LazyCodeMirrorEditor
             ref={editorRef}
             height="100%"
@@ -168,30 +179,33 @@ export const EditorColumn = memo(function EditorColumn({
           />
         </MarkdownFileView>
       </ErrorBoundary>
-      {selectedScenario && !isInterviewStarted && !showScenarioBrowser && (
-        <div className="bg-background/80 absolute inset-0 z-10 flex items-center justify-center overflow-y-auto p-4 backdrop-blur-sm">
-          <div className="max-h-full max-w-md p-2 text-center sm:p-6">
-            <div className="bg-accent/20 mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full">
-              <PlayCircle className="text-accent h-8 w-8" />
+      {selectedScenario &&
+        !isInterviewStarted &&
+        !showScenarioBrowser &&
+        activeWorkspaceFile?.role !== "docs" && (
+          <div className="bg-background/80 absolute inset-0 z-10 flex items-center justify-center overflow-y-auto p-4 backdrop-blur-sm">
+            <div className="max-h-full max-w-md p-2 text-center sm:p-6">
+              <div className="bg-accent/20 mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full">
+                <PlayCircle className="text-accent h-8 w-8" />
+              </div>
+              <h3 className="text-foreground mb-2 text-xl font-bold">Ready to Start?</h3>
+              <p className="text-muted-foreground mb-4 text-sm">
+                Review the problem on the left, then start your interview when ready. The timer will
+                begin once you start.
+              </p>
+              <Button
+                onClick={onStartInterview}
+                className="bg-accent hover:bg-accent/80 text-accent-foreground px-8 py-3 text-base font-semibold"
+              >
+                <PlayCircle className="mr-2 h-5 w-5" />
+                Start Interview
+              </Button>
+              <p className="text-muted-foreground mt-3 text-xs">
+                Estimated time: {selectedScenario.estimatedTime || 30} minutes
+              </p>
             </div>
-            <h3 className="text-foreground mb-2 text-xl font-bold">Ready to Start?</h3>
-            <p className="text-muted-foreground mb-4 text-sm">
-              Review the problem on the left, then start your interview when ready. The timer will
-              begin once you start.
-            </p>
-            <Button
-              onClick={onStartInterview}
-              className="bg-accent hover:bg-accent/80 text-accent-foreground px-8 py-3 text-base font-semibold"
-            >
-              <PlayCircle className="mr-2 h-5 w-5" />
-              Start Interview
-            </Button>
-            <p className="text-muted-foreground mt-3 text-xs">
-              Estimated time: {selectedScenario.estimatedTime || 30} minutes
-            </p>
           </div>
-        </div>
-      )}
+        )}
     </>
   )
 

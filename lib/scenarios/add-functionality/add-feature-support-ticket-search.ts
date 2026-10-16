@@ -15,6 +15,7 @@ export const supportTicketSearchScenario: AddFunctionalityScenario = {
   description: "Add filtered, ranked support ticket search across service and API layers",
   tags: ["python", "backend", "search", "api", "real-codebase"],
   estimatedTime: 55,
+  task: "Add filtered, ranked ticket search through the service and API while preserving the existing list behavior.",
   problemStatement: `Support agents need a search endpoint that can filter tickets by text, status, and priority. The repository already returns ticket records; your task is to wire the feature through the search service and API response shape.
 
 Implement the feature in the editable files while preserving the current list endpoint behavior.`,

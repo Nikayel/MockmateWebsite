@@ -222,7 +222,7 @@ The data-center operations panel annotates each temperature reading with how man
     },
   ],
   expectedTouchedFiles: ["src/temperature-alerts.js"],
-  task: "Annotate every reading with the minutes, taken from the observedAt timestamps, until that sensor's next strictly warmer sample, even when one recovery ends a whole cold streak.",
+  task: "Investigate missing or shortened recovery waits and restore accurate telemetry annotations.",
   // Grounded in the scenario's own first visible test, "a recovery resolves the
   // whole streak using observed timestamps": rack-a reads 70 at 09:00, 69 at
   // 09:02, then recovers to 71 at 09:05. The starter returns [0, 3, 0] where the

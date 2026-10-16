@@ -4,6 +4,8 @@ import { InterviewTopBar } from "@/app/interview/_components/InterviewTopBar"
 import { useEditorLanguageChange } from "@/app/interview/_hooks/useEditorLanguageChange"
 import { genericCacheEvictionMutationScenario as workspaceScenario } from "@/lib/scenarios/real-world/bugfix/packs/generic-cache-eviction-mutation"
 import { dsaTwoSumScenario } from "@/lib/scenarios/dsa/arrays-hashing/dsa-two-sum"
+import { bugfixScenarios } from "@/lib/scenarios/real-world/bugfix/all"
+import { addFunctionalityScenarios } from "@/lib/scenarios/add-functionality"
 import { toWorkspaceScenarioFiles } from "@/app/interview/_utils/workspace"
 import type { PackRunView } from "@/lib/workspace-execution"
 import type { ChatMessage, EditorLanguage } from "@/app/interview/_types"
@@ -11,8 +13,14 @@ import type { PartnerChatMessage } from "@/app/interview/_components/SparraPartn
 
 const noop = () => {}
 export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
-  const isDsa = new URLSearchParams(window.location.search).get("scenario") === "dsa"
-  const scenario = isDsa ? dsaTwoSumScenario : workspaceScenario
+  const params = new URLSearchParams(window.location.search)
+  const isDsa = params.get("scenario") === "dsa"
+  const started = params.get("started") !== "0"
+  const scenario = isDsa
+    ? dsaTwoSumScenario
+    : ([...bugfixScenarios, ...addFunctionalityScenarios].find(
+        (entry) => entry.id === params.get("scenario")
+      ) ?? workspaceScenario)
   const [activePanel, setActivePanel] = useState<"problem" | "editor" | "chat">("editor")
   const [expanded, setExpanded] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
@@ -24,8 +32,13 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
   const [singleFileCode, setSingleFileCode] = useState(
     dsaTwoSumScenario.starterCode.javascript ?? ""
   )
-  const [files, setFiles] = useState(() => toWorkspaceScenarioFiles(scenario))
+  const [files, setFiles] = useState(() =>
+    toWorkspaceScenarioFiles(scenario).filter(
+      (file) => params.get("saved") !== "1" || file.path !== "task.md"
+    )
+  )
   const [path, setPath] = useState(files.find((file) => file.role === "editable")?.path ?? "")
+  const [documentPreviewPath, setDocumentPreviewPath] = useState<string | null>(null)
   const [input, setInput] = useState("")
   const [messages, setMessages] = useState<PartnerChatMessage[]>([])
   const [interviewerInput, setInterviewerInput] = useState("")
@@ -118,7 +131,7 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
             }}
             calmMode={calmMode}
             onCalmModeChange={setCalmMode}
-            isInterviewStarted
+            isInterviewStarted={started}
             hideTimer={hideTimer}
             onHideTimerChange={setHideTimer}
             strictTimeLimit={null}
@@ -140,8 +153,15 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
         problemCtx={{
           activePanel,
           activeWorkspacePath: path,
-          onWorkspaceFileSelect: (file) => {
+          onWorkspaceFileSelect: (file, options) => {
             setPath(file.path)
+            setDocumentPreviewPath(options?.readable ? file.path : null)
+            if (options?.readable && file.role === "docs")
+              setFiles((current) =>
+                current.some((entry) => entry.path === file.path)
+                  ? current
+                  : [...current, { ...file, originalContent: file.content }]
+              )
             setActivePanel("editor")
           },
           elapsedTime: 900,
@@ -153,7 +173,7 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
           hintFeedback: new Map(),
           hintFetchStatus: "idle",
           hintsStale: false,
-          isInterviewStarted: true,
+          isInterviewStarted: started,
           ragHints: [],
           realInterviewMode: false,
           revealedAIHintIndices: new Set(),
@@ -171,6 +191,8 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
         }}
         activePanel={activePanel}
         activeWorkspaceFile={active}
+        documentPreviewPath={documentPreviewPath}
+        onDocumentPreviewChange={(preview) => setDocumentPreviewPath(preview ? path : null)}
         selectedLanguage={language}
         editorLanguage={isDsa ? language : "python"}
         code={active?.content ?? singleFileCode}
@@ -181,7 +203,7 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
               previous.map((file) => (file.path === path ? { ...file, content } : file))
             )
         }}
-        isInterviewStarted
+        isInterviewStarted={started}
         showScenarioBrowser={false}
         showFeedback={false}
         showPostInterviewDiscussion={false}
