@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { MAX_FILE_SIZE } from "@/lib/interview/context-window"
 import {
   buildConsoleContext,
+  buildBugFixContext,
   buildCurrentCodeContext,
   buildEdgeCaseContext,
   buildEnvironmentContext,
@@ -14,6 +15,19 @@ import {
 } from "../context-builders"
 
 describe("chat context builders", () => {
+  it("keeps diagnosis candidate-led, including after edits and partially repaired incidents", () => {
+    const { bugFixContext } = buildBugFixContext("bugfix")
+    expect(bugFixContext).toContain(
+      "before the candidate states that hypothesis or explicitly asks for a hint"
+    )
+    expect(bugFixContext).toContain("Seeing their code edits or a test result is not permission")
+    expect(bugFixContext).toContain(
+      "do not assume one repaired symptom means the incident is resolved"
+    )
+    expect(bugFixContext).toContain("A small correctness patch need not have a design trade-off")
+    expect(buildBugFixContext("dsa").bugFixContext).toBe("")
+  })
+
   it("derives candidate display context from a full name", () => {
     const result = buildUserPersonalizationContext({
       email: "ada@example.com",

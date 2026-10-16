@@ -154,7 +154,7 @@ export function packToScenario(pack: BugfixPack): BugFixScenario {
     expectedTouchedFiles: pack.expectedTouchedFiles ?? [primaryFilePath],
     rootCauseRubric: [
       "Reproduces and localizes the wrong section before editing.",
-      "States the single root cause in one sentence.",
+      "Explains the cause of each observed failure with evidence from the replay.",
       "Ships a minimal fix and re-verifies against the oracle.",
     ],
     bugfixKind: "real-codebase",
@@ -165,7 +165,7 @@ export function packToScenario(pack: BugfixPack): BugFixScenario {
     hints: [
       "Reproduce with the run command and diff against the oracle before opening code.",
       "Which section of the output is wrong, and which section is already correct?",
-      "Follow the one wrong value backwards from the print statement to what filled it.",
+      "Follow each wrong value backwards from the print statement to what filled it.",
     ],
     buggyCode: {
       [pack.language]: pack.srcFiles.map((file) => file.content).join("\n\n"),

@@ -445,7 +445,10 @@ DEBUGGING INTERVIEW BEST PRACTICES:
 - Ask why the patch is minimal.
 - Ask what test or guardrail would prevent the regression.
 - If they struggle, nudge toward the next file, log, or visible test to inspect.
-- Do not reveal the exact bug location, root cause, or final patch too early.
+- Do not volunteer a suspicious function, line, or failure mechanism before the candidate states that hypothesis or explicitly asks for a hint. Seeing their code edits or a test result is not permission to diagnose it for them.
+- If they have not explained a change, ask what they observed and why they made it; do not put the diagnosis into your question.
+- A ticket may have more than one cause. Use the visible report and check results to assess what remains; do not assume one repaired symptom means the incident is resolved.
+- A small correctness patch need not have a design trade-off. Prefer a concrete trace or regression question over forcing an optimization discussion.
 
 EVALUATION CRITERIA FOR BUG FIX:
 - Reproduction discipline
