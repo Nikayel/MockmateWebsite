@@ -11,7 +11,6 @@ import {
   type TestResult,
   type TestSummary,
 } from "@/components/interview/CodeConsole"
-import { GradingCriteriaTooltip } from "@/components/GradingCriteria"
 import { cn } from "@/lib/utils"
 import {
   useGuidedLabComplete,
@@ -29,7 +28,6 @@ import {
 import { LazyCodeMirrorEditor } from "./LazyCodeMirrorEditor"
 import { ConsoleOutput as ConsoleOutputPanel } from "./_sub/ConsoleOutput"
 import { TestResultsPanel } from "./_sub/TestResultsPanel"
-import { SparraPartnerWidget, type PartnerChatMessage } from "./SparraPartnerWidget"
 
 interface EditorColumnProps {
   activePanel: "problem" | "editor" | "chat"
@@ -58,14 +56,6 @@ interface EditorColumnProps {
   onSelectedLanguageChange: (language: EditorLanguage) => void
   onResetActiveFile?: () => void
   onResetWorkspace?: () => void
-  isAIPartnerExpanded: boolean
-  onAIPartnerExpandedChange: (expanded: boolean) => void
-  chatMessages: PartnerChatMessage[]
-  chatEndRef: RefObject<HTMLDivElement | null>
-  chatInput: string
-  onChatInputChange: (value: string) => void
-  isLoadingChat: boolean
-  onSendPartnerMessage: () => void
   workspaceContext?: WorkspaceContextFile[]
   editorRef?: RefObject<CodeMirrorEditorRef | null>
   onGoToLine?: (lineNum: number) => void
@@ -97,14 +87,6 @@ export const EditorColumn = memo(function EditorColumn({
   onSelectedLanguageChange,
   onResetActiveFile,
   onResetWorkspace,
-  isAIPartnerExpanded,
-  onAIPartnerExpandedChange,
-  chatMessages,
-  chatEndRef,
-  chatInput,
-  onChatInputChange,
-  isLoadingChat,
-  onSendPartnerMessage,
   workspaceContext = [],
   editorRef,
   onGoToLine,
@@ -209,7 +191,7 @@ export const EditorColumn = memo(function EditorColumn({
 
   return (
     <Card
-      className={`editor-panel-card glass-effect border-border bg-card/50 relative order-2 h-full flex-col gap-0 overflow-hidden py-0 ${
+      className={`editor-panel-card border-border bg-card relative order-2 h-full min-w-0 flex-col gap-0 overflow-hidden py-0 ${
         activePanel === "editor" ? "flex" : "hidden lg:flex"
       }`}
     >
@@ -272,13 +254,6 @@ export const EditorColumn = memo(function EditorColumn({
                   All
                 </Button>
               )}
-              <GradingCriteriaTooltip />
-              {isInterviewStarted && (
-                <div className="flex items-center space-x-1">
-                  <div className="bg-accent h-1.5 w-1.5 animate-pulse rounded-full"></div>
-                  <span className="text-accent text-xs">LIVE</span>
-                </div>
-              )}
             </div>
           </div>
         ) : (
@@ -299,15 +274,6 @@ export const EditorColumn = memo(function EditorColumn({
                   </span>
                 )}
               </div>
-              <div className="flex items-center space-x-3">
-                <GradingCriteriaTooltip />
-                {isInterviewStarted && (
-                  <div className="flex items-center space-x-1">
-                    <div className="bg-accent h-1.5 w-1.5 animate-pulse rounded-full"></div>
-                    <span className="text-accent text-xs">LIVE</span>
-                  </div>
-                )}
-              </div>
             </CardTitle>
           </div>
         )}
@@ -318,19 +284,6 @@ export const EditorColumn = memo(function EditorColumn({
             whole width of the one column the candidate types in. */}
         <div className="border-border relative min-h-0 flex-1 overflow-auto rounded border">
           {editorSurface}
-          {selectedScenario && selectedScenario.type !== "dsa" && (
-            <SparraPartnerWidget
-              expanded={isAIPartnerExpanded}
-              onExpandedChange={onAIPartnerExpandedChange}
-              messages={chatMessages}
-              messagesEndRef={chatEndRef}
-              input={chatInput}
-              onInputChange={onChatInputChange}
-              isLoading={isLoadingChat}
-              onSendMessage={onSendPartnerMessage}
-              isDebuggingScenario={selectedScenario.type === "bugfix"}
-            />
-          )}
         </div>
 
         {isInterviewStarted && selectedScenario?.type !== "system-design" && (

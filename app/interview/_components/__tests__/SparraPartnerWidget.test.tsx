@@ -19,20 +19,51 @@ describe("SparraPartnerWidget", () => {
   it("renders as a named, minimized chat launcher", () => {
     render(<SparraPartnerWidget expanded={false} onExpandedChange={vi.fn()} {...baseProps} />)
 
-    expect(screen.getByRole("button", { name: "Open Sparra AI partner" })).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Open Sparra partner" })).toBeTruthy()
     expect(screen.getByText("Ask Sparra")).toBeTruthy()
   })
 
-  it("renders the popup conversation and can be minimized", () => {
+  it("renders a docked conversation and returns to the problem", () => {
     const onExpandedChange = vi.fn()
     render(<SparraPartnerWidget expanded onExpandedChange={onExpandedChange} {...baseProps} />)
 
-    expect(screen.getByRole("dialog", { name: "Sparra AI partner" })).toBeTruthy()
-    expect(screen.getByText("AI debugging partner")).toBeTruthy()
+    expect(screen.getByRole("region", { name: "Sparra partner" })).toBeTruthy()
+    expect(screen.queryByRole("dialog")).toBeNull()
     expect(screen.getByText("Tell me what you inspected.")).toBeTruthy()
 
-    fireEvent.click(screen.getByRole("button", { name: "Minimize Sparra" }))
+    fireEvent.click(screen.getByRole("button", { name: "Back to problem" }))
     expect(onExpandedChange).toHaveBeenCalledWith(false)
+  })
+
+  it("focuses the input but only handles Escape originating inside the partner", () => {
+    const onExpandedChange = vi.fn()
+    render(<SparraPartnerWidget expanded onExpandedChange={onExpandedChange} {...baseProps} />)
+    const input = screen.getByRole("textbox", { name: "Message Sparra" })
+    expect(document.activeElement).toBe(input)
+    fireEvent.keyDown(window, { key: "Escape" })
+    expect(onExpandedChange).not.toHaveBeenCalled()
+    fireEvent.keyDown(input, { key: "Escape" })
+    expect(onExpandedChange).toHaveBeenCalledWith(false)
+  })
+
+  it.each([
+    { input: "   ", isLoading: false },
+    { input: "A question", isLoading: true },
+  ])("does not submit empty or busy input: %j", (state) => {
+    const onSendMessage = vi.fn()
+    render(
+      <SparraPartnerWidget
+        expanded
+        onExpandedChange={vi.fn()}
+        {...baseProps}
+        {...state}
+        onSendMessage={onSendMessage}
+      />
+    )
+    fireEvent.submit(
+      screen.getByRole("button", { name: "Send message to Sparra" }).closest("form")!
+    )
+    expect(onSendMessage).not.toHaveBeenCalled()
   })
 
   it("submits a typed message through the existing chat handler", () => {

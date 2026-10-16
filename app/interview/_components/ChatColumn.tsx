@@ -79,28 +79,11 @@ export const ChatColumn = memo(function ChatColumn({
               <div className="bg-accent/15 text-accent ring-accent/30 flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ring-1">
                 S
               </div>
-              <span
-                className="bg-neural border-card absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2"
-                aria-hidden="true"
-              />
             </div>
             <div className="flex min-w-0 flex-col">
-              <span className="text-foreground truncate leading-tight font-semibold">
-                CodeSparring AI
-              </span>
+              <span className="text-foreground truncate leading-tight font-semibold">Sable</span>
               <span className="text-muted-foreground flex items-center gap-1.5 text-[11px] leading-tight font-normal">
-                Sable · reacting live
-                <span className="flex items-end gap-0.5" aria-hidden="true">
-                  <span className="bg-accent/70 h-1.5 w-0.5 animate-pulse rounded-full" />
-                  <span
-                    className="bg-accent/70 h-2.5 w-0.5 animate-pulse rounded-full"
-                    style={{ animationDelay: "150ms" }}
-                  />
-                  <span
-                    className="bg-accent/70 h-1 w-0.5 animate-pulse rounded-full"
-                    style={{ animationDelay: "300ms" }}
-                  />
-                </span>
+                Interviewer
               </span>
             </div>
           </div>

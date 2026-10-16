@@ -4,10 +4,12 @@ import { useRef, type ComponentProps, type CSSProperties } from "react"
 import dynamic from "next/dynamic"
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react"
 import { useWorkspaceRails } from "../_hooks/useWorkspaceRails"
+import { isWorkspaceScenario } from "../_utils/workspace"
 import { FocusProblemPeek } from "./FocusProblemPeek"
 import { ProblemColumn, type ProblemColumnCtx } from "./ProblemColumn"
 import { EditorColumn } from "./EditorColumn"
 import { ChatColumn } from "./ChatColumn"
+import { SparraPartnerWidget } from "./SparraPartnerWidget"
 import type { BugfixOnboardingTour } from "./BugfixOnboardingTour"
 
 /**
@@ -23,6 +25,7 @@ const BugfixOnboardingTourLazy = dynamic(
 
 type FocusProblemPeekProps = ComponentProps<typeof FocusProblemPeek>
 type EditorColumnProps = ComponentProps<typeof EditorColumn>
+type PartnerProps = ComponentProps<typeof SparraPartnerWidget>
 type ChatColumnProps = ComponentProps<typeof ChatColumn>
 type BugfixOnboardingTourProps = ComponentProps<typeof BugfixOnboardingTour>
 
@@ -60,14 +63,14 @@ interface InterviewLayoutGridProps {
   onSelectedLanguageChange: EditorColumnProps["onSelectedLanguageChange"]
   onResetActiveFile: EditorColumnProps["onResetActiveFile"]
   onResetWorkspace: EditorColumnProps["onResetWorkspace"]
-  isAIPartnerExpanded: EditorColumnProps["isAIPartnerExpanded"]
-  onAIPartnerExpandedChange: EditorColumnProps["onAIPartnerExpandedChange"]
-  chatMessages: EditorColumnProps["chatMessages"]
-  chatEndRef: EditorColumnProps["chatEndRef"]
-  chatInput: EditorColumnProps["chatInput"]
-  onChatInputChange: EditorColumnProps["onChatInputChange"]
-  isLoadingChat: EditorColumnProps["isLoadingChat"]
-  onSendPartnerMessage: EditorColumnProps["onSendPartnerMessage"]
+  isAIPartnerExpanded: PartnerProps["expanded"]
+  onAIPartnerExpandedChange: PartnerProps["onExpandedChange"]
+  chatMessages: PartnerProps["messages"]
+  chatEndRef: PartnerProps["messagesEndRef"]
+  chatInput: PartnerProps["input"]
+  onChatInputChange: PartnerProps["onInputChange"]
+  isLoadingChat: PartnerProps["isLoading"]
+  onSendPartnerMessage: PartnerProps["onSendMessage"]
   workspaceContext: EditorColumnProps["workspaceContext"]
   // ChatColumn
   interviewerMessages: ChatColumnProps["interviewerMessages"]
@@ -169,6 +172,13 @@ export function InterviewLayoutGrid({
     toggleLab,
     toggleInt,
   } = useWorkspaceRails(containerRef)
+  const hasPartner = Boolean(selectedScenario && selectedScenario.type !== "dsa")
+  // Multi-file tasks still need navigation in focus mode; only the interviewer rail disappears.
+  const focusHasExplorer =
+    focusMode && isWorkspaceScenario(selectedScenario) && Boolean(workspaceContext?.length)
+  const partnerExpanded = hasPartner && isAIPartnerExpanded && !focusMode
+  // Opening Sparra reveals the rail without overwriting the user's saved width/collapse choice.
+  const leftCollapsed = labCollapsed && !partnerExpanded && !focusHasExplorer
 
   return (
     <div
@@ -177,14 +187,16 @@ export function InterviewLayoutGrid({
         isDragging ? "transition-none select-none" : "transition-all duration-300"
       } ${
         focusMode
-          ? "grid-cols-1" // Focus mode: editor only
+          ? focusHasExplorer
+            ? "grid-cols-1 lg:[grid-template-columns:var(--w-lab)_minmax(0,1fr)]"
+            : "grid-cols-1"
           : "grid-cols-1 lg:[grid-template-columns:var(--w-lab)_minmax(0,1fr)_var(--w-int)]"
       }`}
       style={
-        focusMode
+        focusMode && !focusHasExplorer
           ? undefined
           : ({
-              "--w-lab": labCollapsed ? "0px" : `${labWidth}px`,
+              "--w-lab": leftCollapsed ? "0px" : `${labWidth}px`,
               "--w-int": intCollapsed ? "0px" : `${intWidth}px`,
             } as CSSProperties)
       }
@@ -195,7 +207,7 @@ export function InterviewLayoutGrid({
           A collapsed rail hides its handle and shows a slim re-open tab. */}
       {!focusMode && (
         <>
-          {!labCollapsed && (
+          {!leftCollapsed && (
             <div
               role="separator"
               aria-orientation="vertical"
@@ -219,7 +231,7 @@ export function InterviewLayoutGrid({
               <div className="group-hover:bg-accent/40 mx-auto h-full w-px bg-transparent transition-colors" />
             </div>
           )}
-          {labCollapsed && (
+          {leftCollapsed && (
             <button
               type="button"
               onClick={toggleLab}
@@ -257,7 +269,27 @@ export function InterviewLayoutGrid({
           onShowProblemPeekChange={onShowProblemPeekChange}
         />
       )}
-      <ProblemColumn ctx={problemCtx} collapsed={labCollapsed} onToggleCollapse={toggleLab} />
+      <aside
+        aria-label="Problem and partner"
+        className={`order-1 min-h-0 min-w-0 flex-col gap-2 overflow-hidden ${focusMode && !focusHasExplorer ? "hidden" : `${activePanel === "problem" ? "flex" : "hidden lg:flex"} ${leftCollapsed ? "lg:invisible" : ""}`}`}
+      >
+        <div className={`min-h-0 flex-1 ${partnerExpanded ? "hidden" : ""}`}>
+          <ProblemColumn ctx={problemCtx} onToggleCollapse={focusMode ? undefined : toggleLab} />
+        </div>
+        {hasPartner && !focusMode && (
+          <SparraPartnerWidget
+            expanded={isAIPartnerExpanded}
+            onExpandedChange={onAIPartnerExpandedChange}
+            messages={chatMessages}
+            messagesEndRef={chatEndRef}
+            input={chatInput}
+            onInputChange={onChatInputChange}
+            isLoading={isLoadingChat}
+            onSendMessage={onSendPartnerMessage}
+            isDebuggingScenario={selectedScenario?.type === "bugfix"}
+          />
+        )}
+      </aside>
 
       <EditorColumn
         activePanel={activePanel}
@@ -285,14 +317,6 @@ export function InterviewLayoutGrid({
         onSelectedLanguageChange={onSelectedLanguageChange}
         onResetActiveFile={onResetActiveFile}
         onResetWorkspace={onResetWorkspace}
-        isAIPartnerExpanded={isAIPartnerExpanded}
-        onAIPartnerExpandedChange={onAIPartnerExpandedChange}
-        chatMessages={chatMessages}
-        chatEndRef={chatEndRef}
-        chatInput={chatInput}
-        onChatInputChange={onChatInputChange}
-        isLoadingChat={isLoadingChat}
-        onSendPartnerMessage={onSendPartnerMessage}
         workspaceContext={workspaceContext}
       />
 
