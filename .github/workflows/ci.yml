@@ -179,6 +179,10 @@ jobs:
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:4256
 
+      # Reuses the Chromium install above; no second app build, credentials or AI calls.
+      - name: Interview review layout and workspace regressions
+        run: npx playwright test --config playwright.interview-review.config.ts
+
       - name: Stop built server
         if: always()
         run: kill "$(cat /tmp/seo-audit-server.pid)" 2>/dev/null || true

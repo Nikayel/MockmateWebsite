@@ -7,6 +7,8 @@ const externalBaseURL = process.env.PLAYWRIGHT_BASE_URL
 
 export default defineConfig({
   testDir: "./e2e",
+  // Isolated component fixture has its own server/config, not the Next.js app server.
+  testIgnore: ["**/interview-review/**"],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
