@@ -2,7 +2,12 @@
 
 Never candidate-visible. Compiles into `lib/scenarios/sealed/generic-cache-eviction-mutation.server.ts`.
 
-## Bug (src/cache_store.py, in `evict_expired()`)
+## Two independent causes, not one missing edge case
+There are two repairs across two modules. The initial report undercounts `feed`
+and overcounts `sessions`. Repairing either alone must still fail the public
+regression runner. Do not imply that the first passing row resolves the ticket.
+
+## Eviction defect (src/cache_store.py, in `evict_expired()`)
 The sweep walks the entry list by index and calls `entries.pop(index)` when an
 entry is expired, then advances `index += 1` unconditionally. Popping shifts
 every later entry down one slot, so the entry that slides into the just-vacated
@@ -11,10 +16,37 @@ list, the second one is stepped over and survives the sweep, so that namespace
 reports one too many live entries.
 
 Follow the entry point through `log_reader.read_events`, `CacheStore.write`,
-`CacheStore.sweep`, and `reporting.format_report`. The parser and formatting
-modules preserve the contract; `sweep` passes each namespace's entries through
+`CacheStore.sweep`, and `reporting.format_report`. The `parse_line` function and
+formatting module preserve the contract; `sweep` passes each namespace's entries through
 `evict_expired` and writes the survivors back to the store. The list returned
 by that function determines both the retained state and the report.
+
+## Replay defect (src/log_reader.py, in `read_events()`)
+The `seen` set uses `(namespace, key)` as a unique event identity. That pair
+identifies a cache entry, NOT a write. Later refreshes of the same entry are
+silently dropped before the correctly implemented `CacheStore.write` sees them.
+In the incident, `feed,f-1` starts expired and later receives a live expiry. The
+refresh is discarded, so repairing eviction alone still reports feed as 1, not 2.
+
+Preserve all valid records in arrival order. The store already replaces the
+complete previous record for that namespace/key, so identical duplicate deliveries
+do not create additional entries. One straightforward repair is:
+
+```python
+def read_events(path):
+    events = []
+    with open(path, encoding="utf-8") as handle:
+        for raw in handle:
+            event = parse_line(raw)
+            if event is not None:
+                events.append(event)
+    return events
+```
+
+An equivalent compaction may preserve the LAST complete record for each pair.
+Never choose the greatest expiry: a later write may intentionally shorten a
+lifetime, and metadata such as pinned state must also be replaced. Grade behavior,
+not whether the candidate deletes the set or uses an appropriate dictionary.
 
 ## Minimal fix
 Iterate a snapshot instead of mutating the list under the index, i.e. build the
@@ -40,14 +72,14 @@ entries are adjacent in a namespace's entry list:
 - `catalog` = `[c-1 expired, c-2 live, c-3 live, c-4 expired]`: the expired
   entries are separated by live ones, so each is evicted and the count is
   correct at 2.
-- `feed` = `[f-1 live, f-2 live, f-3 expired]`: the only expired entry is last
-  and correctly evicted, count 2.
+- `feed`: the first f-1 write is expired and its later refresh is lost. This
+  independent replay failure produces 1 instead of 2 even after eviction is fixed.
 - `search` = `[q-1 live, q-2 live, q-3 live]`: nothing expires, count 3.
 - `sessions` = `[s-1 expired, s-2 expired, s-3 live, s-4 live]`: `s-1` and `s-2`
   are adjacent expired entries. `s-1` is popped, `s-2` slides into slot 0, the
   index advances past it, and `s-2` survives — `sessions` reports 3 instead of
   2. It is the only namespace with two adjacent expired entries, so it is the
-  only wrong row (partial wrongness).
+  inflated row; feed has the independent undercount.
 
 ## Red herrings (both reachable, both provably innocent)
 1. `entry["expires_at"] <= now` in `evict_expired()` — the `<=` invites a
@@ -62,7 +94,14 @@ entries are adjacent in a namespace's entry list:
    `f-2` is written as ` feed ` with surrounding spaces, and the strip folds it
    into the `feed` bucket. The contract declares surrounding whitespace
    trimmed, so the normalization is correct; removing it would split `feed` into
-   two rows, not touch `sessions`, and again cannot explain the inflation.
+   two rows. It does not explain the discarded refresh or the sessions inflation.
+
+## Public checks are part of the learner run
+`python3 fixtures/regression_checks.py fixtures/input.txt` runs the incident and
+twelve read-only replay cases, each checking retained state after two sweeps at
+the same checkpoint. The shipped code passes 6/12. Both repairs pass 12/12 and
+match the report. The oracle includes the individual statuses, so merely printing
+the right primary counts is insufficient. Failures describe behavior, not fixes.
 
 ## Complexity
 Parsing and building the cache are O(n) in the number of log rows. The

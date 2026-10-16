@@ -1,28 +1,28 @@
 {
   "id": "generic-cache-eviction-mutation",
   "title": "Cache cleanup: reconcile the overnight report",
-  "summary": "One feature's cache count disagrees with the morning metrics. Trace a small Python service and restore the cleanup report before operations uses it to plan capacity.",
+  "summary": "The overnight cache report disagrees with the morning metrics in both directions. Trace a small Python service, reconcile the counts, and verify its replay checks before operations plans capacity.",
   "task": "Report each namespace's live count at the sweep checkpoint so the capacity-planning on-call can size memory from a report that agrees with the cache's own metrics endpoint.",
   "company": {
     "tag": "generic-fdse",
     "round_name": "Debugging round",
     "confidence": "styled",
-    "notes": "In-memory cache eviction sweep over a write log; subtle logic flaw, no syntax error, no crash."
+    "notes": "Two connected lifecycle defects across log replay and in-memory eviction; no syntax error or crash."
   },
   "companies": ["Generic"],
   "domain": "caching",
   "language": "python",
   "difficulty": 2,
   "est_minutes": 45,
-  "run_cmd": "python3 src/cache_sweep.py fixtures/input.txt",
+  "run_cmd": "python3 fixtures/regression_checks.py fixtures/input.txt",
   "primary_file": "src/cache_sweep.py",
-  "expected_touched_files": ["src/cache_store.py"],
-  "expected_output": "=== Live entries by namespace ===\ncatalog: 2\nfeed: 2\nsearch: 3\nsessions: 2\n",
-  "buggy_output": "=== Live entries by namespace ===\ncatalog: 2\nfeed: 2\nsearch: 3\nsessions: 3\n",
+  "expected_touched_files": ["src/cache_store.py", "src/log_reader.py"],
+  "expected_output": "=== Live entries by namespace ===\ncatalog: 2\nfeed: 2\nsearch: 3\nsessions: 2\n=== Regression checks ===\nconsecutive expirations: PASS\ncheckpoint boundary: PASS\nrefreshed key: PASS\nshortened lifetime: PASS\nnamespace isolation: PASS\nduplicate delivery: PASS\nthree writes to one key: PASS\nempty namespace after cleanup: PASS\nlive entries retained: PASS\ninput validation and whitespace: PASS\nempty feed: PASS\ninterleaved updates: PASS\nRegression checks: 12/12 passed\n",
+  "buggy_output": "=== Live entries by namespace ===\ncatalog: 2\nfeed: 1\nsearch: 3\nsessions: 3\n=== Regression checks ===\nconsecutive expirations: FAIL\ncheckpoint boundary: PASS\nrefreshed key: FAIL\nshortened lifetime: FAIL\nnamespace isolation: FAIL\nduplicate delivery: PASS\nthree writes to one key: PASS\nempty namespace after cleanup: FAIL\nlive entries retained: PASS\ninput validation and whitespace: PASS\nempty feed: PASS\ninterleaved updates: FAIL\nRegression checks: 6/12 passed\n",
   "bug_class": "mutation-during-iteration",
   "phase2": {
     "spec_patch": "Ops also needs pinned entries to survive the sweep: a pinned entry is never evicted, even once it is expired, because those keys are hand-warmed and must stay resident. The pinned flag is already the optional fourth column on every write. Keep the same header and per-row format.",
     "fixture_patch": "sessions,s-5,1699998000,pinned\nsearch,q-4,1699990000,pinned\n",
-    "expected_output_v2": "=== Live entries by namespace ===\ncatalog: 2\nfeed: 2\nsearch: 4\nsessions: 3\n"
+    "expected_output_v2": "=== Live entries by namespace ===\ncatalog: 2\nfeed: 2\nsearch: 4\nsessions: 3\n=== Regression checks ===\nconsecutive expirations: PASS\ncheckpoint boundary: PASS\nrefreshed key: PASS\nshortened lifetime: PASS\nnamespace isolation: PASS\nduplicate delivery: PASS\nthree writes to one key: PASS\nempty namespace after cleanup: PASS\nlive entries retained: PASS\ninput validation and whitespace: PASS\nempty feed: PASS\ninterleaved updates: PASS\nRegression checks: 12/12 passed\n"
   }
 }

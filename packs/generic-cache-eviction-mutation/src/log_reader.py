@@ -32,11 +32,16 @@ def parse_line(raw):
 
 
 def read_events(path):
-    """Preserve arrival order, including later refreshes of an existing key."""
+    """Load usable writes, suppressing repeated deliveries before replay."""
     events = []
+    seen = set()
     with open(path, encoding="utf-8") as handle:
         for raw in handle:
             event = parse_line(raw)
             if event is not None:
+                identity = (event["namespace"], event["key"])
+                if identity in seen:
+                    continue
+                seen.add(identity)
                 events.append(event)
     return events

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { genericCacheEvictionMutationPack as pack } from "../generic-cache-eviction-mutation"
+import { packToScenario } from "@/lib/bugfix/packs/scenario"
 import {
   FIXED_SWEEP,
   runCachePack,
@@ -17,6 +18,32 @@ describe("cache incident requires two independent repairs", () => {
     expect(runCacheReport(sweepOnly)).toContain("feed: 1")
   })
 
+  it("also accepts last-write dictionary compaction rather than requiring a specific patch", () => {
+    const compact = {
+      ...withSweep(pack, FIXED_SWEEP),
+      srcFiles: withSweep(pack, FIXED_SWEEP).srcFiles.map((file) =>
+        file.path === "src/log_reader.py"
+          ? {
+              ...file,
+              content: file.content.replace(
+                /def read_events\(path\):[\s\S]*$/,
+                `def read_events(path):
+    latest = {}
+    with open(path, encoding="utf-8") as handle:
+        for raw in handle:
+            event = parse_line(raw)
+            if event is not None:
+                latest[(event["namespace"], event["key"])] = event
+    return list(latest.values())
+`
+              ),
+            }
+          : file
+      ),
+    }
+    expect(runCachePack(compact, undefined, true)).toBe(pack.expectedOutput)
+  })
+
   it("does not accept the replay-only fix while cleanup still skips entries", () => {
     expect(runCachePack(withReplay(pack))).not.toBe(pack.expectedOutput)
     expect(runCacheReport(withReplay(pack))).toContain("sessions: 3")
@@ -26,6 +53,11 @@ describe("cache incident requires two independent repairs", () => {
     expect(pack.runCmd).toContain("fixtures/regression_checks.py")
     expect(runCachePack(fixed, undefined, true)).toBe(pack.expectedOutput)
     expect(pack.expectedOutput).toContain("Regression checks: 12/12 passed")
+    const workspace = packToScenario(pack).workspace
+    for (const path of ["fixtures/regression_checks.py", "fixtures/regression_cases.json"]) {
+      expect(workspace.files.find((file) => file.path === path)).toMatchObject({ role: "readonly" })
+      expect(workspace.editableFilePaths).not.toContain(path)
+    }
   })
 
   it.each([

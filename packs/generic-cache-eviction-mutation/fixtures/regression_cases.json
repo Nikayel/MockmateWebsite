@@ -1,0 +1,62 @@
+[
+  {
+    "name": "consecutive expirations",
+    "input": "sessions,one,1\nsessions,two,2\nsessions,three,1700000001\n",
+    "counts": { "sessions": 1 }
+  },
+  {
+    "name": "checkpoint boundary",
+    "input": "catalog,one,1700000000\ncatalog,two,1700000001\n",
+    "counts": { "catalog": 1 }
+  },
+  {
+    "name": "refreshed key",
+    "input": "feed,key,1\nfeed,key,1700000001\n",
+    "counts": { "feed": 1 }
+  },
+  {
+    "name": "shortened lifetime",
+    "input": "permissions,key,1700000001\npermissions,key,1\n",
+    "counts": { "permissions": 0 }
+  },
+  {
+    "name": "namespace isolation",
+    "input": "feed,key,1\ncatalog,key,1700000001\nfeed,key,1700000001\n",
+    "counts": { "catalog": 1, "feed": 1 }
+  },
+  {
+    "name": "duplicate delivery",
+    "input": "search,key,1700000001\nsearch,key,1700000001\n",
+    "counts": { "search": 1 }
+  },
+  {
+    "name": "three writes to one key",
+    "input": "profiles,key,1\nprofiles,key,1700000001\nprofiles,key,2\n",
+    "counts": { "profiles": 0 }
+  },
+  {
+    "name": "empty namespace after cleanup",
+    "input": "notifications,one,1\nnotifications,two,2\nnotifications,three,3\n",
+    "counts": { "notifications": 0 }
+  },
+  {
+    "name": "live entries retained",
+    "input": "inventory,one,1700000001\ninventory,two,1700000002\n",
+    "counts": { "inventory": 2 }
+  },
+  {
+    "name": "input validation and whitespace",
+    "input": "# writes\n\na,key\na,key,soon\na,key,1,extra,field\n a , key ,1700000001\n",
+    "counts": { "a": 1 }
+  },
+  {
+    "name": "empty feed",
+    "input": "# no writes\n",
+    "counts": {}
+  },
+  {
+    "name": "interleaved updates",
+    "input": "a,key,1\nb,key,1700000001\na,key,1700000001\nb,key,1\nb,key,1700000002\n",
+    "counts": { "a": 1, "b": 1 }
+  }
+]

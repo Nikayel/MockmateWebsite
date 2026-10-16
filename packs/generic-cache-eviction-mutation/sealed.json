@@ -1,8 +1,8 @@
 {
-  "bugLocation": "src/cache_store.py — evict_expired(): `entries.pop(index)` followed by an unconditional `index += 1`",
-  "bugSummary": "The sweep pops from the list it is walking by index and always advances the index, so the entry that shifts into a just-vacated slot is skipped; two adjacent expired entries leave the second one live.",
-  "minimalFix": "Build the survivors as a new list instead of mutating under the index: `return [entry for entry in entries if entry[\"expires_at\"] > now]` (or only advance the index in the else branch).",
-  "survivalStory": "evict_expired reads correctly in isolation and for every namespace whose expired entries are separated by live ones or sit last; it only over-counts the rare namespace with two adjacent expired entries, which the happy-path fixtures (isolated expirations) never exercised, and the inflated count still looks like a plausible per-namespace number.",
+  "bugLocation": "src/cache_store.py — evict_expired(): unconditional index advance after removal; src/log_reader.py — read_events(): namespace/key-only deduplication before replay",
+  "bugSummary": "Two independent defects: eviction skips shifted entries after a pop, inflating sessions; log ingestion treats every later write to an existing namespace/key as a duplicate delivery, dropping a valid refresh and undercounting feed.",
+  "minimalFix": "Repair the sweep with survivors or a guarded index, AND preserve valid write events through read_events so CacheStore.write applies the last complete record for each namespace/key. Removing only one defect cannot satisfy the incident and regression checks.",
+  "survivalStory": "Isolated expirations and identical duplicate deliveries pass, hiding both defects. Namespace/key identifies a cache slot, not a unique write event; a refresh has the same identity but different lifecycle data. A sweep-only patch fixes the inflated row while the missing refresh still leaves another row too low.",
   "redHerrings": [
     {
       "location": "src/cache_store.py — evict_expired(): `entry[\"expires_at\"] <= now`",
@@ -12,7 +12,7 @@
     {
       "location": "src/log_reader.py — parse_line(): `part.strip()` field normalization",
       "looksWrongBecause": "trimming fields looks like it could merge or split namespaces and drop data",
-      "provablyInnocentBecause": "the contract declares surrounding whitespace trimmed, so ` feed ` and feed are one namespace by design; the strip is load-bearing (it folds feed's f-2 into the feed bucket) and removing it would split feed into two rows, the opposite of the observed single-row inflation"
+      "provablyInnocentBecause": "the contract declares surrounding whitespace trimmed, so ` feed ` and feed are one namespace by design; parse_line normalizes valid records correctly. read_events, not field trimming, discards a valid later refresh."
     }
   ],
   "complexityAnswer": {
@@ -22,12 +22,14 @@
   },
   "debriefRubric": [
     "Reproduced with the run command and diffed against the oracle before opening the source.",
-    "Localized the inflated value to the sessions row and named the skipped-after-pop entry (s-2 stepped over when s-1 was removed) as the cause, in one sentence.",
-    "Shipped a minimal fix (iterate a snapshot / build a new list, or guard the index advance) rather than rewriting the sweep.",
+    "Independently explained the sessions overcount (s-2 skipped after s-1 is removed) and feed undercount (f-1 refresh dropped before CacheStore.write).",
+    "Verified that a sweep-only patch still fails refreshed-key checks, and a replay-only patch still fails consecutive-expiration checks. Did not stop after one symptom disappeared.",
+    "Preserved last-arrival-wins semantics, namespace isolation, complete metadata replacement, and duplicate-delivery idempotence. Did not select the greatest expiry instead of the latest write.",
+    "Repaired both lifecycle stages without hard-coding report counts or changing read-only fixtures/checks.",
     "Tested the `<=` expiry boundary against the contract (catalog's c-1 at exactly now) and cleared it instead of chasing it.",
     "Tested the field strip normalization against the contract and cleared it instead of chasing it.",
     "Complexity: traced the chosen implementation. A survivor-list sweep is linear; a guarded-index pop sweep can be quadratic because each removal shifts entries. Include the O(k log k) namespace sort, and accept an accurate explanation of either correct patch.",
     "Phase-2: adapted evict_expired to exempt pinned entries, recognizing the pinned flag was already parsed and thrown away, instead of rewriting.",
-    "Recommend exactly one drill: for a weak sweep pass, a mutation-during-iteration drill; for a weak phase-2, an adapt-vs-rewrite drill."
+    "Recommend exactly one drill based on observed weakness: mutation during iteration, event identity versus entity identity, or adapting the pinned-entry rule."
   ]
 }

@@ -2,15 +2,26 @@
 import { describe, expect, it } from "vitest"
 import { genericCacheEvictionMutationPack as pack } from "../generic-cache-eviction-mutation"
 import { sealed } from "@/lib/scenarios/sealed/generic-cache-eviction-mutation.server"
-import { FIXED_SWEEP, PINNED_SWEEP, runCachePack, withSweep } from "./cache-cleanup-fixture"
+import {
+  FIXED_SWEEP,
+  PINNED_SWEEP,
+  runCachePack,
+  runCacheReport,
+  withReplay,
+  withSweep,
+} from "./cache-cleanup-fixture"
 import { packToScenario, validatePackQuality } from "@/lib/bugfix/packs/scenario"
 
-const fixed = withSweep(pack, FIXED_SWEEP)
-const extended = withSweep(pack, PINNED_SWEEP)
+const fixed = withReplay(withSweep(pack, FIXED_SWEEP))
+const extended = withReplay(withSweep(pack, PINNED_SWEEP))
 const header = "=== Live entries by namespace ===\n"
 const phase2Fixture = pack.fixtures[0].content + sealed.phase2.fixturePatch
 
 describe("cache cleanup executable contract", () => {
+  it("passes the authored pack quality and sealing checks", () => {
+    expect(validatePackQuality(pack, sealed)).toEqual([])
+  })
+
   it("opens the entry point without pointing directly at the defective module", () => {
     const scenario = packToScenario(pack)
     expect(pack.srcFiles.map((file) => file.path)).toEqual([
@@ -20,7 +31,7 @@ describe("cache cleanup executable contract", () => {
       "src/reporting.py",
     ])
     expect(scenario.workspace.primaryFilePath).toBe("src/cache_sweep.py")
-    expect(scenario.expectedTouchedFiles).toEqual(["src/cache_store.py"])
+    expect(scenario.expectedTouchedFiles).toEqual(["src/cache_store.py", "src/log_reader.py"])
     expect(scenario.id).toBe("generic-cache-eviction-mutation")
     expect(
       pack.srcFiles.reduce((total, file) => total + file.content.split("\n").length, 0)
@@ -72,7 +83,7 @@ describe("cache cleanup executable contract", () => {
     ],
     ["empty feed", "# no writes\n", ""],
   ])("handles %s", (_name, input, expected) => {
-    expect(runCachePack(fixed, input)).toBe(header + expected)
+    expect(runCacheReport(fixed, input)).toBe(header + expected)
   })
 
   it("rejects changing <= to < as a false fix", () => {
@@ -81,7 +92,7 @@ describe("cache cleanup executable contract", () => {
   })
 
   it("also accepts a correct guarded-index patch, without requiring the reference's approach", () => {
-    const guarded = {
+    const guarded = withReplay({
       ...pack,
       srcFiles: pack.srcFiles.map((file) => ({
         ...file,
@@ -90,9 +101,9 @@ describe("cache cleanup executable contract", () => {
           "        else:\n            index += 1"
         ),
       })),
-    }
+    })
     expect(runCachePack(guarded, undefined, true)).toBe(pack.expectedOutput)
-    expect(runCachePack(guarded, "a,one,1\na,two,2\na,three,3\n")).toBe(header + "a: 0\n")
+    expect(runCacheReport(guarded, "a,one,1\na,two,2\na,three,3\n")).toBe(header + "a: 0\n")
   })
 
   it("rejects leaving every entry resident", () => {
@@ -113,7 +124,7 @@ describe("cache cleanup executable contract", () => {
   it("keeps ordinary expiry and refreshed pin state working after the feature", () => {
     const input =
       "a,pinned,1,pinned\na,ordinary,1\na,live,1700000001\na,refresh,1,pinned\na,refresh,2\n"
-    expect(runCachePack(extended, input)).toBe(header + "a: 2\n")
+    expect(runCacheReport(extended, input)).toBe(header + "a: 2\n")
     expect(runCachePack(extended)).toBe(pack.expectedOutput)
   })
 
@@ -141,6 +152,6 @@ print("state verified")
         file.path === "src/cache_sweep.py" ? { ...file, content: probe } : file
       ),
     }
-    expect(runCachePack(probing, undefined, true)).toBe("state verified\n")
+    expect(runCacheReport(probing, undefined, true)).toBe("state verified\n")
   })
 })
