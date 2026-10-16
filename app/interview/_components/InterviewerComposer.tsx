@@ -11,6 +11,7 @@ interface InterviewerComposerProps {
   onInputChange: (value: string) => void
   onSend: () => void
   isRecording: boolean
+  mediaStream?: MediaStream | null
   countdownActive: boolean
   onToggleRecording: () => void
   onCancelRecording: () => void
@@ -24,6 +25,7 @@ export function InterviewerComposer({
   onInputChange,
   onSend,
   isRecording,
+  mediaStream,
   countdownActive,
   onToggleRecording,
   onCancelRecording,
@@ -38,6 +40,7 @@ export function InterviewerComposer({
       {(showRecording || voiceUnavailable) && (
         <VoiceModeToggle
           isRecording={isRecording}
+          mediaStream={mediaStream}
           onToggleRecording={onToggleRecording}
           onCancel={onCancelRecording}
           onSend={() => {

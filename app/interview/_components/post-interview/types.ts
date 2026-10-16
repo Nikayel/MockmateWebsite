@@ -37,6 +37,7 @@ export interface PostInterviewViewProps {
   setInterviewerInput: (input: string) => void
   handleSendMessage: (isInterviewer: boolean) => void
   isRecordingInterviewer: boolean
+  interviewerMediaStream?: MediaStream | null
   toggleVoiceRecording: (isInterviewer: boolean) => void
   interviewerEndRef?: RefObject<HTMLDivElement | null>
   showCodeInDiscussion: boolean

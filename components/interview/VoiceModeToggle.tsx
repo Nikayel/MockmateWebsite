@@ -4,11 +4,13 @@ import { Mic, MicOff, Send, Square, X } from "lucide-react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { RecordingWaveform } from "./recording-waveform/RecordingWaveform"
 
 const CANCEL_DRAG_DISTANCE = 50
 
 interface VoiceModeToggleProps {
   isRecording: boolean
+  mediaStream?: MediaStream | null
   onToggleRecording: () => void
   transcript?: string
   disabled?: boolean
@@ -25,6 +27,7 @@ interface VoiceModeToggleProps {
 /** Recording controls only. Reply progress belongs in the conversation. */
 export function VoiceModeToggle({
   isRecording,
+  mediaStream = null,
   onToggleRecording,
   transcript = "",
   disabled = false,
@@ -94,6 +97,7 @@ export function VoiceModeToggle({
           <p className="text-foreground text-xs font-medium" role={active ? "status" : undefined}>
             {countdownActive ? "Sending soon…" : isRecording ? "Listening…" : "Tap to speak"}
           </p>
+          {isRecording && <RecordingWaveform mediaStream={mediaStream} />}
           {isRecording && onCancel && (
             <p className="text-muted-foreground text-xs">Swipe to cancel</p>
           )}

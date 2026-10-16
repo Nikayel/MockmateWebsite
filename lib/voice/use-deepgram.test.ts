@@ -18,6 +18,10 @@ const fakeService = vi.hoisted(() => ({
   startTranscription: vi.fn(async () => {}),
   stopTranscription: vi.fn(() => ""),
   onMaxDuration: null as ((transcript: string) => void) | null,
+  onStatus: null as
+    | ((status: "connecting" | "connected" | "disconnected" | "error") => void)
+    | null,
+  mediaStream: null as MediaStream | null,
 }))
 
 vi.mock("./deepgram-service", async (importOriginal) => {
@@ -27,7 +31,12 @@ vi.mock("./deepgram-service", async (importOriginal) => {
     setAuthTokenProvider() {}
     setOnTranscript() {}
     setOnError() {}
-    setOnStatus() {}
+    setOnStatus(callback: NonNullable<typeof fakeService.onStatus>) {
+      fakeService.onStatus = callback
+    }
+    getMediaStream() {
+      return fakeService.mediaStream
+    }
     setOnUtteranceEnd() {}
     setMaxDuration() {}
     setOnMaxDuration(callback: (transcript: string) => void) {
@@ -78,6 +87,8 @@ beforeEach(() => {
   fetchMock.mockClear()
   fakeService.stopTranscription.mockReturnValue("")
   fakeService.onMaxDuration = null
+  fakeService.onStatus = null
+  fakeService.mediaStream = null
   vi.stubGlobal("fetch", fetchMock)
 })
 
@@ -158,6 +169,40 @@ describe("useDeepgram usage reporting", () => {
 
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
     expect(reportedBody().durationSeconds).toBe(VOICE.MAX_RECORDING_SECONDS)
+  })
+})
+
+describe("useDeepgram recording stream", () => {
+  it("exposes the recorder's stream only while connected", () => {
+    const view = renderVoiceHook()
+    const stream = { id: "recorder-owned-stream" } as MediaStream
+    fakeService.mediaStream = stream
+    expect(view.result.current.mediaStream).toBeNull()
+
+    act(() => fakeService.onStatus?.("connected"))
+    expect(view.result.current.mediaStream).toBe(stream)
+
+    act(() => fakeService.onStatus?.("disconnected"))
+    expect(view.result.current.mediaStream).toBeNull()
+  })
+
+  it.each(["error", "connecting"] as const)("clears the waveform source on %s", (status) => {
+    const view = renderVoiceHook()
+    fakeService.mediaStream = { id: "recorder-owned-stream" } as MediaStream
+    act(() => fakeService.onStatus?.("connected"))
+    act(() => fakeService.onStatus?.(status))
+    expect(view.result.current.mediaStream).toBeNull()
+  })
+
+  it("clears the source on explicit stop and automatic duration limit", () => {
+    const view = renderVoiceHook()
+    fakeService.mediaStream = { id: "recorder-owned-stream" } as MediaStream
+    act(() => fakeService.onStatus?.("connected"))
+    act(() => view.result.current.stopRecording())
+    expect(view.result.current.mediaStream).toBeNull()
+    act(() => fakeService.onStatus?.("connected"))
+    act(() => fakeService.onMaxDuration?.("finished"))
+    expect(view.result.current.mediaStream).toBeNull()
   })
 })
 

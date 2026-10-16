@@ -578,6 +578,11 @@ export class DeepgramVoiceService {
     return this.connection.isRecording
   }
 
+  /** The service owns this stream; visualizers may observe it without requesting another mic. */
+  getMediaStream(): MediaStream | null {
+    return this.connection.mediaStream
+  }
+
   /**
    * Cleanup resources
    */

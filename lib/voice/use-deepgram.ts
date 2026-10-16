@@ -43,6 +43,7 @@ export interface UseDeepgramOptions extends DeepgramConfig {
 export interface UseDeepgramReturn {
   // State
   isRecording: boolean
+  mediaStream: MediaStream | null
   status: VoiceStatus
   transcript: string
   error: Error | null
@@ -116,6 +117,7 @@ export function buildVoiceUsagePayload(params: {
  */
 export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn {
   const [isRecording, setIsRecording] = useState(false)
+  const [mediaStream, setMediaStream] = useState<MediaStream | null>(null)
   const [status, setStatus] = useState<VoiceStatus>("idle")
   const [transcript, setTranscript] = useState("")
   const [error, setError] = useState<Error | null>(null)
@@ -261,6 +263,7 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
 
       setStatus(mappedStatus)
       setIsRecording(newStatus === "connected")
+      setMediaStream(newStatus === "connected" ? service.getMediaStream() : null)
       options.onStatusChange?.(mappedStatus)
     })
 
@@ -272,6 +275,7 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
       logger.info("[useDeepgram] Max duration reached, auto-stopping")
       setStatus("idle")
       setIsRecording(false)
+      setMediaStream(null)
       // The service stops itself right after this callback and callers gate `stopRecording` on
       // `isRecording`, so this is the only exit this session gets.
       reportUsageRef.current(text)
@@ -356,6 +360,7 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
     const finalTranscript = serviceRef.current.stopTranscription()
     setStatus("idle")
     setIsRecording(false)
+    setMediaStream(null)
 
     // Track voice usage if we have a valid recording session
     reportUsageRef.current(finalTranscript)
@@ -394,6 +399,7 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
 
   return {
     isRecording,
+    mediaStream,
     status,
     transcript,
     error,

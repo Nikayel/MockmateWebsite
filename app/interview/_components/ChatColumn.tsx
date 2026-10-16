@@ -19,6 +19,7 @@ interface ChatColumnProps {
   isInterviewStarted: boolean
   showPostInterviewDiscussion: boolean
   isRecordingInterviewer: boolean
+  interviewerMediaStream?: MediaStream | null
   onToggleRecording: () => void
   onCancelRecording: () => void
   onCancelCountdown: () => void
@@ -43,6 +44,7 @@ export const ChatColumn = memo(function ChatColumn({
   isInterviewStarted,
   showPostInterviewDiscussion,
   isRecordingInterviewer,
+  interviewerMediaStream,
   onToggleRecording,
   onCancelRecording,
   onCancelCountdown,
@@ -141,6 +143,7 @@ export const ChatColumn = memo(function ChatColumn({
             onInputChange={onInterviewerInputChange}
             onSend={onSendMessage}
             isRecording={isRecordingInterviewer}
+            mediaStream={interviewerMediaStream}
             countdownActive={countdownActive}
             onToggleRecording={onToggleRecording}
             onCancelRecording={onCancelRecording}

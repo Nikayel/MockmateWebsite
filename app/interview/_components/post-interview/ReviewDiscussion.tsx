@@ -22,6 +22,7 @@ type DiscussionProps = Pick<
   | "setInterviewerInput"
   | "handleSendMessage"
   | "isRecordingInterviewer"
+  | "interviewerMediaStream"
   | "toggleVoiceRecording"
 >
 
@@ -32,6 +33,7 @@ export function ReviewDiscussion(props: DiscussionProps) {
     setInterviewerInput,
     handleSendMessage,
     isRecordingInterviewer,
+    interviewerMediaStream,
     toggleVoiceRecording,
   } = props
   const busy = props.isLoadingInterviewer || props.isGeneratingDiscussion
@@ -87,6 +89,7 @@ export function ReviewDiscussion(props: DiscussionProps) {
         {isRecordingInterviewer && (
           <VoiceModeToggle
             isRecording={isRecordingInterviewer}
+            mediaStream={interviewerMediaStream}
             onToggleRecording={() => toggleVoiceRecording(true)}
             transcript={interviewerInput}
             disabled={busy}

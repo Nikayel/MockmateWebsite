@@ -84,6 +84,7 @@ interface InterviewLayoutGridProps {
   isGeneratingDiscussion: ChatColumnProps["isGeneratingDiscussion"]
   interviewerEndRef: ChatColumnProps["interviewerEndRef"]
   isRecordingInterviewer: ChatColumnProps["isRecordingInterviewer"]
+  interviewerMediaStream?: ChatColumnProps["interviewerMediaStream"]
   onToggleInterviewerRecording: ChatColumnProps["onToggleRecording"]
   onCancelInterviewerRecording: ChatColumnProps["onCancelRecording"]
   onCancelInterviewerCountdown: ChatColumnProps["onCancelCountdown"]
@@ -155,6 +156,7 @@ export function InterviewLayoutGrid({
   isGeneratingDiscussion,
   interviewerEndRef,
   isRecordingInterviewer,
+  interviewerMediaStream,
   onToggleInterviewerRecording,
   onCancelInterviewerRecording,
   onCancelInterviewerCountdown,
@@ -366,6 +368,7 @@ export function InterviewLayoutGrid({
           isInterviewStarted={isInterviewStarted}
           showPostInterviewDiscussion={showPostInterviewDiscussion}
           isRecordingInterviewer={isRecordingInterviewer}
+          interviewerMediaStream={interviewerMediaStream}
           onToggleRecording={onToggleInterviewerRecording}
           onCancelRecording={onCancelInterviewerRecording}
           onCancelCountdown={onCancelInterviewerCountdown}

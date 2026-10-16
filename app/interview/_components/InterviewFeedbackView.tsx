@@ -49,6 +49,7 @@ interface InterviewFeedbackViewProps {
   setInterviewerInput: PostInterviewViewProps["setInterviewerInput"]
   handleSendMessage: PostInterviewViewProps["handleSendMessage"]
   isRecordingInterviewer: PostInterviewViewProps["isRecordingInterviewer"]
+  interviewerMediaStream?: PostInterviewViewProps["interviewerMediaStream"]
   toggleVoiceRecording: PostInterviewViewProps["toggleVoiceRecording"]
   interviewerEndRef: PostInterviewViewProps["interviewerEndRef"]
   showCodeInDiscussion: PostInterviewViewProps["showCodeInDiscussion"]
@@ -118,6 +119,7 @@ export function InterviewFeedbackView({
   setInterviewerInput,
   handleSendMessage,
   isRecordingInterviewer,
+  interviewerMediaStream,
   toggleVoiceRecording,
   interviewerEndRef,
   showCodeInDiscussion,
@@ -172,6 +174,7 @@ export function InterviewFeedbackView({
       setInterviewerInput={setInterviewerInput}
       handleSendMessage={handleSendMessage}
       isRecordingInterviewer={isRecordingInterviewer}
+      interviewerMediaStream={interviewerMediaStream}
       toggleVoiceRecording={toggleVoiceRecording}
       interviewerEndRef={interviewerEndRef}
       showCodeInDiscussion={showCodeInDiscussion}

@@ -2187,6 +2187,7 @@ function InterviewPageContent() {
               isGeneratingDiscussion={isGeneratingDiscussion}
               interviewerEndRef={interviewerEndRef}
               isRecordingInterviewer={isRecordingInterviewer}
+              interviewerMediaStream={interviewerVoice.mediaStream}
               onToggleInterviewerRecording={onToggleInterviewerRecording}
               onCancelInterviewerRecording={onCancelInterviewerRecording}
               onCancelInterviewerCountdown={onCancelInterviewerCountdown}
@@ -2246,6 +2247,7 @@ function InterviewPageContent() {
               setInterviewerInput={setInterviewerInput}
               handleSendMessage={handleSendMessage}
               isRecordingInterviewer={isRecordingInterviewer}
+              interviewerMediaStream={interviewerVoice.mediaStream}
               toggleVoiceRecording={toggleVoiceRecording}
               interviewerEndRef={interviewerEndRef}
               showCodeInDiscussion={showCodeInDiscussion}

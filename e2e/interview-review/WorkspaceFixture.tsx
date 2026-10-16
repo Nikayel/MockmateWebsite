@@ -10,6 +10,8 @@ import { toWorkspaceScenarioFiles } from "@/app/interview/_utils/workspace"
 import type { PackRunView } from "@/lib/workspace-execution"
 import type { ChatMessage, EditorLanguage } from "@/app/interview/_types"
 import type { PartnerChatMessage } from "@/app/interview/_components/SparraPartnerWidget"
+import { useVoiceInput } from "@/lib/voice"
+import { voiceUnavailableCopy } from "@/lib/voice/voice-availability"
 
 const noop = () => {}
 export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
@@ -43,7 +45,14 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
   const [messages, setMessages] = useState<PartnerChatMessage[]>([])
   const [interviewerInput, setInterviewerInput] = useState("")
   const [replyPending, setReplyPending] = useState(false)
-  const [recording, setRecording] = useState(false)
+  const [simulatedRecording, setRecording] = useState(false)
+  const realVoice = params.get("voice") === "1"
+  const voice = useVoiceInput({
+    apiKey: "fixture-only",
+    autoSendEnabled: false,
+    onTranscript: setInterviewerInput,
+  })
+  const recording = realVoice ? voice.isRecording : simulatedRecording
   const [interviewerMessages, setInterviewerMessages] = useState<ChatMessage[]>([
     { type: "ai", message: "Start by reproducing the failure and inspecting the relevant files." },
     {
@@ -88,6 +97,10 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
     if (!interviewerInput.trim() || replyPending) return
     setInterviewerMessages((previous) => [...previous, { type: "user", message: interviewerInput }])
     setInterviewerInput("")
+    if (realVoice) {
+      voice.stopRecording()
+      voice.resetTranscript()
+    }
     setRecording(false)
     setReplyPending(true)
     window.setTimeout(() => {
@@ -248,12 +261,26 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
         isGeneratingDiscussion={false}
         interviewerEndRef={endRef}
         isRecordingInterviewer={recording}
+        interviewerMediaStream={realVoice ? voice.mediaStream : null}
+        voiceUnavailable={
+          realVoice && voice.unavailableReason
+            ? voiceUnavailableCopy(voice.unavailableReason)
+            : null
+        }
         onToggleInterviewerRecording={() => {
+          if (realVoice) {
+            void voice.toggleRecording().catch(() => {})
+            return
+          }
           setRecording((current) => !current)
           if (!recording)
             setInterviewerInput("I traced the loop boundary and reproduced the skipped entry.")
         }}
         onCancelInterviewerRecording={() => {
+          if (realVoice) {
+            voice.stopRecording()
+            voice.resetTranscript()
+          }
           setRecording(false)
           setInterviewerInput("")
         }}
