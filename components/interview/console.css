@@ -1,0 +1,14 @@
+.code-console {
+  --console-error: var(--workspace-error, #b23333);
+  --console-success: var(--workspace-success, #23704d);
+  --console-warning: var(--workspace-warning, #825900);
+  --console-info: var(--workspace-info, #365f83);
+}
+
+.dark .code-console,
+.code-console.dark {
+  --console-error: var(--workspace-error, #eca3a1);
+  --console-success: var(--workspace-success, #8bc6a4);
+  --console-warning: var(--workspace-warning, #d7ba78);
+  --console-info: var(--workspace-info, #a1bed6);
+}

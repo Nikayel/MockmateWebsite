@@ -55,7 +55,7 @@ export function FileTreeSidebar({
     <div
       role="tree"
       aria-label="Workspace files"
-      className={cn("bg-card/50 border-border h-full overflow-y-auto py-1 text-xs", className)}
+      className={cn("bg-card border-border h-full overflow-y-auto py-1 text-xs", className)}
     >
       {tree.map((node) => (
         <FileTreeNodeRow
@@ -104,9 +104,9 @@ function FileTreeNodeRow({
             aria-hidden="true"
           />
           {isOpen ? (
-            <FolderOpen className="h-3.5 w-3.5 shrink-0 text-amber-400/80" aria-hidden="true" />
+            <FolderOpen className="text-muted-foreground h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           ) : (
-            <Folder className="h-3.5 w-3.5 shrink-0 text-amber-400/80" aria-hidden="true" />
+            <Folder className="text-muted-foreground h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           )}
           <span className="truncate">{node.name}</span>
         </CollapsibleTrigger>
@@ -148,17 +148,11 @@ function FileTreeNodeRow({
           : "text-muted-foreground hover:bg-muted/60 hover:text-foreground border-l-transparent"
       )}
     >
-      <RoleIcon
-        className={cn(
-          "h-3.5 w-3.5 shrink-0",
-          isActive ? style.iconColorActive : style.iconColorIdle
-        )}
-        aria-hidden="true"
-      />
+      <RoleIcon className="text-muted-foreground h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       <span className="truncate">{node.name}</span>
       {hasWorkspaceFileEdits(file) && (
         <span
-          className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300"
+          className="bg-accent ml-auto h-1.5 w-1.5 shrink-0 rounded-full"
           title="Unsaved edit"
           aria-label="Unsaved edit"
         />

@@ -20,6 +20,7 @@ import { useEffect, useState } from "react"
 import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 
 type SetTheme = (value: string) => void
 
@@ -87,7 +88,13 @@ function isDarkOnScreen(): boolean {
   return document.documentElement.classList.contains("dark")
 }
 
-export function ThemeToggle({ className }: { className?: string }) {
+export function ThemeToggle({
+  className,
+  variant = "button",
+}: {
+  className?: string
+  variant?: "button" | "menu-item"
+}) {
   const { theme, setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -101,13 +108,24 @@ export function ThemeToggle({ className }: { className?: string }) {
   const Icon = !mounted ? Moon : isDark ? Sun : Moon
   const label = mounted ? `Switch to ${next} mode` : "Toggle color theme"
 
+  const toggleTheme = () => applyTheme(setTheme, isDarkOnScreen() ? "light" : "dark")
+
+  if (variant === "menu-item") {
+    return (
+      <DropdownMenuItem onSelect={toggleTheme} className={cn("gap-2", className)}>
+        <Icon className="h-4 w-4" aria-hidden="true" />
+        {label}
+      </DropdownMenuItem>
+    )
+  }
+
   return (
     <button
       type="button"
       // The direction is decided from the DOM at click time, not from `next`.
       // Before the mount effect lands they disagree, and the DOM is the one
       // that matches what the visitor can see. See isDarkOnScreen.
-      onClick={() => applyTheme(setTheme, isDarkOnScreen() ? "light" : "dark")}
+      onClick={toggleTheme}
       aria-label={label}
       title={label}
       className={cn(

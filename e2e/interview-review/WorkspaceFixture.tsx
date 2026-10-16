@@ -1,8 +1,9 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { InterviewLayoutGrid } from "@/app/interview/_components/InterviewLayoutGrid"
 import { InterviewTopBar } from "@/app/interview/_components/InterviewTopBar"
 import { genericCacheEvictionMutationScenario as scenario } from "@/lib/scenarios/real-world/bugfix/packs/generic-cache-eviction-mutation"
 import { toWorkspaceScenarioFiles } from "@/app/interview/_utils/workspace"
+import type { PackRunView } from "@/lib/workspace-execution"
 import type { EditorLanguage } from "@/app/interview/_types"
 import type { PartnerChatMessage } from "@/app/interview/_components/SparraPartnerWidget"
 
@@ -11,6 +12,10 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
   const [activePanel, setActivePanel] = useState<"problem" | "editor" | "chat">("editor")
   const [expanded, setExpanded] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
+  const [calmMode, setCalmMode] = useState(false)
+  const [hideTimer, setHideTimer] = useState(false)
+  const [isRunning, setIsRunning] = useState(false)
+  const [packRun, setPackRun] = useState<PackRunView | null>(null)
   const [language, setLanguage] = useState<EditorLanguage>("python")
   const [files, setFiles] = useState(() => toWorkspaceScenarioFiles(scenario))
   const [path, setPath] = useState(files.find((file) => file.role === "editable")!.path)
@@ -18,6 +23,26 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
   const [messages, setMessages] = useState<PartnerChatMessage[]>([])
   const endRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    document.documentElement.classList.toggle("calm", calmMode)
+    document.documentElement.classList.toggle("focus-mode-active", focusMode)
+  }, [calmMode, focusMode])
+
+  const run = () => {
+    setIsRunning(true)
+    window.setTimeout(() => {
+      setPackRun({
+        runCmd: "python3 fixtures/regression_checks.py fixtures/input.txt",
+        ran: true,
+        stdout:
+          "=== Regression checks ===\ncheckpoint boundary: FAIL\nRegression checks: 8/12 passed\n",
+        oraclePath: "tests/expected_output.txt",
+        match: false,
+        crashError: null,
+      })
+      setIsRunning(false)
+    }, 150)
+  }
   const active = files.find((file) => file.path === path)!
   return (
     <>
@@ -29,11 +54,11 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
         onActivePanelChange={setActivePanel}
         focusMode={focusMode}
         onFocusModeChange={setFocusMode}
-        calmMode={false}
-        onCalmModeChange={noop}
+        calmMode={calmMode}
+        onCalmModeChange={setCalmMode}
         isInterviewStarted
-        hideTimer={false}
-        onHideTimerChange={noop}
+        hideTimer={hideTimer}
+        onHideTimerChange={setHideTimer}
         strictTimeLimit={null}
         elapsedTime={900}
         onCloseClick={noop}
@@ -45,6 +70,7 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
       />
       <InterviewLayoutGrid
         focusMode={focusMode}
+        onFocusModeChange={setFocusMode}
         selectedScenario={scenario}
         realInterviewMode={false}
         showProblemPeek={false}
@@ -100,15 +126,21 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
         editorConsoleOutputs={[]}
         testResults={[]}
         testSummary={{ total: 12, passed: 8, failed: 4, passRate: 67 }}
-        packRun={null}
-        isRunningTests={false}
-        onClearConsole={noop}
+        packRun={packRun}
+        isRunningTests={isRunning}
+        onClearConsole={() => setPackRun(null)}
         onSubmitSystemDesign={onSubmit}
-        onRunCode={noop}
+        onRunCode={run}
         onSubmitCode={onSubmit}
         onSelectedLanguageChange={setLanguage}
-        onResetActiveFile={noop}
-        onResetWorkspace={noop}
+        onResetActiveFile={() =>
+          setFiles((current) =>
+            current.map((file) =>
+              file.path === path ? { ...file, content: file.originalContent ?? file.content } : file
+            )
+          )
+        }
+        onResetWorkspace={() => setFiles(toWorkspaceScenarioFiles(scenario))}
         isAIPartnerExpanded={expanded}
         onAIPartnerExpandedChange={setExpanded}
         chatMessages={messages}

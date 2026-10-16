@@ -16,34 +16,18 @@ const baseProps = {
 }
 
 describe("SparraPartnerWidget", () => {
-  it("renders as a named, minimized chat launcher", () => {
-    render(<SparraPartnerWidget expanded={false} onExpandedChange={vi.fn()} {...baseProps} />)
-
-    expect(screen.getByRole("button", { name: "Open Sparra partner" })).toBeTruthy()
-    expect(screen.getByText("Ask Sparra")).toBeTruthy()
+  it("leaves navigation to the rail while the problem is active", () => {
+    render(<SparraPartnerWidget expanded={false} {...baseProps} />)
+    expect(screen.queryByRole("region", { name: "Sparra partner" })).toBeNull()
+    expect(screen.queryByRole("button", { name: /open/i })).toBeNull()
   })
 
-  it("renders a docked conversation and returns to the problem", () => {
-    const onExpandedChange = vi.fn()
-    render(<SparraPartnerWidget expanded onExpandedChange={onExpandedChange} {...baseProps} />)
-
+  it("renders a docked conversation with a labeled input", () => {
+    render(<SparraPartnerWidget expanded {...baseProps} />)
     expect(screen.getByRole("region", { name: "Sparra partner" })).toBeTruthy()
     expect(screen.queryByRole("dialog")).toBeNull()
     expect(screen.getByText("Tell me what you inspected.")).toBeTruthy()
-
-    fireEvent.click(screen.getByRole("button", { name: "Back to problem" }))
-    expect(onExpandedChange).toHaveBeenCalledWith(false)
-  })
-
-  it("focuses the input but only handles Escape originating inside the partner", () => {
-    const onExpandedChange = vi.fn()
-    render(<SparraPartnerWidget expanded onExpandedChange={onExpandedChange} {...baseProps} />)
-    const input = screen.getByRole("textbox", { name: "Message Sparra" })
-    expect(document.activeElement).toBe(input)
-    fireEvent.keyDown(window, { key: "Escape" })
-    expect(onExpandedChange).not.toHaveBeenCalled()
-    fireEvent.keyDown(input, { key: "Escape" })
-    expect(onExpandedChange).toHaveBeenCalledWith(false)
+    expect(screen.getByRole("textbox", { name: "Message Sparra" })).toBeTruthy()
   })
 
   it.each([
@@ -51,15 +35,7 @@ describe("SparraPartnerWidget", () => {
     { input: "A question", isLoading: true },
   ])("does not submit empty or busy input: %j", (state) => {
     const onSendMessage = vi.fn()
-    render(
-      <SparraPartnerWidget
-        expanded
-        onExpandedChange={vi.fn()}
-        {...baseProps}
-        {...state}
-        onSendMessage={onSendMessage}
-      />
-    )
+    render(<SparraPartnerWidget expanded {...baseProps} {...state} onSendMessage={onSendMessage} />)
     fireEvent.submit(
       screen.getByRole("button", { name: "Send message to Sparra" }).closest("form")!
     )
@@ -71,7 +47,6 @@ describe("SparraPartnerWidget", () => {
     render(
       <SparraPartnerWidget
         expanded
-        onExpandedChange={vi.fn()}
         {...baseProps}
         input="My hypothesis"
         onSendMessage={onSendMessage}

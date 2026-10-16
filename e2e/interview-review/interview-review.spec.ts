@@ -151,7 +151,7 @@ test("Sparra occupies the left rail, never the code panel, and restores the prob
   const editor = page.locator(".editor-panel-card")
   await expect(editor.locator(".cm-editor")).toBeVisible()
   const before = await editor.boundingBox()
-  await page.getByRole("button", { name: "Open Sparra partner", exact: true }).first().click()
+  await page.getByRole("tab", { name: "Sparra coding partner" }).click()
   const partner = page.getByRole("region", { name: "Sparra partner", exact: true })
   await expect(partner).toBeVisible()
   const dock = (await partner.boundingBox())!
@@ -159,7 +159,7 @@ test("Sparra occupies the left rail, never the code panel, and restores the prob
   expect(dock.x + dock.width).toBeLessThanOrEqual(code.x)
   expect(code).toEqual(before)
   const input = partner.getByRole("textbox", { name: "Message Sparra" })
-  await expect(input).toBeFocused()
+  await expect(page.getByRole("tab", { name: "Sparra coding partner" })).toBeFocused()
   await input.fill("Can you help me inspect the report?")
   await partner.getByRole("button", { name: "Send message to Sparra" }).click()
   await expect(
@@ -173,9 +173,7 @@ test("Sparra occupies the left rail, never the code panel, and restores the prob
   await input.focus()
   await page.keyboard.press("Escape")
   await expect(partner).toBeHidden()
-  await expect(
-    page.getByRole("button", { name: "Open Sparra partner", exact: true }).last()
-  ).toBeFocused()
+  await expect(page.getByRole("tab", { name: "Problem", exact: true })).toBeFocused()
   await expectViewportFit(page)
 })
 
@@ -184,9 +182,10 @@ test("Sparra remains accessible on mobile and when its desktop rail was collapse
 }) => {
   await page.setViewportSize({ width: 375, height: 812 })
   await page.goto("/?view=workspace&theme=light")
-  await page.getByRole("button", { name: "Open Sparra partner", exact: true }).first().click()
+  await page.getByRole("button", { name: "Show problem", exact: true }).click()
+  await page.getByRole("tab", { name: "Sparra coding partner" }).click()
   await expect(page.getByRole("textbox", { name: "Message Sparra" })).toBeVisible()
-  await page.getByRole("button", { name: "Back to problem" }).click()
+  await page.getByRole("tab", { name: "Problem", exact: true }).click()
   await expect(
     page
       .getByRole("complementary", { name: "Problem and partner" })
@@ -197,7 +196,8 @@ test("Sparra remains accessible on mobile and when its desktop rail was collapse
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.getByRole("button", { name: "Collapse problem panel" }).click()
   await expect(page.getByRole("button", { name: "Expand problem panel" })).toBeVisible()
-  await page.getByRole("button", { name: "Open Sparra partner", exact: true }).first().click()
+  await page.getByRole("button", { name: "Expand problem panel" }).click()
+  await page.getByRole("tab", { name: "Sparra coding partner" }).click()
   await expect(page.getByRole("region", { name: "Sparra partner", exact: true })).toBeVisible()
   expect((await page.locator(".editor-panel-card").boundingBox())!.width).toBeGreaterThan(300)
 })
@@ -218,7 +218,7 @@ test("focus mode retains workspace navigation and opening Sparra exits focus", a
     .boundingBox())!
   const editor = (await page.locator(".editor-panel-card").boundingBox())!
   expect(rail.x + rail.width).toBeLessThanOrEqual(editor.x)
-  await page.getByRole("button", { name: "Open Sparra partner", exact: true }).click()
+  await page.getByRole("tab", { name: "Sparra coding partner" }).click()
   await expect(page.getByRole("button", { name: "Enable focus mode", exact: true })).toBeVisible()
   await expect(page.getByRole("region", { name: "Sparra partner", exact: true })).toBeVisible()
   await expectViewportFit(page)

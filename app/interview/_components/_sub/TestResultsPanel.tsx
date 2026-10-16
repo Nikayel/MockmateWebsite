@@ -62,7 +62,7 @@ export function TestResultsPanel({
           onClick={onSubmitSystemDesign}
           disabled={showFeedback || showPostInterviewDiscussion}
           loading={isRunningTests}
-          className="bg-accent hover:bg-accent/80 text-accent-foreground h-9 text-sm font-semibold"
+          className="bg-accent hover:bg-accent/80 text-accent-foreground h-11 text-sm font-semibold"
           aria-label={isRunningTests ? "Submitting design..." : "Submit Design"}
         >
           {!isRunningTests && <CheckCircle className="mr-1 h-3 w-3" aria-hidden="true" />}
@@ -71,22 +71,18 @@ export function TestResultsPanel({
       </div>
     </div>
   ) : (
-    <div className="flex flex-shrink-0 items-center justify-between gap-2">
-      <div className="flex min-w-0 items-center gap-2 text-xs text-amber-700 dark:text-amber-300">
-        {!isLanguageSupported(selectedLanguage) && (
-          <span className="truncate">Use JS/Python to run tests</span>
-        )}
-        {guidedLabBlocksSubmit && (
-          <span className="truncate">Finish all lab milestones to submit</span>
-        )}
+    <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-amber-700 dark:text-amber-300">
+        {!isLanguageSupported(selectedLanguage) && <span>Use JS/Python to run tests</span>}
+        {guidedLabBlocksSubmit && <span>Finish all lab milestones to submit</span>}
       </div>
-      <div className="flex flex-shrink-0 items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
         <Button
           variant="outline"
           size="sm"
           onClick={() => runWithLanguageGuard(onRunCode, "run tests")}
           disabled={showFeedback || isRunningTests}
-          className={`border-border h-9 ${
+          className={`border-border h-11 ${
             isLanguageSupported(selectedLanguage)
               ? "text-foreground hover:bg-muted bg-transparent"
               : "bg-muted text-muted-foreground hover:bg-muted"
@@ -101,7 +97,7 @@ export function TestResultsPanel({
           onClick={() => runWithLanguageGuard(onSubmitCode, "submit")}
           disabled={showFeedback || isRunningTests || guidedLabBlocksSubmit}
           title={guidedLabBlocksSubmit ? "Finish all lab milestones before submitting" : undefined}
-          className="bg-accent hover:bg-accent/80 text-accent-foreground h-9 text-sm font-semibold shadow-[0_4px_20px_-4px_var(--glow)] disabled:opacity-[.55] disabled:shadow-none"
+          className="bg-accent hover:bg-accent/80 text-accent-foreground h-11 text-sm font-semibold disabled:opacity-[.55]"
           aria-label={selectedScenario?.type === "bugfix" ? "Submit fix" : "Submit solution"}
         >
           <Send className="mr-1 h-4 w-4" aria-hidden="true" />

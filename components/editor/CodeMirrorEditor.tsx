@@ -9,6 +9,7 @@ import { Extension, Prec } from "@codemirror/state"
 import { indentUnit, syntaxHighlighting } from "@codemirror/language"
 import { classHighlighter } from "@lezer/highlight"
 import { insertNewlineAndIndent, indentMore, indentLess } from "@codemirror/commands"
+import { darkTheme, lightTheme } from "./editor-theme"
 
 // Lazy-loaded language extensions (reduces initial bundle by ~100KB)
 // These are only loaded when the specific language is needed
@@ -47,8 +48,6 @@ export interface CodeMirrorEditorProps {
   // Support both CodeMirror style ("dark"/"light") and Monaco style ("vs-dark"/"vs-light"/"hc-black")
   theme?: "dark" | "light" | "vs-dark" | "vs-light" | "hc-black"
   className?: string
-  // New: Support calm mode for reduced visual stress
-  calmMode?: boolean
 }
 
 // Language indentation settings
@@ -87,88 +86,6 @@ const getJsExtension = (language: string): Extension | null => {
   return null
 }
 
-/*
- * Calm, warm editor chrome (Claude-inspired). These themes set ONLY the editor
- * surface — background, gutter, cursor, selection, brackets — in the clay
- * palette. Syntax token colors are NOT set here: they come from the centralized
- * `.tok-*` CSS variables in globals.css (applied via CodeMirror's
- * classHighlighter), so highlighting is restrained, on-palette, and follows the
- * light/dark theme automatically instead of CodeMirror's default rainbow.
- */
-const EDITOR_FONT = '"Fira Code", "Consolas", "Monaco", monospace'
-
-const darkTheme = EditorView.theme(
-  {
-    "&": { backgroundColor: "#1e1d1b", color: "#ece9e1", height: "100%" },
-    ".cm-content": {
-      caretColor: "#ece9e1",
-      fontFamily: EDITOR_FONT,
-      fontSize: "14px",
-      lineHeight: "22px",
-      padding: "8px 0",
-    },
-    ".cm-cursor": { borderLeftColor: "#ece9e1", borderLeftWidth: "2px" },
-    ".cm-activeLine": { backgroundColor: "transparent" },
-    "&.cm-focused .cm-activeLine": { backgroundColor: "rgba(255, 255, 255, 0.035)" },
-    ".cm-gutters": {
-      backgroundColor: "#1a1917",
-      color: "#6a675f",
-      border: "none",
-      borderRight: "1px solid rgba(255, 255, 255, 0.06)",
-      paddingRight: "8px",
-    },
-    ".cm-activeLineGutter": { backgroundColor: "rgba(255, 255, 255, 0.035)" },
-    ".cm-lineNumbers .cm-gutterElement": { minWidth: "3ch", padding: "0 8px 0 0" },
-    ".cm-scroller": { overflow: "auto", fontFamily: EDITOR_FONT },
-    ".cm-selectionBackground": { backgroundColor: "rgba(196, 112, 63, 0.20) !important" },
-    "&.cm-focused .cm-selectionBackground": {
-      backgroundColor: "rgba(196, 112, 63, 0.30) !important",
-    },
-    ".cm-matchingBracket": { backgroundColor: "rgba(196, 112, 63, 0.30)", outline: "none" },
-    ".cm-searchMatch": { backgroundColor: "rgba(76, 199, 155, 0.22)" },
-    ".cm-searchMatch.cm-searchMatch-selected": {
-      backgroundColor: "rgba(196, 112, 63, 0.38)",
-    },
-  },
-  { dark: true }
-)
-
-const lightTheme = EditorView.theme(
-  {
-    "&": { backgroundColor: "#f8f7f3", color: "#292824", height: "100%" },
-    ".cm-content": {
-      caretColor: "#292824",
-      fontFamily: EDITOR_FONT,
-      fontSize: "14px",
-      lineHeight: "22px",
-      padding: "8px 0",
-    },
-    ".cm-cursor": { borderLeftColor: "#292824", borderLeftWidth: "2px" },
-    ".cm-activeLine": { backgroundColor: "transparent" },
-    "&.cm-focused .cm-activeLine": { backgroundColor: "rgba(196, 112, 63, 0.06)" },
-    ".cm-gutters": {
-      backgroundColor: "#f3f2ee",
-      color: "#a8a49c",
-      border: "none",
-      borderRight: "1px solid rgba(0, 0, 0, 0.06)",
-      paddingRight: "8px",
-    },
-    ".cm-activeLineGutter": { backgroundColor: "rgba(196, 112, 63, 0.06)" },
-    ".cm-lineNumbers .cm-gutterElement": { minWidth: "3ch", padding: "0 8px 0 0" },
-    ".cm-scroller": { overflow: "auto", fontFamily: EDITOR_FONT },
-    ".cm-selectionBackground": { backgroundColor: "rgba(196, 112, 63, 0.16) !important" },
-    "&.cm-focused .cm-selectionBackground": {
-      backgroundColor: "rgba(196, 112, 63, 0.24) !important",
-    },
-    ".cm-matchingBracket": { backgroundColor: "rgba(196, 112, 63, 0.22)", outline: "none" },
-    ".cm-searchMatch": { backgroundColor: "rgba(29, 158, 117, 0.18)" },
-    ".cm-searchMatch.cm-searchMatch-selected": {
-      backgroundColor: "rgba(196, 112, 63, 0.30)",
-    },
-  },
-  { dark: false }
-)
-
 // Stable token classes (.tok-keyword, .tok-string, …) colored from globals.css.
 const calmSyntax = syntaxHighlighting(classHighlighter)
 
@@ -193,7 +110,6 @@ const CodeMirrorEditorComponent = React.forwardRef<CodeMirrorEditorRef, CodeMirr
       readOnly = false,
       theme,
       className = "",
-      calmMode = false,
     }: CodeMirrorEditorProps,
     ref
   ) => {
@@ -229,10 +145,6 @@ const CodeMirrorEditorComponent = React.forwardRef<CodeMirrorEditorRef, CodeMirr
 
     // State for lazy-loaded language extension
     const [loadedLangExt, setLoadedLangExt] = useState<Extension | null>(null)
-    const [langLoading, setLangLoading] = useState(false)
-
-    // Detect calm mode from DOM if not explicitly passed
-    const [isCalm, setIsCalm] = useState(calmMode)
 
     // Lazy load language extension when language changes
     useEffect(() => {
@@ -248,7 +160,6 @@ const CodeMirrorEditorComponent = React.forwardRef<CodeMirrorEditorRef, CodeMirr
       // Check if we have a loader for this language
       const loader = languageLoaders[lang]
       if (loader) {
-        setLangLoading(true)
         loader()
           .then((ext) => {
             setLoadedLangExt(ext)
@@ -257,31 +168,11 @@ const CodeMirrorEditorComponent = React.forwardRef<CodeMirrorEditorRef, CodeMirr
             console.warn(`Failed to load language extension for ${lang}:`, err)
             setLoadedLangExt(null)
           })
-          .finally(() => setLangLoading(false))
       } else {
         // Unknown language, no extension
         setLoadedLangExt(null)
       }
     }, [language])
-
-    useEffect(() => {
-      // Check if calm class is on document
-      const checkCalmMode = () => {
-        const hasCalmClass =
-          document.documentElement.classList.contains("calm") ||
-          document.body.classList.contains("calm")
-        setIsCalm(calmMode || hasCalmClass)
-      }
-
-      checkCalmMode()
-
-      // Watch for class changes
-      const observer = new MutationObserver(checkCalmMode)
-      observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] })
-      observer.observe(document.body, { attributes: true, attributeFilter: ["class"] })
-
-      return () => observer.disconnect()
-    }, [calmMode])
 
     // Resolve the effective theme: an explicit prop wins; otherwise follow the
     // global app theme (next-themes), defaulting to dark before mount.
@@ -317,9 +208,7 @@ const CodeMirrorEditorComponent = React.forwardRef<CodeMirrorEditorRef, CodeMirr
         ])
       )
 
-      // Calm, on-palette surface + centralized syntax classes. Calm mode keeps
-      // the same restrained theme (token colors are already low-saturation, so
-      // there's no rainbow to mute); it's retained in deps for parity.
+      // Chrome and syntax colors share the workspace roles.
       exts.push(isDarkTheme ? darkTheme : lightTheme, calmSyntax)
 
       // In auto-height mode, neutralize the base themes' `height: 100%` so the editor sizes to its
@@ -330,7 +219,7 @@ const CodeMirrorEditorComponent = React.forwardRef<CodeMirrorEditorRef, CodeMirr
       }
 
       return exts
-    }, [loadedLangExt, indentSize, isDarkTheme, isCalm, autoHeight, minHeight, maxHeight])
+    }, [loadedLangExt, indentSize, isDarkTheme, autoHeight, minHeight, maxHeight])
 
     // Handle value changes
     const handleChange = useCallback(

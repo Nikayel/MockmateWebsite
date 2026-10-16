@@ -219,14 +219,17 @@ export function VoiceModeToggle({
           </AnimatePresence>
 
           <Button
+            aria-label={isRecording ? "Stop recording" : "Start voice answer"}
             onClick={onToggleRecording}
             disabled={disabled || isLoading}
             className={cn(
               "relative z-10 transition-all duration-200",
-              compact ? "h-8 w-8" : "h-10 w-10",
+              compact ? "h-11 w-11" : "h-10 w-10",
               isRecording
                 ? "bg-destructive hover:bg-destructive/80 shadow-lg"
-                : "bg-accent hover:bg-accent/80 text-accent-foreground shadow-md hover:shadow-lg"
+                : compact
+                  ? "border-border bg-secondary text-foreground hover:bg-muted border shadow-none"
+                  : "bg-accent hover:bg-accent/80 text-accent-foreground shadow-md hover:shadow-lg"
             )}
           >
             <AnimatePresence mode="wait">

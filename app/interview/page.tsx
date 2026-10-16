@@ -2136,6 +2136,7 @@ function InterviewPageContent() {
           {resultSurface === "workspace" ? (
             <InterviewLayoutGrid
               focusMode={focusMode}
+              onFocusModeChange={setFocusMode}
               selectedScenario={selectedScenario}
               realInterviewMode={realInterviewMode}
               showProblemPeek={showProblemPeek}

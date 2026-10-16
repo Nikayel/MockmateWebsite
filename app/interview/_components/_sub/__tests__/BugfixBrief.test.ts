@@ -99,6 +99,14 @@ describe("extractIncidentNarrative", () => {
     expect(extractIncidentNarrative(packish)).toBe(packish.trim())
   })
 
+  it("omits only an exact repeated scenario title while retaining the contract", () => {
+    const statement = "# Cache cleanup\n\n## Data contract\nPreserve the public API."
+    expect(extractIncidentNarrative(statement, "Cache cleanup")).toBe(
+      "## Data contract\nPreserve the public API."
+    )
+    expect(extractIncidentNarrative(statement, "Another task")).toBe(statement)
+  })
+
   it("returns an empty string when everything was redundant", () => {
     expect(extractIncidentNarrative("**Your Task**\n1. Fix it.\n")).toBe("")
   })

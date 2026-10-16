@@ -1,9 +1,9 @@
 "use client"
 
-import React, { useEffect, useRef } from "react"
-import { AlertCircle, CheckCircle, XCircle, Terminal, Trash2 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import React, { useEffect, useId, useRef } from "react"
+import { AlertCircle, CheckCircle, XCircle } from "lucide-react"
+import { ConsoleHeader } from "./ConsoleHeader"
+import "./console.css"
 import { cn } from "@/lib/utils"
 import { TerminalOutput, TERMINAL_PRE } from "./TerminalOutput"
 // The offsets must come from the wrappers that actually RAN the code. They used to be
@@ -38,11 +38,11 @@ export interface ConsoleOutput {
 export interface TestResult {
   description: string
   passed: boolean
-  input: any
+  input: unknown
   /** Absent for workspace suites, whose only honest signal is `error`. */
-  expected?: any
+  expected?: unknown
   /** Absent for workspace suites, whose only honest signal is `error`. */
-  actual?: any
+  actual?: unknown
   error: string | null
   isHidden?: boolean
 }
@@ -55,6 +55,8 @@ export interface TestSummary {
 }
 
 interface CodeConsoleProps {
+  expanded?: boolean
+  onExpandedChange?: (expanded: boolean) => void
   outputs?: ConsoleOutput[]
   testResults?: TestResult[]
   testSummary?: TestSummary
@@ -352,6 +354,8 @@ function formatValue(value: unknown): string {
 }
 
 export function CodeConsole({
+  expanded = true,
+  onExpandedChange,
   outputs = [],
   testResults = [],
   testSummary = { total: 0, passed: 0, failed: 0, passRate: 0 },
@@ -363,6 +367,7 @@ export function CodeConsole({
   notice,
   packRun,
 }: CodeConsoleProps) {
+  const contentId = useId()
   const consoleRef = useRef<HTMLDivElement>(null)
   const userScrolledUpRef = useRef(false)
   const prevOutputLengthRef = useRef(0)
@@ -389,7 +394,7 @@ export function CodeConsole({
     if (consoleRef.current && !userScrolledUpRef.current) {
       consoleRef.current.scrollTop = consoleRef.current.scrollHeight
     }
-  }, [outputs, testResults, isRunning])
+  }, [outputs, testResults, isRunning, expanded])
 
   // Check for code errors
   const errorResults = testResults.filter((r) => r.error)
@@ -414,84 +419,37 @@ export function CodeConsole({
   return (
     <div
       className={cn(
-        // The panel is always dark (bg-[#1e1d1b]); scope the subtree to `dark` so the
-        // theme tokens inside (muted-foreground, foreground, border) resolve to their
-        // light-on-dark values. Without this, light app mode paints dark-gray text on the
-        // dark panel (~3:1, fails AA).
-        "dark border-border flex flex-shrink-0 flex-col rounded border bg-[#1e1d1b]",
+        "code-console border-border bg-card flex shrink-0 flex-col overflow-hidden rounded border",
         className
       )}
     >
-      {/* Console Header */}
-      <div className="border-border flex flex-shrink-0 items-center justify-between border-b bg-[#232220] px-3 py-1.5">
-        <div className="flex items-center space-x-2">
-          <Terminal className="text-muted-foreground h-3.5 w-3.5" />
-          <span className="text-muted-foreground text-xs font-medium">Console</span>
-          {/* A crashed pack already reports "crashed"; two red badges is noise. */}
-          {hasCodeError && !packRun && (
-            <Badge className="h-4 border-red-500/30 bg-red-500/20 px-1.5 text-[10px] text-red-400">
-              Error
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center space-x-2">
-          {/* Packs have no test suite — report the oracle verdict, not a tally. */}
-          {packRun && (
-            <Badge
-              className={cn(
-                "h-5 text-xs",
-                !packRun.ran
-                  ? "border-red-500/30 bg-red-500/20 text-red-400"
-                  : packRun.match
-                    ? "border-green-500/30 bg-green-500/20 text-green-400"
-                    : "border-yellow-500/30 bg-yellow-500/20 text-yellow-400"
-              )}
-            >
-              {!packRun.ran ? "crashed" : packRun.match ? "oracle match" : "oracle mismatch"}
-            </Badge>
-          )}
-          {!packRun && testResults.length > 0 && !hasCodeError && (
-            <Badge
-              className={cn(
-                "h-5 text-xs",
-                testSummary.passRate === 100
-                  ? "border-green-500/30 bg-green-500/20 text-green-400"
-                  : testSummary.passRate >= 60
-                    ? "border-yellow-500/30 bg-yellow-500/20 text-yellow-400"
-                    : "border-red-500/30 bg-red-500/20 text-red-400"
-              )}
-            >
-              {testSummary.passed}/{testSummary.total} tests
-            </Badge>
-          )}
-          {isRunning && (
-            <Badge className="h-5 animate-pulse border-blue-500/30 bg-blue-500/20 text-xs text-blue-400">
-              Running...
-            </Badge>
-          )}
-          {onClear && (outputs.length > 0 || testResults.length > 0 || packRun) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-muted-foreground h-5 w-5 p-0"
-              onClick={onClear}
-              aria-label="Clear console"
-            >
-              <Trash2 className="h-3 w-3" aria-hidden="true" />
-            </Button>
-          )}
-        </div>
-      </div>
+      <ConsoleHeader
+        isRunning={isRunning}
+        hasCodeError={hasCodeError}
+        hasContent={outputs.length > 0 || testResults.length > 0 || Boolean(packRun)}
+        testCount={testResults.length}
+        testSummary={testSummary}
+        packRun={packRun}
+        onClear={onClear}
+        expanded={expanded}
+        onExpandedChange={onExpandedChange}
+        contentId={contentId}
+      />
 
       {/* Console Content. role="log" + aria-live so a screen reader announces run output
           and test results as they stream in, instead of the panel updating silently. */}
       <div
         ref={consoleRef}
+        id={contentId}
+        hidden={!expanded}
         onScroll={handleScroll}
         role="log"
         aria-live="polite"
         aria-label="Console output"
-        className="max-h-[200px] min-h-[100px] flex-1 space-y-1 overflow-y-auto p-2 font-mono text-xs"
+        className={cn(
+          "max-h-[200px] flex-1 space-y-1 overflow-y-auto p-2 font-mono text-xs",
+          onExpandedChange ? "min-h-0" : "min-h-[100px]"
+        )}
       >
         {/* Optional info banner (e.g. guided-lab reveal signpost) */}
         {notice && (
@@ -511,7 +469,7 @@ export function CodeConsole({
 
         {/* Running state */}
         {isRunning && (
-          <div className="flex items-center gap-2 text-blue-400">
+          <div className="flex items-center gap-2 text-[var(--console-info)]">
             <span className="text-muted-foreground">{">"}</span>
             <span>Executing code</span>
             <span className="animate-pulse">...</span>
@@ -524,11 +482,11 @@ export function CodeConsole({
             key={`output-${output.type}-${index}`}
             className={cn(
               "flex items-start gap-2",
-              output.type === "error" && "text-red-400",
-              output.type === "warn" && "text-yellow-400",
-              output.type === "info" && "text-blue-400",
+              output.type === "error" && "text-[var(--console-error)]",
+              output.type === "warn" && "text-[var(--console-warning)]",
+              output.type === "info" && "text-[var(--console-info)]",
               output.type === "log" && "text-muted-foreground",
-              output.type === "result" && "text-green-400"
+              output.type === "result" && "text-[var(--console-success)]"
             )}
           >
             <span className="text-muted-foreground select-none">{">"}</span>
@@ -550,19 +508,22 @@ export function CodeConsole({
             {/* Error banner for syntax/runtime errors */}
             {hasCodeError && errorInfo && (
               <div className="mb-2 rounded border border-red-500/30 bg-red-500/10 p-2">
-                <div className="flex items-start gap-2 text-red-400">
+                <div className="flex items-start gap-2 text-[var(--console-error)]">
                   <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                   <div className="flex-1">
                     <div className="mb-1 font-semibold">{errorInfo.title}</div>
                     {errorInfo.hint && (
-                      <div className="mb-2 text-[11px] text-yellow-300/80 italic">
+                      <div className="mb-2 text-[11px] text-[var(--console-warning)] italic">
                         💡 {errorInfo.hint}
                       </div>
                     )}
                     {/* A traceback is column-aligned output like any other: scroll
                         it, never break-all it. */}
                     <pre
-                      className={cn(TERMINAL_PRE, "bg-background/20 rounded p-2 text-red-300/80")}
+                      className={cn(
+                        TERMINAL_PRE,
+                        "bg-background/20 rounded p-2 text-[var(--console-error)]"
+                      )}
                     >
                       {errorInfo.details}
                     </pre>
@@ -575,7 +536,7 @@ export function CodeConsole({
             {!hasCodeError && (
               <div className="border-border/50 mb-1 border-t pt-1">
                 {failureSummary ? (
-                  <div className="flex items-start gap-1.5 text-red-300">
+                  <div className="flex items-start gap-1.5 text-[var(--console-error)]">
                     <XCircle className="mt-0.5 h-3 w-3 flex-shrink-0" aria-hidden="true" />
                     <span className="break-words">{failureSummary}</span>
                   </div>
@@ -594,7 +555,7 @@ export function CodeConsole({
                 <div
                   className={cn(
                     "flex items-center gap-2",
-                    result.passed ? "text-green-400" : "text-red-400"
+                    result.passed ? "text-[var(--console-success)]" : "text-[var(--console-error)]"
                   )}
                 >
                   {result.passed ? (
@@ -627,7 +588,7 @@ export function CodeConsole({
                         {result.input != null && typeof result.input === "object" && (
                           <div className="flex items-start gap-2">
                             <span className="text-muted-foreground w-14 flex-shrink-0">Input:</span>
-                            <pre className={cn(TERMINAL_PRE, "text-blue-300")}>
+                            <pre className={cn(TERMINAL_PRE, "text-[var(--console-info)]")}>
                               {formatValue(result.input)}
                             </pre>
                           </div>
@@ -640,7 +601,9 @@ export function CodeConsole({
                         {result.error ? (
                           <div className="flex items-start gap-2">
                             <span className="text-muted-foreground w-14 flex-shrink-0">Error:</span>
-                            <pre className={cn(TERMINAL_PRE, "text-red-300")}>{result.error}</pre>
+                            <pre className={cn(TERMINAL_PRE, "text-[var(--console-error)]")}>
+                              {result.error}
+                            </pre>
                           </div>
                         ) : hasComparison(result) ? (
                           <>
@@ -648,13 +611,13 @@ export function CodeConsole({
                               <span className="text-muted-foreground w-14 flex-shrink-0">
                                 Expected:
                               </span>
-                              <pre className={cn(TERMINAL_PRE, "text-green-300")}>
+                              <pre className={cn(TERMINAL_PRE, "text-[var(--console-success)]")}>
                                 {formatValue(result.expected)}
                               </pre>
                             </div>
                             <div className="flex items-start gap-2">
                               <span className="text-muted-foreground w-14 flex-shrink-0">Got:</span>
-                              <pre className={cn(TERMINAL_PRE, "text-red-300")}>
+                              <pre className={cn(TERMINAL_PRE, "text-[var(--console-error)]")}>
                                 {formatValue(result.actual)}
                               </pre>
                             </div>

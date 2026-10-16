@@ -1,21 +1,11 @@
 "use client"
 
 import { memo, type Dispatch, type RefObject, type SetStateAction } from "react"
-import {
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  HardDrive,
-  HelpCircle,
-  Lightbulb,
-  PanelLeftClose,
-  Target,
-} from "lucide-react"
+import { ChevronDown, ChevronUp, Clock, HardDrive, HelpCircle, Lightbulb } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
-import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import type { Scenario } from "@/lib/scenarios"
 import type { BugSymptom, BugFixScenario } from "@/lib/scenarios/types"
 import { resolveReporterNote } from "@/lib/scenarios/bugfix-quality"
@@ -79,23 +69,15 @@ export interface ProblemColumnCtx {
 
 interface ProblemColumnProps {
   ctx: ProblemColumnCtx
-  collapsed?: boolean
-  onToggleCollapse?: () => void
 }
 
-export const ProblemColumn = memo(function ProblemColumn({
-  ctx,
-  collapsed = false,
-  onToggleCollapse,
-}: ProblemColumnProps) {
+export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnProps) {
   const {
-    activePanel,
     activeWorkspacePath,
     onWorkspaceFileSelect,
     elapsedTime,
     fetchRAGHints,
     fileInputRef,
-    focusMode,
     handleFileUpload,
     hintAgent,
     hintFeedback,
@@ -136,52 +118,19 @@ export const ProblemColumn = memo(function ProblemColumn({
 
   return (
     <>
-      {/* Left: Problem Description / File Upload
-                      - Hidden in focus mode (desktop)
-                      - Only visible when activePanel === 'problem' (mobile)
-                  */}
-      <Card
-        className={`glass-effect border-border bg-card/50 order-1 h-full flex-col gap-0 overflow-hidden py-0 ${
-          focusMode && !showFileTree
-            ? // Focus mode hides the problem description — but not when this column owns the
-              // workspace file tree, which is a working tool a bugfix candidate needs (and
-              // which records the codebase-navigation scoring evidence).
-              "hidden"
-            : collapsed
-              ? // Collapsed is a desktop affordance: hide at lg, still tab-able on mobile
-                activePanel === "problem"
-                ? "flex lg:hidden"
-                : "hidden"
-              : activePanel === "problem"
-                ? "flex"
-                : "hidden lg:flex"
-        }`}
-      >
-        {/* IMPROVED: Enhanced header with title and difficulty badge */}
-        <CardHeader className="border-border/50 flex-shrink-0 border-b px-4 pt-3 pb-2">
+      <Card className="bg-card flex h-full flex-col gap-0 overflow-hidden rounded-none border-0 py-0 shadow-none">
+        <CardHeader className="flex-shrink-0 px-4 pt-4 pb-3">
           <CardTitle className="text-foreground flex w-full min-w-0 items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              <Target className="text-accent h-5 w-5 flex-shrink-0" />
-              <span className="truncate text-base font-semibold">
+              <h2 className="text-base leading-snug font-semibold">
                 {selectedScenario?.title || "Problem"}
-              </span>
+              </h2>
             </div>
             <div className="flex flex-shrink-0 items-center gap-1.5">
               {selectedScenario && (
-                <Badge className={`text-xs ${difficultyColorClass(selectedScenario.difficulty)}`}>
+                <Badge className="border-border text-muted-foreground bg-transparent text-xs">
                   {selectedScenario.difficulty}
                 </Badge>
-              )}
-              {onToggleCollapse && (
-                <button
-                  type="button"
-                  onClick={onToggleCollapse}
-                  className="text-muted-foreground hover:bg-muted hover:text-foreground hidden h-6 w-6 items-center justify-center rounded transition-colors lg:inline-flex"
-                  title="Collapse panel"
-                  aria-label="Collapse problem panel"
-                >
-                  <PanelLeftClose className="h-4 w-4" />
-                </button>
               )}
             </div>
           </CardTitle>
@@ -192,7 +141,7 @@ export const ProblemColumn = memo(function ProblemColumn({
         <CardContent className="min-h-0 flex-1 overflow-hidden p-0">
           <ResizablePanelGroup direction="vertical" className="h-full">
             <ResizablePanel defaultSize={showFileTree ? 62 : 100} minSize={30}>
-              <div className="h-full space-y-5 overflow-y-auto p-3">
+              <div className="h-full space-y-5 overflow-y-auto px-4 pb-4">
                 {guidedLab && selectedScenario && (
                   <div className="border-border/60 bg-muted/20 rounded-lg border p-3">
                     <GuidedLabRail config={guidedLab} scenarioId={selectedScenario.id} />
@@ -204,6 +153,9 @@ export const ProblemColumn = memo(function ProblemColumn({
                   the classic Description block. */}
                     {isBugfix ? (
                       <BugfixBrief
+                        title={selectedScenario.title}
+                        reproductionSteps={reproductionSteps}
+                        visibleLogs={visibleLogs}
                         task={scenarioDetails?.task}
                         symptom={scenarioDetails?.symptom}
                         acceptance={successCriteria}
@@ -222,11 +174,10 @@ export const ProblemColumn = memo(function ProblemColumn({
                       />
                     ) : (
                       <div className="space-y-2">
-                        <h3 className="text-accent flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
-                          <span className="bg-accent h-4 w-1 rounded-full"></span>
+                        <h3 className="text-foreground flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
                           Description
                           {realInterviewMode && scenarioDetails?.fuzzyStatement && (
-                            <Badge className="border-accent/30 bg-accent/10 text-accent-strong text-xs">
+                            <Badge className="border-accent/30 bg-accent/10 text-foreground-strong text-xs">
                               Real Interview Mode
                             </Badge>
                           )}
@@ -242,44 +193,11 @@ export const ProblemColumn = memo(function ProblemColumn({
                       </div>
                     )}
 
-                    {/* Repro steps and logs are evidence, not narrative: they stay, but
-                  below the brief and without a second telling of the incident. */}
-                    {isBugfix && (reproductionSteps.length > 0 || visibleLogs.length > 0) && (
-                      <div className="space-y-3">
-                        {reproductionSteps.length > 0 && (
-                          <div>
-                            <p className="text-muted-foreground/70 mb-1 font-mono text-[10px] tracking-[0.14em] uppercase">
-                              Repro steps
-                            </p>
-                            <ol className="text-muted-foreground list-decimal space-y-1 pl-4 text-[12px]">
-                              {reproductionSteps.map((step: string, index: number) => (
-                                <li key={`${step}-${index}`}>{step}</li>
-                              ))}
-                            </ol>
-                          </div>
-                        )}
-                        {visibleLogs.length > 0 && (
-                          <div>
-                            <p className="text-muted-foreground/70 mb-1 font-mono text-[10px] tracking-[0.14em] uppercase">
-                              Visible logs
-                            </p>
-                            <div className="border-border/60 bg-background/50 text-muted-foreground space-y-1 overflow-x-auto rounded border p-2 font-mono text-[11px] whitespace-pre">
-                              {visibleLogs.map((log: string, index: number) => (
-                                <p key={`${log}-${index}`}>{log}</p>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* IMPROVED: Examples with better visual hierarchy */}
                     {selectedScenario.type === "dsa" &&
                       selectedScenario.examples &&
                       selectedScenario.examples.length > 0 && (
                         <div className="space-y-2">
-                          <h3 className="text-accent flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
-                            <span className="bg-accent h-4 w-1 rounded-full"></span>
+                          <h3 className="text-foreground flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
                             Examples
                           </h3>
                           <div className="space-y-3">
@@ -313,19 +231,17 @@ export const ProblemColumn = memo(function ProblemColumn({
                         </div>
                       )}
 
-                    {/* IMPROVED: Constraints with better styling */}
                     {selectedScenario.type === "dsa" &&
                       selectedScenario.constraints &&
                       selectedScenario.constraints.length > 0 && (
                         <div className="space-y-2">
-                          <h3 className="text-accent flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
-                            <span className="bg-accent h-4 w-1 rounded-full"></span>
+                          <h3 className="text-foreground flex items-center gap-2 text-sm font-semibold tracking-wide uppercase">
                             Constraints
                           </h3>
                           <ul className="text-muted-foreground space-y-1.5">
                             {selectedScenario.constraints.slice(0, 4).map((c, i) => (
                               <li key={i} className="flex items-start gap-2 text-sm">
-                                <span className="text-accent mt-0.5">•</span>
+                                <span className="text-foreground mt-0.5">•</span>
                                 <code className="text-muted-foreground font-mono">{c}</code>
                               </li>
                             ))}
@@ -341,7 +257,6 @@ export const ProblemColumn = memo(function ProblemColumn({
                           className="hover:bg-muted/30 flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition-colors"
                         >
                           <div className="flex items-center gap-2">
-                            <span className="bg-accent h-4 w-1 rounded-full"></span>
                             <span className="text-foreground text-sm font-medium">
                               Target complexity
                             </span>
@@ -358,13 +273,13 @@ export const ProblemColumn = memo(function ProblemColumn({
                             <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
                               <span className="text-muted-foreground flex items-center gap-1.5">
                                 <Clock className="text-muted-foreground h-3.5 w-3.5" />
-                                <code className="text-accent font-mono">
+                                <code className="text-foreground font-mono">
                                   {scenarioDetails.optimalComplexity.time}
                                 </code>
                               </span>
                               <span className="text-muted-foreground flex items-center gap-1.5">
                                 <HardDrive className="text-muted-foreground h-3.5 w-3.5" />
-                                <code className="text-accent font-mono">
+                                <code className="text-foreground font-mono">
                                   {scenarioDetails.optimalComplexity.space}
                                 </code>
                               </span>

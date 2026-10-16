@@ -32,8 +32,8 @@ export function WorkspaceFilesPanel({
     <div className="flex h-full min-h-0 flex-col" data-bugfix-tour={tourAnchor}>
       <div className="border-border/50 text-muted-foreground flex flex-shrink-0 items-center gap-1.5 border-y px-3 py-1.5">
         <FolderTree className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
-        <span className="font-mono text-[10px] tracking-[0.14em] uppercase">Files</span>
-        <span className="ml-auto font-mono text-[10px] tabular-nums">{files.length}</span>
+        <span className="text-xs font-medium">Files</span>
+        <span className="ml-auto text-xs tabular-nums">{files.length}</span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <FileTreeSidebar files={files} activePath={activePath} onFileSelect={onFileSelect} />

@@ -6,10 +6,11 @@ import { PanelLeftOpen, PanelRightOpen } from "lucide-react"
 import { useWorkspaceRails } from "../_hooks/useWorkspaceRails"
 import { isWorkspaceScenario } from "../_utils/workspace"
 import { FocusProblemPeek } from "./FocusProblemPeek"
-import { ProblemColumn, type ProblemColumnCtx } from "./ProblemColumn"
+import { type ProblemColumnCtx } from "./ProblemColumn"
 import { EditorColumn } from "./EditorColumn"
 import { ChatColumn } from "./ChatColumn"
 import { SparraPartnerWidget } from "./SparraPartnerWidget"
+import { ProblemPartnerPanel } from "./ProblemPartnerPanel"
 import type { BugfixOnboardingTour } from "./BugfixOnboardingTour"
 
 /**
@@ -31,6 +32,7 @@ type BugfixOnboardingTourProps = ComponentProps<typeof BugfixOnboardingTour>
 
 interface InterviewLayoutGridProps {
   focusMode: boolean
+  onFocusModeChange: (enabled: boolean) => void
   // FocusProblemPeek
   selectedScenario: FocusProblemPeekProps["scenario"]
   realInterviewMode: FocusProblemPeekProps["realInterviewMode"]
@@ -64,7 +66,7 @@ interface InterviewLayoutGridProps {
   onResetActiveFile: EditorColumnProps["onResetActiveFile"]
   onResetWorkspace: EditorColumnProps["onResetWorkspace"]
   isAIPartnerExpanded: PartnerProps["expanded"]
-  onAIPartnerExpandedChange: PartnerProps["onExpandedChange"]
+  onAIPartnerExpandedChange: (expanded: boolean) => void
   chatMessages: PartnerProps["messages"]
   chatEndRef: PartnerProps["messagesEndRef"]
   chatInput: PartnerProps["input"]
@@ -102,6 +104,7 @@ interface InterviewLayoutGridProps {
  */
 export function InterviewLayoutGrid({
   focusMode,
+  onFocusModeChange,
   selectedScenario,
   realInterviewMode,
   showProblemPeek,
@@ -216,7 +219,7 @@ export function InterviewLayoutGrid({
               className="group absolute inset-y-0 z-20 hidden w-2 -translate-x-1/2 cursor-col-resize touch-none lg:block"
               style={{ left: "calc(var(--w-lab) + 0.25rem)" }}
             >
-              <div className="group-hover:bg-accent/40 mx-auto h-full w-px bg-transparent transition-colors" />
+              <div className="group-hover:bg-muted-foreground/40 mx-auto h-full w-px bg-transparent transition-colors" />
             </div>
           )}
           {!intCollapsed && (
@@ -228,7 +231,7 @@ export function InterviewLayoutGrid({
               className="group absolute inset-y-0 z-20 hidden w-2 translate-x-1/2 cursor-col-resize touch-none lg:block"
               style={{ right: "calc(var(--w-int) + 0.25rem)" }}
             >
-              <div className="group-hover:bg-accent/40 mx-auto h-full w-px bg-transparent transition-colors" />
+              <div className="group-hover:bg-muted-foreground/40 mx-auto h-full w-px bg-transparent transition-colors" />
             </div>
           )}
           {leftCollapsed && (
@@ -237,7 +240,7 @@ export function InterviewLayoutGrid({
               onClick={toggleLab}
               aria-label="Expand problem panel"
               title="Expand problem panel"
-              className="bg-card/80 border-border text-muted-foreground hover:border-accent/50 hover:text-accent absolute top-3 left-0 z-20 hidden flex-col items-center gap-2 rounded-r-md border border-l-0 py-3 pr-1 pl-0.5 shadow-sm backdrop-blur transition-colors lg:flex"
+              className="bg-card border-border text-muted-foreground hover:border-accent/50 hover:text-accent absolute top-3 left-0 z-20 hidden flex-col items-center gap-2 rounded-r-md border border-l-0 py-3 pr-1 pl-0.5 transition-colors lg:flex"
             >
               <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
               <span className="text-[10px] font-semibold tracking-widest [writing-mode:vertical-rl]">
@@ -251,7 +254,7 @@ export function InterviewLayoutGrid({
               onClick={toggleInt}
               aria-label="Expand interviewer panel"
               title="Expand interviewer panel"
-              className="bg-card/80 border-border text-muted-foreground hover:border-accent/50 hover:text-accent absolute top-3 right-0 z-20 hidden flex-col items-center gap-2 rounded-l-md border border-r-0 py-3 pr-0.5 pl-1 shadow-sm backdrop-blur transition-colors lg:flex"
+              className="bg-card border-border text-muted-foreground hover:border-accent/50 hover:text-accent absolute top-3 right-0 z-20 hidden flex-col items-center gap-2 rounded-l-md border border-r-0 py-3 pr-0.5 pl-1 transition-colors lg:flex"
             >
               <PanelRightOpen className="h-4 w-4" aria-hidden="true" />
               <span className="text-[10px] font-semibold tracking-widest [writing-mode:vertical-rl]">
@@ -261,7 +264,7 @@ export function InterviewLayoutGrid({
           )}
         </>
       )}
-      {focusMode && (
+      {focusMode && !focusHasExplorer && (
         <FocusProblemPeek
           scenario={selectedScenario}
           realInterviewMode={realInterviewMode}
@@ -273,22 +276,33 @@ export function InterviewLayoutGrid({
         aria-label="Problem and partner"
         className={`order-1 min-h-0 min-w-0 flex-col gap-2 overflow-hidden ${focusMode && !focusHasExplorer ? "hidden" : `${activePanel === "problem" ? "flex" : "hidden lg:flex"} ${leftCollapsed ? "lg:invisible" : ""}`}`}
       >
-        <div className={`min-h-0 flex-1 ${partnerExpanded ? "hidden" : ""}`}>
-          <ProblemColumn ctx={problemCtx} onToggleCollapse={focusMode ? undefined : toggleLab} />
-        </div>
-        {hasPartner && !focusMode && (
-          <SparraPartnerWidget
-            expanded={isAIPartnerExpanded}
-            onExpandedChange={onAIPartnerExpandedChange}
-            messages={chatMessages}
-            messagesEndRef={chatEndRef}
-            input={chatInput}
-            onInputChange={onChatInputChange}
-            isLoading={isLoadingChat}
-            onSendMessage={onSendPartnerMessage}
-            isDebuggingScenario={selectedScenario?.type === "bugfix"}
-          />
-        )}
+        <ProblemPartnerPanel
+          problemCtx={problemCtx}
+          hasPartner={hasPartner}
+          onPartnerExpandedChange={onAIPartnerExpandedChange}
+          onToggleCollapse={
+            focusMode
+              ? undefined
+              : () => {
+                  onAIPartnerExpandedChange(false)
+                  if (!labCollapsed) toggleLab()
+                }
+          }
+          onOpenPartner={() => {
+            if (focusMode) onFocusModeChange(false)
+            onAIPartnerExpandedChange(true)
+          }}
+          partner={{
+            expanded: isAIPartnerExpanded,
+            messages: chatMessages,
+            messagesEndRef: chatEndRef,
+            input: chatInput,
+            onInputChange: onChatInputChange,
+            isLoading: isLoadingChat,
+            onSendMessage: onSendPartnerMessage,
+            isDebuggingScenario: selectedScenario?.type === "bugfix",
+          }}
+        />
       </aside>
 
       <EditorColumn

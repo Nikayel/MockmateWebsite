@@ -1,7 +1,7 @@
 "use client"
 
 import { memo, type RefObject } from "react"
-import { Code, PlayCircle, RotateCcw } from "lucide-react"
+import { Code, PlayCircle } from "lucide-react"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -11,7 +11,6 @@ import {
   type TestResult,
   type TestSummary,
 } from "@/components/interview/CodeConsole"
-import { cn } from "@/lib/utils"
 import {
   useGuidedLabComplete,
   useGuidedLabStore,
@@ -28,6 +27,7 @@ import {
 import { LazyCodeMirrorEditor } from "./LazyCodeMirrorEditor"
 import { ConsoleOutput as ConsoleOutputPanel } from "./_sub/ConsoleOutput"
 import { TestResultsPanel } from "./_sub/TestResultsPanel"
+import { EditorActionsMenu } from "./EditorActionsMenu"
 
 interface EditorColumnProps {
   activePanel: "problem" | "editor" | "chat"
@@ -191,34 +191,29 @@ export const EditorColumn = memo(function EditorColumn({
 
   return (
     <Card
-      className={`editor-panel-card border-border bg-card relative order-2 h-full min-w-0 flex-col gap-0 overflow-hidden py-0 ${
+      className={`editor-panel-card workspace-panel border-border bg-card relative order-2 h-full min-w-0 flex-col gap-0 overflow-hidden py-0 ${
         activePanel === "editor" ? "flex" : "hidden lg:flex"
       }`}
     >
       <CardHeader className="flex-shrink-0 px-0 pt-0 pb-2">
         {isWorkspace ? (
-          <div className="border-border bg-card/80 flex w-full items-center justify-between border-b pr-4">
+          <div className="border-border bg-muted/40 flex w-full items-center justify-between border-b pr-1">
             <div className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
               {activeWorkspaceFile && activeRoleStyle && ActiveRoleIcon ? (
                 <>
                   <ActiveRoleIcon
-                    className={cn("h-3.5 w-3.5 shrink-0", activeRoleStyle.iconColorActive)}
+                    className="text-muted-foreground h-3.5 w-3.5 shrink-0"
                     aria-hidden="true"
                   />
                   <span className="text-foreground truncate text-xs">
                     {activeWorkspaceFile.path}
                   </span>
-                  <span
-                    className={cn(
-                      "shrink-0 rounded border px-1.5 py-0.5 text-[11px] leading-none",
-                      activeRoleStyle.badgeClass
-                    )}
-                  >
+                  <span className="border-border text-muted-foreground shrink-0 rounded border px-1.5 py-0.5 text-[11px] leading-none">
                     {activeRoleStyle.label}
                   </span>
                   {hasWorkspaceFileEdits(activeWorkspaceFile) && (
                     <span
-                      className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300"
+                      className="bg-accent h-1.5 w-1.5 shrink-0 rounded-full"
                       title="Unsaved edit"
                       aria-label="Unsaved edit"
                     />
@@ -228,39 +223,18 @@ export const EditorColumn = memo(function EditorColumn({
                 <span className="text-muted-foreground truncate text-xs">Workspace files</span>
               )}
             </div>
-            <div className="flex items-center gap-2 pl-4">
-              {activeWorkspaceFile?.role === "editable" && onResetActiveFile && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onResetActiveFile}
-                  className="border-border bg-card text-muted-foreground hover:bg-muted h-8 px-2 text-xs"
-                  title="Reset active file"
-                  aria-label="Reset active file"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                </Button>
-              )}
-              {onResetWorkspace && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onResetWorkspace}
-                  className="border-border bg-card text-muted-foreground hover:bg-muted h-8 px-2 text-xs"
-                  title="Reset workspace"
-                  aria-label="Reset workspace"
-                >
-                  <RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                  All
-                </Button>
-              )}
-            </div>
+            <EditorActionsMenu
+              onResetActiveFile={
+                activeWorkspaceFile?.role === "editable" ? onResetActiveFile : undefined
+              }
+              onResetWorkspace={onResetWorkspace}
+            />
           </div>
         ) : (
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
             <CardTitle className="text-foreground flex w-full items-center justify-between text-xs">
               <div className="flex items-center space-x-1">
-                <Code className="text-accent h-3 w-3" />
+                <Code className="text-muted-foreground h-3 w-3" />
                 {selectedScenario?.type === "system-design" ? (
                   <span>Design Notes</span>
                 ) : (
@@ -282,7 +256,7 @@ export const EditorColumn = memo(function EditorColumn({
       <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3">
         {/* The file tree lives in the problem column now, so the editor keeps the
             whole width of the one column the candidate types in. */}
-        <div className="border-border relative min-h-0 flex-1 overflow-auto rounded border">
+        <div className="workspace-code-surface border-border relative min-h-0 flex-1 overflow-auto rounded border">
           {editorSurface}
         </div>
 

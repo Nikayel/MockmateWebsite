@@ -1,0 +1,138 @@
+/* Interview surfaces share these roles, including their portaled menus.
+   Keep emphasis on the code and the primary action; status colors carry meaning. */
+.interview-workspace {
+  --background: #f5f5f3;
+  --foreground: #252523;
+  --card: #ffffff;
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --primary: var(--foreground);
+  --primary-foreground: var(--card);
+  --secondary: #eeefec;
+  --secondary-foreground: var(--foreground);
+  --muted: #f1f2ef;
+  --muted-foreground: #62645e;
+  --border: #d6d8d2;
+  --input: #8b8f85;
+  --accent: #9b502a;
+  --accent-strong: var(--accent);
+  --accent-foreground: #ffffff;
+  --ring: var(--accent);
+  --neural-strong: #23704d;
+  --workspace-success: #23704d;
+  --workspace-error: #b23333;
+  --workspace-warning: #825900;
+  --editor-bg: #ffffff;
+  --editor-gutter: #f5f5f3;
+  --editor-line-active: #f1f2ef;
+  --editor-selection: #dce5ed;
+  --workspace-editor-bg: var(--editor-bg);
+  --workspace-editor-fg: var(--foreground);
+  --workspace-editor-gutter: var(--editor-gutter);
+  --workspace-editor-line-number: var(--muted-foreground);
+  --workspace-editor-active: var(--editor-line-active);
+  --workspace-editor-selection: var(--editor-selection);
+  --code-comment: #72766c;
+  --code-keyword: #8d4929;
+  --code-string: #426741;
+  --code-number: #785a26;
+  --code-function: #333c30;
+  --code-type: #645239;
+  --code-variable: var(--foreground);
+  --code-property: #4e5548;
+  --code-punct: #686f60;
+  --code-regexp: var(--code-string);
+  --code-meta: var(--code-comment);
+  --code-invalid: var(--workspace-error);
+  color: var(--foreground);
+  color-scheme: light;
+}
+
+.dark .interview-workspace {
+  --background: #1b1c1b;
+  --foreground: #e8e9e5;
+  --card: #232523;
+  --secondary: #30332f;
+  --muted: #2a2d29;
+  --muted-foreground: #afb3aa;
+  --border: #41453e;
+  --input: #6e7568;
+  --accent: #d59670;
+  --accent-foreground: #211e1b;
+  --neural-strong: #8bc6a4;
+  --workspace-success: #8bc6a4;
+  --workspace-error: #eca3a1;
+  --workspace-warning: #d7ba78;
+  --editor-bg: #1e201e;
+  --editor-gutter: #232523;
+  --editor-line-active: #2b2e2a;
+  --editor-selection: #364951;
+  --code-comment: #969e90;
+  --code-keyword: #d59a76;
+  --code-string: #a1b595;
+  --code-number: #c9b38b;
+  --code-function: #cad1c1;
+  --code-type: #c6b99f;
+  --code-property: #d0d4cc;
+  --code-punct: #aaafa4;
+  color-scheme: dark;
+}
+
+.workspace-panel {
+  background: var(--card);
+  border-color: var(--border);
+  border-radius: 0.5rem;
+  box-shadow: none;
+}
+
+.workspace-toolbar {
+  opacity: 1;
+}
+
+.workspace-tabs [role="tab"] {
+  min-height: 44px;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  box-shadow: none;
+}
+
+.workspace-tabs [role="tab"][data-state="active"] {
+  background: transparent;
+  border-bottom-color: var(--foreground);
+  color: var(--foreground);
+}
+
+.workspace-menu [role^="menuitem"] {
+  min-height: 44px;
+}
+
+.workspace-menu [role^="menuitem"]:focus,
+.workspace-menu [role^="menuitem"][data-state="open"] {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.workspace-brief h2 {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.workspace-brief h3 {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.workspace-brief h2:first-child {
+  margin-top: 0;
+}
+
+/* Focus keeps controls readable and reachable with a keyboard, without a vignette. */
+.focus-mode-active .interview-workspace .focus-header {
+  opacity: 1;
+}
+
+.focus-mode-active .interview-workspace .focus-float-button {
+  backdrop-filter: none;
+  box-shadow: none;
+}

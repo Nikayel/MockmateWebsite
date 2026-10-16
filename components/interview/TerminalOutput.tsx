@@ -51,11 +51,13 @@ export function TerminalOutput({
           every "line N", but a pack traceback already points at the real file. */}
       {!ran && (
         <div className="rounded border border-red-500/30 bg-red-500/10 p-2">
-          <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-red-400">
+          <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-[var(--console-error)]">
             <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
             <span>The program crashed before producing output</span>
           </div>
-          <pre className={cn(TERMINAL_PRE, "text-red-300/90")}>{crashError ?? "Unknown error"}</pre>
+          <pre className={cn(TERMINAL_PRE, "text-[var(--console-error)]")}>
+            {crashError ?? "Unknown error"}
+          </pre>
         </div>
       )}
 
@@ -82,7 +84,7 @@ export function TerminalOutput({
           <div
             className={cn(
               "border-border/50 flex items-start gap-1.5 border-t pt-1.5 font-mono text-[11px]",
-              match ? "text-green-400" : "text-red-400"
+              match ? "text-[var(--console-success)]" : "text-[var(--console-error)]"
             )}
           >
             {match ? (

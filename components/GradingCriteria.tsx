@@ -191,83 +191,17 @@ export function GradingCriteriaRadial({ className }: { className?: string }) {
     </div>
   )
 }
-// Minimal tooltip trigger for interview coding panel
-export function GradingCriteriaTooltip({ className }: { className?: string }) {
-  const [isOpen, setIsOpen] = useState(false)
-
+// The workspace and feedback share the same criterion definitions.
+export function GradingCriteriaList() {
   return (
-    <div className={cn("relative", className)}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="text-muted-foreground hover:text-muted-foreground flex items-center gap-1 text-[10px] transition-colors"
-      >
-        <span className="flex gap-0.5">
-          {criteria.map((c) => (
-            <span
-              key={c.id}
-              className="h-1 w-1 rounded-full"
-              style={{ backgroundColor: c.color, opacity: 0.6 }}
-            />
-          ))}
-        </span>
-        <span>grading</span>
-      </button>
-
-      <AnimatePresence>
-        {isOpen && (
-          <>
-            {/* Backdrop */}
-            <div
-              className="fixed inset-0 z-40"
-              onClick={() => setIsOpen(false)}
-              role="button"
-              tabIndex={0}
-              aria-label="Close grading criteria"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " " || e.key === "Escape") {
-                  e.preventDefault()
-                  setIsOpen(false)
-                }
-              }}
-            />
-
-            {/* Popover */}
-            <motion.div
-              initial={{ opacity: 0, y: 4, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 4, scale: 0.95 }}
-              transition={{ duration: 0.15 }}
-              className="absolute bottom-full left-0 z-50 mb-2"
-            >
-              <div className="bg-card/95 border-border min-w-[200px] rounded-lg border p-3 shadow-xl backdrop-blur-sm">
-                <div className="text-muted-foreground mb-2 text-[10px] tracking-wider uppercase">
-                  What matters
-                </div>
-                <div className="space-y-1.5">
-                  {criteria.map((criterion) => (
-                    <div key={criterion.id} className="flex items-center gap-2">
-                      <div
-                        className="h-3 w-1 rounded-full"
-                        style={{ backgroundColor: criterion.color }}
-                      />
-                      <div className="text-muted-foreground flex-1 text-xs">{criterion.label}</div>
-                      <div className="text-[10px] font-medium" style={{ color: criterion.color }}>
-                        {criterion.weight}%
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="border-border mt-2 border-t pt-2">
-                  <p className="text-muted-foreground text-[10px] leading-relaxed">
-                    AI usage is optional. Explain your thinking.
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </div>
+    <dl className="divide-border divide-y">
+      {criteria.map((criterion) => (
+        <div key={criterion.id} className="py-3 text-sm">
+          <dt className="text-foreground font-medium">{criterion.label}</dt>
+          <dd className="text-muted-foreground mt-1">{criterion.hint}</dd>
+        </div>
+      ))}
+    </dl>
   )
 }
 

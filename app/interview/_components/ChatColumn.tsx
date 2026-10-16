@@ -59,7 +59,7 @@ export const ChatColumn = memo(function ChatColumn({
 
   return (
     <Card
-      className={`glass-effect border-border bg-card/50 order-3 h-full flex-col gap-0 overflow-hidden py-0 ${
+      className={`workspace-panel border-border bg-card order-3 h-full flex-col gap-0 overflow-hidden py-0 ${
         focusMode
           ? "hidden"
           : collapsed
@@ -76,7 +76,7 @@ export const ChatColumn = memo(function ChatColumn({
         <CardTitle className="text-foreground flex w-full min-w-0 items-center justify-between gap-2 text-sm">
           <div className="flex min-w-0 items-center gap-2.5">
             <div className="relative flex-shrink-0">
-              <div className="bg-accent/15 text-accent ring-accent/30 flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ring-1">
+              <div className="bg-muted text-muted-foreground flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold">
                 S
               </div>
             </div>
@@ -91,7 +91,7 @@ export const ChatColumn = memo(function ChatColumn({
             <button
               type="button"
               onClick={onToggleCollapse}
-              className="text-muted-foreground hover:bg-muted hover:text-foreground hidden h-6 w-6 items-center justify-center rounded transition-colors lg:inline-flex"
+              className="text-muted-foreground hover:bg-muted hover:text-foreground hidden h-11 w-11 items-center justify-center rounded transition-colors lg:inline-flex"
               title="Collapse panel"
               aria-label="Collapse interviewer panel"
             >
@@ -112,19 +112,17 @@ export const ChatColumn = memo(function ChatColumn({
               {interviewerMessages.map((msg, index) => (
                 <div
                   key={msg.id || `interviewer-${msg.type}-${index}`}
-                  className={`animate-in slide-in-from-bottom-2 flex duration-300 ${
-                    msg.type === "user" ? "justify-end" : "justify-start"
-                  }`}
+                  className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[88%] px-3 py-2 ${
+                    className={`max-w-full px-2 py-2 ${
                       msg.type === "user"
                         ? "bg-secondary text-foreground rounded-[14px_14px_4px_14px]"
-                        : "border-accent/20 bg-accent/10 text-foreground rounded-[14px_14px_14px_4px] border"
+                        : "text-foreground"
                     }`}
                   >
                     {msg.isStreaming ? (
-                      <p className="text-xs leading-relaxed">
+                      <p className="text-sm leading-relaxed">
                         {msg.message}
                         <span
                           className="bg-accent ml-1 inline-block h-3 w-1 animate-pulse"
@@ -132,7 +130,7 @@ export const ChatColumn = memo(function ChatColumn({
                         />
                       </p>
                     ) : (
-                      <MarkdownRenderer content={msg.message} className="text-xs leading-relaxed" />
+                      <MarkdownRenderer content={msg.message} className="text-sm leading-relaxed" />
                     )}
                   </div>
                 </div>
@@ -172,7 +170,7 @@ export const ChatColumn = memo(function ChatColumn({
                   placeholder={
                     showPostInterviewDiscussion ? "Type or use mic above..." : "Type a question..."
                   }
-                  className="bg-secondary border-border text-foreground placeholder-muted-foreground h-7 flex-1 text-xs"
+                  className="bg-secondary border-border text-foreground placeholder-muted-foreground h-11 min-w-0 flex-1 text-base sm:text-sm"
                   onKeyPress={(event) => {
                     if (event.key === "Enter" && !isBusy) {
                       onSendMessage()
@@ -183,7 +181,7 @@ export const ChatColumn = memo(function ChatColumn({
                 />
                 <Button
                   onClick={onSendMessage}
-                  className="bg-accent hover:bg-accent/80 text-accent-foreground h-7 px-2"
+                  className="bg-secondary hover:bg-muted text-foreground h-11 w-11 p-0"
                   loading={isBusy}
                   disabled={!interviewerInput.trim()}
                   aria-label="Send message"
