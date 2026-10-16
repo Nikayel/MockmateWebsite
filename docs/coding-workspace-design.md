@@ -46,10 +46,14 @@ Focused Vitest coverage checks the submitted-message microphone regression, type
 
 ## Debugging discovery and repository documents
 
-The debugging picker includes a quiet Beta note explaining that we are working with recruiters to align the interviews with industry standards. It appears only before choosing a debugging problem. It does not claim certification or endorsement.
+The debugging picker combines track context and discovery controls in one panel. A short description, inline progress, search, result count, type filters, advanced-filter disclosure, and Cards/List switch share the same container. The switch has no separate row outside the panel and stays available for empty results. It shares a stored density preference with the result list through `useScenarioDensity`; the list retains its own progressive reveal. DSA's all-problems view reuses the same controls.
+
+The Beta label sits beside the track title, with a quiet note explaining that we are working with recruiters to align the interviews with industry standards. It appears only before choosing a debugging problem. It does not claim certification or endorsement. Search and type selections are shown by their existing controls rather than repeated in a badge row. Collapsing advanced filters retains removable difficulty, language, and company selections.
+
+This grouping applies [NN/g's proximity principle](https://www.nngroup.com/articles/gestalt-proximity/) and Apple's toolbar guidance: controls for the same task stay together, with secondary options disclosed on demand. The specific layout is a design judgment, not a measured claim about cognitive-load reduction. Discovery controls wrap on narrow screens, retain 44px targets, and use the existing semantic color tokens.
 
 A dismissible release banner highlights the updated four-file Python cache incident. Viewing it filters the existing catalog to that question and focuses the results; starting remains a separate action with the existing entitlement checks. Dismissal is versioned and remembered in browser storage. Active filters hide the banner.
 
 Repository `.md`, `.markdown`, and `.mdown` files offer **Make readable / View source** in both the workspace and uploaded-file viewer. The shared reading mode lazy-loads a plain GitHub-flavored Markdown renderer, preserves the current source, and uses semantic theme colors, 16px prose, a bounded reading width, and local scrolling for tables and code. Raw HTML is skipped and Markdown URLs retain the parser's safe URL handling. Lesson widgets and lesson-only source transformations are intentionally excluded from repository documents.
 
-Verification covers the catalog action and persistent dismissal, debugging-only Beta copy, Markdown rendering and source restoration, GFM tables and indented code, unsafe HTML/links, and desktop/mobile layouts in both themes.
+Verification covers the catalog action and persistent dismissal, debugging-only Beta copy, integrated controls, keyboard selection, stored Cards/List preference, search and filter recovery, DSA progressive reveal, Markdown rendering and source restoration, GFM tables and indented code, unsafe HTML/links, and desktop/mobile layouts in both themes.

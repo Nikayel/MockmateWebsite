@@ -18,6 +18,8 @@ import { PatternBrowser } from "./PatternBrowser"
 import { RoadmapPitch } from "./RoadmapPitch"
 import { ScenarioFilters } from "./ScenarioFilters"
 import { ScenarioList } from "./ScenarioList"
+import { ScenarioViewControl } from "./ScenarioViewControl"
+import { useScenarioDensity } from "./useScenarioDensity"
 import { TrackViewTabs, type TrackViewTab } from "./TrackViewTabs"
 import {
   scenariosInTrack,
@@ -76,6 +78,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   const trackId = track?.id ?? null
 
   const [dsaView, setDsaView] = useState<DsaView>("roadmap")
+  const { density, updateDensity } = useScenarioDensity()
   const problemListRef = useRef<HTMLDivElement>(null)
 
   const { selectedScenario, setSelectedScenario } = useInterviewStore(
@@ -99,7 +102,6 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
     toggleDifficultyFilter,
     toggleCompanyFilter,
     toggleLanguageFilter,
-    removeTypeFilter,
     removeDifficultyFilter,
     removeCompanyFilter,
     removeLanguageFilter,
@@ -148,6 +150,35 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   // extra when the guest banner (~40px) is also shown.
   const topPadding = hasGuestBanner ? "pt-40" : "pt-32"
 
+  const renderFilters = () => (
+    <ScenarioFilters
+      viewControl={<ScenarioViewControl value={density} onChange={updateDensity} />}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+      resultsCount={trackScenarios.length}
+      hasActiveFilters={hasActiveFilters}
+      onClearFilters={clearAllFilters}
+      // Derived from the track, never hand-listed. The old constant advertised Optimization and
+      // Security chips against zero scenarios, so clicking one could only empty the list. A
+      // single-type track shows no row at all, because a chip that can only reselect everything
+      // already on screen is the same kind of dead control.
+      availableTypes={track && track.types.length > 1 ? track.types : []}
+      filterType={filterType}
+      onToggleType={toggleTypeFilter}
+      filterDifficulty={filterDifficulty}
+      onToggleDifficulty={toggleDifficultyFilter}
+      onRemoveDifficulty={removeDifficultyFilter}
+      filterCompanies={filterCompanies}
+      onToggleCompany={toggleCompanyFilter}
+      onRemoveCompany={removeCompanyFilter}
+      onClearCompanies={clearCompanyFilters}
+      availableLanguages={availableLanguages}
+      filterLanguages={filterLanguages}
+      onToggleLanguage={toggleLanguageFilter}
+      onRemoveLanguage={removeLanguageFilter}
+    />
+  )
+
   const renderProblemList = () => (
     <div
       ref={problemListRef}
@@ -156,33 +187,8 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
       tabIndex={-1}
       className="focus-visible:ring-ring rounded-xl focus-visible:ring-2 focus-visible:outline-none"
     >
-      <ScenarioFilters
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        resultsCount={trackScenarios.length}
-        hasActiveFilters={hasActiveFilters}
-        onClearFilters={clearAllFilters}
-        // Derived from the track, never hand-listed. The old constant advertised Optimization and
-        // Security chips against zero scenarios, so clicking one could only empty the list. A
-        // single-type track shows no row at all, because a chip that can only reselect everything
-        // already on screen is the same kind of dead control.
-        availableTypes={track && track.types.length > 1 ? track.types : []}
-        filterType={filterType}
-        onToggleType={toggleTypeFilter}
-        onRemoveType={removeTypeFilter}
-        filterDifficulty={filterDifficulty}
-        onToggleDifficulty={toggleDifficultyFilter}
-        onRemoveDifficulty={removeDifficultyFilter}
-        filterCompanies={filterCompanies}
-        onToggleCompany={toggleCompanyFilter}
-        onRemoveCompany={removeCompanyFilter}
-        onClearCompanies={clearCompanyFilters}
-        availableLanguages={availableLanguages}
-        filterLanguages={filterLanguages}
-        onToggleLanguage={toggleLanguageFilter}
-        onRemoveLanguage={removeLanguageFilter}
-      />
       <ScenarioList
+        density={density}
         scenarios={trackScenarios}
         selectedScenarioId={selectedScenario?.id ?? null}
         completedProblems={completedProblems}
@@ -200,7 +206,9 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
     if (!track || !progress) return null
     return (
       <>
-        <InterviewTrackHeader track={track} total={progress.total} completed={progress.completed} />
+        <InterviewTrackHeader track={track} total={progress.total} completed={progress.completed}>
+          {track.id === "debugging" && renderFilters()}
+        </InterviewTrackHeader>
         {track.id === "debugging" && pythonRelease && !hasActiveFilters && (
           <DebuggingReleaseBanner
             scenario={pythonRelease}
@@ -232,7 +240,14 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
                 completedProblems={completedProblems}
               />
             )}
-            {dsaView === "all" && renderProblemList()}
+            {dsaView === "all" && (
+              <>
+                <div className="border-border bg-card mb-4 rounded-2xl border p-4">
+                  {renderFilters()}
+                </div>
+                {renderProblemList()}
+              </>
+            )}
           </>
         ) : (
           renderProblemList()

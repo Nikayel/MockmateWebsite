@@ -1,18 +1,14 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { LayoutGrid, Rows3, Search } from "lucide-react"
+import { Search } from "lucide-react"
 
 import type { Scenario } from "@/lib/scenarios"
 import type { UsageLimit } from "@/lib/stores"
-import { cn } from "@/lib/utils"
 
 import { ScenarioCard } from "./ScenarioCard"
 import { ScenarioListRow } from "./ScenarioListRow"
-
-/** Density of a scenario list: rich cards for discovery, compact rows for scanning. */
-type Density = "cards" | "rows"
-const DENSITY_STORAGE_KEY = "mockmate_scenario_density"
+import type { ScenarioDensity } from "./useScenarioDensity"
 
 // Progressive reveal: render a light initial batch and let users expand in chunks rather than
 // mounting the whole catalog up front.
@@ -20,6 +16,7 @@ const INITIAL_VISIBLE = 18
 const LOAD_MORE_STEP = 18
 
 interface ScenarioListProps {
+  density: ScenarioDensity
   /** Already narrowed to one track and filtered. This component does no selecting of its own. */
   scenarios: Scenario[]
   selectedScenarioId: string | null
@@ -36,12 +33,11 @@ interface ScenarioListProps {
 /**
  * A list of problems, at the density the user picked, revealed a batch at a time.
  *
- * Split out of `ScenarioBrowser` because both track surfaces render it and neither of them cares
- * how it works. Density and reveal state belong here rather than in the browser: they are
- * properties of a list, and keeping them local means a list that unmounts (switching to the DSA
- * roadmap, say) comes back collapsed instead of remembering an expansion from another context.
+ * The discovery toolbar owns density; progressive reveal stays local so switching away from
+ * the list still resets its expansion without losing the user's view preference.
  */
 export function ScenarioList({
+  density,
   scenarios,
   selectedScenarioId,
   completedProblems,
@@ -52,14 +48,7 @@ export function ScenarioList({
   onSelect,
   onStart,
 }: ScenarioListProps) {
-  const [density, setDensity] = useState<Density>("cards")
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
-
-  // Restore the user's preferred density once on mount (client-only).
-  useEffect(() => {
-    const saved = localStorage.getItem(DENSITY_STORAGE_KEY)
-    if (saved === "cards" || saved === "rows") setDensity(saved)
-  }, [])
 
   // Collapse the reveal back to the initial batch whenever the visible set changes, so an
   // expanded count from one search never leaks into the results of the next. Relies on the caller
@@ -67,11 +56,6 @@ export function ScenarioList({
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE)
   }, [scenarios])
-
-  const updateDensity = (next: Density) => {
-    setDensity(next)
-    localStorage.setItem(DENSITY_STORAGE_KEY, next)
-  }
 
   if (scenarios.length === 0) {
     return (
@@ -98,44 +82,6 @@ export function ScenarioList({
 
   return (
     <>
-      <div className="mb-4 flex justify-end">
-        <div
-          role="group"
-          aria-label="List density"
-          className="border-border bg-card inline-flex rounded-lg border p-0.5"
-        >
-          {(
-            [
-              { id: "cards", label: "Cards", title: "Card view", Icon: LayoutGrid },
-              { id: "rows", label: "List", title: "List view", Icon: Rows3 },
-            ] as const
-          ).map(({ id, label, title, Icon }) => {
-            const isActive = density === id
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => updateDensity(id)}
-                aria-pressed={isActive}
-                // The visible label is hidden below `sm`, which also hides it from assistive
-                // tech, so the name is spelled out here rather than left to the title attribute.
-                aria-label={title}
-                title={title}
-                className={cn(
-                  "focus-visible:ring-accent/50 flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
-                  isActive
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                <span className="hidden sm:inline">{label}</span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
       {density === "rows" ? (
         <div className="flex flex-col gap-1.5">
           {visible.map((scenario) => (

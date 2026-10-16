@@ -35,7 +35,8 @@ export function DebuggingReleaseBanner({ scenario, onView }: DebuggingReleaseBan
           <p className="text-muted-foreground mb-1 text-xs font-medium">New · Python debugging</p>
           <h3 className="text-foreground text-sm font-semibold">{scenario.title}</h3>
           <p className="text-muted-foreground mt-1 text-sm leading-6">
-            Four Python files · Fix + extend · {scenario.estimatedTime} min
+            4 Python files · Fix + extend ·{" "}
+            <span className="whitespace-nowrap">{scenario.estimatedTime} min</span>
           </p>
         </div>
         <Button

@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useState, useRef, useEffect } from "react"
+import { memo, useState, useRef, useEffect, type ReactNode } from "react"
 import { Check, X, ChevronDown, Building2, Code2, SlidersHorizontal } from "lucide-react"
 import {
   SCENARIO_LANGUAGE_LABELS,
@@ -15,6 +15,7 @@ import { EXERCISE_TYPES } from "./scenario-display"
 import { ScenarioSearchBar } from "./ScenarioSearchBar"
 
 interface ScenarioFiltersProps {
+  viewControl: ReactNode
   // Search
   searchQuery: string
   onSearchChange: (value: string) => void
@@ -25,7 +26,6 @@ interface ScenarioFiltersProps {
   // Type filters
   filterType: ScenarioType[]
   onToggleType: (type: ScenarioType) => void
-  onRemoveType: (type: ScenarioType) => void
 
   // Difficulty filters
   filterDifficulty: DifficultyLevel[]
@@ -97,6 +97,7 @@ const COMPANY_COUNTS = scenarios.reduce<Record<string, number>>((acc, s) => {
 }, {})
 
 export const ScenarioFilters = memo(function ScenarioFilters({
+  viewControl,
   searchQuery,
   onSearchChange,
   resultsCount,
@@ -104,7 +105,6 @@ export const ScenarioFilters = memo(function ScenarioFilters({
   onClearFilters,
   filterType,
   onToggleType,
-  onRemoveType,
   filterDifficulty,
   onToggleDifficulty,
   onRemoveDifficulty,
@@ -179,9 +179,9 @@ export const ScenarioFilters = memo(function ScenarioFilters({
   }
 
   return (
-    <div className="border-border bg-card mb-4 rounded-2xl border p-3 shadow-xs">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="min-w-0 flex-1">
+    <div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="w-full min-w-0 xl:w-auto xl:flex-1">
           <ScenarioSearchBar
             searchQuery={searchQuery}
             onSearchChange={onSearchChange}
@@ -191,25 +191,55 @@ export const ScenarioFilters = memo(function ScenarioFilters({
           />
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowAdvancedFilters((visible) => !visible)}
-          aria-expanded={showAdvancedFilters}
-          className={`focus-visible:ring-accent/50 flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full border px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none ${
-            hasActiveFilters
-              ? "border-accent/50 bg-accent/10 text-accent-strong"
-              : "border-border bg-muted/50 text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-          Filters{hasActiveFilters ? " active" : ""}
-        </button>
+        {visibleTypes.length > 0 && (
+          <div role="group" aria-label="Problem type" className="flex flex-wrap gap-2">
+            {visibleTypes.map((type) => {
+              const isActive = filterType.includes(type.id as ScenarioType)
+              const count = scenarios.filter((scenario) => scenario.type === type.id).length
+              return (
+                <button
+                  key={type.id}
+                  type="button"
+                  onClick={() => onToggleType(type.id as ScenarioType)}
+                  aria-pressed={isActive}
+                  title={type.description}
+                  className={`focus-visible:ring-ring flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none ${
+                    isActive
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  }`}
+                >
+                  {type.label}
+                  <span className="text-muted-foreground text-xs tabular-nums">{count}</span>
+                  {isActive && <Check className="h-3 w-3" aria-hidden="true" />}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowAdvancedFilters((visible) => !visible)}
+            aria-expanded={showAdvancedFilters}
+            className={`focus-visible:ring-ring flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none ${
+              hasActiveFilters
+                ? "border-accent/50 bg-accent/10 text-accent-strong"
+                : "border-border bg-muted/50 text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            Filters{hasActiveFilters ? " active" : ""}
+          </button>
+          {viewControl}
+        </div>
       </div>
 
       {showAdvancedFilters && (
         <div className="border-border mt-3 flex flex-wrap items-center gap-3 border-t pt-3">
           {/* Difficulty Selection */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
               Difficulty
             </span>
@@ -220,7 +250,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                   <button
                     key={diff.id}
                     onClick={() => onToggleDifficulty(diff.id as DifficultyLevel)}
-                    className={`focus-visible:ring-accent/50 cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-all duration-200 focus-visible:ring-2 focus-visible:outline-none ${
+                    className={`focus-visible:ring-accent/50 min-h-11 cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-all duration-200 focus-visible:ring-2 focus-visible:outline-none ${
                       isActive
                         ? `border-transparent font-semibold ${difficultyColorClass(diff.id, "badgeOnLight")}`
                         : "border-border bg-muted/50 text-muted-foreground hover:text-foreground"
@@ -270,7 +300,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
             <button
               ref={companyTriggerRef}
               onClick={() => setShowCompanyDropdown(!showCompanyDropdown)}
-              className={`focus-visible:ring-accent/50 flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-all duration-200 focus-visible:ring-2 focus-visible:outline-none ${
+              className={`focus-visible:ring-accent/50 flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-all duration-200 focus-visible:ring-2 focus-visible:outline-none ${
                 filterCompanies.length > 0
                   ? "border-accent/50 bg-accent/10 text-accent-strong"
                   : "border-border bg-muted/50 text-muted-foreground hover:text-foreground"
@@ -304,7 +334,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                   tabIndex={-1}
                   aria-label="Filter by company"
                   onKeyDown={handleCompanyMenuKeyDown}
-                  className="border-border bg-popover text-popover-foreground absolute top-full right-0 z-20 mt-2 flex w-[min(15rem,calc(100vw-2rem))] flex-col rounded-2xl border shadow-lg"
+                  className="border-border bg-popover text-popover-foreground absolute top-full left-0 z-20 mt-2 flex w-[min(15rem,calc(100vw-2rem))] flex-col rounded-2xl border shadow-lg"
                 >
                   <div className="border-border border-b p-2">
                     <input
@@ -313,7 +343,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                       onChange={(e) => setCompanyQuery(e.target.value)}
                       placeholder="Search companies"
                       aria-label="Search companies"
-                      className="border-input bg-background text-foreground placeholder:text-muted-foreground focus:border-accent/50 w-full rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none"
+                      className="border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-ring h-11 w-full rounded-lg border px-2.5 text-base focus-visible:ring-2 focus-visible:outline-none"
                     />
                   </div>
                   <div className="max-h-64 overflow-y-auto py-1">
@@ -328,7 +358,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                           role="menuitemcheckbox"
                           aria-checked={isActive}
                           onClick={() => onToggleCompany(company as Company)}
-                          className="hover:bg-muted focus-visible:bg-muted flex w-full cursor-pointer items-center justify-between px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none"
+                          className="hover:bg-muted focus-visible:bg-muted flex min-h-11 w-full cursor-pointer items-center justify-between px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none"
                         >
                           <span className={isActive ? "text-foreground" : "text-muted-foreground"}>
                             {company}
@@ -351,7 +381,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                       <button
                         role="menuitem"
                         onClick={onClearCompanies}
-                        className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:bg-muted w-full cursor-pointer px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none"
+                        className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:bg-muted min-h-11 w-full cursor-pointer px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none"
                       >
                         Clear selection
                       </button>
@@ -364,121 +394,60 @@ export const ScenarioFilters = memo(function ScenarioFilters({
         </div>
       )}
 
-      {/* Type Filter - Horizontal Pills (Second Row) */}
-      {visibleTypes.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
-          {visibleTypes.map((type) => {
-            const Icon = type.icon
-            const isActive = filterType.includes(type.id as ScenarioType)
-            const count = scenarios.filter((s) => s.type === type.id).length
-            return (
-              <button
-                key={type.id}
-                onClick={() => onToggleType(type.id as ScenarioType)}
-                className={`focus-visible:ring-accent/50 flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-all duration-200 focus-visible:ring-2 focus-visible:outline-none ${
-                  isActive
-                    ? "border-accent/50 bg-accent/10 text-accent-strong"
-                    : "border-border bg-muted/50 text-muted-foreground hover:text-foreground"
-                } `}
-                aria-pressed={isActive}
-                title={type.description}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {type.label}
-                <span className="text-xs opacity-70">{count}</span>
-                {isActive && <Check className="h-3 w-3" />}
-              </button>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Active Filters Summary */}
-      {hasActiveFilters && (
-        <div className="border-border mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
-          <span className="text-muted-foreground text-xs">Active:</span>
-          {filterType.map((t) => {
-            const type = EXERCISE_TYPES.find((et) => et.id === t)
-            if (!type) return null
-            const Icon = type.icon
-            return (
+      {/* Collapsed advanced options retain a visible way to inspect and remove selections. */}
+      {!showAdvancedFilters &&
+        filterDifficulty.length + filterCompanies.length + filterLanguages.length > 0 && (
+          <div className="border-border mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+            <span className="text-muted-foreground text-xs">Active:</span>
+            {filterDifficulty.map((d) => (
               <span
-                key={t}
-                className="bg-muted text-muted-foreground inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs"
+                key={d}
+                className={`inline-flex min-h-11 items-center rounded-lg pl-3 text-xs capitalize ${difficultyColorClass(d, "badgeOnLight")}`}
               >
-                <Icon className="h-3 w-3" />
-                {type.label}
+                {d}
                 <button
-                  onClick={() => onRemoveType(t)}
-                  aria-label={`Remove ${type.label} filter`}
-                  className="focus-visible:ring-ring rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:outline-none"
+                  onClick={() => onRemoveDifficulty(d)}
+                  aria-label={`Remove ${d} difficulty filter`}
+                  className="focus-visible:ring-ring flex h-11 w-11 items-center justify-center rounded-lg hover:opacity-70 focus-visible:ring-2 focus-visible:outline-none"
                 >
                   <X className="h-3 w-3" aria-hidden="true" />
                 </button>
               </span>
-            )
-          })}
-          {filterDifficulty.map((d) => (
-            <span
-              key={d}
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs capitalize ${difficultyColorClass(d, "badgeOnLight")}`}
-            >
-              {d}
-              <button
-                onClick={() => onRemoveDifficulty(d)}
-                aria-label={`Remove ${d} difficulty filter`}
-                className="focus-visible:ring-ring rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:outline-none"
+            ))}
+            {filterCompanies.map((c) => (
+              <span
+                key={c}
+                className="bg-muted text-muted-foreground inline-flex min-h-11 items-center rounded-lg pl-3 text-xs"
               >
-                <X className="h-3 w-3" aria-hidden="true" />
-              </button>
-            </span>
-          ))}
-          {filterCompanies.map((c) => (
-            <span
-              key={c}
-              className="bg-muted text-muted-foreground inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs"
-            >
-              {c}
-              <button
-                onClick={() => onRemoveCompany(c)}
-                aria-label={`Remove ${c} filter`}
-                className="focus-visible:ring-ring rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:outline-none"
+                {c}
+                <button
+                  onClick={() => onRemoveCompany(c)}
+                  aria-label={`Remove ${c} filter`}
+                  className="focus-visible:ring-ring flex h-11 w-11 items-center justify-center rounded-lg hover:opacity-70 focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  <X className="h-3 w-3" aria-hidden="true" />
+                </button>
+              </span>
+            ))}
+            {filterLanguages.map((language) => (
+              <span
+                key={language}
+                className="bg-muted text-muted-foreground inline-flex min-h-11 items-center gap-1.5 rounded-lg pl-3 text-xs"
               >
-                <X className="h-3 w-3" aria-hidden="true" />
-              </button>
-            </span>
-          ))}
-          {filterLanguages.map((language) => (
-            <span
-              key={language}
-              className="bg-muted text-muted-foreground inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs"
-            >
-              <Code2 className="h-3 w-3" aria-hidden="true" />
-              {SCENARIO_LANGUAGE_LABELS[language]}
-              <button
-                type="button"
-                onClick={() => onRemoveLanguage(language)}
-                aria-label={`Remove ${SCENARIO_LANGUAGE_LABELS[language]} filter`}
-                className="focus-visible:ring-ring rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:outline-none"
-              >
-                <X className="h-3 w-3" aria-hidden="true" />
-              </button>
-            </span>
-          ))}
-          {searchQuery && (
-            <span className="bg-muted text-muted-foreground inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs">
-              "{searchQuery}"
-              <button
-                onClick={() => onSearchChange("")}
-                aria-label="Clear search filter"
-                className="focus-visible:ring-ring rounded-full hover:opacity-70 focus-visible:ring-1 focus-visible:outline-none"
-              >
-                <X className="h-3 w-3" aria-hidden="true" />
-              </button>
-            </span>
-          )}
-        </div>
-      )}
+                <Code2 className="h-3 w-3" aria-hidden="true" />
+                {SCENARIO_LANGUAGE_LABELS[language]}
+                <button
+                  type="button"
+                  onClick={() => onRemoveLanguage(language)}
+                  aria-label={`Remove ${SCENARIO_LANGUAGE_LABELS[language]} filter`}
+                  className="focus-visible:ring-ring flex h-11 w-11 items-center justify-center rounded-lg hover:opacity-70 focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  <X className="h-3 w-3" aria-hidden="true" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
     </div>
   )
 })

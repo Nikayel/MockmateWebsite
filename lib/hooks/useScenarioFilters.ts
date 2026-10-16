@@ -107,10 +107,6 @@ export function useScenarioFilters() {
     }
   }
 
-  const removeTypeFilter = (type: ScenarioType) => {
-    setFilterType(filterType.filter((t) => t !== type))
-  }
-
   const removeDifficultyFilter = (difficulty: DifficultyLevel) => {
     setFilterDifficulty(filterDifficulty.filter((d) => d !== difficulty))
   }
@@ -141,7 +137,6 @@ export function useScenarioFilters() {
     toggleDifficultyFilter,
     toggleCompanyFilter,
     toggleLanguageFilter,
-    removeTypeFilter,
     removeDifficultyFilter,
     removeCompanyFilter,
     removeLanguageFilter,

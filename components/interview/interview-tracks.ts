@@ -60,8 +60,7 @@ export const INTERVIEW_TRACKS: InterviewTrack[] = [
     id: "debugging",
     label: "Debugging",
     shortLabel: "Debugging",
-    blurb:
-      "The round that looks like the job. You are dropped into a codebase you did not write, with a symptom and no line number.",
+    blurb: "Investigate a symptom, find the cause, and ship a fix in an unfamiliar codebase.",
     loop: ["Read the codebase", "Find the cause", "Ship the fix"],
     types: ["bugfix", "add-functionality"],
     Icon: Bug,

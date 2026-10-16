@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { createRoot } from "react-dom/client"
 import { ScenarioList } from "@/components/interview/ScenarioList"
+import { ScenarioViewControl } from "@/components/interview/ScenarioViewControl"
+import { useScenarioDensity } from "@/components/interview/useScenarioDensity"
 import { prioritizeDebuggingScenarios } from "@/components/interview/scenario-discovery"
 import { CodeMirrorEditor } from "@/components/editor/CodeMirrorEditor"
 import { FileTreeSidebar } from "@/app/interview/_components/FileTreeSidebar"
@@ -23,6 +25,7 @@ const catalog = prioritizeDebuggingScenarios(
 )
 
 function Fixture() {
+  const { density, updateDensity } = useScenarioDensity()
   const [selected, setSelected] = useState<Scenario | null>(null)
   const [started, setStarted] = useState(false)
   const [activePath, setActivePath] = useState(flagship.workspace.primaryFilePath)
@@ -53,20 +56,26 @@ function Fixture() {
         Isolated QA fixture: real UI and Python worker; no account or AI calls.
       </p>
       {!started ? (
-        <ScenarioList
-          scenarios={catalog}
-          selectedScenarioId={selected?.id ?? null}
-          completedProblems={[]}
-          usageLimit={null}
-          isStarting={false}
-          hasActiveFilters={false}
-          onClearFilters={() => {}}
-          onSelect={setSelected}
-          onStart={(scenario) => {
-            setSelected(scenario)
-            setStarted(true)
-          }}
-        />
+        <>
+          <div className="mb-4 flex justify-end">
+            <ScenarioViewControl value={density} onChange={updateDensity} />
+          </div>
+          <ScenarioList
+            density={density}
+            scenarios={catalog}
+            selectedScenarioId={selected?.id ?? null}
+            completedProblems={[]}
+            usageLimit={null}
+            isStarting={false}
+            hasActiveFilters={false}
+            onClearFilters={() => {}}
+            onSelect={setSelected}
+            onStart={(scenario) => {
+              setSelected(scenario)
+              setStarted(true)
+            }}
+          />
+        </>
       ) : (
         <section className="mx-auto max-w-5xl space-y-4">
           <h1 className="text-xl font-semibold">{selected?.title}</h1>

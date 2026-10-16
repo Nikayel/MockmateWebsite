@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import type { ReactNode } from "react"
 import { ArrowLeft } from "lucide-react"
 
 import { Progress } from "@/components/ui/progress"
@@ -13,6 +14,7 @@ interface InterviewTrackHeaderProps {
   total: number
   /** How many of those the user has finished. */
   completed: number
+  children?: ReactNode
 }
 
 /**
@@ -23,11 +25,16 @@ interface InterviewTrackHeaderProps {
  * destination's header, and the way back to the choice is a labelled control rather than a tab
  * the user has to notice.
  */
-export function InterviewTrackHeader({ track, total, completed }: InterviewTrackHeaderProps) {
+export function InterviewTrackHeader({
+  track,
+  total,
+  completed,
+  children,
+}: InterviewTrackHeaderProps) {
   const solvedPercent = total > 0 ? Math.round((completed / total) * 100) : 0
 
   return (
-    <header className="mb-5">
+    <header className="mb-4">
       <Link
         href="/interview"
         className="text-muted-foreground hover:text-foreground focus-visible:ring-accent/50 inline-flex min-h-11 items-center gap-1.5 rounded-full px-2 text-xs font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none"
@@ -36,45 +43,43 @@ export function InterviewTrackHeader({ track, total, completed }: InterviewTrack
         Change track
       </Link>
 
-      <div className="border-border bg-card flex flex-col gap-4 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="border-accent/25 bg-accent/10 text-accent-strong flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border">
-            <track.Icon className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <div className="min-w-0">
-            <h2 className="text-foreground text-lg font-semibold text-balance sm:text-xl">
-              {track.label}
-            </h2>
-            <p className="text-muted-foreground mt-0.5 max-w-3xl text-sm leading-5 text-pretty">
-              {track.blurb}
-            </p>
+      <section
+        aria-label={`${track.shortLabel} problem browser`}
+        className="border-border bg-card rounded-2xl border p-4"
+      >
+        <div>
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <track.Icon className="text-muted-foreground h-4 w-4 shrink-0" aria-hidden="true" />
+              <h2 className="text-foreground text-lg font-semibold sm:text-xl">{track.label}</h2>
+              {track.id === "debugging" && (
+                <span className="border-border bg-muted text-muted-foreground rounded border px-1.5 text-xs leading-5 font-medium">
+                  Beta
+                </span>
+              )}
+            </div>
+            <div className="text-muted-foreground flex shrink-0 items-center gap-2 text-xs">
+              <span className="tabular-nums">
+                {completed}/{total} solved
+              </span>
+              <Progress
+                value={solvedPercent}
+                aria-label={`${completed} of ${total} ${track.shortLabel} problems solved`}
+                className="bg-muted hidden h-1 w-16 sm:block"
+              />
+            </div>
           </div>
-        </div>
-
-        <div className="border-border/70 bg-muted/30 min-w-40 rounded-xl border px-3 py-2.5 sm:shrink-0">
-          <p className="flex items-baseline justify-between gap-3">
-            <span className="text-muted-foreground text-xs font-medium">Progress</span>
-            <span className="text-foreground text-sm font-semibold tabular-nums">
-              {completed}/{total}
-            </span>
+          <p className="text-muted-foreground mt-1 max-w-3xl text-sm leading-5 text-pretty">
+            {track.blurb}
           </p>
-          <Progress
-            value={solvedPercent}
-            aria-label={`${completed} of ${total} ${track.shortLabel} problems solved`}
-            className="bg-muted mt-2 h-1"
-          />
+          {track.id === "debugging" && (
+            <p className="text-muted-foreground mt-1 text-xs leading-5">
+              We’re working with recruiters to align these interviews with industry standards.
+            </p>
+          )}
         </div>
-      </div>
-      {track.id === "debugging" && (
-        <p className="text-muted-foreground mt-3 flex items-start gap-2 px-1 text-xs leading-5">
-          <span className="border-border bg-muted shrink-0 rounded border px-1.5 font-medium">
-            Beta
-          </span>
-          <span>
-            We’re working with recruiters to align these interviews with industry standards.
-          </span>
-        </p>
-      )}
+        {children && <div className="border-border mt-3 border-t pt-3">{children}</div>}
+      </section>
     </header>
   )
 }

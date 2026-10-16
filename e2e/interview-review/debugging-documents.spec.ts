@@ -29,7 +29,7 @@ test("debugging release reveals the question and remembers dismissal", async ({
         })
       ).toHaveCount(1)
       // The picker remains open: viewing the question never starts a session.
-      await expect(page.getByText("1 problems", { exact: true })).toBeVisible()
+      await expect(page.getByText("1 problem", { exact: true })).toBeVisible()
       await page.getByRole("button", { name: "Clear filters", exact: true }).click()
       await expect(banner).toBeVisible()
     }
