@@ -47,4 +47,10 @@ describe("ReviewFrame", () => {
     expect(content.getAttribute("tabindex")).toBeNull()
     expect(content.className).not.toContain("overflow-y-auto")
   })
+
+  it("does not invent a test result for interviews without executable tests", () => {
+    render(<ReviewSummary score={73} grade="C" testsPassed={0} testsTotal={0} elapsedTime={45} />)
+    expect(screen.queryByText(/tests/)).toBeNull()
+    expect(screen.getByText("45s")).toBeTruthy()
+  })
 })

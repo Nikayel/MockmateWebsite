@@ -28,11 +28,13 @@ export function ReviewFrame({
       )}
     >
       <header className="border-border/60 bg-background z-10 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-6">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-48">
           <h1 className="text-base font-semibold tracking-tight sm:text-lg">{title}</h1>
           {summary && <div className="text-muted-foreground mt-1 text-sm">{summary}</div>}
         </div>
-        {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+        {actions && (
+          <div className="flex max-w-full min-w-0 flex-wrap items-center gap-2">{actions}</div>
+        )}
       </header>
       <div
         className={cn(

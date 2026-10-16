@@ -25,7 +25,12 @@ export function ReviewSummary({
       </span>
       {problemTitle && <span className="max-w-prose break-words">{problemTitle}</span>}
       <span className="text-muted-foreground text-xs tabular-nums">
-        {testsPassed}/{testsTotal} tests · {Math.floor(elapsedTime / 60)} min
+        {testsTotal > 0 && (
+          <>
+            {testsPassed}/{testsTotal} tests ·{" "}
+          </>
+        )}
+        {elapsedTime < 60 ? `${elapsedTime}s` : `${Math.floor(elapsedTime / 60)} min`}
       </span>
     </div>
   )
