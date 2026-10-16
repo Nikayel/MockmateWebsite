@@ -7,7 +7,8 @@ import { useShallow } from "zustand/react/shallow"
 
 import { useScenarioFilters } from "@/lib/hooks/useScenarioFilters"
 import { getScenarioLanguages, SCENARIO_LANGUAGES, scenarios, type Scenario } from "@/lib/scenarios"
-import { prioritizeDebuggingScenarios } from "./scenario-discovery"
+import { FLAGSHIP_SCENARIO_ID, prioritizeDebuggingScenarios } from "./scenario-discovery"
+import { DebuggingReleaseBanner } from "./DebuggingReleaseBanner"
 import { useInterviewStore, type UsageLimit } from "@/lib/stores"
 
 import { DSARoadmap } from "./DSARoadmap"
@@ -51,6 +52,8 @@ const DSA_VIEWS: readonly TrackViewTab<DsaView>[] = [
   { id: "all", label: "All problems", Icon: List },
 ]
 
+const pythonRelease = scenarios.find((scenario) => scenario.id === FLAGSHIP_SCENARIO_ID)
+
 /**
  * `/interview`: one track, addressed by `?track=`.
  *
@@ -73,6 +76,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   const trackId = track?.id ?? null
 
   const [dsaView, setDsaView] = useState<DsaView>("roadmap")
+  const problemListRef = useRef<HTMLDivElement>(null)
 
   const { selectedScenario, setSelectedScenario } = useInterviewStore(
     useShallow((state) => ({
@@ -145,7 +149,13 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   const topPadding = hasGuestBanner ? "pt-40" : "pt-32"
 
   const renderProblemList = () => (
-    <>
+    <div
+      ref={problemListRef}
+      role="region"
+      aria-label="Practice problems"
+      tabIndex={-1}
+      className="focus-visible:ring-ring rounded-xl focus-visible:ring-2 focus-visible:outline-none"
+    >
       <ScenarioFilters
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -183,7 +193,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
         onSelect={setSelectedScenario}
         onStart={onStartInterview}
       />
-    </>
+    </div>
   )
 
   const renderTrack = () => {
@@ -191,6 +201,16 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
     return (
       <>
         <InterviewTrackHeader track={track} total={progress.total} completed={progress.completed} />
+        {track.id === "debugging" && pythonRelease && !hasActiveFilters && (
+          <DebuggingReleaseBanner
+            scenario={pythonRelease}
+            onView={(scenario) => {
+              setSelectedScenario(scenario)
+              setSearchQuery(scenario.title)
+              requestAnimationFrame(() => problemListRef.current?.focus())
+            }}
+          />
+        )}
         {track.id === "dsa" ? (
           <>
             <TrackViewTabs

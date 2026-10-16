@@ -65,6 +65,16 @@ export function InterviewTrackHeader({ track, total, completed }: InterviewTrack
           />
         </div>
       </div>
+      {track.id === "debugging" && (
+        <p className="text-muted-foreground mt-3 flex items-start gap-2 px-1 text-xs leading-5">
+          <span className="border-border bg-muted shrink-0 rounded border px-1.5 font-medium">
+            Beta
+          </span>
+          <span>
+            We’re working with recruiters to align these interviews with industry standards.
+          </span>
+        </p>
+      )}
     </header>
   )
 }

@@ -7,6 +7,7 @@ import { PostInterviewView } from "@/app/interview/_components/PostInterviewView
 import type { ReviewMessage } from "@/app/interview/_components/post-interview/types"
 import PracticeFeedback from "@/components/PracticeFeedback"
 import { WorkspaceFixture } from "./WorkspaceFixture"
+import { ScenarioBrowser } from "@/components/interview/ScenarioBrowser"
 import "@/app/globals.css"
 
 const params = new URLSearchParams(window.location.search)
@@ -33,7 +34,13 @@ function Fixture() {
   const [messages, setMessages] = useState(initialMessages)
   return (
     <main className="bg-background text-foreground">
-      {view === "done" ? (
+      {view === "picker" ? (
+        <ScenarioBrowser
+          onStartInterview={() => setView("workspace")}
+          usageLimit={null}
+          completedProblems={[]}
+        />
+      ) : view === "done" ? (
         <h1>Dashboard return</h1>
       ) : (
         <InterviewSurfaceFrame>

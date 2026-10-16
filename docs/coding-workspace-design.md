@@ -43,3 +43,13 @@ The particular neutral/clay palette is a product design choice. These sources su
 Browser coverage includes both themes at 1440×900, 375×812, and 812×375; interviewer-header bounds at 1024, 1280, and 1440px; controls remaining reachable through focus and collapse; desktop keyboard and mobile direct-picker language changes; fixed workspace language metadata; tab keyboard interaction and retained state; file navigation; reset scope; settings and dialog focus; console reruns; submit through review/feedback; and foreground, muted text, primary action, code comment, error, warning, success, and conversation contrast pairs. The actual microphone hover state is checked for contrast. Delayed reply and voice-cancel/send fixtures exercise composer recovery, streaming, and a single send action.
 
 Focused Vitest coverage checks the submitted-message microphone regression, typed-draft duplication, voice-countdown cancellation, initial/streaming reply states, console disclosure, partner form guards, theme direction, and voice fallback. TypeScript and focused ESLint are also checked.
+
+## Debugging discovery and repository documents
+
+The debugging picker includes a quiet Beta note explaining that we are working with recruiters to align the interviews with industry standards. It appears only before choosing a debugging problem. It does not claim certification or endorsement.
+
+A dismissible release banner highlights the updated four-file Python cache incident. Viewing it filters the existing catalog to that question and focuses the results; starting remains a separate action with the existing entitlement checks. Dismissal is versioned and remembered in browser storage. Active filters hide the banner.
+
+Repository `.md`, `.markdown`, and `.mdown` files offer **Make readable / View source** in both the workspace and uploaded-file viewer. The shared reading mode lazy-loads a plain GitHub-flavored Markdown renderer, preserves the current source, and uses semantic theme colors, 16px prose, a bounded reading width, and local scrolling for tables and code. Raw HTML is skipped and Markdown URLs retain the parser's safe URL handling. Lesson widgets and lesson-only source transformations are intentionally excluded from repository documents.
+
+Verification covers the catalog action and persistent dismissal, debugging-only Beta copy, Markdown rendering and source restoration, GFM tables and indented code, unsafe HTML/links, and desktop/mobile layouts in both themes.

@@ -4,6 +4,7 @@ import React, { useEffect, memo } from "react"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MonacoEditor } from "@/components/editor"
+import { MarkdownFileView } from "@/components/editor/MarkdownFileView"
 
 interface CodeViewerSidePanelProps {
   isOpen: boolean
@@ -76,41 +77,41 @@ function CodeViewerSidePanelInner({
     <>
       {/* Backdrop overlay - click to close (darker on mobile, subtle on desktop) */}
       <div
-        className="fixed inset-0 bg-background/60 lg:bg-background/30 z-[39] backdrop-blur-sm lg:backdrop-blur-none"
+        className="bg-background/60 lg:bg-background/30 fixed inset-0 z-[39] backdrop-blur-sm lg:backdrop-blur-none"
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Side Panel - Responsive widths - Pure overlay, doesn't shift content */}
-      <div className="fixed left-0 top-0 h-full w-[calc(100vw-48px)] sm:w-[300px] md:w-[340px] lg:w-[380px] xl:w-[420px] 2xl:w-[460px] max-w-[460px] z-[40] bg-card border-r border-border shadow-2xl flex flex-col transition-transform duration-300 ease-in-out animate-in slide-in-from-left">
+      <div className="bg-card border-border animate-in slide-in-from-left fixed top-0 left-0 z-[40] flex h-full w-[calc(100vw-48px)] max-w-[460px] flex-col border-r shadow-2xl transition-transform duration-300 ease-in-out sm:w-[300px] md:w-[340px] lg:w-[380px] xl:w-[420px] 2xl:w-[460px]">
         {/* Header */}
-        <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border bg-muted/50 flex-shrink-0">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-blue-400 text-sm">📄</span>
-            <h3 className="text-foreground font-semibold text-xs sm:text-sm truncate">{fileName}</h3>
+        <div className="border-border bg-muted/50 flex flex-shrink-0 items-center justify-between border-b p-3 sm:p-4">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="text-sm text-blue-400">📄</span>
+            <h3 className="text-foreground truncate text-xs font-semibold sm:text-sm">
+              {fileName}
+            </h3>
           </div>
           <Button
             onClick={onClose}
+            aria-label="Close file viewer"
             variant="ghost"
             size="sm"
-            className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-muted text-muted-foreground hover:text-foreground flex-shrink-0"
+            className="hover:bg-muted text-muted-foreground hover:text-foreground h-7 w-7 flex-shrink-0 p-0 sm:h-8 sm:w-8"
           >
             <X className="h-4 w-4" />
           </Button>
         </div>
 
         {/* Editor - Using shared MonacoEditor component */}
-        <div className="flex-1 overflow-hidden editor-wrapper min-h-0">
-          <MonacoEditor
-            height="100%"
-            language={editorLanguage}
-            value={content}
-            readOnly
-          />
+        <div className="editor-wrapper min-h-0 flex-1 overflow-hidden">
+          <MarkdownFileView key={fileName} fileName={fileName} content={content}>
+            <MonacoEditor height="100%" language={editorLanguage} value={content} readOnly />
+          </MarkdownFileView>
         </div>
 
         {/* Footer */}
-        <div className="flex justify-between items-center px-3 sm:px-4 py-2 border-t border-border bg-muted/50 text-xs text-muted-foreground flex-shrink-0">
+        <div className="border-border bg-muted/50 text-muted-foreground flex flex-shrink-0 items-center justify-between border-t px-3 py-2 text-xs sm:px-4">
           <span>Language: {editorLanguage}</span>
           <span>{content.split("\n").length} lines</span>
         </div>

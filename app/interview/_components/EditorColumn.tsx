@@ -29,6 +29,7 @@ import { ConsoleOutput as ConsoleOutputPanel } from "./_sub/ConsoleOutput"
 import { TestResultsPanel } from "./_sub/TestResultsPanel"
 import { EditorActionsMenu } from "./EditorActionsMenu"
 import { EditorLanguageControl } from "./EditorLanguageControl"
+import { MarkdownFileView } from "@/components/editor/MarkdownFileView"
 
 interface EditorColumnProps {
   toolbar?: ReactNode
@@ -152,18 +153,20 @@ export const EditorColumn = memo(function EditorColumn({
   const editorSurface = (
     <>
       <ErrorBoundary>
-        <LazyCodeMirrorEditor
-          ref={editorRef}
-          height="100%"
-          language={editorLanguage}
-          value={code}
-          onChange={onCodeChange}
-          readOnly={
-            !isInterviewStarted ||
-            showFeedback ||
-            (isWorkspaceScenario(selectedScenario) && !isActiveWorkspaceFileEditable)
-          }
-        />
+        <MarkdownFileView fileName={activeWorkspaceFile?.path ?? ""} content={code}>
+          <LazyCodeMirrorEditor
+            ref={editorRef}
+            height="100%"
+            language={editorLanguage}
+            value={code}
+            onChange={onCodeChange}
+            readOnly={
+              !isInterviewStarted ||
+              showFeedback ||
+              (isWorkspaceScenario(selectedScenario) && !isActiveWorkspaceFileEditable)
+            }
+          />
+        </MarkdownFileView>
       </ErrorBoundary>
       {selectedScenario && !isInterviewStarted && !showScenarioBrowser && (
         <div className="bg-background/80 absolute inset-0 z-10 flex items-center justify-center overflow-y-auto p-4 backdrop-blur-sm">
