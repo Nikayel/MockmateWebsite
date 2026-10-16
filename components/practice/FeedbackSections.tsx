@@ -107,7 +107,6 @@ export const FeedbackSections = memo(function FeedbackSections({
 
   return (
     <div className="w-full space-y-4">
-      {userId && sessionId && <NextPracticeCard sessionId={sessionId} />}
       {/* Warning Banners - Show important feedback penalties */}
       {silentSolution && (
         <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4">
@@ -353,6 +352,8 @@ export const FeedbackSections = memo(function FeedbackSections({
           </ul>
         </div>
       </div>
+
+      {userId && sessionId && <NextPracticeCard sessionId={sessionId} />}
 
       {/* What You Missed - Collapsible section with coaching tone */}
       {sections.whatYouMissed && sections.whatYouMissed.length > 0 && (
