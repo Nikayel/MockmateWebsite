@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, type RefObject } from "react"
+import { memo, type RefObject, type ReactNode } from "react"
 import { MessageSquare, PanelRightClose } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { ChatMessage } from "../_types"
@@ -9,6 +9,7 @@ import { ConversationMessage } from "./ConversationMessage"
 import { InterviewerComposer } from "./InterviewerComposer"
 
 interface ChatColumnProps {
+  toolbar?: ReactNode
   focusMode: boolean
   activePanel: "problem" | "editor" | "chat"
   interviewerMessages: ChatMessage[]
@@ -32,6 +33,7 @@ interface ChatColumnProps {
 }
 
 export const ChatColumn = memo(function ChatColumn({
+  toolbar,
   focusMode,
   activePanel,
   interviewerMessages,
@@ -57,6 +59,8 @@ export const ChatColumn = memo(function ChatColumn({
 
   return (
     <Card
+      role="complementary"
+      aria-label="Interviewer"
       className={`workspace-panel border-border bg-card order-3 h-full flex-col gap-0 overflow-hidden py-0 ${
         focusMode
           ? "hidden"
@@ -70,7 +74,7 @@ export const ChatColumn = memo(function ChatColumn({
               : "hidden lg:flex"
       }`}
     >
-      <CardHeader className="flex-shrink-0 px-4 pt-3 pb-2">
+      <CardHeader className="block shrink-0 p-2">
         <CardTitle className="text-foreground flex w-full min-w-0 items-center justify-between gap-2 text-sm">
           <div className="flex min-w-0 items-center gap-2.5">
             <div className="relative flex-shrink-0">
@@ -97,6 +101,7 @@ export const ChatColumn = memo(function ChatColumn({
             </button>
           )}
         </CardTitle>
+        {toolbar && <div className="mt-1 hidden min-w-0 lg:block">{toolbar}</div>}
       </CardHeader>
       <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
         <div

@@ -2,20 +2,14 @@
 
 import { memo } from "react"
 import { X, Maximize2, Minimize2 } from "lucide-react"
-import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { WorkspaceMenu } from "./WorkspaceMenu"
-import { EditorLanguageControl } from "./EditorLanguageControl"
 import { InterviewTimer } from "@/components/interview"
 import type { Scenario } from "@/lib/scenarios"
-import type { EditorLanguage } from "../_types"
-import { isLanguageSupported } from "../_utils/language"
 import { isWorkspaceScenario } from "../_utils/workspace"
 
 interface InterviewTopBarProps {
   selectedScenario: Scenario | null
-  selectedLanguage: EditorLanguage
-  onLanguageChange: (language: EditorLanguage) => void
   focusMode: boolean
   onFocusModeChange: (enabled: boolean) => void
   calmMode: boolean
@@ -33,8 +27,6 @@ interface InterviewTopBarProps {
 
 export const InterviewTopBar = memo(function InterviewTopBar({
   selectedScenario,
-  selectedLanguage,
-  onLanguageChange,
   focusMode,
   onFocusModeChange,
   calmMode,
@@ -48,37 +40,15 @@ export const InterviewTopBar = memo(function InterviewTopBar({
   onCloseClick,
   onOpenSparra,
 }: InterviewTopBarProps) {
-  const handleLanguageChange = (newLang: EditorLanguage) => {
-    if (isWorkspaceScenario(selectedScenario)) {
-      toast.info(`Workspace scenarios run in ${selectedScenario.workspace.language}`)
-      return
-    }
-
-    onLanguageChange(newLang)
-    localStorage.setItem("mockmate_preferred_language", newLang)
-    if (!isLanguageSupported(newLang)) {
-      toast.warning(`${newLang.toUpperCase()} execution coming soon`, {
-        description:
-          "You can write code, but tests won't run. Use JavaScript or Python for full support.",
-        duration: 5000,
-      })
-    }
-  }
-
   return (
     <div
       role="group"
       aria-label="Interview controls"
-      className="workspace-toolbar focus-header flex min-w-0 items-center gap-0.5"
+      className="workspace-toolbar focus-header flex min-w-0 flex-wrap items-center justify-end gap-0.5"
     >
       <h2 className="text-foreground min-w-0 flex-1 truncate text-sm font-medium lg:hidden">
         {selectedScenario?.title}
       </h2>
-      <EditorLanguageControl
-        value={selectedLanguage}
-        onChange={handleLanguageChange}
-        isWorkspace={isWorkspaceScenario(selectedScenario)}
-      />
       <div className="flex shrink-0 items-center gap-1">
         {isInterviewStarted && !hideTimer && (
           <InterviewTimer
@@ -106,9 +76,6 @@ export const InterviewTopBar = memo(function InterviewTopBar({
           )}
         </Button>
         <WorkspaceMenu
-          selectedLanguage={selectedLanguage}
-          onLanguageChange={handleLanguageChange}
-          isWorkspace={isWorkspaceScenario(selectedScenario)}
           focusMode={focusMode}
           onFocusModeChange={onFocusModeChange}
           calmMode={calmMode}

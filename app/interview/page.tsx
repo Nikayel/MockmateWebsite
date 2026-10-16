@@ -42,6 +42,7 @@ import {
 } from "./_components"
 import { InterviewDialogs } from "./_components/InterviewDialogs"
 import { InterviewTopBar } from "./_components/InterviewTopBar"
+import { useEditorLanguageChange } from "./_hooks/useEditorLanguageChange"
 import type { ProblemColumnCtx } from "./_components/ProblemColumn"
 // Streaming feedback - Edge function with no timeout
 import { useStreamingFeedback } from "@/lib/hooks/use-streaming-feedback"
@@ -202,6 +203,8 @@ function InterviewPageContent() {
     }
     return "javascript"
   })
+
+  const changeEditorLanguage = useEditorLanguageChange(selectedScenario, setSelectedLanguage)
 
   // Filters (handled inside ScenarioBrowser now)
   const [completedProblems, setCompletedProblems] = useState<string[]>([])
@@ -2083,8 +2086,6 @@ function InterviewPageContent() {
               toolbar={
                 <InterviewTopBar
                   selectedScenario={selectedScenario}
-                  selectedLanguage={selectedLanguage}
-                  onLanguageChange={setSelectedLanguage}
                   focusMode={focusMode}
                   onFocusModeChange={(enabled) => {
                     if (enabled) setActivePanel("editor")
@@ -2151,7 +2152,7 @@ function InterviewPageContent() {
               onSubmitSystemDesign={submitSystemDesign}
               onRunCode={runCode}
               onSubmitCode={submitCode}
-              onSelectedLanguageChange={setSelectedLanguage}
+              onSelectedLanguageChange={changeEditorLanguage}
               onResetActiveFile={resetActiveWorkspaceFile}
               onResetWorkspace={resetEditableWorkspaceFiles}
               isAIPartnerExpanded={isAIPartnerExpanded}

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react"
 import { InterviewLayoutGrid } from "@/app/interview/_components/InterviewLayoutGrid"
 import { InterviewTopBar } from "@/app/interview/_components/InterviewTopBar"
-import { genericCacheEvictionMutationScenario as scenario } from "@/lib/scenarios/real-world/bugfix/packs/generic-cache-eviction-mutation"
+import { useEditorLanguageChange } from "@/app/interview/_hooks/useEditorLanguageChange"
+import { genericCacheEvictionMutationScenario as workspaceScenario } from "@/lib/scenarios/real-world/bugfix/packs/generic-cache-eviction-mutation"
+import { dsaTwoSumScenario } from "@/lib/scenarios/dsa/arrays-hashing/dsa-two-sum"
 import { toWorkspaceScenarioFiles } from "@/app/interview/_utils/workspace"
 import type { PackRunView } from "@/lib/workspace-execution"
 import type { ChatMessage, EditorLanguage } from "@/app/interview/_types"
@@ -9,6 +11,8 @@ import type { PartnerChatMessage } from "@/app/interview/_components/SparraPartn
 
 const noop = () => {}
 export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
+  const isDsa = new URLSearchParams(window.location.search).get("scenario") === "dsa"
+  const scenario = isDsa ? dsaTwoSumScenario : workspaceScenario
   const [activePanel, setActivePanel] = useState<"problem" | "editor" | "chat">("editor")
   const [expanded, setExpanded] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
@@ -16,9 +20,12 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
   const [hideTimer, setHideTimer] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
   const [packRun, setPackRun] = useState<PackRunView | null>(null)
-  const [language, setLanguage] = useState<EditorLanguage>("python")
+  const [language, setLanguage] = useState<EditorLanguage>(isDsa ? "javascript" : "python")
+  const [singleFileCode, setSingleFileCode] = useState(
+    dsaTwoSumScenario.starterCode.javascript ?? ""
+  )
   const [files, setFiles] = useState(() => toWorkspaceScenarioFiles(scenario))
-  const [path, setPath] = useState(files.find((file) => file.role === "editable")!.path)
+  const [path, setPath] = useState(files.find((file) => file.role === "editable")?.path ?? "")
   const [input, setInput] = useState("")
   const [messages, setMessages] = useState<PartnerChatMessage[]>([])
   const [interviewerInput, setInterviewerInput] = useState("")
@@ -60,6 +67,10 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
     }, 150)
   }
   const active = files.find((file) => file.path === path)!
+  const changeLanguage = useEditorLanguageChange(scenario, (next) => {
+    setLanguage(next)
+    if (isDsa) setSingleFileCode(dsaTwoSumScenario.starterCode[next] ?? "")
+  })
   const sendInterviewerMessage = () => {
     if (!interviewerInput.trim() || replyPending) return
     setInterviewerMessages((previous) => [...previous, { type: "user", message: interviewerInput }])
@@ -100,8 +111,6 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
         toolbar={
           <InterviewTopBar
             selectedScenario={scenario}
-            selectedLanguage={language}
-            onLanguageChange={setLanguage}
             focusMode={focusMode}
             onFocusModeChange={(enabled) => {
               if (enabled) setActivePanel("editor")
@@ -163,18 +172,20 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
         activePanel={activePanel}
         activeWorkspaceFile={active}
         selectedLanguage={language}
-        editorLanguage="python"
-        code={active.content}
-        onCodeChange={(content) =>
-          setFiles((previous) =>
-            previous.map((file) => (file.path === path ? { ...file, content } : file))
-          )
-        }
+        editorLanguage={isDsa ? language : "python"}
+        code={active?.content ?? singleFileCode}
+        onCodeChange={(content) => {
+          if (isDsa) setSingleFileCode(content)
+          else
+            setFiles((previous) =>
+              previous.map((file) => (file.path === path ? { ...file, content } : file))
+            )
+        }}
         isInterviewStarted
         showScenarioBrowser={false}
         showFeedback={false}
         showPostInterviewDiscussion={false}
-        isActiveWorkspaceFileEditable={active.role === "editable"}
+        isActiveWorkspaceFileEditable={isDsa || active?.role === "editable"}
         onStartInterview={noop}
         editorConsoleOutputs={[]}
         testResults={[]}
@@ -185,7 +196,7 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
         onSubmitSystemDesign={onSubmit}
         onRunCode={run}
         onSubmitCode={onSubmit}
-        onSelectedLanguageChange={setLanguage}
+        onSelectedLanguageChange={changeLanguage}
         onResetActiveFile={() =>
           setFiles((current) =>
             current.map((file) =>

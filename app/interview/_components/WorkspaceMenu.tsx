@@ -21,13 +21,8 @@ import {
 } from "@/components/ui/dialog"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { GradingCriteriaList } from "@/components/GradingCriteria"
-import { EditorLanguageControl } from "./EditorLanguageControl"
-import type { EditorLanguage } from "../_types"
 
 interface WorkspaceMenuProps {
-  selectedLanguage: EditorLanguage
-  onLanguageChange: (language: EditorLanguage) => void
-  isWorkspace: boolean
   focusMode: boolean
   onFocusModeChange: (enabled: boolean) => void
   calmMode: boolean
@@ -39,9 +34,6 @@ interface WorkspaceMenuProps {
 }
 
 export function WorkspaceMenu({
-  selectedLanguage,
-  onLanguageChange,
-  isWorkspace,
   focusMode,
   onFocusModeChange,
   calmMode,
@@ -73,12 +65,6 @@ export function WorkspaceMenu({
           className="interview-workspace workspace-menu max-h-[var(--radix-dropdown-menu-content-available-height)] w-64 overflow-y-auto"
         >
           <DropdownMenuLabel>Workspace</DropdownMenuLabel>
-          <EditorLanguageControl
-            variant="menu"
-            value={selectedLanguage}
-            onChange={onLanguageChange}
-            isWorkspace={isWorkspace}
-          />
           <DropdownMenuCheckboxItem
             className="lg:hidden"
             checked={focusMode}

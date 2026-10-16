@@ -320,7 +320,7 @@ export function InterviewLayoutGrid({
         </aside>
 
         <EditorColumn
-          toolbar={toolbar}
+          toolbar={focusMode || intCollapsed ? toolbar : undefined}
           activePanel={activePanel}
           selectedScenario={selectedScenario}
           activeWorkspaceFile={activeWorkspaceFile}
@@ -350,6 +350,7 @@ export function InterviewLayoutGrid({
         />
 
         <ChatColumn
+          toolbar={toolbar}
           focusMode={focusMode}
           activePanel={activePanel}
           interviewerMessages={interviewerMessages}

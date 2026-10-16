@@ -217,7 +217,7 @@ test("workspace color pairs meet text contrast in both themes", async ({ page })
   }
 })
 
-test("desktop controls share the editor header and leave the code more vertical space", async ({
+test("desktop controls live in the interviewer header and keep the code panel clear", async ({
   page,
 }) => {
   for (const width of [1024, 1280, 1440]) {
@@ -226,20 +226,97 @@ test("desktop controls share the editor header and leave the code more vertical 
     const editor = page.locator(".editor-panel-card")
     const bounds = (await editor.boundingBox())!
     expect(bounds.y).toBeLessThan(16)
-    await expect(editor.getByRole("group", { name: "Interview controls" })).toBeVisible()
+    const interviewer = page.getByRole("complementary", { name: "Interviewer", exact: true })
+    await expect(interviewer.getByRole("group", { name: "Interview controls" })).toBeVisible()
+    await expect(editor.getByRole("group", { name: "Interview controls" })).toHaveCount(0)
     const code = (await page.locator(".workspace-code-surface").boundingBox())!
     expect(code.height).toBeGreaterThan(700)
-    const controls = editor
+    const controls = interviewer
       .getByRole("group", { name: "Interview controls" })
       .locator("button, select")
+    const chatBounds = (await interviewer.boundingBox())!
+    const conversation = (await page
+      .getByRole("log", { name: "Interview messages" })
+      .boundingBox())!
     for (const control of await controls.all()) {
       if (!(await control.isVisible())) continue
       const box = (await control.boundingBox())!
-      expect(box.x).toBeGreaterThanOrEqual(bounds.x)
-      expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width)
-      expect(box.y + box.height).toBeLessThanOrEqual(code.y)
+      expect(box.x).toBeGreaterThanOrEqual(chatBounds.x)
+      expect(box.x + box.width).toBeLessThanOrEqual(chatBounds.x + chatBounds.width)
+      expect(box.y + box.height).toBeLessThanOrEqual(conversation.y)
     }
   }
+})
+
+test("session controls stay reachable when the interviewer is collapsed or focus mode is active", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto("/?view=workspace")
+  const editor = page.locator(".editor-panel-card")
+  await page.getByRole("button", { name: "Collapse interviewer panel" }).click()
+  await expect(editor.getByRole("button", { name: "Workspace settings" })).toBeVisible()
+  await expect(editor.getByRole("button", { name: "Close interview" })).toBeVisible()
+  await page.getByRole("button", { name: "Expand interviewer panel" }).click()
+  await expect(editor.getByRole("group", { name: "Interview controls" })).toHaveCount(0)
+  await page.getByRole("button", { name: "Enable focus mode", exact: true }).click()
+  await expect(editor.getByRole("button", { name: "Exit focus mode", exact: true })).toBeVisible()
+  await expect(editor.getByRole("button", { name: "Close interview" })).toBeVisible()
+  await editor.getByRole("button", { name: "Exit focus mode", exact: true }).click()
+  await expect(
+    page
+      .getByRole("complementary", { name: "Interviewer", exact: true })
+      .getByRole("button", { name: "Workspace settings" })
+  ).toBeVisible()
+})
+
+test("workspace language is fixed metadata and switchable languages work on desktop and mobile", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto("/?view=workspace&theme=light")
+  await expect(page.getByRole("combobox", { name: "Editor language" })).toHaveCount(0)
+  await expect(
+    page.locator(".editor-panel-card").getByText("Fixed for this workspace", { exact: true })
+  ).toHaveCount(1)
+  await page.goto("/?view=workspace&scenario=dsa&theme=light")
+  const picker = page.getByRole("combobox", { name: "Editor language" })
+  await expect(picker).toBeEnabled()
+  await picker.click()
+  await expect(page.getByRole("option", { name: "Python", exact: true })).toBeInViewport()
+  await page.screenshot({
+    path: testInfo.outputPath("language-picker.png"),
+    animations: "disabled",
+  })
+  await page.getByRole("option", { name: "Python", exact: true }).click()
+  await expect(picker).toHaveText("Python")
+  await expect(page.locator(".cm-content")).toContainText("def two_sum")
+  expect(await page.evaluate(() => localStorage.getItem("mockmate_preferred_language"))).toBe(
+    "python"
+  )
+  await picker.focus()
+  await page.keyboard.press("Space")
+  await expect(page.getByRole("option", { name: "Python", exact: true })).toBeFocused()
+  await page.keyboard.press("Home")
+  await expect(page.getByRole("option", { name: "JavaScript", exact: true })).toBeFocused()
+  await page.keyboard.press("ArrowDown")
+  await expect(page.getByRole("option", { name: "TypeScript", exact: true })).toBeFocused()
+  await page.keyboard.press("Enter")
+  await expect(picker).toHaveText("TypeScript")
+  await expect(page.locator(".cm-content")).toContainText("nums: number[]")
+  await page.setViewportSize({ width: 375, height: 812 })
+  await expect(picker).toBeVisible()
+  await picker.click()
+  await page.getByRole("option", { name: "Python", exact: true }).click()
+  await expect(page.locator(".cm-content")).toContainText("def two_sum")
+  expect(await page.evaluate(() => localStorage.getItem("mockmate_preferred_language"))).toBe(
+    "python"
+  )
+  await page.goto("/?view=workspace&theme=light")
+  await expect(page.getByRole("combobox", { name: "Editor language" })).toHaveCount(0)
+  await expect(
+    page.locator(".editor-panel-card").getByText("Fixed for this workspace", { exact: true })
+  ).toHaveCount(1)
 })
 
 test("submitted text restores the mic while reply progress stays in the conversation", async ({

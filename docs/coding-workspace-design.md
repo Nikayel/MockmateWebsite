@@ -1,6 +1,6 @@
 # Coding workspace design
 
-The workspace gives reading, editing, running, and submitting the clearest emphasis. Desktop language, timer, focus, settings, and exit controls share the existing editor header, reclaiming the separate toolbar row. Icon controls retain 44px targets and accessible names. Mobile keeps session controls above its panel navigation so settings and exit remain reachable from every panel. Occasional display controls live in Workspace settings. File resets live in Editor actions and use the existing reset handlers.
+The workspace gives reading, editing, running, and submitting the clearest emphasis. Desktop timer, focus, settings, and exit controls live in the interviewer header on the right. The language control stays beside the code in the editor header. When that panel is collapsed or hidden in focus mode, the editor header hosts those controls so the candidate can change settings or exit. Icon controls retain 44px targets and accessible names. Mobile keeps session controls above its panel navigation so settings and exit remain reachable from every panel. Occasional display controls live in Workspace settings. File resets live in Editor actions and use the existing reset handlers.
 
 ## Interaction contracts
 
@@ -11,6 +11,7 @@ The workspace gives reading, editing, running, and submitting the clearest empha
 - Run Tests and Submit Fix remain separate actions. Guided-lab test visibility, submission gating, execution, and scoring are unchanged.
 - The brief prioritizes the task, observed behavior, reproduction steps, and acceptance criteria. Incident details remain open by default because they contain constraints and context. Only an exact repeated scenario heading is removed; program and data-contract sections stay intact.
 - Mobile retains labeled Problem, Code, and Interview navigation. Settings and primary actions have 44px targets; menu controls remain available in both themes.
+- Workspace files and tests require their scenario language. Display that language as fixed metadata with a lock and an explanation, rather than a disabled dropdown. Switchable problems use the same enabled language picker beside the code on desktop and mobile. The dropdown uses the shared Select primitive; its portal can fit the viewport without a nested settings submenu. Selecting a language updates the editor and saved preference through the shared `useEditorLanguageChange` handler.
 
 ## Color and implementation
 
@@ -29,7 +30,7 @@ LIVE indicators, persistent online/equalizer decoration, and submit-button glow 
 - [Apple: Toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars) recommends choosing commands deliberately to avoid overcrowding and prioritizing frequently used controls.
 - [Nielsen Norman Group: Progressive Disclosure](https://www.nngroup.com/articles/progressive-disclosure/) supports moving occasional options behind a clear, predictable entry point while keeping frequent tasks direct.
 - [Material: Color roles](https://m3.material.io/styles/color/the-color-system) distinguishes neutral surface roles from emphasis and error roles, implemented through shared tokens.
-- [NN/g: Visual-design principles](https://www.nngroup.com/articles/principles-visual-design/) describes contrast, hierarchy, and proximity as tools for distinguishing functions and grouping related elements. This informs placing commands inside the editor header and giving conversation turns a clear visual rhythm.
+- [NN/g: Visual-design principles](https://www.nngroup.com/articles/principles-visual-design/) describes contrast, hierarchy, and proximity as tools for distinguishing functions and grouping related elements. This informs grouping commands inside panel headers and giving conversation turns a clear visual rhythm.
 - [NN/g: Visibility of system status](https://www.nngroup.com/articles/visibility-system-status/) supports immediate feedback that describes the current activity. [WhatsApp's receipts](https://faq.whatsapp.com/665923838265756/) distinguish sending, delivery, and reading, while its [voice-message design](https://blog.whatsapp.com/making-voice-messages-better) separates recording and draft review from sending. We apply that state separation to capture, submission, and reply preparation.
 - [WCAG: Contrast minimum](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html) specifies 4.5:1 for ordinary text. [Use of color](https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html) requires another means of conveying meaning.
 
@@ -39,6 +40,6 @@ The particular neutral/clay palette is a product design choice. These sources su
 
 `playwright.interview-review.config.ts` renders the real workspace/review components and CodeMirror. Local fixture callbacks simulate chat replies, reset operations, and runner output without accounts or paid AI calls.
 
-Browser coverage includes both themes at 1440×900, 375×812, and 812×375; integrated-header bounds at 1024, 1280, and 1440px; tab keyboard interaction and retained state; focus/collapse/file navigation; reset scope; settings and dialog focus; console reruns; submit through review/feedback; and foreground, muted text, primary action, code comment, error, warning, success, and conversation contrast pairs. The actual microphone hover state is checked for contrast. Delayed reply and voice-cancel/send fixtures exercise composer recovery, streaming, and a single send action.
+Browser coverage includes both themes at 1440×900, 375×812, and 812×375; interviewer-header bounds at 1024, 1280, and 1440px; controls remaining reachable through focus and collapse; desktop keyboard and mobile direct-picker language changes; fixed workspace language metadata; tab keyboard interaction and retained state; file navigation; reset scope; settings and dialog focus; console reruns; submit through review/feedback; and foreground, muted text, primary action, code comment, error, warning, success, and conversation contrast pairs. The actual microphone hover state is checked for contrast. Delayed reply and voice-cancel/send fixtures exercise composer recovery, streaming, and a single send action.
 
 Focused Vitest coverage checks the submitted-message microphone regression, typed-draft duplication, voice-countdown cancellation, initial/streaming reply states, console disclosure, partner form guards, theme direction, and voice fallback. TypeScript and focused ESLint are also checked.

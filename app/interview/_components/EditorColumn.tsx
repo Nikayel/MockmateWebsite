@@ -28,6 +28,7 @@ import { LazyCodeMirrorEditor } from "./LazyCodeMirrorEditor"
 import { ConsoleOutput as ConsoleOutputPanel } from "./_sub/ConsoleOutput"
 import { TestResultsPanel } from "./_sub/TestResultsPanel"
 import { EditorActionsMenu } from "./EditorActionsMenu"
+import { EditorLanguageControl } from "./EditorLanguageControl"
 
 interface EditorColumnProps {
   toolbar?: ReactNode
@@ -259,6 +260,11 @@ export const EditorColumn = memo(function EditorColumn({
               </div>
             )}
           </div>
+          <EditorLanguageControl
+            value={selectedLanguage}
+            onChange={onSelectedLanguageChange}
+            isWorkspace={isWorkspaceScenario(selectedScenario)}
+          />
           <div className="hidden lg:block">{toolbar}</div>
         </div>
       </CardHeader>
