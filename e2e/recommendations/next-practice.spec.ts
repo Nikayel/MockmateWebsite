@@ -2,6 +2,20 @@ import { expect, test } from "@playwright/test"
 
 // Isolated fixture, not the live Firebase/AI backend. See playwright.recommendations.config.ts.
 test.describe("post-feedback recommendation", () => {
+  test("shows feedback before the next task and keeps optional details collapsed", async ({
+    page,
+  }) => {
+    await page.goto("/")
+    const card = page.getByRole("region", { name: "Your next practice" })
+    await expect(card.getByRole("button", { name: "Save for later" })).toBeEnabled()
+    expect((await page.getByText("To Improve", { exact: true }).boundingBox())!.y).toBeLessThan(
+      (await card.boundingBox())!.y
+    )
+    await expect(card.getByRole("button")).toHaveCount(1)
+    await expect(card.getByText(/Opening uses no sessions/)).not.toBeVisible()
+    await card.locator("summary").click()
+    await expect(card.getByText(/Opening uses no sessions/)).toBeVisible()
+  })
   test("opens the exact catalog task and language without consuming a start", async ({ page }) => {
     const browserErrors: string[] = []
     page.on("pageerror", (error) => browserErrors.push(error.message))
@@ -9,7 +23,7 @@ test.describe("post-feedback recommendation", () => {
     const card = page.getByRole("region", { name: "Your next practice" })
     const link = card.getByRole("link", { name: /open practice/i })
     await expect(link).toBeVisible()
-    const title = await card.getByRole("heading", { level: 3 }).textContent()
+    const title = (await link.getAttribute("aria-label"))!.replace("Open practice: ", "")
     const href = await link.getAttribute("href")
     const destination = new URL(href!, "http://127.0.0.1:3101")
     expect(destination.searchParams.get("language")).toBe("python")
@@ -39,7 +53,7 @@ test.describe("post-feedback recommendation", () => {
 
   test("fits a narrow screen in both themes and keeps error recovery accessible", async ({
     page,
-  }) => {
+  }, testInfo) => {
     await page.setViewportSize({ width: 375, height: 812 })
     for (const theme of ["light", "dark"]) {
       await page.goto(`/?theme=${theme}`)
@@ -49,6 +63,18 @@ test.describe("post-feedback recommendation", () => {
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
       ).toBe(true)
+      const card = page.getByRole("region", { name: "Your next practice" })
+      await card.screenshot({ path: testInfo.outputPath(`next-practice-${theme}-mobile.png`) })
+      if (await card.getByRole("button", { name: "Save for later" }).isVisible()) {
+        await card.getByRole("button", { name: "Save for later" }).click()
+      }
+      await card.getByRole("button", { name: "Add reminder" }).click()
+      await expect(card.getByLabel("Email me a reminder")).toBeFocused()
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+      ).toBe(true)
+      await card.screenshot({ path: testInfo.outputPath(`reminder-${theme}-mobile.png`) })
+      await card.getByRole("button", { name: "Cancel", exact: true }).click()
     }
     await page.goto("/?state=error")
     await expect(page.getByRole("button", { name: "Try again" })).toBeVisible()
@@ -102,9 +128,7 @@ test.describe("saved task return journey", () => {
     expect(writes).toEqual([])
     const href = await page.getByRole("link", { name: /open practice/i }).getAttribute("href")
     await page.getByRole("button", { name: "Save for later" }).click()
-    await expect(
-      page.getByText("Saved to your dashboard. No email reminder scheduled.")
-    ).toBeVisible()
+    await expect(page.getByText("Saved to dashboard", { exact: true })).toBeVisible()
     expect(writes).toEqual(["POST"])
     await page.goto("/dashboard")
     const link = page.getByRole("link", { name: "Open saved practice" })
@@ -120,44 +144,55 @@ test.describe("saved task return journey", () => {
     await page.getByRole("button", { name: "Save for later" }).click()
     await expect(page.getByRole("alert")).toContainText("couldn't confirm")
     await expect(page.getByRole("link", { name: /open practice/i })).toBeVisible()
-    await expect(
-      page.getByText("Saved to your dashboard. No email reminder scheduled.")
-    ).not.toBeVisible()
+    await expect(page.getByText("Saved to dashboard", { exact: true })).not.toBeVisible()
     await page.goto("/")
     await page.getByRole("button", { name: "Save for later" }).click()
-    await expect(
-      page.getByText("Saved to your dashboard. No email reminder scheduled.")
-    ).toBeVisible()
+    await expect(page.getByText("Saved to dashboard", { exact: true })).toBeVisible()
   })
   test("requires an explicit reminder save and cancellation removes the schedule", async ({
     page,
-  }) => {
+  }, testInfo) => {
     const writes: unknown[] = []
     page.on("request", (request) => {
       if (request.url().includes("/api/practice-plan") && request.method() === "POST")
         writes.push(request.postDataJSON())
     })
     await page.goto("/")
-    await page.getByRole("button", { name: "Remind me", exact: true }).click()
-    await expect(page.getByLabel("Email me after this time")).toBeVisible()
-    expect(writes).toEqual([])
-    await page.getByRole("button", { name: "Save and schedule reminder" }).click()
-    await expect(page.getByText(/Saved. We'll email you after/)).toBeVisible()
-    expect(writes[0]).toMatchObject({ reminderAt: expect.any(String) })
-    await page.getByRole("button", { name: "Save without reminder" }).click()
-    await expect(
-      page.getByText("Saved to your dashboard. No email reminder scheduled.")
-    ).toBeVisible()
-    expect(writes[1]).toMatchObject({ reminderAt: null })
+    const card = page.getByRole("region", { name: "Your next practice" })
+    await page.getByRole("button", { name: "Save for later" }).click()
+    await expect(page.getByText("Saved to dashboard", { exact: true })).toBeVisible()
+    expect(writes).toEqual([expect.objectContaining({ reminderAt: null })])
+    await page.getByRole("button", { name: "Add reminder" }).click()
+    await expect(page.getByLabel("Email me a reminder")).toBeFocused()
+    expect(writes).toHaveLength(1)
+    await page.getByRole("button", { name: "Cancel", exact: true }).click()
+    await expect(page.getByRole("button", { name: "Add reminder" })).toBeFocused()
+    expect(writes).toHaveLength(1)
+    await page.getByRole("button", { name: "Add reminder" }).click()
+    await page.getByRole("button", { name: "Set reminder" }).click()
+    await expect(card.getByRole("status")).toContainText("Reminder set")
+    expect(writes[1]).toMatchObject({ reminderAt: expect.any(String) })
+    await expect(page.getByRole("form", { name: "Email reminder" })).not.toBeVisible()
+    await expect(page.getByRole("button", { name: "Save without reminder" })).not.toBeVisible()
+    await expect(page.getByRole("button", { name: "Remind me", exact: true })).not.toBeVisible()
+    await expect(page.getByRole("button", { name: "Save for later" })).not.toBeVisible()
+    await card.screenshot({ path: testInfo.outputPath("reminder-scheduled-desktop.png") })
+    await page.reload()
+    await expect(card.getByRole("status")).toContainText("Reminder set")
+    await page.getByRole("button", { name: "Edit reminder" }).click()
+    await expect(page.getByRole("button", { name: "Save changes" })).toBeVisible()
+    expect(writes).toHaveLength(2)
+    await page.getByRole("button", { name: "Cancel reminder" }).click()
+    await expect(card.getByRole("status")).toContainText("No email reminder")
+    expect(writes[2]).toMatchObject({ reminderAt: null })
+    await expect(page.getByRole("button", { name: "Add reminder" })).toBeVisible()
   })
   test("preserves the saved task when removal fails and shows honest progress before Pro", async ({
     page,
   }) => {
     await page.goto("/")
     await page.getByRole("button", { name: "Save for later" }).click()
-    await expect(
-      page.getByText("Saved to your dashboard. No email reminder scheduled.")
-    ).toBeVisible()
+    await expect(page.getByText("Saved to dashboard", { exact: true })).toBeVisible()
     await page.goto("/dashboard?state=remove_failure")
     await page.getByRole("button", { name: "Remove saved task" }).click()
     await expect(page.getByRole("alert")).toContainText("couldn't confirm")

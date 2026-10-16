@@ -36,13 +36,15 @@ describe("next task card", () => {
     }
     render(<NextPracticeCard sessionId="source" />)
     const link = screen.getByRole("link", { name: /open practice/i })
+    expect(screen.getByRole("heading", { level: 3 }).textContent).toBe("Reproduce first")
+    expect(screen.getByText("A different task")).toBeTruthy()
     expect(link.getAttribute("href")).toBe(mocks.result.recommendation.href)
     expect(screen.getByText(/about 20 minutes/i)).toBeTruthy()
     expect(screen.getByText(/opening uses no sessions/i)).toBeTruthy()
     expect(screen.getByText("Bug Fix")).toBeTruthy()
     const note = screen.getByText("Original private feedback").closest("details")!
     expect(note.open).toBe(false)
-    fireEvent.click(screen.getByText("From your feedback"))
+    fireEvent.click(screen.getByText("Why this task?"))
     expect(note.open).toBe(true)
     link.addEventListener("click", (event) => event.preventDefault())
     fireEvent.click(link)
