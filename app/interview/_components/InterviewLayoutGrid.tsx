@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, type ComponentProps, type CSSProperties } from "react"
+import { useRef, type ComponentProps, type CSSProperties, type ReactNode } from "react"
 import dynamic from "next/dynamic"
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react"
 import { useWorkspaceRails } from "../_hooks/useWorkspaceRails"
@@ -11,6 +11,7 @@ import { EditorColumn } from "./EditorColumn"
 import { ChatColumn } from "./ChatColumn"
 import { SparraPartnerWidget } from "./SparraPartnerWidget"
 import { ProblemPartnerPanel } from "./ProblemPartnerPanel"
+import { MobileWorkspaceNav } from "./MobileWorkspaceNav"
 import type { BugfixOnboardingTour } from "./BugfixOnboardingTour"
 
 /**
@@ -31,6 +32,7 @@ type ChatColumnProps = ComponentProps<typeof ChatColumn>
 type BugfixOnboardingTourProps = ComponentProps<typeof BugfixOnboardingTour>
 
 interface InterviewLayoutGridProps {
+  toolbar?: ReactNode
   focusMode: boolean
   onFocusModeChange: (enabled: boolean) => void
   // FocusProblemPeek
@@ -103,6 +105,7 @@ interface InterviewLayoutGridProps {
  * handlers, and the render guard live in the page.
  */
 export function InterviewLayoutGrid({
+  toolbar,
   focusMode,
   onFocusModeChange,
   selectedScenario,
@@ -184,190 +187,203 @@ export function InterviewLayoutGrid({
   const leftCollapsed = labCollapsed && !partnerExpanded && !focusHasExplorer
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative grid min-h-0 flex-1 gap-1.5 overflow-hidden sm:gap-2 ${
-        isDragging ? "transition-none select-none" : "transition-all duration-300"
-      } ${
-        focusMode
-          ? focusHasExplorer
-            ? "grid-cols-1 lg:[grid-template-columns:var(--w-lab)_minmax(0,1fr)]"
-            : "grid-cols-1"
-          : "grid-cols-1 lg:[grid-template-columns:var(--w-lab)_minmax(0,1fr)_var(--w-int)]"
-      }`}
-      style={
-        focusMode && !focusHasExplorer
-          ? undefined
-          : ({
-              "--w-lab": leftCollapsed ? "0px" : `${labWidth}px`,
-              "--w-int": intCollapsed ? "0px" : `${intWidth}px`,
-            } as CSSProperties)
-      }
-    >
-      {/* Desktop-only resize handles — drag to give the code panel more room.
+    <>
+      <div className="flex shrink-0 flex-col gap-1 lg:hidden">
+        {toolbar}
+        <MobileWorkspaceNav
+          activePanel={activePanel}
+          onPanelChange={(panel) => {
+            if (panel !== "editor" && focusMode) onFocusModeChange(false)
+            onActivePanelChange(panel)
+          }}
+        />
+      </div>
+      <div
+        ref={containerRef}
+        className={`relative grid min-h-0 flex-1 gap-1.5 overflow-hidden sm:gap-2 ${
+          isDragging ? "transition-none select-none" : "transition-all duration-300"
+        } ${
+          focusMode
+            ? focusHasExplorer
+              ? "grid-cols-1 lg:[grid-template-columns:var(--w-lab)_minmax(0,1fr)]"
+              : "grid-cols-1"
+            : "grid-cols-1 lg:[grid-template-columns:var(--w-lab)_minmax(0,1fr)_var(--w-int)]"
+        }`}
+        style={
+          focusMode && !focusHasExplorer
+            ? undefined
+            : ({
+                "--w-lab": leftCollapsed ? "0px" : `${labWidth}px`,
+                "--w-int": intCollapsed ? "0px" : `${intWidth}px`,
+              } as CSSProperties)
+        }
+      >
+        {/* Desktop-only resize handles — drag to give the code panel more room.
           The center editor column is 1fr, so it absorbs whatever the rails give
           up. Pointer-capture drag works for mouse + touch; widths persist.
           A collapsed rail hides its handle and shows a slim re-open tab. */}
-      {!focusMode && (
-        <>
-          {!leftCollapsed && (
-            <div
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="Resize problem panel"
-              onPointerDown={startLabDrag}
-              className="group absolute inset-y-0 z-20 hidden w-2 -translate-x-1/2 cursor-col-resize touch-none lg:block"
-              style={{ left: "calc(var(--w-lab) + 0.25rem)" }}
-            >
-              <div className="group-hover:bg-muted-foreground/40 mx-auto h-full w-px bg-transparent transition-colors" />
-            </div>
-          )}
-          {!intCollapsed && (
-            <div
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="Resize interviewer panel"
-              onPointerDown={startIntDrag}
-              className="group absolute inset-y-0 z-20 hidden w-2 translate-x-1/2 cursor-col-resize touch-none lg:block"
-              style={{ right: "calc(var(--w-int) + 0.25rem)" }}
-            >
-              <div className="group-hover:bg-muted-foreground/40 mx-auto h-full w-px bg-transparent transition-colors" />
-            </div>
-          )}
-          {leftCollapsed && (
-            <button
-              type="button"
-              onClick={toggleLab}
-              aria-label="Expand problem panel"
-              title="Expand problem panel"
-              className="bg-card border-border text-muted-foreground hover:border-accent/50 hover:text-accent absolute top-3 left-0 z-20 hidden flex-col items-center gap-2 rounded-r-md border border-l-0 py-3 pr-1 pl-0.5 transition-colors lg:flex"
-            >
-              <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
-              <span className="text-[10px] font-semibold tracking-widest [writing-mode:vertical-rl]">
-                PROBLEM
-              </span>
-            </button>
-          )}
-          {intCollapsed && (
-            <button
-              type="button"
-              onClick={toggleInt}
-              aria-label="Expand interviewer panel"
-              title="Expand interviewer panel"
-              className="bg-card border-border text-muted-foreground hover:border-accent/50 hover:text-accent absolute top-3 right-0 z-20 hidden flex-col items-center gap-2 rounded-l-md border border-r-0 py-3 pr-0.5 pl-1 transition-colors lg:flex"
-            >
-              <PanelRightOpen className="h-4 w-4" aria-hidden="true" />
-              <span className="text-[10px] font-semibold tracking-widest [writing-mode:vertical-rl]">
-                SABLE
-              </span>
-            </button>
-          )}
-        </>
-      )}
-      {focusMode && !focusHasExplorer && (
-        <FocusProblemPeek
-          scenario={selectedScenario}
-          realInterviewMode={realInterviewMode}
-          showProblemPeek={showProblemPeek}
-          onShowProblemPeekChange={onShowProblemPeekChange}
-        />
-      )}
-      <aside
-        aria-label="Problem and partner"
-        className={`order-1 min-h-0 min-w-0 flex-col gap-2 overflow-hidden ${focusMode && !focusHasExplorer ? "hidden" : `${activePanel === "problem" ? "flex" : "hidden lg:flex"} ${leftCollapsed ? "lg:invisible" : ""}`}`}
-      >
-        <ProblemPartnerPanel
-          problemCtx={problemCtx}
-          hasPartner={hasPartner}
-          onPartnerExpandedChange={onAIPartnerExpandedChange}
-          onToggleCollapse={
-            focusMode
-              ? undefined
-              : () => {
-                  onAIPartnerExpandedChange(false)
-                  if (!labCollapsed) toggleLab()
-                }
-          }
-          onOpenPartner={() => {
-            if (focusMode) onFocusModeChange(false)
-            onAIPartnerExpandedChange(true)
-          }}
-          partner={{
-            expanded: isAIPartnerExpanded,
-            messages: chatMessages,
-            messagesEndRef: chatEndRef,
-            input: chatInput,
-            onInputChange: onChatInputChange,
-            isLoading: isLoadingChat,
-            onSendMessage: onSendPartnerMessage,
-            isDebuggingScenario: selectedScenario?.type === "bugfix",
-          }}
-        />
-      </aside>
+        {!focusMode && (
+          <>
+            {!leftCollapsed && (
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize problem panel"
+                onPointerDown={startLabDrag}
+                className="group absolute inset-y-0 z-20 hidden w-2 -translate-x-1/2 cursor-col-resize touch-none lg:block"
+                style={{ left: "calc(var(--w-lab) + 0.25rem)" }}
+              >
+                <div className="group-hover:bg-muted-foreground/40 mx-auto h-full w-px bg-transparent transition-colors" />
+              </div>
+            )}
+            {!intCollapsed && (
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize interviewer panel"
+                onPointerDown={startIntDrag}
+                className="group absolute inset-y-0 z-20 hidden w-2 translate-x-1/2 cursor-col-resize touch-none lg:block"
+                style={{ right: "calc(var(--w-int) + 0.25rem)" }}
+              >
+                <div className="group-hover:bg-muted-foreground/40 mx-auto h-full w-px bg-transparent transition-colors" />
+              </div>
+            )}
+            {leftCollapsed && (
+              <button
+                type="button"
+                onClick={toggleLab}
+                aria-label="Expand problem panel"
+                title="Expand problem panel"
+                className="bg-card border-border text-muted-foreground hover:border-accent/50 hover:text-accent absolute top-3 left-0 z-20 hidden flex-col items-center gap-2 rounded-r-md border border-l-0 py-3 pr-1 pl-0.5 transition-colors lg:flex"
+              >
+                <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
+                <span className="text-[10px] font-semibold tracking-widest [writing-mode:vertical-rl]">
+                  PROBLEM
+                </span>
+              </button>
+            )}
+            {intCollapsed && (
+              <button
+                type="button"
+                onClick={toggleInt}
+                aria-label="Expand interviewer panel"
+                title="Expand interviewer panel"
+                className="bg-card border-border text-muted-foreground hover:border-accent/50 hover:text-accent absolute top-3 right-0 z-20 hidden flex-col items-center gap-2 rounded-l-md border border-r-0 py-3 pr-0.5 pl-1 transition-colors lg:flex"
+              >
+                <PanelRightOpen className="h-4 w-4" aria-hidden="true" />
+                <span className="text-[10px] font-semibold tracking-widest [writing-mode:vertical-rl]">
+                  SABLE
+                </span>
+              </button>
+            )}
+          </>
+        )}
+        {focusMode && !focusHasExplorer && (
+          <FocusProblemPeek
+            scenario={selectedScenario}
+            realInterviewMode={realInterviewMode}
+            showProblemPeek={showProblemPeek}
+            onShowProblemPeekChange={onShowProblemPeekChange}
+          />
+        )}
+        <aside
+          aria-label="Problem and partner"
+          className={`order-1 min-h-0 min-w-0 flex-col gap-2 overflow-hidden ${focusMode && !focusHasExplorer ? "hidden" : `${activePanel === "problem" ? "flex" : "hidden lg:flex"} ${leftCollapsed ? "lg:invisible" : ""}`}`}
+        >
+          <ProblemPartnerPanel
+            problemCtx={problemCtx}
+            hasPartner={hasPartner}
+            onPartnerExpandedChange={onAIPartnerExpandedChange}
+            onToggleCollapse={
+              focusMode
+                ? undefined
+                : () => {
+                    onAIPartnerExpandedChange(false)
+                    if (!labCollapsed) toggleLab()
+                  }
+            }
+            onOpenPartner={() => {
+              if (focusMode) onFocusModeChange(false)
+              onAIPartnerExpandedChange(true)
+            }}
+            partner={{
+              expanded: isAIPartnerExpanded,
+              messages: chatMessages,
+              messagesEndRef: chatEndRef,
+              input: chatInput,
+              onInputChange: onChatInputChange,
+              isLoading: isLoadingChat,
+              onSendMessage: onSendPartnerMessage,
+              isDebuggingScenario: selectedScenario?.type === "bugfix",
+            }}
+          />
+        </aside>
 
-      <EditorColumn
-        activePanel={activePanel}
-        selectedScenario={selectedScenario}
-        activeWorkspaceFile={activeWorkspaceFile}
-        selectedLanguage={selectedLanguage}
-        editorLanguage={editorLanguage}
-        code={code}
-        onCodeChange={onCodeChange}
-        isInterviewStarted={isInterviewStarted}
-        showScenarioBrowser={showScenarioBrowser}
-        showFeedback={showFeedback}
-        showPostInterviewDiscussion={showPostInterviewDiscussion}
-        isActiveWorkspaceFileEditable={isActiveWorkspaceFileEditable}
-        onStartInterview={onStartInterview}
-        editorConsoleOutputs={editorConsoleOutputs}
-        testResults={testResults}
-        packRun={packRun}
-        testSummary={testSummary}
-        isRunningTests={isRunningTests}
-        onClearConsole={onClearConsole}
-        onSubmitSystemDesign={onSubmitSystemDesign}
-        onRunCode={onRunCode}
-        onSubmitCode={onSubmitCode}
-        onSelectedLanguageChange={onSelectedLanguageChange}
-        onResetActiveFile={onResetActiveFile}
-        onResetWorkspace={onResetWorkspace}
-        workspaceContext={workspaceContext}
-      />
-
-      <ChatColumn
-        focusMode={focusMode}
-        activePanel={activePanel}
-        interviewerMessages={interviewerMessages}
-        isLoadingInterviewer={isLoadingInterviewer}
-        isGeneratingDiscussion={isGeneratingDiscussion}
-        interviewerEndRef={interviewerEndRef}
-        isInterviewStarted={isInterviewStarted}
-        showPostInterviewDiscussion={showPostInterviewDiscussion}
-        isRecordingInterviewer={isRecordingInterviewer}
-        onToggleRecording={onToggleInterviewerRecording}
-        onCancelRecording={onCancelInterviewerRecording}
-        onCancelCountdown={onCancelInterviewerCountdown}
-        onSendMessage={onSendInterviewerMessage}
-        countdownActive={countdownActive}
-        voiceUnavailable={voiceUnavailable}
-        interviewerInput={interviewerInput}
-        onInterviewerInputChange={onInterviewerInputChange}
-        collapsed={intCollapsed}
-        onToggleCollapse={toggleInt}
-      />
-      {bugfixTourEnabled && (
-        <BugfixOnboardingTourLazy
+        <EditorColumn
+          toolbar={toolbar}
           activePanel={activePanel}
-          enabled={bugfixTourEnabled}
-          isAIPartnerExpanded={isAIPartnerExpanded}
-          onAIPartnerExpandedChange={onAIPartnerExpandedChange}
-          onActivePanelChange={onActivePanelChange}
-          scenarioId={bugfixScenarioId}
-          testResultsCount={testResultsCount}
-          userId={userId}
-          userProfile={userProfile}
+          selectedScenario={selectedScenario}
+          activeWorkspaceFile={activeWorkspaceFile}
+          selectedLanguage={selectedLanguage}
+          editorLanguage={editorLanguage}
+          code={code}
+          onCodeChange={onCodeChange}
+          isInterviewStarted={isInterviewStarted}
+          showScenarioBrowser={showScenarioBrowser}
+          showFeedback={showFeedback}
+          showPostInterviewDiscussion={showPostInterviewDiscussion}
+          isActiveWorkspaceFileEditable={isActiveWorkspaceFileEditable}
+          onStartInterview={onStartInterview}
+          editorConsoleOutputs={editorConsoleOutputs}
+          testResults={testResults}
+          packRun={packRun}
+          testSummary={testSummary}
+          isRunningTests={isRunningTests}
+          onClearConsole={onClearConsole}
+          onSubmitSystemDesign={onSubmitSystemDesign}
+          onRunCode={onRunCode}
+          onSubmitCode={onSubmitCode}
+          onSelectedLanguageChange={onSelectedLanguageChange}
+          onResetActiveFile={onResetActiveFile}
+          onResetWorkspace={onResetWorkspace}
+          workspaceContext={workspaceContext}
         />
-      )}
-    </div>
+
+        <ChatColumn
+          focusMode={focusMode}
+          activePanel={activePanel}
+          interviewerMessages={interviewerMessages}
+          isLoadingInterviewer={isLoadingInterviewer}
+          isGeneratingDiscussion={isGeneratingDiscussion}
+          interviewerEndRef={interviewerEndRef}
+          isInterviewStarted={isInterviewStarted}
+          showPostInterviewDiscussion={showPostInterviewDiscussion}
+          isRecordingInterviewer={isRecordingInterviewer}
+          onToggleRecording={onToggleInterviewerRecording}
+          onCancelRecording={onCancelInterviewerRecording}
+          onCancelCountdown={onCancelInterviewerCountdown}
+          onSendMessage={onSendInterviewerMessage}
+          countdownActive={countdownActive}
+          voiceUnavailable={voiceUnavailable}
+          interviewerInput={interviewerInput}
+          onInterviewerInputChange={onInterviewerInputChange}
+          collapsed={intCollapsed}
+          onToggleCollapse={toggleInt}
+        />
+        {bugfixTourEnabled && (
+          <BugfixOnboardingTourLazy
+            activePanel={activePanel}
+            enabled={bugfixTourEnabled}
+            isAIPartnerExpanded={isAIPartnerExpanded}
+            onAIPartnerExpandedChange={onAIPartnerExpandedChange}
+            onActivePanelChange={onActivePanelChange}
+            scenarioId={bugfixScenarioId}
+            testResultsCount={testResultsCount}
+            userId={userId}
+            userProfile={userProfile}
+          />
+        )}
+      </div>
+    </>
   )
 }

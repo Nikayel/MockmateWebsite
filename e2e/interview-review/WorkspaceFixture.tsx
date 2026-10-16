@@ -4,7 +4,7 @@ import { InterviewTopBar } from "@/app/interview/_components/InterviewTopBar"
 import { genericCacheEvictionMutationScenario as scenario } from "@/lib/scenarios/real-world/bugfix/packs/generic-cache-eviction-mutation"
 import { toWorkspaceScenarioFiles } from "@/app/interview/_utils/workspace"
 import type { PackRunView } from "@/lib/workspace-execution"
-import type { EditorLanguage } from "@/app/interview/_types"
+import type { ChatMessage, EditorLanguage } from "@/app/interview/_types"
 import type { PartnerChatMessage } from "@/app/interview/_components/SparraPartnerWidget"
 
 const noop = () => {}
@@ -21,6 +21,22 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
   const [path, setPath] = useState(files.find((file) => file.role === "editable")!.path)
   const [input, setInput] = useState("")
   const [messages, setMessages] = useState<PartnerChatMessage[]>([])
+  const [interviewerInput, setInterviewerInput] = useState("")
+  const [replyPending, setReplyPending] = useState(false)
+  const [recording, setRecording] = useState(false)
+  const [interviewerMessages, setInterviewerMessages] = useState<ChatMessage[]>([
+    { type: "ai", message: "Start by reproducing the failure and inspecting the relevant files." },
+    {
+      type: "user",
+      message:
+        "The cleanup skips an entry after removing its neighbor. I'll check the loop boundary.",
+    },
+    {
+      type: "ai",
+      message:
+        "Which regression case would show that? Explain the expected state before making the change.",
+    },
+  ])
   const endRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
@@ -44,31 +60,68 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
     }, 150)
   }
   const active = files.find((file) => file.path === path)!
+  const sendInterviewerMessage = () => {
+    if (!interviewerInput.trim() || replyPending) return
+    setInterviewerMessages((previous) => [...previous, { type: "user", message: interviewerInput }])
+    setInterviewerInput("")
+    setRecording(false)
+    setReplyPending(true)
+    window.setTimeout(() => {
+      setInterviewerMessages((previous) => [
+        ...previous,
+        {
+          id: "fixture-stream",
+          type: "ai",
+          message: "Compare the retained entries",
+          isStreaming: true,
+        },
+      ])
+    }, 800)
+    window.setTimeout(() => {
+      setInterviewerMessages((previous) =>
+        previous.map((message) =>
+          message.id === "fixture-stream"
+            ? {
+                ...message,
+                id: undefined,
+                message:
+                  "Compare the retained entries at the exact checkpoint, then run the regression checks again.",
+                isStreaming: false,
+              }
+            : message
+        )
+      )
+      setReplyPending(false)
+    }, 1400)
+  }
   return (
     <>
-      <InterviewTopBar
-        selectedScenario={scenario}
-        selectedLanguage={language}
-        onLanguageChange={setLanguage}
-        activePanel={activePanel}
-        onActivePanelChange={setActivePanel}
-        focusMode={focusMode}
-        onFocusModeChange={setFocusMode}
-        calmMode={calmMode}
-        onCalmModeChange={setCalmMode}
-        isInterviewStarted
-        hideTimer={hideTimer}
-        onHideTimerChange={setHideTimer}
-        strictTimeLimit={null}
-        elapsedTime={900}
-        onCloseClick={noop}
-        onOpenSparra={() => {
-          setFocusMode(false)
-          setActivePanel("problem")
-          setExpanded(true)
-        }}
-      />
       <InterviewLayoutGrid
+        toolbar={
+          <InterviewTopBar
+            selectedScenario={scenario}
+            selectedLanguage={language}
+            onLanguageChange={setLanguage}
+            focusMode={focusMode}
+            onFocusModeChange={(enabled) => {
+              if (enabled) setActivePanel("editor")
+              setFocusMode(enabled)
+            }}
+            calmMode={calmMode}
+            onCalmModeChange={setCalmMode}
+            isInterviewStarted
+            hideTimer={hideTimer}
+            onHideTimerChange={setHideTimer}
+            strictTimeLimit={null}
+            elapsedTime={900}
+            onCloseClick={noop}
+            onOpenSparra={() => {
+              setFocusMode(false)
+              setActivePanel("problem")
+              setExpanded(true)
+            }}
+          />
+        }
         focusMode={focusMode}
         onFocusModeChange={setFocusMode}
         selectedScenario={scenario}
@@ -157,23 +210,25 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
           setInput("")
         }}
         workspaceContext={files}
-        interviewerMessages={[
-          {
-            type: "ai",
-            message: "Start by reproducing the failure and inspecting the relevant files.",
-          },
-        ]}
-        isLoadingInterviewer={false}
+        interviewerMessages={interviewerMessages}
+        isLoadingInterviewer={replyPending}
         isGeneratingDiscussion={false}
         interviewerEndRef={endRef}
-        isRecordingInterviewer={false}
-        onToggleInterviewerRecording={noop}
-        onCancelInterviewerRecording={noop}
+        isRecordingInterviewer={recording}
+        onToggleInterviewerRecording={() => {
+          setRecording((current) => !current)
+          if (!recording)
+            setInterviewerInput("I traced the loop boundary and reproduced the skipped entry.")
+        }}
+        onCancelInterviewerRecording={() => {
+          setRecording(false)
+          setInterviewerInput("")
+        }}
         onCancelInterviewerCountdown={noop}
-        onSendInterviewerMessage={noop}
+        onSendInterviewerMessage={sendInterviewerMessage}
         countdownActive={false}
-        interviewerInput=""
-        onInterviewerInputChange={noop}
+        interviewerInput={interviewerInput}
+        onInterviewerInputChange={setInterviewerInput}
         bugfixTourEnabled={false}
         bugfixScenarioId={scenario.id}
         testResultsCount={0}

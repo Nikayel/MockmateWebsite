@@ -73,7 +73,7 @@ export function EditorLanguageControl({
           ? `Workspace scenario language: ${LANGUAGE_NAMES[value]}`
           : "Choose editor language"
       }
-      className="focus:ring-ring border-border bg-card text-foreground hidden min-h-11 rounded-md border px-3 text-sm focus:ring-2 focus:outline-none lg:block"
+      className="focus:ring-ring bg-card text-foreground hidden h-11 max-w-28 rounded-md px-2 text-xs focus:ring-2 focus:outline-none lg:block"
     >
       {EDITOR_LANGUAGES.map((language) => (
         <option key={language} value={language}>

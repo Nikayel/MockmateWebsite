@@ -4,7 +4,7 @@ import dynamic from "next/dynamic"
 import { ChevronDown, Mic, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { FormattedText } from "@/components/ui/FormattedText"
+import { ConversationMessage } from "../ConversationMessage"
 import { SableWaitStatus } from "../SableWaitStatus"
 import { useReviewScroll } from "./useReviewScroll"
 import type { PostInterviewViewProps } from "./types"
@@ -56,28 +56,14 @@ export function ReviewDiscussion(props: DiscussionProps) {
           // Keyboard users need a focus target to scroll the conversation.
           // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
           tabIndex={0}
-          className="absolute inset-0 space-y-5 overflow-y-auto overscroll-contain p-4"
+          className="workspace-conversation absolute inset-0 space-y-5 overflow-y-auto overscroll-contain p-4"
         >
           {interviewerMessages.map((message, index) => (
-            <article
+            <ConversationMessage
               key={message.id ?? `${message.type}-${index}`}
-              className={
-                message.type === "user"
-                  ? "bg-muted/60 ml-auto max-w-[90%] rounded-xl px-3 py-2.5"
-                  : "max-w-prose"
-              }
-            >
-              <p className="text-muted-foreground mb-1 text-xs font-medium">
-                {message.type === "user" ? "You" : "Sable"}
-              </p>
-              {message.isStreaming ? (
-                <p className="text-foreground text-sm leading-6 break-words">{message.message}</p>
-              ) : (
-                <FormattedText className="text-foreground text-sm leading-6 break-words">
-                  {message.message}
-                </FormattedText>
-              )}
-            </article>
+              message={message}
+              speaker="Sable"
+            />
           ))}
           {interviewerMessages.length === 0 && !busy && (
             <p className="text-muted-foreground text-sm leading-6">

@@ -2010,7 +2010,6 @@ function InterviewPageContent() {
 
   // Determine if we should hide the header (during interview mode)
   const isInterviewMode = !showScenarioBrowser && (isInterviewStarted || selectedScenario !== null)
-  const isResultView = showFeedback || showPostInterviewDiscussion
   // One tested decision for the whole result region (see resolve-result-surface).
   const resultSurface = resolveResultSurface({
     showFeedback,
@@ -2079,62 +2078,51 @@ function InterviewPageContent() {
           hairline) so it never covers the session's top bar. */}
       {!showScenarioBrowser && (
         <InterviewSurfaceFrame hasGuestBanner={hasGuestBanner}>
-          {!isResultView && (
-            <InterviewTopBar
-              selectedScenario={selectedScenario}
-              selectedLanguage={selectedLanguage}
-              onLanguageChange={setSelectedLanguage}
-              activePanel={activePanel}
-              onActivePanelChange={setActivePanel}
-              focusMode={focusMode}
-              onFocusModeChange={setFocusMode}
-              calmMode={calmMode}
-              onCalmModeChange={setCalmMode}
-              isInterviewStarted={isInterviewStarted}
-              hideTimer={hideTimer}
-              onHideTimerChange={setHideTimer}
-              elapsedTime={elapsedTime}
-              strictTimeLimit={strictTimeLimit}
-              onReplayBugfixTour={
-                selectedScenario?.type === "bugfix" &&
-                isInterviewStarted &&
-                workspaceContext.length > 0
-                  ? () => {
-                      if (typeof window !== "undefined") {
-                        window.dispatchEvent(new Event("codesparring:bugfix-tour-replay"))
-                      }
-                    }
-                  : undefined
-              }
-              // A completed session already has its own direct exit in the
-              // result surface. Keep the confirmation-only close control
-              // exclusive to active, resumable interview work.
-              onCloseClick={() => setShowCloseDialog(true)}
-              onOpenSparra={
-                selectedScenario && selectedScenario.type !== "dsa"
-                  ? () => {
-                      setFocusMode(false)
-                      setActivePanel("problem")
-                      setIsAIPartnerExpanded(true)
-                    }
-                  : undefined
-              }
-            />
-          )}
-
-          {/* ═══════════════════════════════════════════════════════════════
-                  MAIN INTERFACE - Cognitive Load Optimized
-
-                  Desktop (lg+):
-                  - Default: 3 columns (Problem | Editor | Chat)
-                  - Focus Mode: Editor only, with floating mini-buttons
-
-                  Mobile/Tablet (<lg):
-                  - Tab-based: One panel at a time (Miller's Law)
-                  - Reduces simultaneous information processing
-              ═══════════════════════════════════════════════════════════════ */}
           {resultSurface === "workspace" ? (
             <InterviewLayoutGrid
+              toolbar={
+                <InterviewTopBar
+                  selectedScenario={selectedScenario}
+                  selectedLanguage={selectedLanguage}
+                  onLanguageChange={setSelectedLanguage}
+                  focusMode={focusMode}
+                  onFocusModeChange={(enabled) => {
+                    if (enabled) setActivePanel("editor")
+                    setFocusMode(enabled)
+                  }}
+                  calmMode={calmMode}
+                  onCalmModeChange={setCalmMode}
+                  isInterviewStarted={isInterviewStarted}
+                  hideTimer={hideTimer}
+                  onHideTimerChange={setHideTimer}
+                  elapsedTime={elapsedTime}
+                  strictTimeLimit={strictTimeLimit}
+                  onReplayBugfixTour={
+                    selectedScenario?.type === "bugfix" &&
+                    isInterviewStarted &&
+                    workspaceContext.length > 0
+                      ? () => {
+                          if (typeof window !== "undefined") {
+                            window.dispatchEvent(new Event("codesparring:bugfix-tour-replay"))
+                          }
+                        }
+                      : undefined
+                  }
+                  // A completed session already has its own direct exit in the
+                  // result surface. Keep the confirmation-only close control
+                  // exclusive to active, resumable interview work.
+                  onCloseClick={() => setShowCloseDialog(true)}
+                  onOpenSparra={
+                    selectedScenario && selectedScenario.type !== "dsa"
+                      ? () => {
+                          setFocusMode(false)
+                          setActivePanel("problem")
+                          setIsAIPartnerExpanded(true)
+                        }
+                      : undefined
+                  }
+                />
+              }
               focusMode={focusMode}
               onFocusModeChange={setFocusMode}
               selectedScenario={selectedScenario}

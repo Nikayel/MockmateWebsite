@@ -1,14 +1,12 @@
 "use client"
 
 import { memo, type RefObject } from "react"
-import { MessageSquare, PanelRightClose, Send } from "lucide-react"
+import { MessageSquare, PanelRightClose } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
-import { VoiceModeToggle } from "@/components/interview"
 import type { ChatMessage } from "../_types"
 import { SableWaitStatus } from "./SableWaitStatus"
+import { ConversationMessage } from "./ConversationMessage"
+import { InterviewerComposer } from "./InterviewerComposer"
 
 interface ChatColumnProps {
   focusMode: boolean
@@ -76,7 +74,7 @@ export const ChatColumn = memo(function ChatColumn({
         <CardTitle className="text-foreground flex w-full min-w-0 items-center justify-between gap-2 text-sm">
           <div className="flex min-w-0 items-center gap-2.5">
             <div className="relative flex-shrink-0">
-              <div className="bg-muted text-muted-foreground flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold">
+              <div className="workspace-chat-avatar flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold">
                 S
               </div>
             </div>
@@ -100,97 +98,50 @@ export const ChatColumn = memo(function ChatColumn({
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
-        <div className="mb-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-2">
-          {interviewerMessages.length === 0 ? (
+      <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+        <div
+          className="workspace-conversation min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-3"
+          role="log"
+          aria-label="Interview messages"
+          aria-live="polite"
+          aria-relevant="additions"
+          // Keyboard users can focus the log to read earlier turns.
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+          tabIndex={0}
+        >
+          {interviewerMessages.length === 0 && !isBusy && (
             <div className="text-muted-foreground py-8 text-center">
               <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
-              <p className="text-xs">Interview will begin when you start...</p>
+              <p className="text-xs">
+                {isInterviewStarted
+                  ? "Ask Sable about the problem."
+                  : "Start your interview to meet Sable."}
+              </p>
             </div>
-          ) : (
-            <>
-              {interviewerMessages.map((msg, index) => (
-                <div
-                  key={msg.id || `interviewer-${msg.type}-${index}`}
-                  className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-full px-2 py-2 ${
-                      msg.type === "user"
-                        ? "bg-secondary text-foreground rounded-[14px_14px_4px_14px]"
-                        : "text-foreground"
-                    }`}
-                  >
-                    {msg.isStreaming ? (
-                      <p className="text-sm leading-relaxed">
-                        {msg.message}
-                        <span
-                          className="bg-accent ml-1 inline-block h-3 w-1 animate-pulse"
-                          aria-hidden="true"
-                        />
-                      </p>
-                    ) : (
-                      <MarkdownRenderer content={msg.message} className="text-sm leading-relaxed" />
-                    )}
-                  </div>
-                </div>
-              ))}
-              {isBusy && !isRevealingReply && (
-                <div className="flex justify-start">
-                  <div className="border-border/50 bg-muted/50 text-muted-foreground max-w-[90%] rounded-lg border p-2">
-                    <SableWaitStatus />
-                  </div>
-                </div>
-              )}
-              <div ref={interviewerEndRef} />
-            </>
           )}
+          {interviewerMessages.map((msg, index) => (
+            <ConversationMessage
+              key={msg.id || `interviewer-${msg.type}-${index}`}
+              message={msg}
+              speaker="Sable"
+            />
+          ))}
+          {isBusy && !isRevealingReply && <SableWaitStatus />}
+          <div ref={interviewerEndRef} />
         </div>
         {(isInterviewStarted || showPostInterviewDiscussion) && (
-          <div className="border-border flex flex-shrink-0 flex-col gap-2 border-t pt-3">
-            <VoiceModeToggle
-              isRecording={isRecordingInterviewer}
-              onToggleRecording={onToggleRecording}
-              onCancel={onCancelRecording}
-              onSend={onSendMessage}
-              onCancelCountdown={onCancelCountdown}
-              countdownActive={countdownActive}
-              unavailable={voiceUnavailable}
-              autoSendDelayMs={500}
-              isLoading={isBusy}
-              transcript={interviewerInput}
-              disabled={isBusy}
-              compact={true}
-            />
-            {!isRecordingInterviewer && (
-              <div className="flex space-x-1">
-                <Input
-                  value={interviewerInput}
-                  onChange={(event) => onInterviewerInputChange(event.target.value)}
-                  placeholder={
-                    showPostInterviewDiscussion ? "Type or use mic above..." : "Type a question..."
-                  }
-                  className="bg-secondary border-border text-foreground placeholder-muted-foreground h-11 min-w-0 flex-1 text-base sm:text-sm"
-                  onKeyPress={(event) => {
-                    if (event.key === "Enter" && !isBusy) {
-                      onSendMessage()
-                    }
-                  }}
-                  disabled={isBusy}
-                  aria-label="Chat with interviewer"
-                />
-                <Button
-                  onClick={onSendMessage}
-                  className="bg-secondary hover:bg-muted text-foreground h-11 w-11 p-0"
-                  loading={isBusy}
-                  disabled={!interviewerInput.trim()}
-                  aria-label="Send message"
-                >
-                  {!isBusy && <Send className="h-3 w-3" aria-hidden="true" />}
-                </Button>
-              </div>
-            )}
-          </div>
+          <InterviewerComposer
+            busy={isBusy}
+            input={interviewerInput}
+            onInputChange={onInterviewerInputChange}
+            onSend={onSendMessage}
+            isRecording={isRecordingInterviewer}
+            countdownActive={countdownActive}
+            onToggleRecording={onToggleRecording}
+            onCancelRecording={onCancelRecording}
+            onCancelCountdown={onCancelCountdown}
+            voiceUnavailable={voiceUnavailable}
+          />
         )}
       </CardContent>
     </Card>

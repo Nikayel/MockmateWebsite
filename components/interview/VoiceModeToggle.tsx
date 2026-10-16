@@ -1,12 +1,11 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { Mic, MicOff, X, Volume2, Send } from "lucide-react"
+import { Mic, MicOff, Send, Square, X } from "lucide-react"
+import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { motion, AnimatePresence } from "framer-motion"
 
-const CANCEL_THRESHOLD = 50 // pixels to drag before cancel triggers
+const CANCEL_DRAG_DISTANCE = 50
 
 interface VoiceModeToggleProps {
   isRecording: boolean
@@ -16,100 +15,14 @@ interface VoiceModeToggleProps {
   compact?: boolean
   className?: string
   onCancel?: () => void
-  onSend?: () => void // Manual send button
-  isLoading?: boolean
-  // Auto-send props
+  onSend?: () => void
   countdownActive?: boolean
-  autoSendDelayMs?: number
   onCancelCountdown?: () => void
-  /**
-   * Why voice cannot be used, if it cannot.
-   *
-   * Passed as copy rather than a reason code so this component stays free of
-   * the voice stack: it renders a message and a struck-through mic, and knows
-   * nothing about Deepgram, tokens or getUserMedia.
-   */
+  /** Display copy supplied by the voice controller; typing stays available. */
   unavailable?: { title: string; detail: string } | null
 }
 
-/**
- * Voice Input Component - Streamlined UX
- *
- * Flow: Tap to start → speaks → auto-sends on pause
- * Cancel: Swipe away OR tap X button
- */
-
-// Countdown ring component
-function CountdownRing({ durationMs }: { durationMs: number }) {
-  const [progress, setProgress] = useState(0)
-
-  useEffect(() => {
-    const startTime = Date.now()
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime
-      const newProgress = Math.min(elapsed / durationMs, 1)
-      setProgress(newProgress)
-
-      if (newProgress >= 1) {
-        clearInterval(interval)
-      }
-    }, 16) // ~60fps
-
-    return () => clearInterval(interval)
-  }, [durationMs])
-
-  const circumference = 2 * Math.PI * 14 // radius = 14
-
-  return (
-    <svg className="h-8 w-8 -rotate-90" viewBox="0 0 32 32">
-      <circle
-        cx="16"
-        cy="16"
-        r="14"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        className="text-muted/30"
-      />
-      <circle
-        cx="16"
-        cy="16"
-        r="14"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeDasharray={circumference}
-        strokeDashoffset={circumference * (1 - progress)}
-        strokeLinecap="round"
-        className="text-accent transition-all duration-75"
-      />
-    </svg>
-  )
-}
-
-// Audio waveform visualization
-function AudioWaveform({ isActive }: { isActive: boolean }) {
-  const bars = 5
-
-  return (
-    <div className="flex h-4 items-center gap-0.5">
-      {Array.from({ length: bars }).map((_, i) => (
-        <div
-          key={i}
-          className={cn(
-            "bg-accent w-0.5 rounded-full transition-all duration-150",
-            isActive ? "animate-waveform" : "h-1 opacity-40"
-          )}
-          style={{
-            animationDelay: isActive ? `${i * 100}ms` : "0ms",
-            height: isActive ? undefined : "4px",
-          }}
-        />
-      ))}
-    </div>
-  )
-}
-
+/** Recording controls only. Reply progress belongs in the conversation. */
 export function VoiceModeToggle({
   isRecording,
   onToggleRecording,
@@ -119,34 +32,22 @@ export function VoiceModeToggle({
   className,
   onCancel,
   onSend,
-  isLoading = false,
   countdownActive = false,
-  unavailable = null,
-  autoSendDelayMs = 500,
   onCancelCountdown,
+  unavailable = null,
 }: VoiceModeToggleProps) {
-  const hasTranscript = transcript.trim().length > 0
-  const [dragOffset, setDragOffset] = useState(0)
-
-  const handleCancel = useCallback(() => {
+  const hasTranscript = Boolean(transcript.trim())
+  const active = isRecording || countdownActive
+  const cancel = () => {
     onCancelCountdown?.()
     onCancel?.()
-    setDragOffset(0)
-  }, [onCancel, onCancelCountdown])
+  }
 
-  // Compute opacity based on drag distance
-  const dragOpacity = Math.max(0.3, 1 - Math.abs(dragOffset) / (CANCEL_THRESHOLD * 2))
-
-  // A dead mic button that throws on click is worse than no mic button: the
-  // candidate cannot tell whether they misclicked, whether the site is broken,
-  // or whether they are meant to do something. Say which it is, and say that
-  // typing still works, because voice is a convenience here and never the only
-  // way to answer.
   if (unavailable) {
     return (
       <div
         className={cn(
-          "border-border/60 bg-muted/40 flex items-start gap-2 rounded-md border px-3 py-2",
+          "border-border bg-muted flex items-start gap-2 rounded-md border p-3",
           className
         )}
         role="status"
@@ -161,257 +62,83 @@ export function VoiceModeToggle({
   }
 
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      {/* Main Recording Area - Draggable */}
+    <div className={cn("flex min-w-0 flex-col gap-2", className)}>
       <motion.div
-        drag={isRecording ? "x" : false}
+        drag={isRecording && onCancel ? "x" : false}
         dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={0.5}
-        onDrag={(_, info) => {
-          setDragOffset(info.offset.x)
-        }}
+        dragElastic={0.3}
         onDragEnd={(_, info) => {
-          if (Math.abs(info.offset.x) > CANCEL_THRESHOLD) {
-            handleCancel()
-          }
-          setDragOffset(0)
+          if (Math.abs(info.offset.x) > CANCEL_DRAG_DISTANCE) cancel()
         }}
-        style={{
-          opacity: isRecording ? dragOpacity : 1,
-          touchAction: "pan-y",
-        }}
-        className="flex items-center gap-3"
+        style={{ touchAction: "pan-y" }}
+        className="flex min-w-0 flex-wrap items-center gap-2"
       >
-        {/* Microphone Button with Pulsing Ring */}
-        <div className="relative">
-          {/* Pulsing ring when recording */}
-          <AnimatePresence>
-            {isRecording && !countdownActive && (
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                className="absolute inset-0 flex items-center justify-center"
-              >
-                <div
-                  className={cn(
-                    "bg-accent/20 absolute rounded-full",
-                    compact ? "h-12 w-12" : "h-14 w-14",
-                    "animate-listening-pulse"
-                  )}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Countdown ring when about to send */}
-          <AnimatePresence>
-            {countdownActive && (
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                className="absolute inset-0 flex items-center justify-center"
-              >
-                <CountdownRing durationMs={autoSendDelayMs} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-
+        <Button
+          type="button"
+          aria-label={isRecording ? "Stop recording" : "Start voice answer"}
+          onClick={onToggleRecording}
+          disabled={disabled}
+          variant="ghost"
+          className={cn(
+            "h-11 w-11 shrink-0 p-0",
+            isRecording && "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          )}
+        >
+          {isRecording ? (
+            <Square className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <Mic className="h-4 w-4" aria-hidden="true" />
+          )}
+        </Button>
+        <div className="min-w-0 flex-1">
+          <p className="text-foreground text-xs font-medium" role={active ? "status" : undefined}>
+            {countdownActive ? "Sending soon…" : isRecording ? "Listening…" : "Tap to speak"}
+          </p>
+          {isRecording && onCancel && (
+            <p className="text-muted-foreground text-xs">Swipe to cancel</p>
+          )}
+        </div>
+        {hasTranscript && onSend && (
           <Button
-            aria-label={isRecording ? "Stop recording" : "Start voice answer"}
-            onClick={onToggleRecording}
-            disabled={disabled || isLoading}
-            className={cn(
-              "relative z-10 transition-all duration-200",
-              compact ? "h-11 w-11" : "h-10 w-10",
-              isRecording
-                ? "bg-destructive hover:bg-destructive/80 shadow-lg"
-                : compact
-                  ? "border-border bg-secondary text-foreground hover:bg-muted border shadow-none"
-                  : "bg-accent hover:bg-accent/80 text-accent-foreground shadow-md hover:shadow-lg"
-            )}
+            type="button"
+            onClick={() => {
+              onCancelCountdown?.()
+              onSend()
+            }}
+            disabled={disabled}
+            aria-label="Send voice answer"
+            className="bg-accent text-accent-foreground hover:bg-accent/90 h-11 w-11 shrink-0 p-0"
           >
-            <AnimatePresence mode="wait">
-              {isLoading ? (
-                <motion.div
-                  key="loading"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  className="border-border h-4 w-4 animate-spin rounded-full border-2 border-t-white"
-                />
-              ) : (
-                <motion.div
-                  key="mic"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                >
-                  <Mic className={compact ? "h-4 w-4" : "h-5 w-5"} />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <Send className="h-4 w-4" aria-hidden="true" />
           </Button>
-        </div>
-
-        {/* Status Area */}
-        <div className="flex flex-col gap-0.5">
-          {/* Status with waveform when recording */}
-          <div className="flex items-center gap-2">
-            <AnimatePresence mode="wait">
-              {isRecording && !countdownActive && (
-                <motion.div
-                  key="recording"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  className="flex items-center gap-2"
-                >
-                  <AudioWaveform isActive={true} />
-                  <span className="text-accent text-xs font-medium">Listening...</span>
-                </motion.div>
-              )}
-
-              {countdownActive && (
-                <motion.div
-                  key="countdown"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  className="flex items-center gap-2"
-                >
-                  <span className="text-xs font-medium text-green-400">Sending...</span>
-                </motion.div>
-              )}
-
-              {!isRecording && !countdownActive && !isLoading && (
-                <motion.span
-                  key="idle"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="text-muted-foreground text-xs"
-                >
-                  Tap to speak
-                </motion.span>
-              )}
-
-              {isLoading && (
-                <motion.span
-                  key="sending"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="text-accent text-xs font-medium"
-                >
-                  Sending...
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Swipe hint when recording */}
-          <AnimatePresence>
-            {isRecording && (
-              <motion.span
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 0.6, y: 0 }}
-                exit={{ opacity: 0, y: -5 }}
-                className="text-muted-foreground text-[9px]"
-              >
-                Swipe to cancel
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Send button - visible when there's transcript */}
-        <AnimatePresence>
-          {hasTranscript && onSend && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-            >
-              <Button
-                onClick={onSend}
-                disabled={isLoading}
-                size="sm"
-                className={cn(
-                  "h-8 px-3 transition-all",
-                  isRecording
-                    ? "animate-pulse bg-green-500 hover:bg-green-600"
-                    : "bg-accent hover:bg-accent/80"
-                )}
-              >
-                {isLoading ? (
-                  <div className="border-border h-4 w-4 animate-spin rounded-full border-2 border-t-white" />
-                ) : (
-                  <>
-                    <Send className="mr-1 h-4 w-4" />
-                    <span className="text-xs font-medium">Send</span>
-                  </>
-                )}
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Cancel button (X) - visible when recording */}
-        <AnimatePresence>
-          {(isRecording || countdownActive) && onCancel && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-            >
-              <Button
-                onClick={handleCancel}
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-7 w-7 p-0"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        )}
+        {active && onCancel && (
+          <Button
+            type="button"
+            onClick={cancel}
+            variant="ghost"
+            className="text-muted-foreground h-11 w-11 shrink-0 p-0"
+            aria-label="Cancel voice answer"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        )}
       </motion.div>
-
-      {/* Transcript Preview */}
-      <AnimatePresence>
-        {hasTranscript && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
+      {hasTranscript && (
+        <div className="border-border bg-background rounded-lg border p-3">
+          <p className="text-muted-foreground mb-1 text-xs">
+            {isRecording ? "Live transcription" : countdownActive ? "Ready to send" : "Transcribed"}
+          </p>
+          <p
             className={cn(
-              "overflow-hidden rounded-lg border px-3 py-2",
-              isRecording || countdownActive
-                ? "bg-card border-accent/20"
-                : "bg-card/50 border-border"
+              "text-foreground leading-relaxed [overflow-wrap:anywhere]",
+              compact ? "text-sm" : "text-base"
             )}
           >
-            <div className="mb-1 flex items-center gap-2">
-              <Volume2 className="text-muted-foreground h-3 w-3" />
-              <span className="text-muted-foreground text-[10px]">
-                {isRecording
-                  ? "Live transcription"
-                  : countdownActive
-                    ? "Sending..."
-                    : "Transcribed"}
-              </span>
-            </div>
-            <p className={cn("text-foreground text-sm leading-relaxed", compact && "text-xs")}>
-              {transcript}
-              {isRecording && (
-                <span className="bg-accent/70 ml-0.5 inline-block h-4 w-0.5 animate-pulse" />
-              )}
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            {transcript}
+          </p>
+        </div>
+      )}
     </div>
   )
 }

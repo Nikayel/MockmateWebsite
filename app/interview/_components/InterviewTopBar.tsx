@@ -1,12 +1,11 @@
 "use client"
 
 import { memo } from "react"
-import { ArrowLeft, Maximize2, Minimize2 } from "lucide-react"
+import { X, Maximize2, Minimize2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { WorkspaceMenu } from "./WorkspaceMenu"
 import { EditorLanguageControl } from "./EditorLanguageControl"
-import { MobileWorkspaceNav } from "./MobileWorkspaceNav"
 import { InterviewTimer } from "@/components/interview"
 import type { Scenario } from "@/lib/scenarios"
 import type { EditorLanguage } from "../_types"
@@ -17,8 +16,6 @@ interface InterviewTopBarProps {
   selectedScenario: Scenario | null
   selectedLanguage: EditorLanguage
   onLanguageChange: (language: EditorLanguage) => void
-  activePanel: "problem" | "editor" | "chat"
-  onActivePanelChange: (panel: "problem" | "editor" | "chat") => void
   focusMode: boolean
   onFocusModeChange: (enabled: boolean) => void
   calmMode: boolean
@@ -38,8 +35,6 @@ export const InterviewTopBar = memo(function InterviewTopBar({
   selectedScenario,
   selectedLanguage,
   onLanguageChange,
-  activePanel,
-  onActivePanelChange,
   focusMode,
   onFocusModeChange,
   calmMode,
@@ -71,17 +66,19 @@ export const InterviewTopBar = memo(function InterviewTopBar({
   }
 
   return (
-    <header className="workspace-toolbar focus-header flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1">
-      <div className="flex min-w-0 flex-1 items-center gap-2">
-        <h2 className="text-foreground min-w-0 truncate text-sm font-medium lg:hidden">
-          {selectedScenario?.title}
-        </h2>
-        <EditorLanguageControl
-          value={selectedLanguage}
-          onChange={handleLanguageChange}
-          isWorkspace={isWorkspaceScenario(selectedScenario)}
-        />
-      </div>
+    <div
+      role="group"
+      aria-label="Interview controls"
+      className="workspace-toolbar focus-header flex min-w-0 items-center gap-0.5"
+    >
+      <h2 className="text-foreground min-w-0 flex-1 truncate text-sm font-medium lg:hidden">
+        {selectedScenario?.title}
+      </h2>
+      <EditorLanguageControl
+        value={selectedLanguage}
+        onChange={handleLanguageChange}
+        isWorkspace={isWorkspaceScenario(selectedScenario)}
+      />
       <div className="flex shrink-0 items-center gap-1">
         {isInterviewStarted && !hideTimer && (
           <InterviewTimer
@@ -97,7 +94,7 @@ export const InterviewTopBar = memo(function InterviewTopBar({
           type="button"
           variant="ghost"
           onClick={() => onFocusModeChange(!focusMode)}
-          className="text-muted-foreground hidden min-h-11 gap-2 lg:flex"
+          className="text-muted-foreground hidden h-11 w-11 shrink-0 p-0 lg:flex"
           aria-pressed={focusMode}
           aria-label={focusMode ? "Exit focus mode" : "Enable focus mode"}
           title={focusMode ? "Exit focus mode (Esc)" : "Focus mode (⌘K Z)"}
@@ -107,17 +104,13 @@ export const InterviewTopBar = memo(function InterviewTopBar({
           ) : (
             <Maximize2 className="h-4 w-4" aria-hidden="true" />
           )}
-          {focusMode ? "Exit focus" : "Focus"}
         </Button>
         <WorkspaceMenu
           selectedLanguage={selectedLanguage}
           onLanguageChange={handleLanguageChange}
           isWorkspace={isWorkspaceScenario(selectedScenario)}
           focusMode={focusMode}
-          onFocusModeChange={(enabled) => {
-            if (enabled) onActivePanelChange("editor")
-            onFocusModeChange(enabled)
-          }}
+          onFocusModeChange={onFocusModeChange}
           calmMode={calmMode}
           onCalmModeChange={onCalmModeChange}
           hideTimer={hideTimer}
@@ -132,21 +125,14 @@ export const InterviewTopBar = memo(function InterviewTopBar({
             type="button"
             onClick={onCloseClick}
             variant="ghost"
-            className="text-muted-foreground h-11 min-w-11 px-3 text-sm"
+            className="text-muted-foreground h-11 w-11 shrink-0 p-0"
             aria-label="Close interview"
+            title="Close interview"
           >
-            <ArrowLeft className="h-4 w-4 sm:mr-1" aria-hidden="true" />
-            <span className="hidden sm:inline">Close</span>
+            <X className="h-4 w-4" aria-hidden="true" />
           </Button>
         )}
       </div>
-      <MobileWorkspaceNav
-        activePanel={activePanel}
-        onPanelChange={(panel) => {
-          if (panel !== "editor" && focusMode) onFocusModeChange(false)
-          onActivePanelChange(panel)
-        }}
-      />
-    </header>
+    </div>
   )
 })

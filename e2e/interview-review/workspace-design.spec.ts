@@ -151,8 +151,20 @@ test("editor menu resets only the requested scope", async ({ page }) => {
 })
 
 test("workspace color pairs meet text contrast in both themes", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" })
   for (const theme of ["light", "dark"]) {
     await page.goto(`/?view=workspace&theme=${theme}`)
+    const micButton = page.getByRole("button", { name: "Start voice answer" })
+    const hoverFill = await micButton.evaluate((button) => {
+      const sample = document.createElement("span")
+      sample.style.backgroundColor = "var(--muted)"
+      button.appendChild(sample)
+      const color = getComputedStyle(sample).backgroundColor
+      sample.remove()
+      return color
+    })
+    await micButton.hover()
+    await expect(micButton).toHaveCSS("background-color", hoverFill)
     const ratios = await page
       .locator(".interview-workspace")
       .first()
@@ -178,25 +190,119 @@ test("workspace color pairs meet text contrast in both themes", async ({ page })
           ["workspace-error", "card"],
           ["workspace-success", "card"],
           ["workspace-warning", "card"],
+          ["chat-incoming-text", "chat-incoming"],
+          ["chat-outgoing-text", "chat-outgoing"],
+          ["muted-foreground", "chat-canvas"],
         ]
+        const contrast = (foreground: string, background: string) => {
+          const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a)
+          return (values[0] + 0.05) / (values[1] + 0.05)
+        }
         const ratios = pairs.map(([foreground, background]) => {
           sample.style.color = `var(--${foreground})`
           sample.style.backgroundColor = `var(--${background})`
           const computed = getComputedStyle(sample)
-          const values = [luminance(computed.color), luminance(computed.backgroundColor)].sort(
-            (a, b) => b - a
-          )
           return {
             pair: `${foreground}/${background}`,
-            ratio: (values[0] + 0.05) / (values[1] + 0.05),
+            ratio: contrast(computed.color, computed.backgroundColor),
           }
         })
+        const mic = getComputedStyle(surface.querySelector('[aria-label="Start voice answer"]')!)
+        ratios.push({ pair: "mic hover", ratio: contrast(mic.color, mic.backgroundColor) })
         sample.remove()
         return ratios
       })
     for (const { pair, ratio } of ratios)
       expect(ratio, `${theme}: ${pair}`).toBeGreaterThanOrEqual(4.5)
   }
+})
+
+test("desktop controls share the editor header and leave the code more vertical space", async ({
+  page,
+}) => {
+  for (const width of [1024, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto("/?view=workspace&theme=light")
+    const editor = page.locator(".editor-panel-card")
+    const bounds = (await editor.boundingBox())!
+    expect(bounds.y).toBeLessThan(16)
+    await expect(editor.getByRole("group", { name: "Interview controls" })).toBeVisible()
+    const code = (await page.locator(".workspace-code-surface").boundingBox())!
+    expect(code.height).toBeGreaterThan(700)
+    const controls = editor
+      .getByRole("group", { name: "Interview controls" })
+      .locator("button, select")
+    for (const control of await controls.all()) {
+      if (!(await control.isVisible())) continue
+      const box = (await control.boundingBox())!
+      expect(box.x).toBeGreaterThanOrEqual(bounds.x)
+      expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width)
+      expect(box.y + box.height).toBeLessThanOrEqual(code.y)
+    }
+  }
+})
+
+test("submitted text restores the mic while reply progress stays in the conversation", async ({
+  page,
+}, testInfo) => {
+  for (const width of [1440, 375]) {
+    await page.setViewportSize({ width, height: 900 })
+    for (const theme of ["light", "dark"]) {
+      await page.goto(`/?view=workspace&theme=${theme}`)
+      if (width < 1024) await page.getByRole("button", { name: "Show interview chat" }).click()
+      const mic = page.getByRole("button", { name: "Start voice answer" })
+      await expect(mic).toBeEnabled()
+      const input = page.getByRole("textbox", { name: "Chat with interviewer" })
+      await input.fill("I reproduced the skipped entry at the checkpoint.")
+      await expect(mic).toBeHidden()
+      await expect(page.getByText("Transcribed", { exact: true })).toHaveCount(0)
+      const send = page.getByRole("button", { name: "Send message", exact: true })
+      await expect(send).toHaveCount(1)
+      await send.click()
+      await expect(input).toHaveValue("")
+      await expect(mic).toBeDisabled()
+      await expect(page.getByRole("status")).toContainText("Sable is replying")
+      await expect(page.getByText(/Sending/)).toHaveCount(0)
+      await expect(mic).toBeEnabled()
+      await expect(page.getByRole("status")).toHaveCount(0)
+      const log = page.getByRole("log", { name: "Interview messages" })
+      await expect(log).toContainText("Compare the retained entries at the exact checkpoint")
+      const colors = await log.evaluate((element) => {
+        const incoming = getComputedStyle(element.querySelector('[data-speaker="ai"]')!)
+        const outgoing = getComputedStyle(element.querySelector('[data-speaker="user"]')!)
+        return [incoming.backgroundColor, outgoing.backgroundColor]
+      })
+      expect(colors[0]).not.toBe(colors[1])
+      await log.evaluate((element) => {
+        element.scrollTop = element.scrollHeight
+      })
+      await page.screenshot({ path: testInfo.outputPath(`conversation-${theme}-${width}.png`) })
+      if (width < 1024) {
+        await expect(page.getByRole("button", { name: "Workspace settings" })).toBeVisible()
+        await expect(page.getByRole("button", { name: "Close interview" })).toBeVisible()
+      }
+    }
+  }
+})
+
+test("voice recording can be cancelled or submitted without leaving a sending state", async ({
+  page,
+}) => {
+  await page.goto("/?view=workspace&theme=light")
+  const mic = page.getByRole("button", { name: "Start voice answer" })
+  await mic.click()
+  await expect(page.getByText("Live transcription", { exact: true })).toBeVisible()
+  await page.getByRole("button", { name: "Cancel voice answer" }).click()
+  await expect(mic).toBeEnabled()
+  await expect(page.getByRole("textbox", { name: "Chat with interviewer" })).toHaveValue("")
+  await mic.click()
+  await page.getByRole("button", { name: "Send voice answer" }).click()
+  await expect(mic).toBeDisabled()
+  await expect(page.getByText(/Sending/)).toHaveCount(0)
+  await expect(mic).toBeEnabled()
+  await expect(page.getByRole("log", { name: "Interview messages" })).toContainText(
+    "I traced the loop boundary"
+  )
 })
 
 test("larger text keeps workspace actions and partner navigation reachable", async ({ page }) => {

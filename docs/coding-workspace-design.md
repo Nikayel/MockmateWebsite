@@ -1,6 +1,6 @@
 # Coding workspace design
 
-The workspace gives reading, editing, running, and submitting the clearest emphasis. Occasional display controls live in Workspace settings. File resets live in Editor actions and use the existing reset handlers.
+The workspace gives reading, editing, running, and submitting the clearest emphasis. Desktop language, timer, focus, settings, and exit controls share the existing editor header, reclaiming the separate toolbar row. Icon controls retain 44px targets and accessible names. Mobile keeps session controls above its panel navigation so settings and exit remain reachable from every panel. Occasional display controls live in Workspace settings. File resets live in Editor actions and use the existing reset handlers.
 
 ## Interaction contracts
 
@@ -16,7 +16,11 @@ The workspace gives reading, editing, running, and submitting the clearest empha
 
 `app/interview/workspace.css` owns the interview surface, text, border, action, status, editor, and syntax roles for both themes. Menus and dialogs apply the same scope through their portals. Surfaces are opaque and neutral, with clay reserved for action emphasis. File roles use labels/icons. Errors, warnings, and successful checks use semantic color plus text.
 
-LIVE indicators, persistent online/equalizer decoration, colored chat backgrounds, and submit-button glow are absent. The elapsed timer stays neutral; an actual strict deadline can use warning/error emphasis. Focus mode keeps controls at full opacity. Motion is reserved for interaction or meaningful work, with the existing reduced-motion support retained.
+Conversation surfaces use a warm neutral canvas, opaque incoming bubbles, and a restrained clay tint for outgoing bubbles. Sender labels, left/right placement, spacing, and corner shape identify the speaker alongside color. Incoming/outgoing foreground and background roles live in the shared stylesheet. `ConversationMessage` applies the same treatment to Sable, Sparra, and the review discussion.
+
+`InterviewerComposer` shows one idle action: a microphone for an empty draft, or Send for a typed draft. Only recording renders a voice transcript preview. A pending reply disables further submission and shows “Sable is replying” in the conversation; streaming replaces that wait indicator with the reply itself. The microphone has no request-loading or “Sending” state. Manual voice submission cancels the pre-send countdown before invoking the existing send handler. Recording retains explicit stop, cancel, and send controls, plus swipe cancellation. Delivery/read acknowledgements are not available in the client, so the UI makes no receipt claims.
+
+LIVE indicators, persistent online/equalizer decoration, and submit-button glow are absent. The elapsed timer stays neutral; an actual strict deadline can use warning/error emphasis. Focus mode keeps controls at full opacity. Motion is reserved for interaction or meaningful work, with the existing reduced-motion support retained.
 
 `ProblemPartnerPanel`, `WorkspaceMenu`, `EditorActionsMenu`, and `MobileWorkspaceNav` own their respective controls. `ConsoleHeader` separates disclosure/status controls from output rendering. Brief evidence, details, and narrative extraction are grouped in `_sub/bugfix-brief/`. Editor chrome lives in `components/editor/editor-theme.ts`; the syntax palette stays in CSS. Grading help reuses the existing criterion descriptions without presenting generic percentages as scenario-specific scoring weights.
 
@@ -25,6 +29,8 @@ LIVE indicators, persistent online/equalizer decoration, colored chat background
 - [Apple: Toolbars](https://developer.apple.com/design/human-interface-guidelines/toolbars) recommends choosing commands deliberately to avoid overcrowding and prioritizing frequently used controls.
 - [Nielsen Norman Group: Progressive Disclosure](https://www.nngroup.com/articles/progressive-disclosure/) supports moving occasional options behind a clear, predictable entry point while keeping frequent tasks direct.
 - [Material: Color roles](https://m3.material.io/styles/color/the-color-system) distinguishes neutral surface roles from emphasis and error roles, implemented through shared tokens.
+- [NN/g: Visual-design principles](https://www.nngroup.com/articles/principles-visual-design/) describes contrast, hierarchy, and proximity as tools for distinguishing functions and grouping related elements. This informs placing commands inside the editor header and giving conversation turns a clear visual rhythm.
+- [NN/g: Visibility of system status](https://www.nngroup.com/articles/visibility-system-status/) supports immediate feedback that describes the current activity. [WhatsApp's receipts](https://faq.whatsapp.com/665923838265756/) distinguish sending, delivery, and reading, while its [voice-message design](https://blog.whatsapp.com/making-voice-messages-better) separates recording and draft review from sending. We apply that state separation to capture, submission, and reply preparation.
 - [WCAG: Contrast minimum](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html) specifies 4.5:1 for ordinary text. [Use of color](https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html) requires another means of conveying meaning.
 
 The particular neutral/clay palette is a product design choice. These sources support the hierarchy and accessibility constraints; they do not prove a particular hue looks prestigious or lowers anxiety. The redesign has not yet been measured in a user study.
@@ -33,6 +39,6 @@ The particular neutral/clay palette is a product design choice. These sources su
 
 `playwright.interview-review.config.ts` renders the real workspace/review components and CodeMirror. Local fixture callbacks simulate chat replies, reset operations, and runner output without accounts or paid AI calls.
 
-Browser coverage includes both themes at 1440×900, 375×812, and 812×375; tab keyboard interaction and retained state; focus/collapse/file navigation; reset scope; settings and dialog focus; console reruns; submit through review/feedback; and foreground, muted text, primary action, code comment, error, warning, and success contrast pairs.
+Browser coverage includes both themes at 1440×900, 375×812, and 812×375; integrated-header bounds at 1024, 1280, and 1440px; tab keyboard interaction and retained state; focus/collapse/file navigation; reset scope; settings and dialog focus; console reruns; submit through review/feedback; and foreground, muted text, primary action, code comment, error, warning, success, and conversation contrast pairs. The actual microphone hover state is checked for contrast. Delayed reply and voice-cancel/send fixtures exercise composer recovery, streaming, and a single send action.
 
-Focused Vitest coverage checks console disclosure and new-run recovery, partner form guards, narrative preservation, onboarding, theme direction, voice fallback, and the shared Sprint Labs workspace. TypeScript and focused ESLint are also checked.
+Focused Vitest coverage checks the submitted-message microphone regression, typed-draft duplication, voice-countdown cancellation, initial/streaming reply states, console disclosure, partner form guards, theme direction, and voice fallback. TypeScript and focused ESLint are also checked.

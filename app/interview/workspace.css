@@ -23,6 +23,11 @@
   --workspace-success: #23704d;
   --workspace-error: #b23333;
   --workspace-warning: #825900;
+  --chat-canvas: #f5f3ef;
+  --chat-incoming: #ffffff;
+  --chat-incoming-text: #252523;
+  --chat-outgoing: #f0dfd1;
+  --chat-outgoing-text: #503522;
   --editor-bg: #ffffff;
   --editor-gutter: #f5f5f3;
   --editor-line-active: #f1f2ef;
@@ -64,6 +69,11 @@
   --workspace-success: #8bc6a4;
   --workspace-error: #eca3a1;
   --workspace-warning: #d7ba78;
+  --chat-canvas: #1d211e;
+  --chat-incoming: #2a2e2a;
+  --chat-incoming-text: #e8e9e5;
+  --chat-outgoing: #4a382c;
+  --chat-outgoing-text: #f4e4d7;
   --editor-bg: #1e201e;
   --editor-gutter: #232523;
   --editor-line-active: #2b2e2a;
@@ -88,6 +98,38 @@
 
 .workspace-toolbar {
   opacity: 1;
+}
+
+.workspace-conversation {
+  background: var(--chat-canvas);
+}
+
+.workspace-message {
+  width: fit-content;
+  max-width: 92%;
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem 0.875rem 0.875rem;
+  background: var(--chat-incoming);
+  color: var(--chat-incoming-text);
+}
+
+.workspace-message[data-speaker="user"] {
+  margin-left: auto;
+  border-color: transparent;
+  border-radius: 0.875rem 0.25rem 0.875rem 0.875rem;
+  background: var(--chat-outgoing);
+  color: var(--chat-outgoing-text);
+}
+
+.workspace-chat-avatar {
+  background: var(--chat-outgoing);
+  color: var(--chat-outgoing-text);
+}
+
+.workspace-reply-cursor {
+  background: currentColor;
 }
 
 .workspace-tabs [role="tab"] {

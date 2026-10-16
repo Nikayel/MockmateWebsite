@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, type RefObject } from "react"
+import { memo, type RefObject, type ReactNode } from "react"
 import { Code, PlayCircle } from "lucide-react"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -30,6 +30,7 @@ import { TestResultsPanel } from "./_sub/TestResultsPanel"
 import { EditorActionsMenu } from "./EditorActionsMenu"
 
 interface EditorColumnProps {
+  toolbar?: ReactNode
   activePanel: "problem" | "editor" | "chat"
   selectedScenario: Scenario | null
   activeWorkspaceFile: WorkspaceContextFile | null | undefined
@@ -62,6 +63,7 @@ interface EditorColumnProps {
 }
 
 export const EditorColumn = memo(function EditorColumn({
+  toolbar,
   activePanel,
   selectedScenario,
   activeWorkspaceFile,
@@ -195,65 +197,73 @@ export const EditorColumn = memo(function EditorColumn({
         activePanel === "editor" ? "flex" : "hidden lg:flex"
       }`}
     >
-      <CardHeader className="flex-shrink-0 px-0 pt-0 pb-2">
-        {isWorkspace ? (
-          <div className="border-border bg-muted/40 flex w-full items-center justify-between border-b pr-1">
-            <div className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
-              {activeWorkspaceFile && activeRoleStyle && ActiveRoleIcon ? (
-                <>
-                  <ActiveRoleIcon
-                    className="text-muted-foreground h-3.5 w-3.5 shrink-0"
-                    aria-hidden="true"
-                  />
-                  <span className="text-foreground truncate text-xs">
-                    {activeWorkspaceFile.path}
-                  </span>
-                  <span className="border-border text-muted-foreground shrink-0 rounded border px-1.5 py-0.5 text-[11px] leading-none">
-                    {activeRoleStyle.label}
-                  </span>
-                  {hasWorkspaceFileEdits(activeWorkspaceFile) && (
-                    <span
-                      className="bg-accent h-1.5 w-1.5 shrink-0 rounded-full"
-                      title="Unsaved edit"
-                      aria-label="Unsaved edit"
-                    />
+      <CardHeader className="border-border block shrink-0 border-b p-1 [.border-b]:pb-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-1">
+          <div className="min-w-0 flex-1">
+            {isWorkspace ? (
+              <div className="flex min-h-11 w-full min-w-0 items-center justify-between">
+                <div
+                  className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2"
+                  title={activeWorkspaceFile?.path}
+                >
+                  {activeWorkspaceFile && activeRoleStyle && ActiveRoleIcon ? (
+                    <>
+                      <ActiveRoleIcon
+                        className="text-muted-foreground h-3.5 w-3.5 shrink-0"
+                        aria-hidden="true"
+                      />
+                      <span className="text-foreground truncate text-xs">
+                        {activeWorkspaceFile.path}
+                      </span>
+                      <span className="border-border text-muted-foreground hidden shrink-0 rounded border px-1.5 py-0.5 text-[11px] leading-none xl:inline">
+                        {activeRoleStyle.label}
+                      </span>
+                      {hasWorkspaceFileEdits(activeWorkspaceFile) && (
+                        <span
+                          className="bg-accent h-1.5 w-1.5 shrink-0 rounded-full"
+                          title="Unsaved edit"
+                          aria-label="Unsaved edit"
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground truncate text-xs">Workspace files</span>
                   )}
-                </>
-              ) : (
-                <span className="text-muted-foreground truncate text-xs">Workspace files</span>
-              )}
-            </div>
-            <EditorActionsMenu
-              onResetActiveFile={
-                activeWorkspaceFile?.role === "editable" ? onResetActiveFile : undefined
-              }
-              onResetWorkspace={onResetWorkspace}
-            />
-          </div>
-        ) : (
-          <div className="flex items-center justify-between px-4 pt-3 pb-1">
-            <CardTitle className="text-foreground flex w-full items-center justify-between text-xs">
-              <div className="flex items-center space-x-1">
-                <Code className="text-muted-foreground h-3 w-3" />
-                {selectedScenario?.type === "system-design" ? (
-                  <span>Design Notes</span>
-                ) : (
-                  <span>
-                    {selectedScenario?.title.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}.
-                    {selectedLanguage === "javascript"
-                      ? "js"
-                      : selectedLanguage === "typescript"
-                        ? "ts"
-                        : "py"}
-                  </span>
-                )}
+                </div>
+                <EditorActionsMenu
+                  onResetActiveFile={
+                    activeWorkspaceFile?.role === "editable" ? onResetActiveFile : undefined
+                  }
+                  onResetWorkspace={onResetWorkspace}
+                />
               </div>
-            </CardTitle>
+            ) : (
+              <div className="flex min-h-11 items-center justify-between px-2">
+                <CardTitle className="text-foreground flex w-full items-center justify-between text-xs">
+                  <div className="flex items-center space-x-1">
+                    <Code className="text-muted-foreground h-3 w-3" />
+                    {selectedScenario?.type === "system-design" ? (
+                      <span>Design Notes</span>
+                    ) : (
+                      <span>
+                        {selectedScenario?.title.toLowerCase().replace(/\s+/g, "-").slice(0, 20)}.
+                        {selectedLanguage === "javascript"
+                          ? "js"
+                          : selectedLanguage === "typescript"
+                            ? "ts"
+                            : "py"}
+                      </span>
+                    )}
+                  </div>
+                </CardTitle>
+              </div>
+            )}
           </div>
-        )}
+          <div className="hidden lg:block">{toolbar}</div>
+        </div>
       </CardHeader>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
         {/* The file tree lives in the problem column now, so the editor keeps the
             whole width of the one column the candidate types in. */}
         <div className="workspace-code-surface border-border relative min-h-0 flex-1 overflow-auto rounded border">

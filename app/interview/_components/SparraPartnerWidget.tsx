@@ -3,7 +3,7 @@
 import { type FormEvent, type RefObject } from "react"
 import { MessageCircle, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
+import { ConversationMessage } from "./ConversationMessage"
 
 export interface PartnerChatMessage {
   type: "user" | "ai"
@@ -46,7 +46,7 @@ export function SparraPartnerWidget({
       className="bg-card flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
     >
       <div
-        className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4"
+        className="workspace-conversation min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4"
         role="log"
         aria-label="Sparra messages"
         aria-live="polite"
@@ -61,21 +61,11 @@ export function SparraPartnerWidget({
           </div>
         ) : (
           messages.map((message, index) => (
-            <div
+            <ConversationMessage
               key={`sparra-chat-${message.type}-${index}`}
-              className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`max-w-full rounded-xl px-3 py-2 text-sm leading-relaxed ${
-                  message.type === "user" ? "bg-muted text-foreground" : "text-foreground"
-                }`}
-              >
-                <MarkdownRenderer
-                  content={message.message}
-                  className="text-sm [overflow-wrap:anywhere] break-words"
-                />
-              </div>
-            </div>
+              message={message}
+              speaker="Sparra"
+            />
           ))
         )}
         {isLoading && (
