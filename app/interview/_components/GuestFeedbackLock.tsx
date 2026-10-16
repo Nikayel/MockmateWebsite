@@ -27,8 +27,8 @@ interface GuestFeedbackLockProps {
  */
 export function GuestFeedbackLock({ onSignIn, scenarioTitle, retry }: GuestFeedbackLockProps) {
   return (
-    <div className="flex min-h-[50vh] items-center justify-center p-6">
-      <div className="border-border bg-card w-full max-w-md rounded-xl border p-8 text-center">
+    <div className="flex min-h-0 flex-1 overflow-y-auto p-4">
+      <div className="border-border bg-card m-auto w-full max-w-md rounded-xl border p-6 text-center sm:p-8">
         <div className="bg-muted mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full">
           <Lock className="text-accent-strong h-6 w-6" aria-hidden="true" />
         </div>

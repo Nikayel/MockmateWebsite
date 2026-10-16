@@ -1,5 +1,7 @@
 "use client"
 
+import { InterviewSurfaceFrame } from "./_components/InterviewSurfaceFrame"
+
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import nextDynamic from "next/dynamic"
@@ -2076,61 +2078,51 @@ function InterviewPageContent() {
       {/* Interview Interface. Top padding clears the fixed guest banner (h-9 +
           hairline) so it never covers the session's top bar. */}
       {!showScenarioBrowser && (
-        <section
-          className={`from-card to-background flex flex-col bg-gradient-to-b pb-1.5 ${
-            hasGuestBanner ? "pt-[42px]" : "pt-1.5"
-          } ${
-            isResultView
-              ? "min-h-dvh overflow-x-hidden overflow-y-auto"
-              : // `h-dvh`, not `h-screen`. On iOS Safari `100vh` is the height
-                // the viewport WOULD have if the browser chrome were retracted,
-                // so it is taller than what is actually on screen. Paired with
-                // `overflow-hidden`, the bottom of this fixed-height column sat
-                // underneath the URL bar with no way to scroll to it: the
-                // message input and the Run / Submit buttons were unreachable on
-                // a phone. `100dvh` tracks the visible viewport instead.
-                "h-dvh overflow-hidden"
-          }`}
-        >
-          <div
-            className={`flex w-full flex-1 flex-col px-2 lg:px-3 ${isResultView ? "overflow-visible" : "overflow-hidden"}`}
-          >
-            <div
-              className={`flex w-full flex-1 flex-col gap-1 ${isResultView ? "overflow-visible" : "overflow-hidden"}`}
-            >
-              <InterviewTopBar
-                selectedScenario={selectedScenario}
-                selectedLanguage={selectedLanguage}
-                onLanguageChange={setSelectedLanguage}
-                activePanel={activePanel}
-                onActivePanelChange={setActivePanel}
-                focusMode={focusMode}
-                onFocusModeChange={setFocusMode}
-                calmMode={calmMode}
-                onCalmModeChange={setCalmMode}
-                isInterviewStarted={isInterviewStarted}
-                hideTimer={hideTimer}
-                onHideTimerChange={setHideTimer}
-                elapsedTime={elapsedTime}
-                strictTimeLimit={strictTimeLimit}
-                onReplayBugfixTour={
-                  selectedScenario?.type === "bugfix" &&
-                  isInterviewStarted &&
-                  workspaceContext.length > 0
-                    ? () => {
-                        if (typeof window !== "undefined") {
-                          window.dispatchEvent(new Event("codesparring:bugfix-tour-replay"))
-                        }
+        <InterviewSurfaceFrame hasGuestBanner={hasGuestBanner}>
+          {!isResultView && (
+            <InterviewTopBar
+              selectedScenario={selectedScenario}
+              selectedLanguage={selectedLanguage}
+              onLanguageChange={setSelectedLanguage}
+              activePanel={activePanel}
+              onActivePanelChange={setActivePanel}
+              focusMode={focusMode}
+              onFocusModeChange={setFocusMode}
+              calmMode={calmMode}
+              onCalmModeChange={setCalmMode}
+              isInterviewStarted={isInterviewStarted}
+              hideTimer={hideTimer}
+              onHideTimerChange={setHideTimer}
+              elapsedTime={elapsedTime}
+              strictTimeLimit={strictTimeLimit}
+              onReplayBugfixTour={
+                selectedScenario?.type === "bugfix" &&
+                isInterviewStarted &&
+                workspaceContext.length > 0
+                  ? () => {
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(new Event("codesparring:bugfix-tour-replay"))
                       }
-                    : undefined
-                }
-                // A completed session already has its own direct exit in the
-                // result surface. Keep the confirmation-only close control
-                // exclusive to active, resumable interview work.
-                onCloseClick={isResultView ? undefined : () => setShowCloseDialog(true)}
-              />
+                    }
+                  : undefined
+              }
+              // A completed session already has its own direct exit in the
+              // result surface. Keep the confirmation-only close control
+              // exclusive to active, resumable interview work.
+              onCloseClick={() => setShowCloseDialog(true)}
+              onOpenSparra={
+                selectedScenario && selectedScenario.type !== "dsa"
+                  ? () => {
+                      setFocusMode(false)
+                      setActivePanel("problem")
+                      setIsAIPartnerExpanded(true)
+                    }
+                  : undefined
+              }
+            />
+          )}
 
-              {/* ═══════════════════════════════════════════════════════════════
+          {/* ═══════════════════════════════════════════════════════════════
                   MAIN INTERFACE - Cognitive Load Optimized
 
                   Desktop (lg+):
@@ -2141,178 +2133,176 @@ function InterviewPageContent() {
                   - Tab-based: One panel at a time (Miller's Law)
                   - Reduces simultaneous information processing
               ═══════════════════════════════════════════════════════════════ */}
-              {resultSurface === "workspace" ? (
-                <InterviewLayoutGrid
-                  focusMode={focusMode}
-                  selectedScenario={selectedScenario}
-                  realInterviewMode={realInterviewMode}
-                  showProblemPeek={showProblemPeek}
-                  onShowProblemPeekChange={setShowProblemPeek}
-                  problemCtx={problemCtx}
-                  activePanel={activePanel}
-                  activeWorkspaceFile={activeWorkspaceFile}
-                  selectedLanguage={selectedLanguage}
-                  editorLanguage={editorLanguage}
-                  code={code}
-                  onCodeChange={handleEditorChange}
-                  isInterviewStarted={isInterviewStarted}
-                  showScenarioBrowser={showScenarioBrowser}
-                  showFeedback={showFeedback}
-                  showPostInterviewDiscussion={showPostInterviewDiscussion}
-                  isActiveWorkspaceFileEditable={isActiveWorkspaceFileEditable}
-                  onStartInterview={onStartInterviewClick}
-                  editorConsoleOutputs={editorConsoleOutputs}
-                  testResults={testResults}
-                  testSummary={testSummary}
-                  packRun={packRun}
-                  isRunningTests={isRunningTests}
-                  onClearConsole={handleClearConsole}
-                  onSubmitSystemDesign={submitSystemDesign}
-                  onRunCode={runCode}
-                  onSubmitCode={submitCode}
-                  onSelectedLanguageChange={setSelectedLanguage}
-                  onResetActiveFile={resetActiveWorkspaceFile}
-                  onResetWorkspace={resetEditableWorkspaceFiles}
-                  isAIPartnerExpanded={isAIPartnerExpanded}
-                  onAIPartnerExpandedChange={setIsAIPartnerExpanded}
-                  chatMessages={chatMessages}
-                  chatEndRef={chatEndRef}
-                  chatInput={chatInput}
-                  onChatInputChange={setChatInput}
-                  isLoadingChat={isLoadingChat}
-                  onSendPartnerMessage={onSendPartnerMessage}
-                  workspaceContext={workspaceContext}
-                  interviewerMessages={interviewerMessages}
-                  isLoadingInterviewer={isLoadingInterviewer}
-                  isGeneratingDiscussion={isGeneratingDiscussion}
-                  interviewerEndRef={interviewerEndRef}
-                  isRecordingInterviewer={isRecordingInterviewer}
-                  onToggleInterviewerRecording={onToggleInterviewerRecording}
-                  onCancelInterviewerRecording={onCancelInterviewerRecording}
-                  onCancelInterviewerCountdown={onCancelInterviewerCountdown}
-                  onSendInterviewerMessage={onSendInterviewerMessage}
-                  countdownActive={interviewerVoice.countdownActive}
-                  voiceUnavailable={interviewerVoiceUnavailable}
-                  interviewerInput={interviewerInput}
-                  onInterviewerInputChange={setInterviewerInput}
-                  bugfixTourEnabled={bugfixTourEnabled}
-                  bugfixScenarioId={selectedScenario?.id}
-                  testResultsCount={testResults.length}
-                  userId={user?.id}
-                  userProfile={cachedUserProfile}
-                  onActivePanelChange={setActivePanel}
-                />
-              ) : resultSurface === "guest_lock" ? (
-                // Guests never stream AI feedback, so the regular feedback
-                // view here was a shell of empty sections (its fallback
-                // caption "Review feedback for details" dead-clicked in the
-                // wild). The locked panel states the truth instead: the
-                // session is scored and saved, and sign-in reveals it. After
-                // a successful sign-in the resolver hands the slot to the
-                // real view fed by the post-signup stream; after a FAILED
-                // migration it returns here with retry semantics, wired
-                // straight to the signed-in user instead of the modal.
-                <GuestFeedbackLock
-                  retry={guestConversion === "failed"}
-                  onSignIn={
-                    guestConversion === "failed" && firebaseUser
-                      ? () => {
-                          void handleGuestSignedIn(firebaseUser).catch(() => {
-                            // handleGuestSignedIn already set the failed
-                            // state; the rethrow only matters to the modal.
-                          })
-                        }
-                      : () => setShowSignupPrompt(true)
-                  }
-                  scenarioTitle={selectedScenario?.title || "Your session"}
-                />
-              ) : (
-                <InterviewFeedbackView
-                  showPostInterviewDiscussion={showPostInterviewDiscussion}
-                  isFeedbackLoading={isFeedbackLoading}
-                  isFromRoadmap={isFromRoadmap}
-                  activeRoadmap={activeRoadmap}
-                  onGoToDashboard={() => router.push("/dashboard")}
-                  onBackToRoadmap={() => router.push("/roadmap")}
-                  testSummary={testSummary}
-                  efficiencyMetrics={efficiencyMetrics}
-                  code={code}
-                  selectedLanguage={selectedLanguage}
-                  testResults={testResults}
-                  interviewerMessages={interviewerMessages}
-                  isLoadingInterviewer={isLoadingInterviewer}
-                  isGeneratingDiscussion={isGeneratingDiscussion}
-                  interviewerInput={interviewerInput}
-                  setInterviewerInput={setInterviewerInput}
-                  handleSendMessage={handleSendMessage}
-                  isRecordingInterviewer={isRecordingInterviewer}
-                  toggleVoiceRecording={toggleVoiceRecording}
-                  interviewerEndRef={interviewerEndRef}
-                  showCodeInDiscussion={showCodeInDiscussion}
-                  setShowCodeInDiscussion={setShowCodeInDiscussion}
-                  setShowPostInterviewDiscussion={setShowPostInterviewDiscussion}
-                  proceedToFinalFeedback={proceedToFinalFeedback}
-                  isGeneratingFeedback={isGeneratingFeedback}
-                  feedbackStats={{
-                    testsPassed: testSummary.passed,
-                    totalTests: testSummary.total,
-                    timeSpentMinutes: Math.round(elapsedTime / 60),
-                    messagesExchanged: interviewerMessages.length,
-                    codeLines: code.split("\n").filter((line) => line.trim()).length,
-                  }}
-                  phaseMessage={streamingFeedback.state.phaseMessage}
-                  scoringProgress={scoring.progress}
-                  scoringStepIndex={scoring.stepIndex}
-                  scoringCompletedThrough={scoring.completedThrough}
-                  scoringElapsedMs={scoring.elapsedMs}
-                  scoringStalled={scoring.stalled}
-                  scoringRingTweenMs={scoring.tweenMs}
-                  scoringRingEase={scoring.ease}
-                  feedback={comprehensiveFeedback || ""}
-                  performanceScore={performanceScore ?? 0}
-                  technicalScore={technicalScore ?? undefined}
-                  scoreBreakdown={scoreBreakdown || undefined}
-                  constitutionalAICritique={constitutionalAICritique}
-                  structuredFeedback={structuredFeedback || undefined}
-                  testsPassed={testSummary.passed}
-                  testsTotal={testSummary.total}
-                  timeComplexity={efficiencyMetrics?.estimatedTimeComplexity}
-                  spaceComplexity={efficiencyMetrics?.estimatedSpaceComplexity}
-                  efficiencyScore={efficiencyMetrics?.efficiencyScore}
-                  elapsedTime={elapsedTime}
-                  userId={user?.id}
-                  sessionId={currentSessionId ?? undefined}
-                  problemType={selectedScenario?.type}
-                  difficulty={selectedScenario?.difficulty}
-                  problemTitle={selectedScenario?.title}
-                  language={selectedLanguage}
-                  onNewProblem={resetInterview}
-                  clarifyingQuestionsAssessment={clarifyingQuestionsAssessment}
-                  showProfilePersonalization={showProfilePersonalization}
-                  personalizationProfile={cachedUserProfile}
-                  onProfilePersonalizationCompleted={(data) => {
-                    setShowProfilePersonalization(false)
-                    setCachedUserProfile((current) =>
-                      current
-                        ? {
-                            ...current,
-                            role: data.role,
-                            goal: data.goal,
-                            target_company: data.targetCompany || undefined,
-                            interview_timeline: data.interviewTimeline,
-                            weekly_goal: data.weeklyGoal,
-                            onboarding_completed: true,
-                            profile_calibration_completed: true,
-                            profile_calibration_completed_at: new Date().toISOString(),
-                          }
-                        : current
-                    )
-                  }}
-                />
-              )}
-            </div>
-          </div>
-        </section>
+          {resultSurface === "workspace" ? (
+            <InterviewLayoutGrid
+              focusMode={focusMode}
+              selectedScenario={selectedScenario}
+              realInterviewMode={realInterviewMode}
+              showProblemPeek={showProblemPeek}
+              onShowProblemPeekChange={setShowProblemPeek}
+              problemCtx={problemCtx}
+              activePanel={activePanel}
+              activeWorkspaceFile={activeWorkspaceFile}
+              selectedLanguage={selectedLanguage}
+              editorLanguage={editorLanguage}
+              code={code}
+              onCodeChange={handleEditorChange}
+              isInterviewStarted={isInterviewStarted}
+              showScenarioBrowser={showScenarioBrowser}
+              showFeedback={showFeedback}
+              showPostInterviewDiscussion={showPostInterviewDiscussion}
+              isActiveWorkspaceFileEditable={isActiveWorkspaceFileEditable}
+              onStartInterview={onStartInterviewClick}
+              editorConsoleOutputs={editorConsoleOutputs}
+              testResults={testResults}
+              testSummary={testSummary}
+              packRun={packRun}
+              isRunningTests={isRunningTests}
+              onClearConsole={handleClearConsole}
+              onSubmitSystemDesign={submitSystemDesign}
+              onRunCode={runCode}
+              onSubmitCode={submitCode}
+              onSelectedLanguageChange={setSelectedLanguage}
+              onResetActiveFile={resetActiveWorkspaceFile}
+              onResetWorkspace={resetEditableWorkspaceFiles}
+              isAIPartnerExpanded={isAIPartnerExpanded}
+              onAIPartnerExpandedChange={setIsAIPartnerExpanded}
+              chatMessages={chatMessages}
+              chatEndRef={chatEndRef}
+              chatInput={chatInput}
+              onChatInputChange={setChatInput}
+              isLoadingChat={isLoadingChat}
+              onSendPartnerMessage={onSendPartnerMessage}
+              workspaceContext={workspaceContext}
+              interviewerMessages={interviewerMessages}
+              isLoadingInterviewer={isLoadingInterviewer}
+              isGeneratingDiscussion={isGeneratingDiscussion}
+              interviewerEndRef={interviewerEndRef}
+              isRecordingInterviewer={isRecordingInterviewer}
+              onToggleInterviewerRecording={onToggleInterviewerRecording}
+              onCancelInterviewerRecording={onCancelInterviewerRecording}
+              onCancelInterviewerCountdown={onCancelInterviewerCountdown}
+              onSendInterviewerMessage={onSendInterviewerMessage}
+              countdownActive={interviewerVoice.countdownActive}
+              voiceUnavailable={interviewerVoiceUnavailable}
+              interviewerInput={interviewerInput}
+              onInterviewerInputChange={setInterviewerInput}
+              bugfixTourEnabled={bugfixTourEnabled}
+              bugfixScenarioId={selectedScenario?.id}
+              testResultsCount={testResults.length}
+              userId={user?.id}
+              userProfile={cachedUserProfile}
+              onActivePanelChange={setActivePanel}
+            />
+          ) : resultSurface === "guest_lock" ? (
+            // Guests never stream AI feedback, so the regular feedback
+            // view here was a shell of empty sections (its fallback
+            // caption "Review feedback for details" dead-clicked in the
+            // wild). The locked panel states the truth instead: the
+            // session is scored and saved, and sign-in reveals it. After
+            // a successful sign-in the resolver hands the slot to the
+            // real view fed by the post-signup stream; after a FAILED
+            // migration it returns here with retry semantics, wired
+            // straight to the signed-in user instead of the modal.
+            <GuestFeedbackLock
+              retry={guestConversion === "failed"}
+              onSignIn={
+                guestConversion === "failed" && firebaseUser
+                  ? () => {
+                      void handleGuestSignedIn(firebaseUser).catch(() => {
+                        // handleGuestSignedIn already set the failed
+                        // state; the rethrow only matters to the modal.
+                      })
+                    }
+                  : () => setShowSignupPrompt(true)
+              }
+              scenarioTitle={selectedScenario?.title || "Your session"}
+            />
+          ) : (
+            <InterviewFeedbackView
+              showPostInterviewDiscussion={showPostInterviewDiscussion}
+              isFeedbackLoading={isFeedbackLoading}
+              isFromRoadmap={isFromRoadmap}
+              activeRoadmap={activeRoadmap}
+              onGoToDashboard={() => router.push("/dashboard")}
+              onBackToRoadmap={() => router.push("/roadmap")}
+              testSummary={testSummary}
+              efficiencyMetrics={efficiencyMetrics}
+              code={code}
+              selectedLanguage={selectedLanguage}
+              testResults={testResults}
+              interviewerMessages={interviewerMessages}
+              isLoadingInterviewer={isLoadingInterviewer}
+              isGeneratingDiscussion={isGeneratingDiscussion}
+              interviewerInput={interviewerInput}
+              setInterviewerInput={setInterviewerInput}
+              handleSendMessage={handleSendMessage}
+              isRecordingInterviewer={isRecordingInterviewer}
+              toggleVoiceRecording={toggleVoiceRecording}
+              interviewerEndRef={interviewerEndRef}
+              showCodeInDiscussion={showCodeInDiscussion}
+              setShowCodeInDiscussion={setShowCodeInDiscussion}
+              setShowPostInterviewDiscussion={setShowPostInterviewDiscussion}
+              proceedToFinalFeedback={proceedToFinalFeedback}
+              isGeneratingFeedback={isGeneratingFeedback}
+              feedbackStats={{
+                testsPassed: testSummary.passed,
+                totalTests: testSummary.total,
+                timeSpentMinutes: Math.round(elapsedTime / 60),
+                messagesExchanged: interviewerMessages.length,
+                codeLines: code.split("\n").filter((line) => line.trim()).length,
+              }}
+              phaseMessage={streamingFeedback.state.phaseMessage}
+              scoringProgress={scoring.progress}
+              scoringStepIndex={scoring.stepIndex}
+              scoringCompletedThrough={scoring.completedThrough}
+              scoringElapsedMs={scoring.elapsedMs}
+              scoringStalled={scoring.stalled}
+              scoringRingTweenMs={scoring.tweenMs}
+              scoringRingEase={scoring.ease}
+              feedback={comprehensiveFeedback || ""}
+              performanceScore={performanceScore ?? 0}
+              technicalScore={technicalScore ?? undefined}
+              scoreBreakdown={scoreBreakdown || undefined}
+              constitutionalAICritique={constitutionalAICritique}
+              structuredFeedback={structuredFeedback || undefined}
+              testsPassed={testSummary.passed}
+              testsTotal={testSummary.total}
+              timeComplexity={efficiencyMetrics?.estimatedTimeComplexity}
+              spaceComplexity={efficiencyMetrics?.estimatedSpaceComplexity}
+              efficiencyScore={efficiencyMetrics?.efficiencyScore}
+              elapsedTime={elapsedTime}
+              userId={user?.id}
+              sessionId={currentSessionId ?? undefined}
+              problemType={selectedScenario?.type}
+              difficulty={selectedScenario?.difficulty}
+              problemTitle={selectedScenario?.title}
+              language={selectedLanguage}
+              onNewProblem={resetInterview}
+              clarifyingQuestionsAssessment={clarifyingQuestionsAssessment}
+              showProfilePersonalization={showProfilePersonalization}
+              personalizationProfile={cachedUserProfile}
+              onProfilePersonalizationCompleted={(data) => {
+                setShowProfilePersonalization(false)
+                setCachedUserProfile((current) =>
+                  current
+                    ? {
+                        ...current,
+                        role: data.role,
+                        goal: data.goal,
+                        target_company: data.targetCompany || undefined,
+                        interview_timeline: data.interviewTimeline,
+                        weekly_goal: data.weeklyGoal,
+                        onboarding_completed: true,
+                        profile_calibration_completed: true,
+                        profile_calibration_completed_at: new Date().toISOString(),
+                      }
+                    : current
+                )
+              }}
+            />
+          )}
+        </InterviewSurfaceFrame>
       )}
 
       {/* Guest User Signup Prompt - shown before the debrief. No performanceScore

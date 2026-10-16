@@ -12,6 +12,7 @@ import {
   Maximize2,
   Minimize2,
   Target,
+  MessageCircle,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -42,6 +43,7 @@ interface InterviewTopBarProps {
   onReplayBugfixTour?: () => void
   /** Omitted after an interview ends; result views supply their own direct exit. */
   onCloseClick?: () => void
+  onOpenSparra?: () => void
 }
 
 export const InterviewTopBar = memo(function InterviewTopBar({
@@ -61,6 +63,7 @@ export const InterviewTopBar = memo(function InterviewTopBar({
   strictTimeLimit,
   onReplayBugfixTour,
   onCloseClick,
+  onOpenSparra,
 }: InterviewTopBarProps) {
   const handleLanguageChange = (newLang: EditorLanguage) => {
     if (isWorkspaceScenario(selectedScenario)) {
@@ -253,6 +256,17 @@ export const InterviewTopBar = memo(function InterviewTopBar({
           <span className="hidden xl:inline">{focusMode ? "Exit Focus" : "Focus"}</span>
         </button>
 
+        {onOpenSparra && (
+          <Button
+            variant="ghost"
+            className="min-h-11 gap-2"
+            onClick={onOpenSparra}
+            aria-label="Open Sparra partner"
+          >
+            <MessageCircle className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Sparra</span>
+          </Button>
+        )}
         <ThemeToggle />
 
         {onCloseClick && (

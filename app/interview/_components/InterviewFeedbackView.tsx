@@ -182,22 +182,25 @@ export function InterviewFeedbackView({
       onClose={onGoToDashboard}
     />
   ) : isFeedbackLoading ? (
-    <FeedbackLoadingState
-      onGoToDashboard={onGoToDashboard}
-      interviewStats={feedbackStats}
-      phaseMessage={phaseMessage}
-      progress={scoringProgress}
-      stepIndex={scoringStepIndex}
-      completedThrough={scoringCompletedThrough}
-      elapsedMs={scoringElapsedMs}
-      stalled={scoringStalled}
-      ringTweenMs={scoringRingTweenMs}
-      ringEase={scoringRingEase}
-    />
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <FeedbackLoadingState
+        onGoToDashboard={onGoToDashboard}
+        interviewStats={feedbackStats}
+        phaseMessage={phaseMessage}
+        progress={scoringProgress}
+        stepIndex={scoringStepIndex}
+        completedThrough={scoringCompletedThrough}
+        elapsedMs={scoringElapsedMs}
+        stalled={scoringStalled}
+        ringTweenMs={scoringRingTweenMs}
+        ringEase={scoringRingEase}
+      />
+    </div>
   ) : (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <ErrorBoundary>
         <PracticeFeedback
+          contained
           feedback={feedback}
           sessionId={sessionId}
           performanceScore={performanceScore}
@@ -232,8 +235,8 @@ export function InterviewFeedbackView({
           }
         />
       </ErrorBoundary>
-      {isFromRoadmap && activeRoadmap && (
-        <div className="mt-6 flex justify-center">
+      {isFromRoadmap && Boolean(activeRoadmap) && (
+        <div className="flex shrink-0 justify-center py-2">
           <Button
             onClick={onBackToRoadmap}
             className="bg-primary hover:bg-primary/90 text-primary-foreground"
@@ -243,6 +246,6 @@ export function InterviewFeedbackView({
           </Button>
         </div>
       )}
-    </>
+    </div>
   )
 }
