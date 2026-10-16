@@ -115,6 +115,47 @@ test.describe("post-feedback recommendation", () => {
 })
 
 test.describe("saved task return journey", () => {
+  for (const saved of [false, true]) {
+    test(`does not flash an unconfirmed saved-task card (saved: ${saved})`, async ({ page }) => {
+      if (saved) {
+        await page.goto("/")
+        await page.getByRole("button", { name: "Save for later" }).click()
+        await expect(page.getByText("Saved to dashboard", { exact: true })).toBeVisible()
+      }
+      await page.addInitScript(() => {
+        new MutationObserver(() => {
+          const card = document.querySelector('[aria-label="Saved next practice"]')
+          if (card?.textContent?.includes("Loading your saved task")) {
+            document.documentElement.setAttribute("data-saved-practice-loading-seen", "true")
+          }
+        }).observe(document, { childList: true, subtree: true })
+      })
+      let releaseRead!: () => void
+      const pendingRead = new Promise<void>((resolve) => (releaseRead = resolve))
+      await page.route("**/api/practice-plan?**", async (route) => {
+        await pendingRead
+        await route.continue()
+      })
+      await Promise.all([
+        page.waitForRequest((request) => request.url().includes("/api/practice-plan")),
+        page.goto("/dashboard"),
+      ])
+      await expect(page.getByText(/Local verification fixture/)).toBeVisible()
+      try {
+        await expect(page.getByRole("region", { name: "Saved next practice" })).toHaveCount(0)
+      } finally {
+        releaseRead()
+      }
+      if (saved) {
+        await expect(page.getByRole("link", { name: "Open saved practice" })).toBeVisible()
+      } else {
+        await page.waitForResponse((response) => response.url().includes("/api/practice-plan"))
+        await expect(page.getByRole("region", { name: "Saved next practice" })).toHaveCount(0)
+      }
+      expect(await page.locator("html").getAttribute("data-saved-practice-loading-seen")).toBeNull()
+    })
+  }
+
   test("ignoring the card performs no writes; saving survives navigation and opens the exact task", async ({
     page,
   }) => {

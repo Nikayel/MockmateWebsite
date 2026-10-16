@@ -23,7 +23,9 @@ export function SavedPracticeCard({ isPro = false }: { isPro?: boolean }) {
       )
     }
   }, [result])
-  if (result.status === "empty" || result.status === "signed_out") return null
+  // This dashboard section is optional; wait until the saved-task check confirms it belongs here.
+  if (result.status === "loading" || result.status === "empty" || result.status === "signed_out")
+    return null
   return (
     <section
       aria-label="Saved next practice"
@@ -32,11 +34,7 @@ export function SavedPracticeCard({ isPro = false }: { isPro?: boolean }) {
       <h2 className="text-foreground text-base font-semibold">
         {result.status === "complete" ? "You completed your saved practice" : "Your next practice"}
       </h2>
-      {result.status === "loading" ? (
-        <p role="status" className="text-muted-foreground mt-2 text-sm">
-          Loading your saved task…
-        </p>
-      ) : result.status === "error" || result.status === "reauth_required" ? (
+      {result.status === "error" || result.status === "reauth_required" ? (
         <div className="mt-2">
           <p role="status" className="text-muted-foreground text-sm">
             {result.status === "reauth_required"
