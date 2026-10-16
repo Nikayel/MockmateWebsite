@@ -23,6 +23,30 @@ export const PINNED_SWEEP = FIXED_SWEEP.replace(
   'entry["pinned"] or entry["expires_at"] > now'
 )
 
+export const FIXED_REPLAY = `def read_events(path):
+    events = []
+    with open(path, encoding="utf-8") as handle:
+        for raw in handle:
+            event = parse_line(raw)
+            if event is not None:
+                events.append(event)
+    return events
+`
+
+export function withReplay(pack: BugfixPack): BugfixPack {
+  return {
+    ...pack,
+    srcFiles: pack.srcFiles.map((file) =>
+      file.path === "src/log_reader.py"
+        ? {
+            ...file,
+            content: file.content.replace(/def read_events\(path\):[\s\S]*$/, FIXED_REPLAY),
+          }
+        : file
+    ),
+  }
+}
+
 export function withSweep(pack: BugfixPack, source: string): BugfixPack {
   return {
     ...pack,
@@ -37,7 +61,12 @@ export function withSweep(pack: BugfixPack, source: string): BugfixPack {
 }
 
 /** Materialize the actual authored program, not a reimplementation of its logic. */
-export function runCachePack(pack: BugfixPack, fixture?: string, wrapped = false): string {
+export function runCachePack(
+  pack: BugfixPack,
+  fixture?: string,
+  wrapped = false,
+  runCmd = pack.runCmd
+): string {
   const root = mkdtempSync(join(tmpdir(), "cache-cleanup-"))
   try {
     for (const file of [...pack.srcFiles, ...pack.fixtures]) {
@@ -46,10 +75,10 @@ export function runCachePack(pack: BugfixPack, fixture?: string, wrapped = false
       writeFileSync(path, file.content)
     }
     if (fixture !== undefined) writeFileSync(join(root, pack.fixtures[0].path), fixture)
-    const { argv } = parseRunCmd(pack.runCmd)
+    const { argv } = parseRunCmd(runCmd)
     const stdout = execFileSync(
       process.env.PYTHON || "python3",
-      wrapped ? ["-c", buildPackOracleEntrypoint(pack.runCmd)] : argv,
+      wrapped ? ["-c", buildPackOracleEntrypoint(runCmd)] : argv,
       {
         cwd: root,
         encoding: "utf8",
@@ -64,4 +93,8 @@ export function runCachePack(pack: BugfixPack, fixture?: string, wrapped = false
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+}
+
+export function runCacheReport(pack: BugfixPack, fixture?: string, wrapped = false): string {
+  return runCachePack(pack, fixture, wrapped, "python3 src/cache_sweep.py fixtures/input.txt")
 }
