@@ -7,6 +7,8 @@ import { ScoreDisplay, FeedbackSections } from "@/components/practice"
 import type { ChatMessage } from "@/lib/types"
 import type { SessionComplexityAnalysis } from "@/lib/rag/knowledge-base/types"
 import { useFeedbackViewAnalytics } from "@/lib/hooks/useFeedbackViewAnalytics"
+import { ReviewFrame } from "@/components/practice/ReviewFrame"
+import { ReviewSummary, ReviewClose } from "@/components/practice/ReviewSummary"
 
 interface AlternativeApproach {
   name: string
@@ -18,6 +20,7 @@ interface AlternativeApproach {
 }
 
 interface PracticeFeedbackProps {
+  contained?: boolean
   feedback: string
   performanceScore: number
   technicalScore?: number // Code-focused score (excludes communication)
@@ -76,6 +79,7 @@ interface PracticeFeedbackProps {
 }
 
 export default function PracticeFeedback({
+  contained = false,
   feedback,
   performanceScore,
   technicalScore,
@@ -215,44 +219,69 @@ export default function PracticeFeedback({
   const grade = getLetterGrade(overallScore)
 
   return (
-    <div className="w-full space-y-4">
-      <ScoreDisplay
-        sections={sections}
-        overallScore={overallScore}
-        performanceScore={performanceScore}
-        technicalScore={technicalScore}
-        scoreBreakdown={scoreBreakdown}
-        testsPassed={testsPassed}
-        testsTotal={testsTotal}
-        elapsedTime={elapsedTime}
-        problemType={problemType}
-        feedback={feedback}
-        timeComplexity={timeComplexity}
-        spaceComplexity={spaceComplexity}
-        efficiencyScore={efficiencyScore}
-        onExport={onExport}
-        onClose={onClose}
-        problemTitle={problemTitle}
-        grade={grade}
-        scores={scores}
-      />
+    <ReviewFrame
+      title="Interview feedback"
+      contained={contained}
+      summary={
+        <ReviewSummary
+          score={overallScore}
+          grade={grade}
+          problemTitle={problemTitle}
+          testsPassed={testsPassed}
+          testsTotal={testsTotal}
+          elapsedTime={elapsedTime}
+        />
+      }
+      actions={<ReviewClose onClose={onClose} />}
+    >
+      <div className="mx-auto max-w-5xl space-y-4 p-4 sm:p-6">
+        {sections.tldr && (
+          <p className="text-foreground max-w-prose text-sm leading-6">{sections.tldr}</p>
+        )}
+        <details className="border-border/60 rounded-xl border">
+          <summary className="text-muted-foreground focus-visible:ring-ring min-h-11 cursor-pointer rounded-xl px-4 py-3 text-sm font-medium focus-visible:ring-2">
+            Scores &amp; rubric
+          </summary>
+          <div className="px-3 pb-3">
+            <ScoreDisplay
+              sections={sections}
+              overallScore={overallScore}
+              performanceScore={performanceScore}
+              technicalScore={technicalScore}
+              scoreBreakdown={scoreBreakdown}
+              testsPassed={testsPassed}
+              testsTotal={testsTotal}
+              elapsedTime={elapsedTime}
+              problemType={problemType}
+              feedback={feedback}
+              timeComplexity={timeComplexity}
+              spaceComplexity={spaceComplexity}
+              efficiencyScore={efficiencyScore}
+              onExport={onExport}
+              problemTitle={problemTitle}
+              grade={grade}
+              scores={scores}
+            />
+          </div>
+        </details>
 
-      {afterScore}
+        {afterScore}
 
-      <FeedbackSections
-        sections={sections}
-        code={code}
-        language={language}
-        problemType={problemType}
-        userId={userId}
-        sessionId={sessionId}
-        constitutionalAICritique={constitutionalAICritique}
-        chatMessages={chatMessages}
-        interviewerMessages={interviewerMessages}
-        complexityAnalysis={complexityAnalysis}
-        alternativeApproaches={alternativeApproaches}
-        clarifyingQuestionsAssessment={clarifyingQuestionsAssessment}
-      />
-    </div>
+        <FeedbackSections
+          sections={sections}
+          code={code}
+          language={language}
+          problemType={problemType}
+          userId={userId}
+          sessionId={sessionId}
+          constitutionalAICritique={constitutionalAICritique}
+          chatMessages={chatMessages}
+          interviewerMessages={interviewerMessages}
+          complexityAnalysis={complexityAnalysis}
+          alternativeApproaches={alternativeApproaches}
+          clarifyingQuestionsAssessment={clarifyingQuestionsAssessment}
+        />
+      </div>
+    </ReviewFrame>
   )
 }
