@@ -1,3 +1,5 @@
+import { resolveChatInterviewState } from "@/lib/interview/chat/interview-state"
+import { buildChatToolContext } from "@/lib/interview/chat/tool-context"
 import { generateValidatedChatResponse } from "@/lib/interview/chat/generate-response"
 import { prepareConversationExtraction } from "@/lib/interview/chat/extraction-job"
 import { runConversationExtractionAfterResponse } from "@/lib/interview/chat/conversation-extraction"
@@ -15,20 +17,10 @@ import { logger } from "@/lib/logger"
 import { buildInterviewerLevelContext } from "@/lib/rag/knowledge-base/interview-behavior-knowledge"
 // NEW: Phase-aware interview system with deterministic phase detection
 import {
-  type InterviewPhase,
   type ConversationTracker,
-  type PhaseDetectionContext,
   buildTrackingContext,
   getHintGuidance,
-  detectInterviewPhase,
 } from "@/lib/interview/interview-phases"
-import { phaseService } from "@/lib/services/phase-service"
-import { getFlag } from "@/lib/feature-flags"
-import {
-  executeTool,
-  formatToolResultsForPrompt,
-  type ToolContext,
-} from "@/lib/interview/interviewer-tools"
 import {
   buildPreLLMInterviewerPolicy,
   formatPreLLMInterviewerPolicy,
@@ -56,7 +48,6 @@ import {
 } from "@/lib/interview/chat/context-builders"
 import { buildChatRequestContext } from "@/lib/interview/chat/request-context"
 import { buildChatPromptFlow } from "@/lib/interview/chat/prompt-flow"
-import { detectDebuggingPhase } from "@/lib/interview/phases/debugging"
 import { getInterviewerTurns } from "@/lib/interview/conversation-pacing"
 import { buildProactiveSkipResponse } from "@/lib/interview/chat/response-flow"
 import { createValidatedChatStream } from "@/lib/interview/chat/validated-response-stream"
@@ -203,8 +194,16 @@ export async function POST(request: NextRequest) {
 
     // Build console/test results context for interviewer awareness
     // TestResultItem and ConsoleLogItem interfaces defined at module level
-    const testResultsArray =
-      sessionContext && !sessionContext.testsMatchCurrentRevision ? [] : testResults
+    const interviewState = resolveChatInterviewState(requestContext)
+    const {
+      currentPhase,
+      phaseContext,
+      tracker,
+      testsHaveRunNow,
+      testResultsArray,
+      currentCodeLen,
+      starterLen,
+    } = interviewState
     const consoleLogsArray = consoleLogs
 
     const consoleContext = buildConsoleContext(
@@ -233,65 +232,6 @@ export async function POST(request: NextRequest) {
       parseResult.data.pack
     )
 
-    // Build phase-specific context using DETERMINISTIC signals
-    // No longer relies on frontend-passed interviewPhase - we compute it here
-    const testsHaveRunNow =
-      testsHaveRun && (!sessionContext || sessionContext.testsMatchCurrentRevision)
-    const currentCodeLen = currentCodeLength
-    const starterLen = starterCodeLength
-
-    const phaseContext: PhaseDetectionContext = {
-      hasSubmitted: hasSubmitted || false,
-      testsHaveRun: testsHaveRunNow || false,
-      currentCodeLength: currentCodeLen,
-      starterCodeLength: starterLen,
-      approachExplained:
-        enhancedTracker?.approachExplained ||
-        (conversationTracker as unknown as ConversationTracker)?.approachExplained,
-      messageCount,
-    }
-
-    // Feature flag: Use phase service or direct call
-    let currentPhase: InterviewPhase
-    if (getFlag("USE_PHASE_SERVICE")) {
-      const phaseResult = phaseService({
-        hasSubmitted: hasSubmitted || false,
-        testsHaveRun: testsHaveRunNow || false,
-        currentCodeLength: currentCodeLen,
-        starterCodeLength: starterLen,
-        approachExplained:
-          enhancedTracker?.approachExplained ||
-          (conversationTracker as unknown as ConversationTracker)?.approachExplained ||
-          false,
-        messageCount,
-      })
-      currentPhase = phaseResult.phase
-      logger.debug("[Chat API] Phase detected via service", {
-        phase: currentPhase,
-        codeWritten: phaseResult.metadata.codeWritten,
-      })
-    } else {
-      // Original code path
-      currentPhase = detectInterviewPhase(phaseContext)
-    }
-
-    if (isBugFix && sessionContext) {
-      currentPhase = detectDebuggingPhase({
-        hasSubmitted: hasSubmitted || false,
-        hasCodeChanges: sessionContext.files.some((file) => file.status === "modified"),
-        testsAreCurrent: Boolean(testsHaveRunNow),
-        hasTestResults: Boolean(testResults?.length),
-        approachExplained: Boolean(phaseContext.approachExplained),
-      })
-    }
-
-    // Debug logging for phase detection
-    logger.info("[Chat API] Phase detection", {
-      currentPhase,
-      messageCount,
-      approachExplained: phaseContext.approachExplained,
-    })
-
     // Evaluation cases are useful once the candidate is discussing an approach,
     // but exposing them while they are still clarifying turns grounding into an
     // answer key. The builder owns that phase boundary.
@@ -313,8 +253,6 @@ export async function POST(request: NextRequest) {
     const hintGuidance =
       hintsGiven > 0 && !isBugFix && !isSystemDesign ? getHintGuidance(hintsGiven) : ""
 
-    const tracker = (enhancedTracker || conversationTracker) as ConversationTracker | undefined
-
     const preLLMPolicy = buildPreLLMInterviewerPolicy({
       scenarioType,
       phase: currentPhase,
@@ -331,65 +269,7 @@ export async function POST(request: NextRequest) {
     const complexityContext =
       isBugFix || isSystemDesign ? "" : buildComplexityContext(solutionComplexity)
 
-    // =================================================================
-    // TOOL EXECUTION: Pre-execute tools to give AI structured state
-    // This ensures the AI always has accurate state information
-    // =================================================================
-    let toolResultsContext = ""
-    if (role === "interviewer" && !isBugFix && !isSystemDesign) {
-      const toolContext: ToolContext = {
-        tracker: (enhancedTracker || conversationTracker) as ConversationTracker | undefined,
-        phase: currentPhase,
-        isOptimalSolution: solutionComplexity?.isOptimal || false,
-        testsHaveRun: testsHaveRunNow || false,
-        testsPassed: testResultsArray?.filter((t) => t.passed === true).length || 0,
-        testsTotal: testResultsArray?.length || 0,
-      }
-
-      // Execute relevant tools based on phase
-      const toolCalls: Array<{ name: string; result: ReturnType<typeof executeTool> }> = []
-
-      // Always check prerequisites in discussion/coding phases
-      if (currentPhase === "discussion" || currentPhase === "coding") {
-        toolCalls.push({
-          name: "check_prerequisites",
-          result: executeTool("check_prerequisites", {}, toolContext),
-        })
-        toolCalls.push({
-          name: "get_next_required_topic",
-          result: executeTool("get_next_required_topic", {}, toolContext),
-        })
-      }
-
-      // Check what's already discussed in testing phase
-      if (currentPhase === "testing") {
-        toolCalls.push({
-          name: "check_already_discussed:complexity",
-          result: executeTool("check_already_discussed", { topic: "complexity" }, toolContext),
-        })
-        toolCalls.push({
-          name: "check_already_discussed:edge_cases",
-          result: executeTool("check_already_discussed", { topic: "edge_cases" }, toolContext),
-        })
-      }
-
-      // Always include phase info
-      toolCalls.push({
-        name: "get_interview_phase",
-        result: executeTool("get_interview_phase", {}, toolContext),
-      })
-
-      // Analyze user's message if it seems vague
-      if (message && message.length < 80) {
-        toolCalls.push({
-          name: "analyze_user_response",
-          result: executeTool("analyze_user_response", { user_message: message }, toolContext),
-        })
-      }
-
-      // Format tool results for injection into prompt
-      toolResultsContext = formatToolResultsForPrompt(toolCalls)
-    }
+    const toolResultsContext = buildChatToolContext(requestContext, interviewState)
 
     // Few-shot examples are now included in buildInterviewerPrompt()
 
