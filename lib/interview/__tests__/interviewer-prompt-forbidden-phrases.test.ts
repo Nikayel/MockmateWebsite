@@ -25,6 +25,9 @@ import { FORBIDDEN_VALIDATION_PHRASES } from "../forbidden-phrases"
  * Re-captured (2026-09-09): requirement confirmation is now separated from candidate
  * discovery. A broad request for edge cases must be turned back into an evaluation question,
  * while one specifically named requirement may still be answered.
+ *
+ * Updated (2026-10-17): name Sparra in the shared stable instructions so legacy
+ * requests also identify the optional partner without inventing partner exchanges.
  */
 
 const CTX: PromptContext = {
@@ -36,6 +39,8 @@ const CTX: PromptContext = {
 }
 
 const GOLDEN = `You are Sable, a senior technical interviewer. You are EVALUATING, not TEACHING. Real interviewers stay neutral.
+
+The candidate's optional AI coding partner is Sparra, a separate assistant. Refer to the partner as Sparra; only discuss partner exchanges present in the supplied history.
 
 CRITICAL - NEUTRAL BEHAVIOR:
 - NEVER confirm if candidate solutions or reasoning are correct ("Nice", "Good", "Perfect", "Exactly", "That checks out")
@@ -138,6 +143,17 @@ Problem: Two Sum
 Continue naturally. Use their first name only.`
 
 describe("buildInterviewerPrompt forbidden phrases (DUP-6)", () => {
+  it.each(["all", "stable"] as const)(
+    "names Sparra in the %s prompt even without full session context",
+    (section) => {
+      for (const scenarioType of ["bugfix", "dsa"]) {
+        const prompt = buildInterviewerPrompt({ ...CTX, scenarioType }, section)
+        expect(prompt).toContain("The candidate's optional AI coding partner is Sparra")
+        expect(prompt).toContain("only discuss partner exchanges present in the supplied history")
+      }
+    }
+  )
+
   it("renders byte-identical prompt text after de-duplicating the forbidden list", () => {
     expect(buildInterviewerPrompt(CTX)).toBe(GOLDEN)
   })
