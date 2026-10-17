@@ -355,6 +355,7 @@ export function InterviewLayoutGrid({
           onResetActiveFile={onResetActiveFile}
           onResetWorkspace={onResetWorkspace}
           workspaceContext={workspaceContext}
+          onWorkspaceFileSelect={problemCtx.onWorkspaceFileSelect}
         />
 
         <ChatColumn

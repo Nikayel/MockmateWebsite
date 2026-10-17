@@ -16,6 +16,8 @@ interface ConsoleOutputProps {
   isRunningTests: boolean
   onClearConsole: () => void
   onGoToLine?: (lineNum: number) => void
+  testSources?: ReadonlyMap<TestResult, string>
+  onOpenTestSource?: (path: string) => void
   notice?: string
   packRun?: PackRunView | null
 }
@@ -27,6 +29,8 @@ export function ConsoleOutput({
   isRunningTests,
   onClearConsole,
   onGoToLine,
+  testSources,
+  onOpenTestSource,
   notice,
   packRun,
 }: ConsoleOutputProps) {
@@ -85,6 +89,8 @@ export function ConsoleOutput({
         setExpanded(false)
       }}
       onGoToLine={onGoToLine}
+      testSources={testSources}
+      onOpenTestSource={onOpenTestSource}
       notice={notice}
       packRun={packRun}
     />

@@ -1,8 +1,9 @@
 "use client"
 
 import React, { useEffect, useId, useRef } from "react"
-import { AlertCircle, CheckCircle, XCircle } from "lucide-react"
+import { AlertCircle, XCircle } from "lucide-react"
 import { ConsoleHeader } from "./ConsoleHeader"
+import { ConsoleTestResult } from "./ConsoleTestResult"
 import "./console.css"
 import { cn } from "@/lib/utils"
 import { TerminalOutput, TERMINAL_PRE } from "./TerminalOutput"
@@ -66,6 +67,8 @@ interface CodeConsoleProps {
   language?: "python" | "javascript" | "typescript"
   userCodeLineCount?: number // Total lines in user's code for validation
   onGoToLine?: (lineNum: number) => void
+  testSources?: ReadonlyMap<TestResult, string>
+  onOpenTestSource?: (path: string) => void
   /** Optional info banner (e.g. guided-lab "a new check just unlocked"). */
   notice?: string
   /**
@@ -337,22 +340,6 @@ export function formatErrorMessage(
   return { title, details, hint: hints[errorType] }
 }
 
-/**
- * A test row has a real comparison to show only when the runner produced actual
- * values. Workspace suites report an assert message instead, and the old code
- * substituted the literals "pass"/"fail" — rendering `Expected: "pass"`.
- */
-function hasComparison(result: TestResult): boolean {
-  return result.expected !== undefined || result.actual !== undefined
-}
-
-/** Exact by default; pretty-printed once a structure is too wide to scan inline. */
-function formatValue(value: unknown): string {
-  const compact = JSON.stringify(value)
-  if (compact === undefined) return String(value)
-  return compact.length > 60 ? JSON.stringify(value, null, 2) : compact
-}
-
 export function CodeConsole({
   expanded = true,
   onExpandedChange,
@@ -366,6 +353,8 @@ export function CodeConsole({
   userCodeLineCount,
   notice,
   packRun,
+  testSources,
+  onOpenTestSource,
 }: CodeConsoleProps) {
   const contentId = useId()
   const consoleRef = useRef<HTMLDivElement>(null)
@@ -552,90 +541,12 @@ export function CodeConsole({
 
             {/* Individual test results */}
             {testResults.map((result, index) => (
-              <div
+              <ConsoleTestResult
                 key={`test-${result.description?.slice(0, 20) ?? index}-${index}`}
-                className="py-0.5"
-              >
-                <div
-                  className={cn(
-                    "flex items-center gap-2",
-                    result.passed ? "text-[var(--console-success)]" : "text-[var(--console-error)]"
-                  )}
-                >
-                  {result.passed ? (
-                    <CheckCircle className="h-3 w-3 flex-shrink-0" />
-                  ) : (
-                    <XCircle className="h-3 w-3 flex-shrink-0" />
-                  )}
-                  <span
-                    className={result.passed ? "text-muted-foreground" : "text-muted-foreground"}
-                  >
-                    {result.description}
-                  </span>
-                </div>
-
-                {/* Show details for failed tests */}
-                {!result.passed && (
-                  <div className="mt-1 ml-5 space-y-0.5 text-[11px]">
-                    {result.isHidden ? (
-                      <div className="flex items-start gap-2">
-                        <span className="text-muted-foreground italic">
-                          This test case is hidden. The implementation failed to meet the required
-                          behavior.
-                        </span>
-                      </div>
-                    ) : (
-                      <>
-                        {/* Show input only when it's structured data (DSA test
-                            cases). Workspace results carry the suite name in
-                            `input` as a tag, which is noise to display here. */}
-                        {result.input != null && typeof result.input === "object" && (
-                          <div className="flex items-start gap-2">
-                            <span className="text-muted-foreground w-14 flex-shrink-0">Input:</span>
-                            <pre className={cn(TERMINAL_PRE, "text-[var(--console-info)]")}>
-                              {formatValue(result.input)}
-                            </pre>
-                          </div>
-                        )}
-                        {/* Show the error when there is one; otherwise the real
-                            expected/actual values. Workspace suites carry neither
-                            (their assert message is the signal), and inventing
-                            "Expected: pass / Got: fail" for them told the learner
-                            nothing. */}
-                        {result.error ? (
-                          <div className="flex items-start gap-2">
-                            <span className="text-muted-foreground w-14 flex-shrink-0">Error:</span>
-                            <pre className={cn(TERMINAL_PRE, "text-[var(--console-error)]")}>
-                              {result.error}
-                            </pre>
-                          </div>
-                        ) : hasComparison(result) ? (
-                          <>
-                            <div className="flex items-start gap-2">
-                              <span className="text-muted-foreground w-14 flex-shrink-0">
-                                Expected:
-                              </span>
-                              <pre className={cn(TERMINAL_PRE, "text-[var(--console-success)]")}>
-                                {formatValue(result.expected)}
-                              </pre>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <span className="text-muted-foreground w-14 flex-shrink-0">Got:</span>
-                              <pre className={cn(TERMINAL_PRE, "text-[var(--console-error)]")}>
-                                {formatValue(result.actual)}
-                              </pre>
-                            </div>
-                          </>
-                        ) : (
-                          <span className="text-muted-foreground italic">
-                            This check did not pass.
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
+                result={result}
+                sourcePath={testSources?.get(result)}
+                onOpenTestSource={onOpenTestSource}
+              />
             ))}
           </>
         )}

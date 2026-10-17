@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, type RefObject, type ReactNode } from "react"
+import { memo, useMemo, type RefObject, type ReactNode } from "react"
 import { Code, PlayCircle } from "lucide-react"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -30,6 +30,7 @@ import { TestResultsPanel } from "./_sub/TestResultsPanel"
 import { EditorActionsMenu } from "./EditorActionsMenu"
 import { EditorLanguageControl } from "./EditorLanguageControl"
 import { MarkdownFileView } from "@/components/editor/MarkdownFileView"
+import { resolveVisibleTestSources } from "@/lib/interview/test-source/resolve-visible-test-sources"
 
 interface EditorColumnProps {
   toolbar?: ReactNode
@@ -64,6 +65,7 @@ interface EditorColumnProps {
   workspaceContext?: WorkspaceContextFile[]
   editorRef?: RefObject<CodeMirrorEditorRef | null>
   onGoToLine?: (lineNum: number) => void
+  onWorkspaceFileSelect?: (file: WorkspaceContextFile) => void
 }
 
 export const EditorColumn = memo(function EditorColumn({
@@ -98,6 +100,7 @@ export const EditorColumn = memo(function EditorColumn({
   workspaceContext = [],
   editorRef,
   onGoToLine,
+  onWorkspaceFileSelect,
 }: EditorColumnProps) {
   const isWorkspace = isWorkspaceScenario(selectedScenario) && workspaceContext.length > 0
   const activeRoleStyle = activeWorkspaceFile
@@ -116,6 +119,15 @@ export const EditorColumn = memo(function EditorColumn({
       )
     : testResults
   const visiblePassed = visibleTestResults.filter((result) => result.passed).length
+  const testSources = useMemo(
+    () =>
+      resolveVisibleTestSources(
+        testResults,
+        workspaceContext,
+        isWorkspaceScenario(selectedScenario) ? selectedScenario.workspace.visibleTestPaths : []
+      ),
+    [testResults, workspaceContext, selectedScenario]
+  )
   const visibleTestSummary = guideFiltered
     ? {
         total: visibleTestResults.length,
@@ -302,6 +314,17 @@ export const EditorColumn = memo(function EditorColumn({
             isRunningTests={isRunningTests}
             onClearConsole={onClearConsole}
             onGoToLine={onGoToLine}
+            testSources={testSources}
+            onOpenTestSource={
+              onWorkspaceFileSelect
+                ? (path) => {
+                    const file = workspaceContext.find(
+                      (entry) => entry.path === path && !entry.hidden
+                    )
+                    if (file) onWorkspaceFileSelect(file)
+                  }
+                : undefined
+            }
             notice={revealNotice}
           />
         )}
