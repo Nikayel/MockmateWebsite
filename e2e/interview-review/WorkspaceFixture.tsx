@@ -6,7 +6,9 @@ import { genericCacheEvictionMutationScenario as workspaceScenario } from "@/lib
 import { dsaTwoSumScenario } from "@/lib/scenarios/dsa/arrays-hashing/dsa-two-sum"
 import { bugfixScenarios } from "@/lib/scenarios/real-world/bugfix/all"
 import { addFunctionalityScenarios } from "@/lib/scenarios/add-functionality"
-import { toWorkspaceScenarioFiles } from "@/app/interview/_utils/workspace"
+import { isWorkspaceScenario, toWorkspaceScenarioFiles } from "@/app/interview/_utils/workspace"
+import { isLanguageSupported } from "@/app/interview/_utils/language"
+import type { TestResult } from "@/components/interview/CodeConsole"
 import type { PackRunView } from "@/lib/workspace-execution"
 import type { ChatMessage, EditorLanguage } from "@/app/interview/_types"
 import type { PartnerChatMessage } from "@/app/interview/_components/SparraPartnerWidget"
@@ -30,7 +32,32 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
   const [hideTimer, setHideTimer] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
   const [packRun, setPackRun] = useState<PackRunView | null>(null)
-  const [language, setLanguage] = useState<EditorLanguage>(isDsa ? "javascript" : "python")
+  const scenarioLanguage = isWorkspaceScenario(scenario)
+    ? scenario.workspace.language
+    : "javascript"
+  const [language, setLanguage] = useState<EditorLanguage>(
+    isLanguageSupported(scenarioLanguage) ? scenarioLanguage : "javascript"
+  )
+  const [testResults, setTestResults] = useState<TestResult[]>(
+    params.get("results") === "1"
+      ? [
+          {
+            description:
+              "visible reconciliation lookup: does not explain an adjustment with a row that was already reconciled",
+            input: "visible reconciliation lookup",
+            passed: false,
+            error: "Expected deep equality\nExpected: []\nReceived: [0,1]",
+          },
+          {
+            description: "hidden reconciliation edges: protects the open-row contract",
+            input: "hidden reconciliation edges",
+            passed: false,
+            isHidden: true,
+            error: "private hidden assertion",
+          },
+        ]
+      : []
+  )
   const [singleFileCode, setSingleFileCode] = useState(
     dsaTwoSumScenario.starterCode.javascript ?? ""
   )
@@ -207,7 +234,7 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
         documentPreviewPath={documentPreviewPath}
         onDocumentPreviewChange={(preview) => setDocumentPreviewPath(preview ? path : null)}
         selectedLanguage={language}
-        editorLanguage={isDsa ? language : "python"}
+        editorLanguage={language}
         code={active?.content ?? singleFileCode}
         onCodeChange={(content) => {
           if (isDsa) setSingleFileCode(content)
@@ -223,11 +250,23 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
         isActiveWorkspaceFileEditable={isDsa || active?.role === "editable"}
         onStartInterview={noop}
         editorConsoleOutputs={[]}
-        testResults={[]}
-        testSummary={{ total: 12, passed: 8, failed: 4, passRate: 67 }}
+        testResults={testResults}
+        testSummary={
+          testResults.length
+            ? {
+                total: testResults.length,
+                passed: testResults.filter((result) => result.passed).length,
+                failed: testResults.filter((result) => !result.passed).length,
+                passRate: 0,
+              }
+            : { total: 12, passed: 8, failed: 4, passRate: 67 }
+        }
         packRun={packRun}
         isRunningTests={isRunning}
-        onClearConsole={() => setPackRun(null)}
+        onClearConsole={() => {
+          setPackRun(null)
+          setTestResults([])
+        }}
         onSubmitSystemDesign={onSubmit}
         onRunCode={run}
         onSubmitCode={onSubmit}
