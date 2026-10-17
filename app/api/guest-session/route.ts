@@ -344,8 +344,8 @@ export async function PUT(request: NextRequest) {
         code: sessionState.code,
         language: sessionState.language,
         elapsed_time: sessionState.elapsedTime,
-        chat_messages: sessionState.chatMessages?.slice(-20),
-        interviewer_messages: sessionState.interviewerMessages?.slice(-20),
+        chat_messages: sessionState.chatMessages,
+        interviewer_messages: sessionState.interviewerMessages,
         test_results: sessionState.testResults?.slice(-10),
         test_summary: sessionState.testSummary,
         workspace_context: sessionState.workspaceContext,
@@ -358,6 +358,9 @@ export async function PUT(request: NextRequest) {
         is_post_interview_discussion: sessionState.isPostInterviewDiscussion,
         real_interview_mode: sessionState.realInterviewMode,
         strict_time_limit: sessionState.strictTimeLimit,
+        paused: sessionState.paused,
+        interviewer_input: sessionState.interviewerInput,
+        chat_input: sessionState.chatInput,
         saved_at: new Date().toISOString(),
       }
     }

@@ -103,6 +103,25 @@ beforeEach(() => {
 })
 
 describe("useSessionReopen when the submitted session is already on screen", () => {
+  it("restores a code-only checkpoint under a minute and seeds the existing clock", async () => {
+    getSessionState.mockResolvedValueOnce({
+      code: "",
+      elapsedTime: 12,
+      interviewerMessages: [{ type: "ai", message: "Original welcome" }],
+      chatMessages: [],
+    })
+    const opts = buildOpts()
+    const before = Date.now()
+    renderHook(() => useSessionReopen(opts as never))
+    await flush()
+    expect(opts.setCode).toHaveBeenCalledWith("")
+    expect(opts.setInterviewerMessages).toHaveBeenCalledWith([
+      { type: "ai", message: "Original welcome" },
+    ])
+    expect(opts.setStartTime.mock.calls[0][0]).toBeGreaterThanOrEqual(before - 12000)
+    expect(opts.setStartTime.mock.calls[0][0]).toBeLessThanOrEqual(Date.now() - 12000)
+    expect(opts.startInterview).not.toHaveBeenCalled()
+  })
   it("selects the exact recommended task and language without starting or restoring old code", async () => {
     const opts = buildOpts({
       searchParams: new URLSearchParams(

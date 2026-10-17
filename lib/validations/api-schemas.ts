@@ -186,8 +186,8 @@ export const GuestSessionUpdateSchema = z.object({
       code: z.string().max(50000, "Code too long").optional(),
       language: z.string().max(50).optional(),
       elapsedTime: z.number().optional(),
-      chatMessages: z.array(BoundedStateElement).max(100, "Too many messages").optional(),
-      interviewerMessages: z.array(BoundedStateElement).max(100, "Too many messages").optional(),
+      chatMessages: z.array(BoundedStateElement).max(1000, "Too many messages").optional(),
+      interviewerMessages: z.array(BoundedStateElement).max(1000, "Too many messages").optional(),
       testResults: z.array(BoundedStateElement).max(100, "Too many test results").optional(),
       testSummary: z
         .object({
@@ -213,6 +213,9 @@ export const GuestSessionUpdateSchema = z.object({
       isPostInterviewDiscussion: z.boolean().optional(),
       realInterviewMode: z.boolean().optional(),
       strictTimeLimit: z.number().min(0).max(86400).nullable().optional(),
+      paused: z.boolean().optional(),
+      interviewerInput: z.string().max(10000).optional(),
+      chatInput: z.string().max(10000).optional(),
     })
     .optional(),
   performanceScore: z

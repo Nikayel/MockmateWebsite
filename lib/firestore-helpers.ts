@@ -903,6 +903,9 @@ export async function saveSessionState(
     isPostInterviewDiscussion?: boolean
     realInterviewMode?: boolean
     strictTimeLimit?: number | null
+    paused?: boolean
+    interviewerInput?: string
+    chatInput?: string
   }
 ): Promise<void> {
   try {
@@ -930,14 +933,17 @@ export async function saveSessionState(
           is_post_interview_discussion: state.isPostInterviewDiscussion ?? false,
           real_interview_mode: state.realInterviewMode,
           strict_time_limit: state.strictTimeLimit,
+          paused: state.paused,
+          interviewer_input: state.interviewerInput,
+          chat_input: state.chatInput,
           saved_at: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),
       },
       { merge: true }
     )
-  } catch {
-    // Non-blocking - localStorage backup exists
+  } catch (error) {
+    throw error
   }
 }
 
@@ -962,6 +968,9 @@ export async function getSessionState(sessionId: string): Promise<{
   isPostInterviewDiscussion?: boolean
   realInterviewMode?: boolean
   strictTimeLimit?: number | null
+  paused?: boolean
+  interviewerInput?: string
+  chatInput?: string
   savedAt?: string
   completedAt?: string
   feedbackStatus?: FeedbackStatus
@@ -995,6 +1004,9 @@ export async function getSessionState(sessionId: string): Promise<{
       isPostInterviewDiscussion?: boolean
       realInterviewMode?: boolean
       strictTimeLimit?: number | null
+      paused?: boolean
+      interviewerInput?: string
+      chatInput?: string
       savedAt?: string
       completedAt?: string
       feedbackStatus?: FeedbackStatus
@@ -1026,6 +1038,9 @@ export async function getSessionState(sessionId: string): Promise<{
       result.isPostInterviewDiscussion = data.session_state.is_post_interview_discussion ?? false
       result.realInterviewMode = data.session_state.real_interview_mode
       result.strictTimeLimit = data.session_state.strict_time_limit
+      result.paused = data.session_state.paused
+      result.interviewerInput = data.session_state.interviewer_input
+      result.chatInput = data.session_state.chat_input
       result.savedAt = data.session_state.saved_at
     }
 

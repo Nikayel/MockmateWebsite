@@ -180,7 +180,7 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
             opts.setCurrentSessionId(guestSessionId)
             opts.setShowScenarioBrowser(false)
             opts.setIsInterviewStarted(true)
-            opts.setStartTime(Date.now())
+            opts.setStartTime(Date.now() - (Number(sessionState?.elapsed_time) || 0) * 1000)
 
             // Guests only reach the DSA and Debugging tracks, so the code
             // init covers bugfix and default starter code; workspace and
@@ -317,7 +317,7 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
 
           // Now start the interview with restored state
           opts.setIsInterviewStarted(true)
-          opts.setStartTime(Date.now())
+          opts.setStartTime(Date.now() - (savedState?.elapsedTime ?? 0) * 1000)
 
           // CRITICAL: If session is completed or evaluating, redirect to results page
           // This prevents users from being put back into interview mode
@@ -332,12 +332,7 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
             return
           }
 
-          const hasExistingProgress =
-            savedState &&
-            ((savedState.interviewerMessages && savedState.interviewerMessages.length > 1) ||
-              (savedState.chatMessages && savedState.chatMessages.length > 1) ||
-              (savedState.elapsedTime && savedState.elapsedTime > 60) ||
-              savedState.isPostInterviewDiscussion)
+          const hasExistingProgress = !!savedState
 
           // Initialize code based on scenario type
           let initialCode: string
@@ -427,7 +422,7 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
           }
 
           // If there's saved code, use it; otherwise use starter code
-          if (hasExistingProgress && savedState?.code) {
+          if (hasExistingProgress && savedState?.code !== undefined) {
             opts.setCode(savedState.code)
             if (savedState.language) {
               opts.setSelectedLanguage(savedState.language as any)

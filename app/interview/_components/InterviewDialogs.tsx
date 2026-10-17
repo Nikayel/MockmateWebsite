@@ -100,9 +100,7 @@ export const InterviewDialogs = memo(function InterviewDialogs({
       <AlertDialog open={showCloseDialog} onOpenChange={onShowCloseDialogChange}>
         <AlertDialogContent className="border-border bg-card">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-foreground">
-              You want to close this interview?
-            </AlertDialogTitle>
+            <AlertDialogTitle className="text-foreground">Save and leave?</AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
               If you close now, your progress will be saved but you'll exit the interview session.
               You can always come back to continue later.
@@ -119,7 +117,7 @@ export const InterviewDialogs = memo(function InterviewDialogs({
               }}
               className="bg-accent text-accent-foreground hover:bg-accent/90"
             >
-              Close Interview
+              Save and exit
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1304,7 +1304,7 @@ function InterviewPageContent() {
     recordedBugfixEditPathsRef,
   })
 
-  useInterviewAutosave({
+  const { saveNow } = useInterviewAutosave({
     isInterviewStarted,
     selectedScenario,
     firebaseUser,
@@ -1325,7 +1325,25 @@ function InterviewPageContent() {
     showPostInterviewDiscussion,
     realInterviewMode,
     strictTimeLimit,
+    interviewerInput,
+    chatInput,
   })
+
+  const saveAndExit = async () => {
+    interviewerVoice.cancelCountdown()
+    if (interviewerVoice.isRecording) interviewerVoice.stopRecording()
+    resetProactiveState()
+    const saved = await saveNow()
+    if (!saved.cloudSaved) {
+      toast.warning(
+        saved.localSaved
+          ? "Saved on this device. Cloud backup is pending."
+          : "Could not save. Please stay and try again."
+      )
+      return
+    }
+    router.push("/dashboard")
+  }
 
   useSessionRestore({
     firebaseUser,
@@ -2369,7 +2387,7 @@ function InterviewPageContent() {
         }}
         showCloseDialog={showCloseDialog}
         onShowCloseDialogChange={setShowCloseDialog}
-        onCloseInterview={resetInterview}
+        onCloseInterview={saveAndExit}
       />
 
       {!isInterviewMode && <Footer />}

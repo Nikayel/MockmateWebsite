@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import type { User as FirebaseUser } from "firebase/auth"
 import type { Scenario } from "@/lib/scenarios"
 import { saveSessionState } from "@/lib/firestore-helpers"
@@ -38,6 +38,9 @@ export interface UseInterviewAutosaveOptions {
   // Read-but-omitted from deps (see dep array below)
   realInterviewMode: boolean
   strictTimeLimit: number | null
+  interviewerInput?: string
+  chatInput?: string
+  paused?: boolean
 }
 
 /**
@@ -62,59 +65,70 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
   // Firestore writes per hour-long interview spent idle or thinking.
   const lastRemoteSaveRef = useRef<{ sessionId: string; fingerprint: string } | null>(null)
 
-  // Auto-save session data every 30 seconds (localStorage + Firestore/API)
-  useEffect(() => {
-    // Allow auto-save for both authenticated users and guests
-    if (!opts.isInterviewStarted || !opts.selectedScenario) return
-    if (!opts.firebaseUser && !opts.isGuestMode) return
-
-    const autoSaveInterval = setInterval(async () => {
-      const opts = optsRef.current
-      const selectedScenario = opts.selectedScenario
-      if (!selectedScenario) return
+  const pendingSaveRef = useRef<Promise<unknown>>(Promise.resolve())
+  const saveNow = useCallback((force = true) => {
+    const opts = optsRef.current
+    const selectedScenario = opts.selectedScenario
+    if (!selectedScenario) return Promise.resolve({ localSaved: false, cloudSaved: false })
+    let localSaved = false
+    // Everything the remote save persists except the clock. elapsedTime
+    // advances every second, so including it would defeat the dirty check;
+    // it is only worth a remote write when real content changed with it.
+    const remoteFingerprint = JSON.stringify({
+      scenarioId: selectedScenario.id,
+      code: opts.code,
+      chatMessages: opts.chatMessages,
+      interviewerMessages: opts.interviewerMessages,
+      selectedLanguage: opts.selectedLanguage,
+      testResults: opts.testResults,
+      testSummary: opts.testSummary,
+      workspaceContext: opts.workspaceContext,
+      activeWorkspacePath: opts.activeWorkspacePath,
+      consoleLogs: opts.consoleLogs,
+      bugfixEvidenceEvents: opts.bugfixEvidenceEvents,
+      isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
+      paused: opts.paused ?? false,
+      interviewerInput: opts.interviewerInput ?? "",
+      chatInput: opts.chatInput ?? "",
+    })
+    const remoteDirty =
+      force ||
+      !opts.currentSessionId ||
+      lastRemoteSaveRef.current?.sessionId !== opts.currentSessionId ||
+      lastRemoteSaveRef.current?.fingerprint !== remoteFingerprint
+    const sessionData = {
+      sessionId: opts.currentSessionId,
+      scenarioId: selectedScenario.id,
+      code: opts.code,
+      chatMessages: opts.chatMessages,
+      interviewerMessages: opts.interviewerMessages,
+      selectedLanguage: opts.selectedLanguage,
+      elapsedTime: opts.elapsedTime,
+      testResults: opts.testResults,
+      testSummary: opts.testSummary,
+      workspaceContext: opts.workspaceContext,
+      activeWorkspacePath: opts.activeWorkspacePath,
+      consoleLogs: opts.consoleLogs,
+      bugfixEvidenceEvents: opts.bugfixEvidenceEvents,
+      isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
+      paused: opts.paused ?? false,
+      interviewerInput: opts.interviewerInput ?? "",
+      chatInput: opts.chatInput ?? "",
+      timestamp: Date.now(),
+    }
+    try {
+      const storageKey = opts.firebaseUser
+        ? `interview_autosave_${opts.firebaseUser.uid}_${selectedScenario.id}`
+        : `interview_autosave_guest_${selectedScenario.id}`
+      localStorage.setItem(storageKey, JSON.stringify(sessionData))
+      localSaved = true
+    } catch {
+      /* Remote persistence can still succeed when storage is unavailable. */
+    }
+    const persist = async () => {
       try {
-        // Everything the remote save persists except the clock. elapsedTime
-        // advances every second, so including it would defeat the dirty check;
-        // it is only worth a remote write when real content changed with it.
-        const remoteFingerprint = JSON.stringify({
-          scenarioId: selectedScenario.id,
-          code: opts.code,
-          chatMessages: opts.chatMessages,
-          interviewerMessages: opts.interviewerMessages,
-          selectedLanguage: opts.selectedLanguage,
-          testResults: opts.testResults,
-          testSummary: opts.testSummary,
-          workspaceContext: opts.workspaceContext,
-          activeWorkspacePath: opts.activeWorkspacePath,
-          consoleLogs: opts.consoleLogs,
-          bugfixEvidenceEvents: opts.bugfixEvidenceEvents,
-          isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
-        })
-        const remoteDirty =
-          !opts.currentSessionId ||
-          lastRemoteSaveRef.current?.sessionId !== opts.currentSessionId ||
-          lastRemoteSaveRef.current?.fingerprint !== remoteFingerprint
-        const sessionData = {
-          scenarioId: selectedScenario.id,
-          code: opts.code,
-          chatMessages: opts.chatMessages,
-          interviewerMessages: opts.interviewerMessages,
-          selectedLanguage: opts.selectedLanguage,
-          elapsedTime: opts.elapsedTime,
-          testResults: opts.testResults,
-          testSummary: opts.testSummary,
-          workspaceContext: opts.workspaceContext,
-          activeWorkspacePath: opts.activeWorkspacePath,
-          consoleLogs: opts.consoleLogs,
-          bugfixEvidenceEvents: opts.bugfixEvidenceEvents,
-          isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
-          timestamp: Date.now(),
-        }
-
         if (opts.firebaseUser) {
           // Authenticated user - save to localStorage with user-specific key
-          const storageKey = `interview_autosave_${opts.firebaseUser.uid}_${selectedScenario.id}`
-          localStorage.setItem(storageKey, JSON.stringify(sessionData))
 
           // Also save to Firestore if we have a session ID (for cross-device
           // recovery) - but only when something other than the clock changed.
@@ -136,16 +150,17 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
               isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
               realInterviewMode: opts.realInterviewMode,
               strictTimeLimit: opts.strictTimeLimit,
+              paused: opts.paused,
+              interviewerInput: opts.interviewerInput,
+              chatInput: opts.chatInput,
             })
           }
         } else if (opts.isGuestMode && opts.guestId) {
           // Guest user - save to localStorage with guest-specific key
-          const storageKey = `interview_autosave_guest_${selectedScenario.id}`
-          localStorage.setItem(storageKey, JSON.stringify(sessionData))
 
           // Also save state to Firestore via API (for session recovery)
           if (opts.currentSessionId && remoteDirty) {
-            await fetch("/api/guest-session", {
+            const response = await fetch("/api/guest-session", {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -155,8 +170,8 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
                   code: opts.code,
                   language: opts.selectedLanguage,
                   elapsedTime: opts.elapsedTime,
-                  chatMessages: opts.chatMessages.slice(-20), // Limit messages
-                  interviewerMessages: opts.interviewerMessages.slice(-20),
+                  chatMessages: opts.chatMessages,
+                  interviewerMessages: opts.interviewerMessages,
                   testResults: opts.testResults.slice(-10),
                   testSummary: opts.testSummary,
                   workspaceContext: opts.workspaceContext,
@@ -166,9 +181,13 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
                   isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
                   realInterviewMode: opts.realInterviewMode,
                   strictTimeLimit: opts.strictTimeLimit,
+                  paused: opts.paused,
+                  interviewerInput: opts.interviewerInput,
+                  chatInput: opts.chatInput,
                 },
               }),
             })
+            if (!response.ok) throw new Error("Session backup failed")
           }
         }
 
@@ -178,14 +197,33 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
             fingerprint: remoteFingerprint,
           }
         }
+        return { localSaved, cloudSaved: !!opts.currentSessionId }
       } catch (error) {
         console.error("Auto-save failed:", error)
+        return { localSaved, cloudSaved: false }
       }
-    }, 30000) // 30 seconds
+    }
+    // Serialize writes so a slow older snapshot cannot overwrite a newer checkpoint.
+    const pending = pendingSaveRef.current.then(persist, persist)
+    pendingSaveRef.current = pending
+    return pending
+  }, [])
+
+  useEffect(() => {
+    if (!opts.isInterviewStarted || !opts.selectedScenario) return
+    if (!opts.firebaseUser && !opts.isGuestMode) return
+    const autoSaveInterval = setInterval(() => {
+      void saveNow(false)
+    }, 30000)
+    const saveWhenHidden = () => {
+      if (document.visibilityState === "hidden") void saveNow()
+    }
+    document.addEventListener("visibilitychange", saveWhenHidden)
 
     // Cleanup on unmount
     return () => {
       clearInterval(autoSaveInterval)
+      document.removeEventListener("visibilitychange", saveWhenHidden)
     }
     // Interval keyed ONLY on session identity — payload fields are read from
     // optsRef.current inside the callback so a value change (e.g. the 1s clock)
@@ -199,4 +237,5 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
     opts.isGuestMode,
     opts.guestId,
   ])
+  return { saveNow }
 }
