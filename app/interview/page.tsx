@@ -1137,6 +1137,7 @@ function InterviewPageContent() {
     updateTrackerOnTestsRun,
     getInterviewerChatParams,
   } = useInterviewPhaseTracking({
+    sessionContext,
     showPostInterviewDiscussion,
     showFeedback,
     testResults,

@@ -317,7 +317,10 @@ export async function POST(request: NextRequest) {
 
     // Build level-specific interviewer context
     // This adapts questions and expectations based on candidate's experience level
-    const levelContext = buildInterviewerLevelContext(candidateLevel)
+    const levelContext =
+      scenarioType === "bugfix" || scenarioType === "system-design"
+        ? `CANDIDATE EXPERIENCE: ${candidateLevel}. Calibrate the depth of relevant investigation or design questions to this experience. Accept informal explanations; do not turn level expectations into a mandatory question checklist. Do not import algorithm optimization requirements into this round.`
+        : buildInterviewerLevelContext(candidateLevel)
 
     // Manage workspace context with sliding window
     const workspaceContextStr = sessionContext ? "" : buildWorkspaceContextString(workspaceContext)
@@ -648,30 +651,32 @@ Keep responses brief, actionable, and helpful.You're a tool they can use, but th
     // Derive scenarioId from title for complexity lookup (e.g., "Two Sum" -> "dsa-two-sum")
     const scenarioId = sessionContext?.task.id ?? buildScenarioId(scenarioTitle)
 
-    // Enhance both interviewer and partner roles with RAG context
-    // Now includes DYNAMIC context based on the user's current message
-    // OPTIMIZATION: Static parts are cached per-session for cost savings
-    const ragContext = await buildRAGContext({
-      scenarioTitle,
-      scenarioPattern,
-      scenarioCompany: scenarioCompany ?? undefined,
-      scenarioType,
-      scenarioId,
-      problemText: scenarioTitle, // Use title as problem text
-      userCode: currentCode,
-      userId,
-      sessionId, // For session-level caching of static context
-      userMessage: message, // Pass user message for dynamic context
-      testResults: testResults
-        ? {
-            passed: testResults.filter((t) => t.passed).length,
-            total: testResults.length,
-            failingTests: testResults
-              .filter((t) => !t.passed)
-              .map((t) => t.description || "Unknown test"),
-          }
-        : undefined,
-    })
+    // This retrieval path indexes DSA patterns/complexity, not incident or design
+    // contracts. Non-DSA rounds are grounded in their public task and workspace.
+    const ragContext =
+      isBugFix || isSystemDesign
+        ? ""
+        : await buildRAGContext({
+            scenarioTitle,
+            scenarioPattern,
+            scenarioCompany: scenarioCompany ?? undefined,
+            scenarioType,
+            scenarioId,
+            problemText: scenarioTitle, // Use title as problem text
+            userCode: currentCode,
+            userId,
+            sessionId, // For session-level caching of static context
+            userMessage: message, // Pass user message for dynamic context
+            testResults: testResults
+              ? {
+                  passed: testResults.filter((t) => t.passed).length,
+                  total: testResults.length,
+                  failingTests: testResults
+                    .filter((t) => !t.passed)
+                    .map((t) => t.description || "Unknown test"),
+                }
+              : undefined,
+          })
 
     if (ragContext) {
       if (role === "interviewer") {

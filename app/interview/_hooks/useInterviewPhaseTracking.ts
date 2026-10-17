@@ -8,10 +8,12 @@ import {
 import type { Scenario } from "@/lib/scenarios"
 import type { ChatMessage, EfficiencyMetrics, TestResult } from "../_types"
 import { detectDebuggingPhase } from "@/lib/interview/phases/debugging"
+import type { SessionContext } from "@/lib/interview/session-context/schema"
 
 export interface PhaseDerivationInput {
   scenarioType?: string
   hasCodeChanges?: boolean
+  testsAreCurrent?: boolean
   showPostInterviewDiscussion: boolean
   showFeedback: boolean
   testResultsLength: number
@@ -28,6 +30,7 @@ export interface PhaseDerivationInput {
 export function deriveInterviewPhase({
   scenarioType,
   hasCodeChanges = false,
+  testsAreCurrent,
   showPostInterviewDiscussion,
   showFeedback,
   testResultsLength,
@@ -44,7 +47,7 @@ export function deriveInterviewPhase({
       hasSubmitted: false,
       hasCodeChanges,
       hasTestResults: testResultsLength > 0,
-      testsAreCurrent: testResultsLength > 0,
+      testsAreCurrent: testsAreCurrent ?? testResultsLength > 0,
       approachExplained,
     })
   }
@@ -61,6 +64,7 @@ export function deriveInterviewPhase({
 }
 
 export interface UseInterviewPhaseTrackingOptions {
+  sessionContext?: Pick<SessionContext, "files" | "testsMatchCurrentRevision">
   showPostInterviewDiscussion: boolean
   showFeedback: boolean
   testResults: TestResult[]
@@ -86,6 +90,7 @@ export interface UseInterviewPhaseTrackingOptions {
  * getInterviewerChatParams).
  */
 export function useInterviewPhaseTracking({
+  sessionContext,
   showPostInterviewDiscussion,
   showFeedback,
   testResults,
@@ -103,7 +108,10 @@ export function useInterviewPhaseTracking({
     (): InterviewPhase =>
       deriveInterviewPhase({
         scenarioType: selectedScenario?.type,
-        hasCodeChanges: code !== starterCode,
+        hasCodeChanges: sessionContext
+          ? sessionContext.files.some((file) => file.status === "modified")
+          : code !== starterCode,
+        testsAreCurrent: sessionContext?.testsMatchCurrentRevision,
         showPostInterviewDiscussion,
         showFeedback,
         testResultsLength: testResults.length,
@@ -118,6 +126,7 @@ export function useInterviewPhaseTracking({
       code,
       starterCode,
       selectedScenario?.type,
+      sessionContext,
       conversationTracker.approachExplained,
       interviewerMessages.length,
     ]

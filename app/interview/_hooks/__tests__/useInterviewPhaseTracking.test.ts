@@ -13,6 +13,17 @@ const base: PhaseDerivationInput = {
 }
 
 describe("deriveInterviewPhase", () => {
+  it("returns to coding when a debugging patch changes after a run", () => {
+    expect(
+      deriveInterviewPhase({
+        ...base,
+        scenarioType: "bugfix",
+        hasCodeChanges: true,
+        testResultsLength: 2,
+        testsAreCurrent: false,
+      })
+    ).toBe("coding")
+  })
   it("does not mistake a long debugging starter for candidate coding", () => {
     expect(deriveInterviewPhase({ ...base, scenarioType: "bugfix", codeLength: 5000 })).toBe(
       "clarification"

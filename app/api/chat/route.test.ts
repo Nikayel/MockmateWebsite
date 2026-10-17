@@ -114,6 +114,29 @@ describe("/api/chat route", () => {
     vi.clearAllMocks()
   })
 
+  it.each(["bugfix", "system-design"])(
+    "does not import DSA retrieval or level checklists into %s",
+    async (scenarioType) => {
+      const { generateAIResponse, buildRAGContext } = await setupMocks()
+      const { POST } = await import("./route")
+      await POST(
+        createRequest({
+          role: "interviewer",
+          message: "No questions; I'll investigate",
+          scenarioType,
+          scenarioPattern: "arrays-hashing",
+          userContext: { skill_level: "beginner" },
+        })
+      )
+      expect(buildRAGContext).not.toHaveBeenCalled()
+      const [system] = vi.mocked(generateAIResponse).mock.calls[0]
+      expect(system).toContain("CANDIDATE EXPERIENCE: beginner")
+      expect(system).not.toContain("### Appropriate Follow-up Questions")
+      expect(system).not.toContain("### What to Look For (Must Have)")
+      expect(system).not.toContain("PROBLEM PATTERN:")
+    }
+  )
+
   it.each([false, true])(
     "keeps baseline debugging runs in investigation with phase service=%s",
     async (useService) => {
