@@ -213,9 +213,9 @@ Finance support approves a manual invoice adjustment when the review queue shows
 
 **Your Task**
 1. Reproduce the failing behavior by reading the docs and running the tests.
-2. Write a hypothesis before editing.
-3. Make the smallest fix in the reconciliation lookup.
-4. Verify with tests, then explain the root cause and prevention plan.`,
+2. Investigate the failures and make a focused fix in the reconciliation lookup.
+3. Run tests to verify your change.
+4. Explain what caused the bug and how you would prevent it in the conversation.`,
   buggyCode: { javascript: starter },
   codebaseFiles: {
     javascript: [

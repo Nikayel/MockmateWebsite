@@ -3,6 +3,7 @@
  */
 
 import { FORBIDDEN_VALIDATION_PHRASES } from "./forbidden-phrases"
+import { CANDIDATE_LED_BEHAVIOR, getScenarioPhasePrompt } from "./scenario-prompts"
 
 /**
  * Shared interview behavior included in every interviewer prompt.
@@ -188,10 +189,8 @@ export function buildInterviewerPrompt(
   ctx: PromptContext,
   section: "all" | "stable" | "turn" = "all"
 ): string {
-  const phasePrompt =
-    ctx.scenarioType === "bugfix"
-      ? `DEBUGGING PHASE: ${ctx.phase}. Follow observed reproduction, inspection, hypothesis, patch, verification and regression prevention. Answer named requirement questions from public docs. Do not gate progress on a generic complexity checklist or disclose the root cause. Test results apply only to their recorded revision.`
-      : PHASE_PROMPTS[ctx.phase] || PHASE_PROMPTS.discussion
+  const scenarioPhasePrompt = getScenarioPhasePrompt(ctx.scenarioType, ctx.phase)
+  const phasePrompt = scenarioPhasePrompt ?? PHASE_PROMPTS[ctx.phase] ?? PHASE_PROMPTS.discussion
 
   // Render the shared forbidden-phrase list. The 8-then-rest wrap preserves the
   // original prompt's line layout so the model-facing text stays byte-identical.
@@ -216,13 +215,20 @@ FORBIDDEN PHRASES (trigger regeneration):
 ${forbiddenPhraseList}
 
 CORE RULES:
-- Keep responses SHORT (2-4 sentences max)
-- Ask ONE question at a time
+${
+  scenarioPhasePrompt
+    ? "- Usually one short sentence, at most two unless a concrete clarification needs more.\n- Ask at most one question; an acknowledgment or permission to continue needs none."
+    : "- Keep responses SHORT (2-4 sentences max)\n- Ask ONE question at a time"
+}
 - If they say something wrong, either let it stand OR ask "Are you sure?" - don't explain
 - If they deflect ("you tell me"), push back: "I'm asking you"
 - NEVER explain complexity for them
 - NEVER mention "View Detailed Feedback" until POST-INTERVIEW phase
-- Press any single concern at most TWICE. Still unresolved? Change tactics: have them trace a concrete input, or note it for feedback and move on - never rephrase the same question a third time
+${
+  scenarioPhasePrompt
+    ? "- Press a concern at most TWICE, then note the gap for feedback and let them work. No third paraphrase or unsolicited diagnostic hint."
+    : "- Press any single concern at most TWICE. Still unresolved? Change tactics: have them trace a concrete input, or note it for feedback and move on - never rephrase the same question a third time"
+}
 - PACING: messages may include a [TIME: ...] note. Once past the expected time, stop opening new question lines - wrap up what is open and keep the interview moving
 ${ctx.isGenericCompany !== false ? "- Standard technical interview" : ctx.companyName ? `- Adapt to ${ctx.companyName}'s interview culture` : ""}`
 
@@ -311,7 +317,7 @@ ${ctx.isGenericCompany !== false ? "- Standard technical interview" : ctx.compan
     addTurn(ctx.toolResultsContext)
   }
 
-  addStable(FEW_SHOT_EXAMPLES)
+  addStable(scenarioPhasePrompt ? CANDIDATE_LED_BEHAVIOR : FEW_SHOT_EXAMPLES)
 
   // Add candidate environment (what they can actually click; there is no terminal).
   // Sits next to PLATFORM ISSUES because both describe the platform, not the candidate.

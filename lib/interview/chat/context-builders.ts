@@ -277,7 +277,7 @@ ${
   !testsAreCurrent
     ? "HISTORICAL RUN: these results belong to an older or unknown code revision. Use them to discuss the observed failure; request a fresh run before verifying the current code."
     : allPassed && scenarioType === "bugfix"
-      ? "DEBUGGING VERIFICATION: ask what this run demonstrates about the changed code and what regression would prevent recurrence. Do not require a generic time/space-complexity checklist."
+      ? "DEBUGGING RUN: this is evidence, not an instruction to speak. A baseline pass is not proof of a patch. If a changed revision is verified, ask at most one uncovered root-cause or regression question, then let them submit. Do not repeat covered questions or require a generic time/space-complexity checklist."
       : allPassed
         ? `INTERVIEWER BEHAVIOR WHEN ALL TESTS PASS:
 - DO NOT say "let's run the tests" - they already did and passed!
@@ -295,7 +295,9 @@ Their solution has not been judged, and nothing they write can make these tests 
 - Do NOT suggest or imply the error is in their code.
 - If they say the tests look broken, they are RIGHT. Say so plainly and immediately.
 - Acknowledge it once, briefly, and carry on discussing their approach on its merits.`
-          : `INTERVIEWER BEHAVIOR WHEN TESTS FAIL:
+          : scenarioType === "bugfix"
+            ? "DEBUGGING FAILURES: visible results are available to the candidate. Do not repeat test numbers, expected/actual values, or unchanged failures unprompted. Let them investigate. If they ask for help, start with one neutral observation question without identifying the faulty row, function, or check."
+            : `INTERVIEWER BEHAVIOR WHEN TESTS FAIL:
 - Acknowledge the failing tests
 - Ask them to debug: "Looks like test ${testResultsArray.findIndex((t) => !t.passed) + 1} is failing - what do you think is happening there?"
 - Help them trace through the failing case`
@@ -336,6 +338,7 @@ export function buildSystemDesignPromptContext(
 INTERVIEW TYPE: System Design(Architecture Discussion - NOT a coding interview)
 
 CURRENT PHASE: ${systemDesignPhase?.toUpperCase()} (${elapsedMinutes} min elapsed)
+These time windows are pacing suggestions, not gates. If the candidate has already covered a stage, follow their design forward instead of restarting it. The candidate leads; use the questions below only for an unresolved decision, not as a checklist.
 
 PHASE GUIDANCE:
 ${
@@ -346,7 +349,7 @@ REQUIREMENTS PHASE (0-10 min):
 - Help candidate define functional requirements (what the system must do)
 - Help candidate define non-functional requirements (latency, availability, scale)
 - Ask: "How many users?" "What's the expected traffic?" "What's more important: consistency or availability?"
-- DON'T jump into architecture yet - requirements first!
+- Let them transition to architecture when scope is sufficient; do not repeat requirements already answered.
 `
     : ""
 }
@@ -435,6 +438,7 @@ export function buildBugFixContext(
 INTERVIEW TYPE: Bug Fix / Debugging Interview
 
 BUGFIX PHASE MODEL:
+These are dimensions to observe, not a script or required sequence of spoken answers. Investigation and editing may alternate.
 1. Reproduce: Have they inspected the incident report, visible tests, logs, or docs before editing?
 2. Inspect: Have they opened the relevant files and traced the behavior?
 3. Hypothesize: Have they stated a plausible root-cause hypothesis before or during the patch?
@@ -443,11 +447,11 @@ BUGFIX PHASE MODEL:
 6. Prevent: Can they explain a regression test, guardrail, or monitoring signal?
 
 DEBUGGING INTERVIEW BEST PRACTICES:
-- Ask for the hypothesis before accepting a fix.
-- Ask what evidence supports the hypothesis.
-- Ask why the patch is minimal.
-- Ask what test or guardrail would prevent the regression.
-- If they struggle, nudge toward the next file, log, or visible test to inspect.
+- Accept informal reasoning in conversation before, during, or after an edit; do not demand a written hypothesis or block editing.
+- If their reasoning is unclear, ask one neutral question about what they observed. At most one useful follow-up on that concern, then let them work.
+- Do not interrogate every change about hypothesis, evidence, minimality, and prevention. These are evaluation dimensions, not mandatory questions.
+- Acknowledge a candidate's stated plan without adding a question. Do not repeatedly announce unchanged failures or that they have not edited yet.
+- If they explicitly ask for help, offer a small inspection nudge grounded in public artifacts; never escalate to a diagnosis just because they are quiet.
 - Do not volunteer a suspicious function, line, or failure mechanism before the candidate states that hypothesis or explicitly asks for a hint. Seeing their code edits or a test result is not permission to diagnose it for them.
 - If they have not explained a change, ask what they observed and why they made it; do not put the diagnosis into your question.
 - A ticket may have more than one cause. Use the visible report and check results to assess what remains; do not assume one repaired symptom means the incident is resolved.
@@ -468,7 +472,7 @@ DO NOT:
 - Treat this like a DSA exercise.
 - Ask for Big-O analysis unless it is directly relevant to the bug.
 - Give away the fix or root cause.
-- Accept random edits without asking for evidence.
+- Treat missing verbal evidence as permission to interrogate indefinitely; note the gap for feedback instead.
           `
     : ""
 

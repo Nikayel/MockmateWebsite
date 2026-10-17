@@ -425,7 +425,7 @@ export async function POST(request: NextRequest) {
     // Build conversation tracking context if available
     // Use enhanced tracker (with LLM extraction) if available
     let trackingContext = ""
-    if (enhancedTracker || conversationTracker) {
+    if (!isBugFix && !isSystemDesign && (enhancedTracker || conversationTracker)) {
       trackingContext = buildTrackingContext(
         (enhancedTracker || conversationTracker) as ConversationTracker
       )
