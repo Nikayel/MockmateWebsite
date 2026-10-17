@@ -23,14 +23,11 @@ import {
   BarChart3,
   Calendar,
   Terminal,
-  Clock,
   ChevronRight,
-  Zap,
   RefreshCw,
   TrendingUp,
   HelpCircle,
   ShieldCheck,
-  FlaskConical,
   AlertCircle,
 } from "lucide-react"
 import { SubscriptionStatusBanner } from "@/components/ui/subscription-status-banner"
@@ -41,6 +38,7 @@ import { SparraLoader } from "@/components/brand/SparraLoader"
 import { resolveFeedbackGenerationStatus } from "@/lib/feedback/generation-stalled"
 import { shouldShowProfilePersonalization } from "@/lib/onboarding/profile-personalization"
 import { SavedPracticeCard } from "@/components/dashboard/SavedPracticeCard"
+import { RecentActivityHeader } from "@/components/dashboard/RecentActivityHeader"
 
 const InitialInterviewOnboarding = dynamic(
   () =>
@@ -402,27 +400,6 @@ export default function DashboardPage() {
       <div className="pt-20 pb-12 sm:pt-24 sm:pb-16">
         <div className="container mx-auto max-w-6xl px-4">
           <h1 className="sr-only">Dashboard</h1>
-          <div
-            className="mb-6 flex flex-col gap-2 sm:mb-8 sm:flex-row sm:justify-end"
-            data-tour="welcome"
-          >
-            <Link href="/labs">
-              <Button
-                variant="outline"
-                className="border-border text-muted-foreground hover:bg-muted w-full font-medium sm:w-auto"
-              >
-                <FlaskConical className="mr-2 h-4 w-4" />
-                Case Labs
-              </Button>
-            </Link>
-            <Link href="/interview" data-tour="start-practice-btn">
-              <Button className="bg-card text-foreground hover:bg-muted w-full font-medium sm:w-auto">
-                <Terminal className="mr-2 h-4 w-4" />
-                Start Practice
-              </Button>
-            </Link>
-          </div>
-
           <SavedPracticeCard isPro={isPro} />
 
           {shouldShowProfilePersonalization(profile, completedSessions.length) && (
@@ -608,24 +585,7 @@ export default function DashboardPage() {
                 className="border-border/50 bg-card/50 rounded-xl border"
                 data-tour="recent-activity"
               >
-                <div className="border-border/50 flex items-center justify-between border-b p-4">
-                  <div className="flex items-center gap-2">
-                    <Clock className="text-muted-foreground h-4 w-4" />
-                    <span className="text-muted-foreground text-sm font-medium">
-                      Recent Activity
-                    </span>
-                  </div>
-                  <Link href="/sessions">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground hover:text-foreground h-7 text-xs"
-                    >
-                      View All
-                      <ChevronRight className="ml-1 h-3 w-3" />
-                    </Button>
-                  </Link>
-                </div>
+                <RecentActivityHeader />
 
                 {sessionsError ? (
                   <div className="p-8 text-center sm:p-12">
@@ -652,15 +612,9 @@ export default function DashboardPage() {
                       <Calendar className="text-muted-foreground h-6 w-6" />
                     </div>
                     <p className="text-muted-foreground mb-1 text-sm">No sessions yet</p>
-                    <p className="text-muted-foreground mb-4 text-xs">
+                    <p className="text-muted-foreground text-xs">
                       Start practicing to track your progress
                     </p>
-                    <Link href="/interview">
-                      <Button size="sm" className="bg-card text-foreground hover:bg-muted">
-                        <Zap className="mr-1.5 h-3.5 w-3.5" />
-                        Start First Session
-                      </Button>
-                    </Link>
                   </div>
                 ) : (
                   <div className="divide-border divide-y">
