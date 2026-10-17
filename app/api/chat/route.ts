@@ -1,3 +1,4 @@
+import { generateValidatedChatResponse } from "@/lib/interview/chat/generate-response"
 import { prepareConversationExtraction } from "@/lib/interview/chat/extraction-job"
 import { runConversationExtractionAfterResponse } from "@/lib/interview/chat/conversation-extraction"
 import { trackChatCompletion } from "@/lib/interview/chat/completion-telemetry"
@@ -10,12 +11,6 @@ import type { PromptContext } from "@/lib/interview/interviewer-prompts"
 import { claimProactiveNudge } from "@/lib/interview/session-lifecycle/server"
 import { NextRequest, NextResponse } from "next/server"
 import { enforceMeteredAiRequest } from "@/lib/ai/metered-request"
-import {
-  generateAIResponse,
-  validateResponseRelevance,
-  type TaskComplexity,
-} from "@/lib/ai-providers"
-import { trackEnvDriftServer } from "@/lib/analytics-server"
 import { logger } from "@/lib/logger"
 import { buildInterviewerLevelContext } from "@/lib/rag/knowledge-base/interview-behavior-knowledge"
 // NEW: Phase-aware interview system with deterministic phase detection
@@ -26,20 +21,9 @@ import {
   buildTrackingContext,
   getHintGuidance,
   detectInterviewPhase,
-  providerForPhase,
 } from "@/lib/interview/interview-phases"
 import { phaseService } from "@/lib/services/phase-service"
 import { getFlag } from "@/lib/feature-flags"
-import {
-  validateSemanticRules,
-  validateWithRegexRetry,
-  type ValidationContext,
-} from "@/lib/interview/response-validation"
-
-// PERF-S1: run the fire-and-forget semantic (LLM) validator only for the first
-// few messages of a session, where interviewer tone-setting has the most signal.
-// history grows ~2 entries per turn, so 6 covers roughly the first three turns.
-const SEMANTIC_VALIDATION_MAX_HISTORY = 6
 import {
   executeTool,
   formatToolResultsForPrompt,
@@ -50,7 +34,6 @@ import {
   formatPreLLMInterviewerPolicy,
 } from "@/lib/interview/interviewer-policy"
 import { buildInterviewerPrompt } from "@/lib/interview/interviewer-prompts"
-import { matchShellCommandInstruction } from "@/lib/interview/guardrails/response-guardrails"
 import { buildFuzzyModeContext } from "@/lib/interview/fuzzy-mode-context"
 import { chatRequestSchema, type UserContext } from "@/lib/interview/chat-request-schema"
 import { buildRAGContext } from "@/lib/interview/chat-rag-context"
@@ -634,213 +617,15 @@ GROUNDING RULES (prevent hallucination):
 
     const fullUserMessage = promptFlow.fullUserMessage
 
-    // Determine task complexity for provider selection
-    const complexity: TaskComplexity = role == "interviewer" ? "dialogue" : "code"
-
-    // Reasoning effort follows the PHASE, not just the capability. Both
-    // capabilities here run at `low`, which is right while the candidate is
-    // orienting and wrong once the interviewer has to judge whether a proposed
-    // approach actually works. `preferredProvider` PREPENDS to the capability's
-    // chain, so this changes effort only: the vendor order, the retries and the
-    // degradation to DeepSeek then Gemini are all unchanged, and if OpenAI is
-    // unconfigured the provider is disabled and filtered out.
-    const preferredProvider = providerForPhase(currentPhase)
-
-    // DEBUG: Log prompt sizes to identify latency source
-    const historyChars = history.reduce((sum, h) => sum + h.content.length, 0)
-    logger.info("[Chat API] Prompt size debug", {
-      systemPromptChars: systemPrompt.length,
-      userMessageChars: fullUserMessage.length,
-      historyMessages: history.length,
-      historyChars,
-      totalEstimatedChars: systemPrompt.length + fullUserMessage.length + historyChars,
-      estimatedTokens: Math.ceil((systemPrompt.length + fullUserMessage.length + historyChars) / 4),
-    })
-
-    // Use AI provider abstraction with fallback
-    // Pass userId/sessionId for proper cost tracking
-    const aiResponse = await generateAIResponse(systemPrompt, fullUserMessage, history, {
-      complexity,
-      preferredProvider,
+    const aiResponse = await generateValidatedChatResponse({
+      request: requestContext,
       userId,
-      sessionId,
-      service: "interview-chat",
-      abortSignal: request.signal,
-      eventType: "chat_message",
+      systemPrompt,
+      fullUserMessage,
+      history,
+      currentPhase,
+      signal: request.signal,
     })
-
-    // Validate response relevance
-    const validation = validateResponseRelevance(aiResponse.text, {
-      title: scenarioTitle,
-      type: scenarioType,
-    })
-
-    if (!validation.valid) {
-      logger.warn("[Chat API] Response may have relevance issues", { issues: validation.issues })
-      // Don't fail, but log for monitoring
-    }
-
-    // Log-only observer: did the model try to send the candidate to a terminal
-    // that doesn't exist? Checked on the RAW response and on BOTH lanes - the
-    // interviewer's shell-command guardrail regenerates downstream (leaving no
-    // production-visible trace: per-attempt gate logs are info-level, dev-only)
-    // and the partner lane has no gates at all. alwaysReport bypasses the
-    // Sentry warn sampling: post-prompt-fix this should be rare, and a rare
-    // event at a 10% sample rate reads as zero. These counts are the measure of
-    // whether the environment prompt block is holding.
-    const shellInstruction = matchShellCommandInstruction(aiResponse.text)
-    if (shellInstruction) {
-      logger.warn(
-        "[Env Drift] AI instructed a shell command",
-        { sessionId, role, snippet: shellInstruction },
-        { alwaysReport: true }
-      )
-      // Durable counter: Vercel keeps runtime logs for about an hour and Sentry
-      // is not configured, so the countable record is an analytics_events doc
-      // (visible in the Firebase console filtered by event_name).
-      void trackEnvDriftServer({
-        sessionId,
-        role: role === "interviewer" ? "interviewer" : "partner",
-        snippet: shellInstruction,
-      })
-    }
-
-    // HARD GATES: Deterministic validation with retry loop
-    // This catches rule violations that prompt engineering alone can't prevent
-    // Gates are deterministic (not AI) - they always catch specific patterns
-    if (role === "interviewer") {
-      const activeTracker = (enhancedTracker || conversationTracker) as
-        | ConversationTracker
-        | undefined
-
-      const validationContext: ValidationContext = {
-        response: aiResponse.text,
-        phase: currentPhase,
-        tracker: activeTracker,
-        hasSubmitted: hasSubmitted || false,
-        lastUserMessage: message,
-        isOptimalSolution: solutionComplexity?.isOptimal || false,
-      }
-
-      // DEBUG: Log validation context
-      logger.info("[Hard Gates] Validation context", {
-        sessionId,
-        phase: currentPhase,
-        responsePreview: aiResponse.text.substring(0, 100),
-      })
-
-      // Regeneration function for the retry loop
-      const regenerate = async (hint: string): Promise<string> => {
-        // Build a forceful correction prompt that REPLACES the original prompt
-        const correctedPrompt = `${systemPrompt}
-
-⚠️⚠️⚠️ CRITICAL VIOLATION - YOU MUST FIX THIS ⚠️⚠️⚠️
-
-Your previous response violated interview rules and was REJECTED.
-
-VIOLATION: ${hint}
-
-YOU MUST generate a DIFFERENT response that follows the rules.
-
-${
-  currentPhase === "clarification"
-    ? `
-CLARIFICATION PHASE RULES:
-- Do NOT ask about their approach, thinking, or plan
-- Do NOT say "before you start coding" or "walk me through"
-- ONLY say something like: "Take your time reading. Any questions about the problem?"
-- Keep it SHORT (1-2 sentences max)
-`
-    : ""
-}
-
-Generate a compliant response NOW:`
-
-        const regeneratedResponse = await generateAIResponse(
-          correctedPrompt,
-          fullUserMessage,
-          history,
-          {
-            complexity,
-            userId,
-            sessionId,
-            service: "interview-chat",
-            abortSignal: request.signal,
-            eventType: "chat_message",
-            skipCache: true, // Regeneration must bypass the response cache
-          }
-        )
-
-        // COST TRACKING: Log retry for cost monitoring
-        // Each retry is a full AI call that adds to costs
-        logger.warn("[Chat API] Response regenerated due to violation (adds to cost)", {
-          sessionId,
-          userId,
-          retryReason: hint.substring(0, 100),
-          provider: regeneratedResponse.provider,
-          tokensUsed: regeneratedResponse.tokensUsed,
-        })
-
-        return regeneratedResponse.text
-      }
-
-      // Run REGEX-ONLY validation with up to 2 retries for critical violations.
-      // PERF-S1: the semantic LLM check used to run here on the blocking path (a
-      // second provider call per message, multiplied across retries — up to 5+
-      // calls for a flagged message). Regex hard gates stay synchronous; semantic
-      // validation now runs fire-and-forget below.
-      const gateResult = await validateWithRegexRetry(validationContext, regenerate, 2)
-
-      // Update response if regenerated
-      if (gateResult.retries > 0) {
-        aiResponse.text = gateResult.response
-        logger.info("[Hard Gates] Response regenerated", {
-          sessionId,
-          retries: gateResult.retries,
-          remainingViolations: gateResult.violations.map((v) => v.rule),
-        })
-      }
-
-      // Log any remaining violations (warnings that didn't trigger regeneration)
-      if (gateResult.violations.length > 0) {
-        logger.warn("[Hard Gates] Violations in final response", {
-          sessionId,
-          violations: gateResult.violations.map((v) => ({
-            rule: v.rule,
-            severity: v.severity,
-          })),
-        })
-      }
-
-      // PERF-S1: semantic (LLM) validation runs OFF the critical path and only
-      // for early messages, so it adds neither latency nor a per-message provider
-      // call on the happy path. Log-only: it never regenerates or blocks.
-      if (history.length <= SEMANTIC_VALIDATION_MAX_HISTORY) {
-        void validateSemanticRules(aiResponse.text, async (system, user) => {
-          const result = await generateAIResponse(system, user, [], {
-            complexity: "simple",
-            userId,
-            sessionId,
-            service: "interview-chat",
-            abortSignal: request.signal,
-            eventType: "chat_message",
-          })
-          return { text: result.text }
-        })
-          .then((semantic) => {
-            if (semantic.violated) {
-              logger.warn("[Hard Gates] Semantic violation observed (post-hoc, not regenerated)", {
-                sessionId,
-                rule: semantic.rule,
-                evidence: semantic.evidence,
-              })
-            }
-          })
-          .catch((error) => {
-            logger.warn("[Hard Gates] Post-hoc semantic validation failed", { error, sessionId })
-          })
-      }
-    }
 
     trackChatCompletion(requestContext, userId, aiResponse, Date.now() - startTime)
 

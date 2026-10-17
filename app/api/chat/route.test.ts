@@ -334,6 +334,77 @@ describe("/api/chat route", () => {
     expect(enforceChatRateLimit).toHaveBeenCalledWith("user-1", "free")
   })
 
+  it("returns the validated retry while preserving identity, cancellation, and cache bypass", async () => {
+    const { generateAIResponse } = await setupMocks()
+    const { validateWithRegexRetry } = await import("@/lib/interview/response-validation")
+    vi.mocked(generateAIResponse).mockResolvedValueOnce({
+      text: "Rejected reply",
+      provider: "gemini-lite",
+      latencyMs: 12,
+    })
+    vi.mocked(generateAIResponse).mockResolvedValueOnce({
+      text: "Corrected reply",
+      provider: "gemini-lite",
+      latencyMs: 8,
+    })
+    vi.mocked(validateWithRegexRetry).mockImplementationOnce(
+      async (_context, regenerate, retries) => {
+        expect(retries).toBe(2)
+        return {
+          response: await regenerate("Do not reveal the solution"),
+          retries: 1,
+          violations: [],
+        }
+      }
+    )
+    const request = createRequest({
+      role: "interviewer",
+      message: "I am reading",
+      userId: "spoofed",
+      sessionId: "session-1",
+    })
+    const { POST } = await import("./route")
+    const response = await POST(request)
+    expect(response.data.reply).toBe("Corrected reply")
+    expect(generateAIResponse).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(generateAIResponse).mock.calls[1][0]).toContain("Do not reveal the solution")
+    expect(vi.mocked(generateAIResponse).mock.calls[1][3]).toMatchObject({
+      userId: "user-1",
+      sessionId: "session-1",
+      skipCache: true,
+      abortSignal: request.signal,
+    })
+  })
+
+  it("does not apply interviewer validation to the partner lane", async () => {
+    await setupMocks()
+    const { validateWithRegexRetry, validateSemanticRules } =
+      await import("@/lib/interview/response-validation")
+    const { POST } = await import("./route")
+    await POST(createRequest({ role: "partner", message: "Explain this" }))
+    expect(validateWithRegexRetry).not.toHaveBeenCalled()
+    expect(validateSemanticRules).not.toHaveBeenCalled()
+  })
+
+  it("does not await the log-only semantic observer", async () => {
+    await setupMocks()
+    const { validateSemanticRules } = await import("@/lib/interview/response-validation")
+    let release: () => void = () => {}
+    vi.mocked(validateSemanticRules).mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = () => resolve({ violated: false, rule: null, evidence: null, suggestion: null })
+      })
+    )
+    const { POST } = await import("./route")
+    try {
+      const response = await POST(createRequest({ role: "interviewer", message: "I am reading" }))
+      expect(response.status).toBe(200)
+      expect(validateSemanticRules).toHaveBeenCalledOnce()
+    } finally {
+      release()
+    }
+  })
+
   it("returns 400 when the context array exceeds the maximum length", async () => {
     const { generateAIResponse, enforceChatRateLimit } = await setupMocks()
     const { POST } = await import("./route")
