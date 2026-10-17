@@ -1,3 +1,6 @@
+import { prepareConversationExtraction } from "@/lib/interview/chat/extraction-job"
+import { runConversationExtractionAfterResponse } from "@/lib/interview/chat/conversation-extraction"
+import { trackChatCompletion } from "@/lib/interview/chat/completion-telemetry"
 import {
   buildSessionBaselinePrompt,
   buildSessionEvidencePrompt,
@@ -12,7 +15,7 @@ import {
   validateResponseRelevance,
   type TaskComplexity,
 } from "@/lib/ai-providers"
-import { trackAIChatServer, trackEnvDriftServer } from "@/lib/analytics-server"
+import { trackEnvDriftServer } from "@/lib/analytics-server"
 import { logger } from "@/lib/logger"
 import { buildInterviewerLevelContext } from "@/lib/rag/knowledge-base/interview-behavior-knowledge"
 // NEW: Phase-aware interview system with deterministic phase detection
@@ -25,11 +28,6 @@ import {
   detectInterviewPhase,
   providerForPhase,
 } from "@/lib/interview/interview-phases"
-import {
-  extractConversationState,
-  shouldRunExtraction,
-} from "@/lib/interview/conversation-extraction"
-import { extractionService } from "@/lib/services/extraction-service"
 import { phaseService } from "@/lib/services/phase-service"
 import { getFlag } from "@/lib/feature-flags"
 import {
@@ -79,80 +77,6 @@ import { detectDebuggingPhase } from "@/lib/interview/phases/debugging"
 import { getInterviewerTurns } from "@/lib/interview/conversation-pacing"
 import { buildProactiveSkipResponse } from "@/lib/interview/chat/response-flow"
 import { createValidatedChatStream } from "@/lib/interview/chat/validated-response-stream"
-
-type ConversationTrackerWithExtraction = ConversationTracker & {
-  lastExtractionAt?: number
-}
-
-type ConversationExtractionJob = {
-  sessionId?: string
-  /** Real user behind the interview, so the extraction LLM call bills to them
-   * instead of the reserved system identity. */
-  userId?: string
-  recentMessages: Array<{ role: string; content: string }>
-  currentTracker: ConversationTracker
-  messageCount: number
-  lastExtractionAt: number
-  currentMessage: string
-  optimalComplexityContext?: {
-    optimalTimeComplexity: string
-    optimalSpaceComplexity: string
-  }
-}
-
-function runConversationExtractionAfterResponse(job: ConversationExtractionJob | null): void {
-  if (!job) return
-
-  void (async () => {
-    try {
-      if (getFlag("USE_EXTRACTION_SERVICE")) {
-        const result = await extractionService({
-          messages: job.recentMessages,
-          currentTracker: job.currentTracker,
-          messageCount: job.messageCount,
-          lastExtractionAt: job.lastExtractionAt,
-          currentMessage: job.currentMessage,
-          optimalComplexity: job.optimalComplexityContext,
-          userId: job.userId,
-          sessionId: job.sessionId,
-        })
-
-        if (result.didRun) {
-          logger.info("[Chat API] Completed post-response extraction service job", {
-            sessionId: job.sessionId,
-            confidence: result.confidence,
-            silentNotesCount: result.tracker.silentNotes?.length || 0,
-          })
-        }
-        return
-      }
-
-      if (!shouldRunExtraction(job.messageCount, job.lastExtractionAt, job.currentMessage)) {
-        return
-      }
-
-      const extractionUpdates = await extractConversationState(
-        job.recentMessages,
-        job.currentTracker,
-        job.optimalComplexityContext,
-        { userId: job.userId, sessionId: job.sessionId }
-      )
-
-      if (Object.keys(extractionUpdates).length > 0) {
-        logger.info("[Chat API] Completed post-response LLM extraction job", {
-          sessionId: job.sessionId,
-          extractionUpdates,
-          silentNotesCount: extractionUpdates.silentNotes?.length || 0,
-        })
-      }
-    } catch (extractionError) {
-      logger.warn("[Chat API] Post-response extraction failed", {
-        sessionId: job.sessionId,
-        error: extractionError,
-      })
-    }
-  })()
-}
 
 export async function POST(request: NextRequest) {
   // Authenticate and charge this submitted action once; provider calls meter their own work.
@@ -266,51 +190,7 @@ export async function POST(request: NextRequest) {
     // LLM-based conversation extraction is prepared here but runs after the
     // response is generated so chat latency does not wait on a secondary LLM call.
     const enhancedTracker = conversationTracker as unknown as ConversationTracker | undefined
-    const ENABLE_LLM_EXTRACTION = !(sessionContext && scenarioType === "bugfix")
-    const extractionJob: ConversationExtractionJob | null =
-      ENABLE_LLM_EXTRACTION && role === "interviewer" && conversationTracker && context && message
-        ? {
-            sessionId,
-            userId,
-            // The WHOLE conversation, not a tail. This job builds the
-            // conversationTracker that `check_already_discussed` reads, so a
-            // window here is what decides whether the interviewer knows it has
-            // already asked something. At `.slice(-10)` a 43-message session on
-            // 2026-08-22 re-probed one thread seven times: the tracker could
-            // only see the last ten messages, and the earlier probes on that
-            // same thread had fallen out of view.
-            recentMessages: (context as Array<{ type: string; message: string }>).map((m) => ({
-              role: m.type === "user" ? "candidate" : "interviewer",
-              content: m.message,
-            })),
-            currentTracker: conversationTracker as unknown as ConversationTracker,
-            messageCount: Array.isArray(context) ? context.length : 0,
-            lastExtractionAt:
-              (conversationTracker as unknown as ConversationTrackerWithExtraction)
-                .lastExtractionAt || 0,
-            currentMessage: message,
-            optimalComplexityContext: solutionComplexity
-              ? {
-                  optimalTimeComplexity: solutionComplexity.optimal || "O(n)",
-                  optimalSpaceComplexity: solutionComplexity.optimalSpace || "O(n)",
-                }
-              : undefined,
-          }
-        : null
-
-    if (extractionJob) {
-      if (getFlag("USE_EXTRACTION_SERVICE")) {
-        logger.debug("[Chat API] Deferred extraction service until after response", { sessionId })
-      } else if (
-        shouldRunExtraction(
-          extractionJob.messageCount,
-          extractionJob.lastExtractionAt,
-          extractionJob.currentMessage
-        )
-      ) {
-        logger.debug("[Chat API] Deferred LLM extraction until after response", { sessionId })
-      }
-    }
+    const extractionJob = prepareConversationExtraction(requestContext, userId)
 
     const userInfo = userContext as UserContext
     const { userContextString, candidateLevel } = buildUserPersonalizationContext(userInfo)
@@ -962,34 +842,7 @@ Generate a compliant response NOW:`
       }
     }
 
-    const responseTimeMs = Date.now() - startTime
-
-    // Track AI chat interaction with provider info
-    if (sessionId) {
-      trackAIChatServer({
-        sessionId,
-        userId,
-        interactionType: role === "interviewer" ? "interviewer" : "partner",
-        messageLength: message?.length || 0,
-        responseTimeMs,
-        provider: aiResponse.provider, // Track which provider was used
-        // Measured provider-reported usage of the primary call (regeneration
-        // retries are logged separately); omitted when the provider gave none.
-        tokensIn: aiResponse.tokensIn,
-        tokensOut: aiResponse.tokensOut,
-      }).catch((err) => {
-        // COST TRACKING: Log with high severity - costs won't be recorded if this fails
-        logger.error("CRITICAL: Analytics tracking failed - usage costs may not be recorded", {
-          error: err,
-          sessionId,
-          userId,
-          provider: aiResponse.provider,
-          // Include enough info to manually reconcile costs if needed
-          tokensUsed: aiResponse.tokensUsed,
-          latencyMs: aiResponse.latencyMs,
-        })
-      })
-    }
+    trackChatCompletion(requestContext, userId, aiResponse, Date.now() - startTime)
 
     if (!request.signal?.aborted) runConversationExtractionAfterResponse(extractionJob)
 

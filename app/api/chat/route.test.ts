@@ -123,35 +123,67 @@ describe("/api/chat route", () => {
         [false, true].map((withSession) => ({ scenarioType, role, withSession }))
       )
     )
-  )("preserves model input for $scenarioType/$role/session=$withSession", async ({ scenarioType, role, withSession }) => {
-    const { generateAIResponse, buildRAGContext } = await setupMocks()
-    vi.mocked(buildRAGContext).mockResolvedValue("Retrieved pattern knowledge")
-    const { POST } = await import("./route")
-    const sessionContext = withSession ? buildSessionContext({
-      task: { id: "contract", title: "Contract task", type: scenarioType, description: "Public task contract" },
-      workspace: [{ path: "src/main.js", role: "editable", content: "after", originalContent: "before" }],
-      code: "after",
-      interviewerMessages: [{ type: "user", message: "I will inspect the boundary", timestamp: 1 }],
-      partnerMessages: [{ type: "ai", message: "Read the visible tests", timestamp: 2 }],
-    }) : undefined
-    const response = await POST(createRequest({
-      role, scenarioType, sessionContext,
-      message: "I will check a smaller example",
-      scenarioTitle: "Contract task", scenarioPattern: "arrays-hashing",
-      currentCode: "after", starterCodeLength: 6, elapsedTime: 300,
-      context: [{ type: "user", message: "I will inspect the boundary" }],
-      conversationTracker: { ...createEmptyTracker(), approachExplained: true, hintsGiven: 1 },
-      testResults: [{ passed: false, description: "boundary case" }],
-      solutionComplexity: { estimated: "O(n)", optimal: "O(n)", isOptimal: true },
-      edgeCases: [{ description: "empty", input: [] }],
-      userContext: { skill_level: "beginner" },
-    }))
-    expect(response.status).toBe(200)
-    expect(generateAIResponse).toHaveBeenCalledOnce()
-    const [system, turn, history, options] = vi.mocked(generateAIResponse).mock.calls[0]
-    const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex")
-    expect({ system: hash(system), turn: hash(turn), history: hash(history), options: { ...options, abortSignal: undefined } }).toMatchSnapshot()
-  })
+  )(
+    "preserves model input for $scenarioType/$role/session=$withSession",
+    async ({ scenarioType, role, withSession }) => {
+      const { generateAIResponse, buildRAGContext } = await setupMocks()
+      vi.mocked(buildRAGContext).mockResolvedValue("Retrieved pattern knowledge")
+      const { POST } = await import("./route")
+      const sessionContext = withSession
+        ? buildSessionContext({
+            task: {
+              id: "contract",
+              title: "Contract task",
+              type: scenarioType,
+              description: "Public task contract",
+            },
+            workspace: [
+              {
+                path: "src/main.js",
+                role: "editable",
+                content: "after",
+                originalContent: "before",
+              },
+            ],
+            code: "after",
+            interviewerMessages: [
+              { type: "user", message: "I will inspect the boundary", timestamp: 1 },
+            ],
+            partnerMessages: [{ type: "ai", message: "Read the visible tests", timestamp: 2 }],
+          })
+        : undefined
+      const response = await POST(
+        createRequest({
+          role,
+          scenarioType,
+          sessionContext,
+          message: "I will check a smaller example",
+          scenarioTitle: "Contract task",
+          scenarioPattern: "arrays-hashing",
+          currentCode: "after",
+          starterCodeLength: 6,
+          elapsedTime: 300,
+          context: [{ type: "user", message: "I will inspect the boundary" }],
+          conversationTracker: { ...createEmptyTracker(), approachExplained: true, hintsGiven: 1 },
+          testResults: [{ passed: false, description: "boundary case" }],
+          solutionComplexity: { estimated: "O(n)", optimal: "O(n)", isOptimal: true },
+          edgeCases: [{ description: "empty", input: [] }],
+          userContext: { skill_level: "beginner" },
+        })
+      )
+      expect(response.status).toBe(200)
+      expect(generateAIResponse).toHaveBeenCalledOnce()
+      const [system, turn, history, options] = vi.mocked(generateAIResponse).mock.calls[0]
+      const hash = (value: unknown) =>
+        createHash("sha256").update(JSON.stringify(value)).digest("hex")
+      expect({
+        system: hash(system),
+        turn: hash(turn),
+        history: hash(history),
+        options: { ...options, abortSignal: undefined },
+      }).toMatchSnapshot()
+    }
+  )
 
   it.each(["bugfix", "system-design"])(
     "does not import DSA retrieval or level checklists into %s",
