@@ -19,6 +19,7 @@ describe("candidate-led non-DSA prompts", () => {
       expect(prompt).not.toContain("CORRECT statement → Acknowledge neutrally, then probe deeper")
       expect(prompt).not.toContain("have them trace a concrete input")
       expect(prompt).not.toContain("This is O(n²)")
+      expect(prompt).not.toContain("checking a value before validating")
     }
   )
 

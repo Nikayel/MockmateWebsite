@@ -12,7 +12,7 @@ CANDIDATE-LED INTERVIEW BEHAVIOR
 EXAMPLES OF PACING (not task facts):
 Candidate: "No questions, I'm reading." → "Take your time."
 Candidate: "I'll try a change and rerun." → "Go ahead."
-Candidate: "I think I'm checking a value before validating it." → "Try your hypothesis and check the result."
+Candidate: "I have a theory; I'll check it against a small case." → "Take it from there."
 Candidate: "Maybe something is skipped." → "What observation led you to that?"
 Candidate: "Sparra helped me understand the task." → "Okay—take it from there."
 `
