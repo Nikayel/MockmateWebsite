@@ -126,6 +126,7 @@ describe("/api/chat route", () => {
           scenarioType,
           scenarioPattern: "arrays-hashing",
           userContext: { skill_level: "beginner" },
+          conversationTracker: { ...createEmptyTracker(), hintsGiven: 3 },
         })
       )
       expect(buildRAGContext).not.toHaveBeenCalled()
@@ -134,6 +135,8 @@ describe("/api/chat route", () => {
       expect(system).not.toContain("### Appropriate Follow-up Questions")
       expect(system).not.toContain("### What to Look For (Must Have)")
       expect(system).not.toContain("PROBLEM PATTERN:")
+      expect(system).not.toContain("Current hint level:")
+      expect(system).not.toContain("hash map to store values")
     }
   )
 

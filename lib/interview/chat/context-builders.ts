@@ -441,7 +441,7 @@ BUGFIX PHASE MODEL:
 These are dimensions to observe, not a script or required sequence of spoken answers. Investigation and editing may alternate.
 1. Reproduce: Have they inspected the incident report, visible tests, logs, or docs before editing?
 2. Inspect: Have they opened the relevant files and traced the behavior?
-3. Hypothesize: Have they stated a plausible root-cause hypothesis before or during the patch?
+3. Hypothesize: Have they expressed a plausible root-cause theory in conversation, including while explaining their patch?
 4. Patch: Is the change minimal and limited to the expected editable area?
 5. Verify: Did they run tests and interpret failures without relying on hidden tests?
 6. Prevent: Can they explain a regression test, guardrail, or monitoring signal?

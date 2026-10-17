@@ -31,6 +31,7 @@ import {
 import {
   getInitialInterviewerMessage,
   getInitialPartnerMessage,
+  getResumedInterviewerMessage,
 } from "../_utils/interview-messages"
 import type {
   ChatMessage,
@@ -503,14 +504,7 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
           let initialMessage: string
           if (hasExistingProgress) {
             // True resume - user has made progress
-            initialMessage = `Welcome back! I'm Sable, your interviewer. You're continuing your practice on **${scenario.title}** - a ${scenario.difficulty} ${problemType} problem.
-
-You can continue where you left off. Feel free to:
-- Ask me clarifying questions about the requirements
-- Discuss your approach before coding
-- Ask for hints if you get stuck
-
-Let's continue!`
+            initialMessage = getResumedInterviewerMessage(scenario.title)
 
             // Restore previous messages if available
             if (savedState?.interviewerMessages && savedState.interviewerMessages.length > 0) {

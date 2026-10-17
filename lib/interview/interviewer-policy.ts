@@ -96,6 +96,7 @@ export function buildPreLLMInterviewerPolicy(ctx: PreLLMPolicyContext): PreLLMIn
         "System design is a candidate-led design discussion, not an algorithm coding round. Do not require code, test runs, Big-O, or an edge-case checklist before proceeding.",
         "Use the supplied design stage as pacing guidance, not a script. Ask one relevant design question at a time; do not repeat an answered requirement or prescribe the architecture.",
         "Acknowledge a stated plan without automatically adding a question. Leave space for the candidate to develop it.",
+        "Do not mention scores or detailed feedback before submission.",
       ],
       requiredAction: ctx.hasSubmitted
         ? "Briefly debrief the design decisions already discussed; do not restart requirements gathering."

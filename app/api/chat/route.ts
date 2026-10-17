@@ -447,7 +447,8 @@ export async function POST(request: NextRequest) {
     // Build hint guidance if hints have been given
     const hintsGiven =
       (enhancedTracker || (conversationTracker as unknown as ConversationTracker))?.hintsGiven || 0
-    const hintGuidance = hintsGiven > 0 ? getHintGuidance(hintsGiven) : ""
+    const hintGuidance =
+      hintsGiven > 0 && !isBugFix && !isSystemDesign ? getHintGuidance(hintsGiven) : ""
 
     const tracker = (enhancedTracker || conversationTracker) as ConversationTracker | undefined
 
