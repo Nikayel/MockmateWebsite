@@ -67,6 +67,23 @@ function assertMethodsUsedByScenarios(): Set<string> {
 describe("assert shim", () => {
   const assert = loadAssertShim()
 
+  it.each(["deepEqual", "deepStrictEqual"])(
+    "labels expected and received values for %s",
+    (method) => {
+      const compare = assert[method] as (
+        actual: unknown,
+        expected: unknown,
+        message?: string
+      ) => void
+      expect(() => compare([0, 1], [])).toThrow(
+        "Expected deep equality\nExpected: []\nReceived: [0,1]"
+      )
+      expect(() => compare([0, 1], [], "Only open rows may match")).toThrow(
+        "Only open rows may match"
+      )
+    }
+  )
+
   it("is callable directly, the way node's assert module is", () => {
     expect(() => assert(true)).not.toThrow()
     expect(() => assert(false)).toThrow(/truthy/)

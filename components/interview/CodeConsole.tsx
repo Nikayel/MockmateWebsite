@@ -396,22 +396,26 @@ export function CodeConsole({
     }
   }, [outputs, testResults, isRunning, expanded])
 
-  // Check for code errors
-  const errorResults = testResults.filter((r) => r.error)
-  const hasCodeError = errorResults.length > 0 && testSummary.passed === 0
-  const firstError = errorResults[0]?.error || null
+  // Assertion mismatches remain test failures, even if no tests pass. Hidden
+  // diagnostics must never be promoted into the otherwise public error banner.
+  const failedTests = testResults.filter((result) => !result.passed)
+  const firstError =
+    failedTests.find(
+      (result) => !result.isHidden && result.error && getErrorType(result.error) !== "logic"
+    )?.error ?? null
+  const hasCodeError = Boolean(firstError) && testSummary.passed === 0
   const errorInfo = firstError ? formatErrorMessage(firstError, language, userCodeLineCount) : null
 
-  // A one-line "here's what's wrong" lead so the learner doesn't scan rows to
-  // find the single failure. The message comes from the assert (expected X, got Y).
-  const failingVisibleTests = testResults.filter((result) => !result.passed && !result.isHidden)
+  const hiddenFailures = failedTests.filter((result) => result.isHidden).length
+  const visibleFailures = failedTests.length - hiddenFailures
+  const failureBreakdown = [
+    visibleFailures > 0 ? `${visibleFailures} visible` : null,
+    hiddenFailures > 0 ? `${hiddenFailures} hidden` : null,
+  ].filter(Boolean)
+  // Count the whole run; the individual rows own descriptions and diagnostics.
   const failureSummary =
-    !hasCodeError && failingVisibleTests.length > 0
-      ? `${failingVisibleTests.length} ${
-          failingVisibleTests.length === 1 ? "test" : "tests"
-        } failing — ${failingVisibleTests[0].description}${
-          failingVisibleTests[0].error ? `: ${failingVisibleTests[0].error}` : ""
-        }`
+    !hasCodeError && failedTests.length > 0
+      ? `${failedTests.length} ${failedTests.length === 1 ? "test" : "tests"} failing (${failureBreakdown.join(", ")})`
       : null
 
   const isEmpty = outputs.length === 0 && testResults.length === 0 && !packRun && !isRunning
@@ -532,7 +536,7 @@ export function CodeConsole({
               </div>
             )}
 
-            {/* Test result header + one-line failure lead */}
+            {/* Test result header + complete failure counts */}
             {!hasCodeError && (
               <div className="border-border/50 mb-1 border-t pt-1">
                 {failureSummary ? (

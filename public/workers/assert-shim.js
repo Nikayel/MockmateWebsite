@@ -214,10 +214,10 @@
       if (!deepEquals(actual, expected, false)) {
         throw createAssertionError(
           message ||
-            "Expected deep equality, got " +
-              describeValue(actual) +
-              " vs " +
-              describeValue(expected),
+            "Expected deep equality\nExpected: " +
+              describeValue(expected) +
+              "\nReceived: " +
+              describeValue(actual),
           actual,
           expected,
           "deepEqual"
@@ -240,10 +240,10 @@
       if (!deepEquals(actual, expected, true)) {
         throw createAssertionError(
           message ||
-            "Expected deep equality, got " +
-              describeValue(actual) +
-              " vs " +
-              describeValue(expected),
+            "Expected deep equality\nExpected: " +
+              describeValue(expected) +
+              "\nReceived: " +
+              describeValue(actual),
           actual,
           expected,
           "deepStrictEqual"
