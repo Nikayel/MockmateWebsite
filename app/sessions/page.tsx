@@ -1,5 +1,7 @@
 "use client"
 
+import { isPausedAttempt } from "@/lib/interview/session-lifecycle/policy"
+
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Header } from "@/components/header"
@@ -249,7 +251,7 @@ export default function SessionsPage() {
                           )}
                           {isInProgress && !isPostInterviewDiscussion && (
                             <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-400">
-                              In Progress
+                              {isPausedAttempt(session) ? "Paused" : "In Progress"}
                             </span>
                           )}
                           {isFeedbackPending && !isInProgress && (

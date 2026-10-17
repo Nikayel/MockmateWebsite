@@ -40,6 +40,10 @@ export interface UseInterviewAutosaveOptions {
   strictTimeLimit: number | null
   interviewerInput?: string
   chatInput?: string
+  canCheckpoint?: boolean
+  ownerId?: string
+  testRunRevision?: string | null
+  strictDeadlineAt?: number | null
   paused?: boolean
 }
 
@@ -69,7 +73,8 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
   const saveNow = useCallback((force = true) => {
     const opts = optsRef.current
     const selectedScenario = opts.selectedScenario
-    if (!selectedScenario) return Promise.resolve({ localSaved: false, cloudSaved: false })
+    if (!selectedScenario || opts.canCheckpoint === false)
+      return Promise.resolve({ localSaved: false, cloudSaved: false })
     let localSaved = false
     // Everything the remote save persists except the clock. elapsedTime
     // advances every second, so including it would defeat the dirty check;
@@ -77,8 +82,8 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
     const remoteFingerprint = JSON.stringify({
       scenarioId: selectedScenario.id,
       code: opts.code,
-      chatMessages: opts.chatMessages,
-      interviewerMessages: opts.interviewerMessages,
+      chatMessages: opts.chatMessages.filter((message) => !message.isStreaming),
+      interviewerMessages: opts.interviewerMessages.filter((message) => !message.isStreaming),
       selectedLanguage: opts.selectedLanguage,
       testResults: opts.testResults,
       testSummary: opts.testSummary,
@@ -87,6 +92,10 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
       consoleLogs: opts.consoleLogs,
       bugfixEvidenceEvents: opts.bugfixEvidenceEvents,
       isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
+      testRunRevision: opts.testRunRevision ?? null,
+      realInterviewMode: opts.realInterviewMode,
+      strictTimeLimit: opts.strictTimeLimit,
+      strictDeadlineAt: opts.strictDeadlineAt,
       paused: opts.paused ?? false,
       interviewerInput: opts.interviewerInput ?? "",
       chatInput: opts.chatInput ?? "",
@@ -100,8 +109,8 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
       sessionId: opts.currentSessionId,
       scenarioId: selectedScenario.id,
       code: opts.code,
-      chatMessages: opts.chatMessages,
-      interviewerMessages: opts.interviewerMessages,
+      chatMessages: opts.chatMessages.filter((message) => !message.isStreaming),
+      interviewerMessages: opts.interviewerMessages.filter((message) => !message.isStreaming),
       selectedLanguage: opts.selectedLanguage,
       elapsedTime: opts.elapsedTime,
       testResults: opts.testResults,
@@ -111,6 +120,10 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
       consoleLogs: opts.consoleLogs,
       bugfixEvidenceEvents: opts.bugfixEvidenceEvents,
       isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
+      testRunRevision: opts.testRunRevision ?? null,
+      realInterviewMode: opts.realInterviewMode,
+      strictTimeLimit: opts.strictTimeLimit,
+      strictDeadlineAt: opts.strictDeadlineAt,
       paused: opts.paused ?? false,
       interviewerInput: opts.interviewerInput ?? "",
       chatInput: opts.chatInput ?? "",
@@ -139,8 +152,8 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
               code: opts.code,
               selectedLanguage: opts.selectedLanguage,
               elapsedTime: opts.elapsedTime,
-              chatMessages: opts.chatMessages,
-              interviewerMessages: opts.interviewerMessages,
+              chatMessages: opts.chatMessages.filter((message) => !message.isStreaming),
+              interviewerMessages: opts.interviewerMessages.filter((message) => !message.isStreaming),
               testResults: opts.testResults,
               testSummary: opts.testSummary,
               workspaceContext: opts.workspaceContext,
@@ -150,6 +163,9 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
               isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
               realInterviewMode: opts.realInterviewMode,
               strictTimeLimit: opts.strictTimeLimit,
+              ownerId: opts.ownerId,
+              testRunRevision: opts.testRunRevision,
+              strictDeadlineAt: opts.strictDeadlineAt,
               paused: opts.paused,
               interviewerInput: opts.interviewerInput,
               chatInput: opts.chatInput,
@@ -170,8 +186,8 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
                   code: opts.code,
                   language: opts.selectedLanguage,
                   elapsedTime: opts.elapsedTime,
-                  chatMessages: opts.chatMessages,
-                  interviewerMessages: opts.interviewerMessages,
+                  chatMessages: opts.chatMessages.filter((message) => !message.isStreaming),
+                  interviewerMessages: opts.interviewerMessages.filter((message) => !message.isStreaming),
                   testResults: opts.testResults.slice(-10),
                   testSummary: opts.testSummary,
                   workspaceContext: opts.workspaceContext,
@@ -181,6 +197,8 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
                   isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
                   realInterviewMode: opts.realInterviewMode,
                   strictTimeLimit: opts.strictTimeLimit,
+                  testRunRevision: opts.testRunRevision,
+                  strictDeadlineAt: opts.strictDeadlineAt,
                   paused: opts.paused,
                   interviewerInput: opts.interviewerInput,
                   chatInput: opts.chatInput,
@@ -206,7 +224,11 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
     // Serialize writes so a slow older snapshot cannot overwrite a newer checkpoint.
     const pending = pendingSaveRef.current.then(persist, persist)
     pendingSaveRef.current = pending
-    return pending
+    let timeout: ReturnType<typeof setTimeout>
+    const deadline = new Promise<{ localSaved: boolean; cloudSaved: boolean }>((resolve) => {
+      timeout = setTimeout(() => resolve({ localSaved, cloudSaved: false }), 8000)
+    })
+    return Promise.race([pending, deadline]).finally(() => clearTimeout(timeout))
   }, [])
 
   useEffect(() => {

@@ -1,3 +1,5 @@
+import type { RestoredSessionInputs } from "@/lib/interview/session-lifecycle/checkpoint"
+import { recoverLocalCheckpoint } from "@/lib/interview/session-lifecycle/recovery"
 import { createChatMessage } from "@/lib/interview/session-context/conversation"
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react"
 import type { User as FirebaseUser } from "firebase/auth"
@@ -70,6 +72,7 @@ export interface UseSessionReopenOptions {
    * /sessions/{id} mid-handoff, off the very results the sign-in unlocks.
    */
   isShowingPostSubmitSession: (sessionId: string) => boolean
+  isShowingSession?: (sessionId: string) => boolean
 
   // Bugfix reset callback
   resetBugfixSessionState: () => void
@@ -95,11 +98,7 @@ export interface UseSessionReopenOptions {
   setBugfixEvidenceEvents: Dispatch<SetStateAction<BugfixEvidenceEvent[]>>
   setShowPostInterviewDiscussion: Dispatch<SetStateAction<boolean>>
 
-  onSessionRestored?: (state: {
-    chatInput?: string
-    interviewerInput?: string
-    isPostInterviewDiscussion?: boolean
-  }) => void
+  onSessionRestored?: (state: RestoredSessionInputs) => void
 
   // Refs
   recordedBugfixEditPathsRef: { current: Set<string> }
@@ -142,6 +141,7 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
           const guestScenarioId = opts.searchParams?.get("scenario")
           if (guestSessionId && guestScenarioId) {
             if (
+              opts.isShowingSession?.(guestSessionId) ||
               opts.isShowingPostSubmitSession(guestSessionId) ||
               guestRehydratedSessionRef.current === guestSessionId
             ) {
@@ -250,10 +250,30 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
               if (sessionState.test_results?.length) {
                 opts.setTestResults(sessionState.test_results as TestResult[])
               }
+              const localRecovery = recoverLocalCheckpoint(
+                null,
+                `interview_autosave_guest_${guestScenarioId}`,
+                guestSessionId
+              )
+              if (localRecovery) {
+                opts.setCode(localRecovery.code ?? initialCode)
+                opts.setChatMessages((localRecovery.chatMessages ?? []) as ChatMessage[])
+                opts.setInterviewerMessages(
+                  (localRecovery.interviewerMessages ?? [freshInterviewerMessage]) as ChatMessage[]
+                )
+                opts.setElapsedTime(localRecovery.elapsedTime ?? 0)
+                opts.setStartTime(Date.now() - (localRecovery.elapsedTime ?? 0) * 1000)
+              }
               opts.onSessionRestored?.({
-                chatInput: sessionState.chat_input,
-                interviewerInput: sessionState.interviewer_input,
-                isPostInterviewDiscussion: sessionState.is_post_interview_discussion,
+                ...(localRecovery ?? {
+                  chatInput: sessionState.chat_input,
+                  interviewerInput: sessionState.interviewer_input,
+                  isPostInterviewDiscussion: sessionState.is_post_interview_discussion,
+                  testRunRevision: sessionState.test_run_revision,
+                  strictDeadlineAt: sessionState.strict_deadline_at,
+                  strictTimeLimit: sessionState.strict_time_limit,
+                }),
+                sessionId: guestSessionId,
               })
               toast.success("Session resumed")
             } else {
@@ -302,7 +322,7 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
         // Not a reopen at all: this tab already has the session's terminal
         // state on screen (see the option's doc). Signing in mid-page is the
         // one path that gets here — leave the page exactly as it is.
-        if (opts.isShowingPostSubmitSession(sessionId)) {
+        if (opts.isShowingPostSubmitSession(sessionId) || opts.isShowingSession?.(sessionId)) {
           opts.setIsLoading(false)
           return
         }
@@ -316,7 +336,11 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
           opts.setShowScenarioBrowser(false)
 
           // Check if there's saved session state FIRST before starting interview
-          const savedState = await getSessionState(sessionId)
+          const savedState = recoverLocalCheckpoint(
+            await getSessionState(sessionId),
+            `interview_autosave_${opts.firebaseUser.uid}_${scenarioId}`,
+            sessionId
+          )
 
           // Restore Real Interview Mode and strict time limit settings EARLY
           // This needs to happen before rendering so the UI shows the correct problem statement
@@ -512,7 +536,7 @@ Let's continue!`
               }
               toast.success("Resuming post-interview discussion")
             } else {
-              opts.onSessionRestored?.(savedState ?? {})
+              opts.onSessionRestored?.({ ...savedState, sessionId })
               toast.success("Session resumed")
             }
           } else {

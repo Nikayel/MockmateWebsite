@@ -6,6 +6,7 @@ import { InterviewSurfaceFrame } from "@/app/interview/_components/InterviewSurf
 import { PostInterviewView } from "@/app/interview/_components/PostInterviewView"
 import type { ReviewMessage } from "@/app/interview/_components/post-interview/types"
 import PracticeFeedback from "@/components/PracticeFeedback"
+import { SessionLifecycleFixture } from "./SessionLifecycleFixture"
 import { WorkspaceFixture } from "./WorkspaceFixture"
 import { ScenarioBrowser } from "@/components/interview/ScenarioBrowser"
 import "@/app/globals.css"
@@ -34,7 +35,9 @@ function Fixture() {
   const [messages, setMessages] = useState(initialMessages)
   return (
     <main className="bg-background text-foreground">
-      {view === "picker" ? (
+      {view === "lifecycle" ? (
+        <SessionLifecycleFixture />
+      ) : view === "picker" ? (
         <ScenarioBrowser
           onStartInterview={() => setView("workspace")}
           usageLimit={null}

@@ -19,12 +19,18 @@ export function contentRevision(value: unknown): string {
   return `v1-${(hash >>> 0).toString(16)}-${text.length}`
 }
 
-export function workspaceRevision(files: WorkspaceFile[], code: string): string {
+export function workspaceRevision(
+  files: WorkspaceFile[],
+  code: string,
+  includeSolution = false
+): string {
   const visible = files
     .filter((file) => !file.hidden)
     .map(({ path, content }) => ({ path, content }))
     .sort((a, b) => a.path.localeCompare(b.path))
-  return contentRevision(visible.length ? visible : code)
+  return contentRevision(
+    visible.length ? { files: visible, ...(includeSolution ? { solution: code } : {}) } : code
+  )
 }
 
 export function buildSessionContext(input: {
@@ -32,6 +38,7 @@ export function buildSessionContext(input: {
   workspace: WorkspaceFile[]
   code: string
   starterCode?: string
+  includeSolution?: boolean
   interviewerMessages: Message[]
   partnerMessages: Message[]
   testRunRevision?: string | null
@@ -63,7 +70,19 @@ export function buildSessionContext(input: {
                 : "modified",
         },
       ]
-  const currentRevision = workspaceRevision(input.workspace, input.code)
+  if (publicFiles.length && input.includeSolution)
+    files.push({
+      path: "solution",
+      content: input.code,
+      ...(input.starterCode !== undefined ? { originalContent: input.starterCode } : {}),
+      status:
+        input.starterCode === undefined
+          ? "baseline_unknown"
+          : input.code === input.starterCode
+            ? "unchanged"
+            : "modified",
+    })
+  const currentRevision = workspaceRevision(input.workspace, input.code, input.includeSolution)
   return {
     task: input.task,
     baselineVersion: contentRevision(

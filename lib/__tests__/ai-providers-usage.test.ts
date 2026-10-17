@@ -56,6 +56,61 @@ vi.mock("../logger", () => ({
 type FetchMock = ReturnType<typeof vi.fn>
 
 describe("generateAIResponse provider-reported token usage", () => {
+  it("records OpenAI prompt-cache hits from measured usage", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "openai-test-key")
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: "reply" } }],
+          usage: {
+            prompt_tokens: 1000,
+            completion_tokens: 20,
+            prompt_tokens_details: { cached_tokens: 800 },
+          },
+        }),
+      }))
+    )
+    const { generateAIResponse } = await import("../ai-providers")
+    await generateAIResponse("system", "question", [], {
+      service: "interview-chat",
+      preferredProvider: "openai-none",
+      maxRetries: 1,
+    })
+    expect(mocks.calculateCost).toHaveBeenCalledWith(
+      1000,
+      20,
+      "openai-none",
+      expect.objectContaining({ cachedInputTokens: 800 })
+    )
+  })
+
+  it("does not retry or fall back after the session aborts a provider request", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "openai-test-key")
+    const controller = new AbortController()
+    const request = vi.fn(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () =>
+            reject(new DOMException("Paused", "AbortError"))
+          )
+        })
+    )
+    vi.stubGlobal("fetch", request)
+    const { generateAIResponse } = await import("../ai-providers")
+    const result = generateAIResponse("system", "question", [], {
+      service: "interview-chat",
+      preferredProvider: "openai-none",
+      abortSignal: controller.signal,
+    })
+    const rejected = expect(result).rejects.toMatchObject({ name: "AbortError" })
+    await vi.waitFor(() => expect(request).toHaveBeenCalledOnce())
+    controller.abort()
+    await rejected
+    expect(mocks.sendMessage).not.toHaveBeenCalled()
+    expect(request).toHaveBeenCalledOnce()
+  })
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()

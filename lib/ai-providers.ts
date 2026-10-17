@@ -338,7 +338,8 @@ async function callGemini(
   systemPrompt: string,
   userMessage: string,
   history: Array<{ role: "user" | "model"; content: string }>,
-  config: ProviderConfig
+  config: ProviderConfig,
+  abortSignal?: AbortSignal
 ): Promise<ProviderCallResult> {
   try {
     const genAI = new GoogleGenerativeAI(config.apiKey || "")
@@ -383,10 +384,23 @@ async function callGemini(
     }))
 
     const chat = model.startChat({
-      history: geminiHistory,
+      history:
+        geminiHistory[0]?.role === "model"
+          ? [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text: "[Session opened. The following attributed messages are prior transcript evidence.]",
+                  },
+                ],
+              },
+              ...geminiHistory,
+            ]
+          : geminiHistory,
     })
 
-    const result = await chat.sendMessage(userMessage)
+    const result = await chat.sendMessage(userMessage, { signal: abortSignal })
     const response = await result.response
     // Gemini reports measured usage on the response; thread it up so events
     // can carry real token counts (omitted when the SDK returns none).
@@ -466,7 +480,8 @@ async function callDeepseek(
   systemPrompt: string,
   userMessage: string,
   history: Array<{ role: "user" | "model"; content: string }>,
-  config: ProviderConfig
+  config: ProviderConfig,
+  abortSignal?: AbortSignal
 ): Promise<ProviderCallResult> {
   try {
     if (!config.apiKey) {
@@ -486,6 +501,7 @@ async function callDeepseek(
 
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: "POST",
+      signal: abortSignal,
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${config.apiKey}`,
@@ -579,7 +595,8 @@ async function callOpenAI(
   systemPrompt: string,
   userMessage: string,
   history: Array<{ role: "user" | "model"; content: string }>,
-  config: ProviderConfig
+  config: ProviderConfig,
+  abortSignal?: AbortSignal
 ): Promise<ProviderCallResult> {
   if (!config.apiKey) {
     throw new Error("OpenAI API key is not configured")
@@ -602,6 +619,7 @@ async function callOpenAI(
 
   const response = await fetch(`${config.baseUrl}/chat/completions`, {
     method: "POST",
+    signal: abortSignal,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${config.apiKey}`,
@@ -693,7 +711,8 @@ async function callClaude(
   systemPrompt: string,
   userMessage: string,
   history: Array<{ role: "user" | "model"; content: string }>,
-  config: ProviderConfig
+  config: ProviderConfig,
+  abortSignal?: AbortSignal
 ): Promise<ProviderCallResult> {
   const messages = [
     ...history.map((msg) => ({
@@ -705,6 +724,7 @@ async function callClaude(
 
   const response = await fetch(`${config.baseUrl}/messages`, {
     method: "POST",
+    signal: abortSignal,
     headers: {
       "Content-Type": "application/json",
       "x-api-key": config.apiKey || "",
@@ -740,7 +760,8 @@ async function callProvider(
   systemPrompt: string,
   userMessage: string,
   history: Array<{ role: "user" | "model"; content: string }>,
-  temperatureOverride?: number
+  temperatureOverride?: number,
+  abortSignal?: AbortSignal
 ): Promise<ProviderCallResult> {
   const config = { ...PROVIDERS[provider] }
 
@@ -757,15 +778,15 @@ async function callProvider(
     case "openai-none":
     case "openai-medium":
     case "openai-high":
-      return callOpenAI(systemPrompt, userMessage, history, config)
+      return callOpenAI(systemPrompt, userMessage, history, config, abortSignal)
     case "gemini":
     case "gemini-lite":
-      return callGemini(systemPrompt, userMessage, history, config)
+      return callGemini(systemPrompt, userMessage, history, config, abortSignal)
     case "deepseek":
     case "deepseek-chat":
-      return callDeepseek(systemPrompt, userMessage, history, config)
+      return callDeepseek(systemPrompt, userMessage, history, config, abortSignal)
     case "claude":
-      return callClaude(systemPrompt, userMessage, history, config)
+      return callClaude(systemPrompt, userMessage, history, config, abortSignal)
     default:
       throw new Error(`Unknown provider: ${provider}`)
   }
@@ -787,6 +808,7 @@ export async function generateAIResponse(
      * required is the enforcement — a call site without a service does not
      * compile.
      */
+    abortSignal?: AbortSignal
     service: UsageServiceId
     complexity?: TaskComplexity
     preferredProvider?: AIProvider
@@ -802,6 +824,7 @@ export async function generateAIResponse(
     skipRateLimit?: boolean
   }
 ): Promise<AIResponse> {
+  options.abortSignal?.throwIfAborted()
   const {
     service,
     complexity = "standard",
@@ -929,6 +952,7 @@ export async function generateAIResponse(
     // Retry loop for each provider
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
+        options.abortSignal?.throwIfAborted()
         if (attempt > 0) {
           logger.debug("[AI Provider] Retry attempt", {
             attempt: attempt + 1,
@@ -942,7 +966,8 @@ export async function generateAIResponse(
           systemPrompt,
           userMessage,
           history,
-          temperature
+          temperature,
+          options.abortSignal
         )
 
         const latencyMs = Date.now() - startTime
@@ -1051,6 +1076,10 @@ export async function generateAIResponse(
             : {}),
         }
       } catch (error: any) {
+        if (options.abortSignal?.aborted) {
+          if (userId && shouldTrackConcurrency) await endRequestTracking(userId)
+          throw options.abortSignal.reason ?? new DOMException("Session paused", "AbortError")
+        }
         lastError = error
 
         // Log error details for debugging

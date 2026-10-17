@@ -1,5 +1,7 @@
 "use client"
 
+import { isPausedAttempt } from "@/lib/interview/session-lifecycle/policy"
+
 import { useEffect, useState, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Header } from "@/components/header"
@@ -387,9 +389,11 @@ export default function SessionDetailPage() {
               <div className="bg-muted mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl">
                 <Terminal className="text-muted-foreground h-7 w-7" />
               </div>
-              <h3 className="text-foreground mb-2 text-lg font-medium">Session in progress</h3>
+              <h3 className="text-foreground mb-2 text-lg font-medium">
+                {isPausedAttempt(session) ? "Session paused" : "Session in progress"}
+              </h3>
               <p className="text-muted-foreground mb-6 text-sm">
-                This session hasn't been completed yet
+                Your code and conversations are saved. Continue this attempt when you’re ready.
               </p>
               {session.scenario_id && (
                 <Button

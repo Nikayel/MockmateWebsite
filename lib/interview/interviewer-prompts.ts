@@ -158,6 +158,7 @@ RULES:
 }
 
 export interface PromptContext {
+  scenarioType?: string
   phase: string
   problemTitle: string
   problemDifficulty: string
@@ -187,7 +188,10 @@ export function buildInterviewerPrompt(
   ctx: PromptContext,
   section: "all" | "stable" | "turn" = "all"
 ): string {
-  const phasePrompt = PHASE_PROMPTS[ctx.phase] || PHASE_PROMPTS.discussion
+  const phasePrompt =
+    ctx.scenarioType === "bugfix"
+      ? `DEBUGGING PHASE: ${ctx.phase}. Follow observed reproduction, inspection, hypothesis, patch, verification and regression prevention. Answer named requirement questions from public docs. Do not gate progress on a generic complexity checklist or disclose the root cause. Test results apply only to their recorded revision.`
+      : PHASE_PROMPTS[ctx.phase] || PHASE_PROMPTS.discussion
 
   // Render the shared forbidden-phrase list. The 8-then-rest wrap preserves the
   // original prompt's line layout so the model-facing text stays byte-identical.

@@ -64,6 +64,7 @@ interface ChatApiResponse {
 
 export interface UseInterviewChatOptions {
   sessionContext?: SessionContext
+  isActive?: () => boolean
   paused?: boolean
   generationRef?: { current: number }
   ownerId?: string
@@ -326,9 +327,10 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
     const input = messageOverride ?? (isInterviewer ? interviewerInput : chatInput)
     const setInput = isInterviewer ? setInterviewerInput : setChatInput
     const messages = isInterviewer ? interviewerMessages : chatMessages
-    if (opts.paused) return
+    if (opts.paused || opts.isActive?.() === false) return
     const requestGeneration = opts.generationRef?.current
-    const isCurrent = () => opts.generationRef?.current === requestGeneration
+    const isCurrent = () =>
+      opts.generationRef?.current === requestGeneration && opts.isActive?.() !== false
     const setMessages = isInterviewer ? setInterviewerMessages : setChatMessages
     const setLoading = isInterviewer ? setIsLoadingInterviewer : setIsLoadingChat
 
@@ -728,6 +730,11 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
         // that as retryable, which is right: a dropped connection usually is.
         reportSendFailure(0, null, newUserMessage)
       } finally {
+        if ((controller.signal.aborted || !isCurrent()) && streamingResponseId) {
+          setMessages((previous) =>
+            previous.filter((message) => message.id !== streamingResponseId)
+          )
+        }
         controllers.current.delete(controller)
         setLoading(false)
         sendInFlightRef.current[lane] = false

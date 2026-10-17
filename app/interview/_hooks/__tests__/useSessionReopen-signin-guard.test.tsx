@@ -103,6 +103,14 @@ beforeEach(() => {
 })
 
 describe("useSessionReopen when the submitted session is already on screen", () => {
+  it("does not reload or pause the attempt just started in this tab when its URL updates", async () => {
+    const opts = buildOpts({ isShowingSession: () => true })
+    renderHook(() => useSessionReopen(opts as never))
+    await flush()
+    expect(getSessionState).not.toHaveBeenCalled()
+    expect(opts.setCode).not.toHaveBeenCalled()
+    expect(opts.setInterviewerMessages).not.toHaveBeenCalled()
+  })
   it("restores a code-only checkpoint under a minute and seeds the existing clock", async () => {
     getSessionState.mockResolvedValueOnce({
       code: "",

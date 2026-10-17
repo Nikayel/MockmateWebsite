@@ -85,7 +85,7 @@ describe("PUT /api/guest-session validation (API-3)", () => {
 
   it("rejects too many test results", async () => {
     const { PUT } = await importRoute()
-    const testResults = Array.from({ length: 101 }, () => ({ passed: true }))
+    const testResults = Array.from({ length: 1001 }, () => ({ passed: true }))
     const res = (await PUT(
       put({ sessionId: SESSION_ID, guestId: VALID_GUEST_ID, testResults })
     )) as MockResponse
@@ -118,7 +118,7 @@ describe("PUT /api/guest-session validation (API-3)", () => {
         sessionId: SESSION_ID,
         guestId: VALID_GUEST_ID,
         sessionState: {
-          chatMessages: Array.from({ length: 101 }, () => ({ type: "user", message: "hi" })),
+          chatMessages: Array.from({ length: 1001 }, () => ({ type: "user", message: "hi" })),
         },
       })
     )) as MockResponse

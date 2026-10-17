@@ -51,7 +51,8 @@ describe("chat context builders", () => {
     })
 
     expect(result.userName).toBe("Grace")
-    expect(result.userContextString).toContain("- Email: grace.hopper@example.com")
+    expect(result.userContextString).toContain("- Name: Grace")
+    expect(result.userContextString).not.toContain("grace.hopper@example.com")
   })
 
   it("wraps and truncates current code context", () => {

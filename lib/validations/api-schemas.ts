@@ -213,6 +213,8 @@ export const GuestSessionUpdateSchema = z.object({
       isPostInterviewDiscussion: z.boolean().optional(),
       realInterviewMode: z.boolean().optional(),
       strictTimeLimit: z.number().min(0).max(86400).nullable().optional(),
+      testRunRevision: z.string().max(100).nullable().optional(),
+      strictDeadlineAt: z.number().finite().nullable().optional(),
       paused: z.boolean().optional(),
       interviewerInput: z.string().max(10000).optional(),
       chatInput: z.string().max(10000).optional(),

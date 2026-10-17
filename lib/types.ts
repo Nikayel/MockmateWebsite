@@ -1,3 +1,4 @@
+import type { SessionLifecycle } from "./interview/session-lifecycle/policy"
 /**
  * Shared TypeScript types for the application
  */
@@ -109,6 +110,7 @@ export interface ChatMessage {
 }
 
 export interface InterviewSession {
+  session_lifecycle?: SessionLifecycle
   id: string
   user_id: string
   started_at: string
@@ -232,6 +234,7 @@ export interface InterviewSession {
   }
   // Session state (for recovery)
   session_state?: {
+    paused?: boolean
     code?: string
     language?: string
     elapsed_time?: number

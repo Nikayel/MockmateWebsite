@@ -1,3 +1,7 @@
+import {
+  serializeCheckpoint,
+  type SessionCheckpoint,
+} from "./interview/session-lifecycle/checkpoint"
 import { isScoredCompletedSession } from "./interview/completion-status"
 /**
  * Firestore helper functions for creating and managing user data
@@ -14,6 +18,7 @@ import {
   getDocs,
   limit,
   orderBy,
+  runTransaction,
 } from "firebase/firestore"
 import { Profile, ProfileQuota } from "./types"
 import { getSessionsLimitForTier } from "./pricing"
@@ -883,67 +888,31 @@ export async function markSessionEvaluating(
  * Save in-progress session state for recovery
  * Called periodically during active interview
  */
-export async function saveSessionState(
-  sessionId: string,
-  state: {
-    code: string
-    selectedLanguage: string
-    elapsedTime: number
-    chatMessages?: Array<{ type: string; message: string }>
-    interviewerMessages?: Array<{ type: string; message: string }>
-    testResults?: Array<any>
-    testSummary?: { total: number; passed: number; failed: number; passRate: number }
-    workspaceContext?: Array<Record<string, unknown>>
-    activeWorkspacePath?: string | null
-    consoleLogs?: Array<Record<string, unknown>>
-    bugfixEvidenceEvents?: Array<any>
-    bugfixHypothesis?: string
-    bugfixRootCause?: string
-    bugfixPrevention?: string
-    isPostInterviewDiscussion?: boolean
-    realInterviewMode?: boolean
-    strictTimeLimit?: number | null
-    paused?: boolean
-    interviewerInput?: string
-    chatInput?: string
-  }
-): Promise<void> {
-  try {
-    const sessionRef = doc(db, "interview_sessions", sessionId)
-    await setDoc(
-      sessionRef,
-      {
-        session_state: {
-          code: state.code,
-          language: state.selectedLanguage,
-          elapsed_time: state.elapsedTime,
-          chat_messages: state.chatMessages,
-          interviewer_messages: state.interviewerMessages,
-          test_results: state.testResults
-            ? sanitizeTestResultsForFirestore(state.testResults.slice(-20))
-            : undefined,
-          test_summary: state.testSummary,
-          workspace_context: state.workspaceContext,
-          active_workspace_path: state.activeWorkspacePath,
-          console_logs: state.consoleLogs,
-          bugfix_evidence_events: state.bugfixEvidenceEvents,
-          bugfix_hypothesis: state.bugfixHypothesis,
-          bugfix_root_cause: state.bugfixRootCause,
-          bugfix_prevention: state.bugfixPrevention,
-          is_post_interview_discussion: state.isPostInterviewDiscussion ?? false,
-          real_interview_mode: state.realInterviewMode,
-          strict_time_limit: state.strictTimeLimit,
-          paused: state.paused,
-          interviewer_input: state.interviewerInput,
-          chat_input: state.chatInput,
-          saved_at: new Date().toISOString(),
-        },
-        updated_at: new Date().toISOString(),
-      },
-      { merge: true }
-    )
-  } catch (error) {
-    throw error
+export async function saveSessionState(sessionId: string, state: SessionCheckpoint): Promise<void> {
+  const sessionRef = doc(db, "interview_sessions", sessionId)
+  const sessionState = serializeCheckpoint(
+    state,
+    state.testResults ? sanitizeTestResultsForFirestore(state.testResults.slice(-20)) : []
+  )
+  if (new TextEncoder().encode(JSON.stringify(sessionState)).byteLength > 900_000)
+    throw new Error("Session backup exceeds the cloud document limit; local recovery is preserved")
+  const update = { session_state: sessionState, updated_at: new Date().toISOString() }
+  if (state.ownerId) {
+    await runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(sessionRef)
+      const session = snapshot.data()
+      if (
+        !session ||
+        session.completed_at ||
+        session.feedback_status === "pending" ||
+        (session.session_lifecycle?.ownerId && session.session_lifecycle.ownerId !== state.ownerId)
+      ) {
+        throw new Error("This attempt is complete or active in another tab")
+      }
+      transaction.set(sessionRef, update, { merge: true })
+    })
+  } else {
+    await setDoc(sessionRef, update, { merge: true })
   }
 }
 
@@ -968,8 +937,10 @@ export async function getSessionState(sessionId: string): Promise<{
   isPostInterviewDiscussion?: boolean
   realInterviewMode?: boolean
   strictTimeLimit?: number | null
+  strictDeadlineAt?: number | null
   paused?: boolean
   interviewerInput?: string
+  testRunRevision?: string | null
   chatInput?: string
   savedAt?: string
   completedAt?: string
@@ -1004,8 +975,10 @@ export async function getSessionState(sessionId: string): Promise<{
       isPostInterviewDiscussion?: boolean
       realInterviewMode?: boolean
       strictTimeLimit?: number | null
+      strictDeadlineAt?: number | null
       paused?: boolean
       interviewerInput?: string
+      testRunRevision?: string | null
       chatInput?: string
       savedAt?: string
       completedAt?: string
@@ -1038,9 +1011,11 @@ export async function getSessionState(sessionId: string): Promise<{
       result.isPostInterviewDiscussion = data.session_state.is_post_interview_discussion ?? false
       result.realInterviewMode = data.session_state.real_interview_mode
       result.strictTimeLimit = data.session_state.strict_time_limit
+      result.strictDeadlineAt = data.session_state.strict_deadline_at
       result.paused = data.session_state.paused
       result.interviewerInput = data.session_state.interviewer_input
       result.chatInput = data.session_state.chat_input
+      result.testRunRevision = data.session_state.test_run_revision
       result.savedAt = data.session_state.saved_at
     }
 

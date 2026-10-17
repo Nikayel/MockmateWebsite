@@ -12,6 +12,22 @@ export interface SessionLifecycle {
   lastNudgedActivityAt?: number
 }
 
+export function isPausedAttempt(
+  session: {
+    completed_at?: string | null
+    feedback_status?: string
+    session_state?: { paused?: boolean }
+    session_lifecycle?: SessionLifecycle
+  },
+  now = Date.now()
+): boolean {
+  if (session.completed_at || session.feedback_status === "pending") return false
+  const lifecycle = session.session_lifecycle
+  return lifecycle
+    ? lifecycle.status === "paused" || now - lifecycle.lastActivityAt >= SESSION_IDLE_MS
+    : session.session_state?.paused === true
+}
+
 export function canSendProactive(
   lifecycle: SessionLifecycle | undefined,
   ownerId: string | undefined,

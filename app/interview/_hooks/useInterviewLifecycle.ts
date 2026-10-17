@@ -4,7 +4,7 @@ import { SESSION_IDLE_MS, SESSION_WARNING_MS } from "@/lib/interview/session-lif
 interface Options {
   enabled: boolean
   sessionId: string | null
-  onPause: () => void
+  onPause: (saveCheckpoint?: boolean) => void
   onResume?: () => void
   onSync?: (
     action: "activate" | "heartbeat" | "pause",
@@ -18,37 +18,55 @@ export function useInterviewLifecycle(options: Options) {
   latest.current = options
   const [paused, setPaused] = useState(false)
   const [warning, setWarning] = useState(false)
+  const [blockedByOtherTab, setBlockedByOtherTab] = useState(false)
   const pausedRef = useRef(false)
   const activityRef = useRef(Date.now())
-  const ownerId = useRef(crypto.randomUUID()).current
+  const [ownerId] = useState(() => crypto.randomUUID())
   const generationRef = useRef(0)
   const lastSessionRef = useRef<string | null>(null)
-  const pause = useCallback(() => {
-    if (pausedRef.current) return
-    pausedRef.current = true
-    generationRef.current++
-    setPaused(true)
-    setWarning(false)
-    latest.current.onPause()
-    void latest.current.onSync?.("pause", ownerId, activityRef.current)
-  }, [ownerId])
+  const restoredSessionRef = useRef<string | null>(null)
+  const pause = useCallback(
+    (saveCheckpoint = true) => {
+      setBlockedByOtherTab(!saveCheckpoint)
+      if (pausedRef.current) return
+      pausedRef.current = true
+      generationRef.current++
+      setPaused(true)
+      setWarning(false)
+      latest.current.onPause(saveCheckpoint)
+      void latest.current.onSync?.("pause", ownerId, activityRef.current)
+    },
+    [ownerId]
+  )
   const resume = useCallback(() => {
-    activityRef.current = Date.now()
-    pausedRef.current = false
-    generationRef.current++
-    setPaused(false)
-    setWarning(false)
-    latest.current.onResume?.()
-    void latest.current.onSync?.("activate", ownerId, activityRef.current).then((ok) => {
-      if (!ok) pause()
-    })
+    restoredSessionRef.current = null
+    const generation = ++generationRef.current
+    const activate = () => {
+      if (generationRef.current !== generation) return
+      activityRef.current = Date.now()
+      pausedRef.current = false
+      setPaused(false)
+      setBlockedByOtherTab(false)
+      setWarning(false)
+      latest.current.onResume?.()
+    }
+    const sync = latest.current.onSync?.("activate", ownerId, Date.now())
+    if (sync)
+      void sync.then((ok) => {
+        if (generationRef.current === generation) {
+          if (ok) activate()
+          else pause(false)
+        }
+      })
+    else activate()
   }, [ownerId, pause])
 
   useEffect(() => {
     if (!options.enabled || !options.sessionId) return
     if (
-      !pausedRef.current ||
-      (lastSessionRef.current && lastSessionRef.current !== options.sessionId)
+      restoredSessionRef.current !== options.sessionId &&
+      (!pausedRef.current ||
+        (lastSessionRef.current && lastSessionRef.current !== options.sessionId))
     )
       resume()
     lastSessionRef.current = options.sessionId
@@ -58,14 +76,26 @@ export function useInterviewLifecycle(options: Options) {
       if (idle >= SESSION_IDLE_MS) pause()
       else setWarning(idle >= SESSION_WARNING_MS)
     }
-    const activity = () => {
+    let lastHumanInput = Date.now()
+    const activity = (event: Event) => {
+      if (event.type === "pointermove" && (event as PointerEvent).buttons === 0) return
+      if (event.type === "scroll" && Date.now() - lastHumanInput > 2000) return
+      if (event.type !== "scroll") lastHumanInput = Date.now()
       // Check the old clock before recording input: a sleeping tab must not silently resume.
       check()
       if (pausedRef.current || document.visibilityState === "hidden") return
       activityRef.current = Date.now()
       setWarning(false)
     }
-    const events = ["pointerdown", "keydown", "input", "scroll", "wheel"] as const
+    const events = [
+      "pointerdown",
+      "pointermove",
+      "touchmove",
+      "keydown",
+      "input",
+      "scroll",
+      "wheel",
+    ] as const
     events.forEach((event) =>
       window.addEventListener(event, activity, { capture: true, passive: true })
     )
@@ -76,7 +106,7 @@ export function useInterviewLifecycle(options: Options) {
     const heartbeat = setInterval(() => {
       if (!pausedRef.current && document.visibilityState !== "hidden") {
         void latest.current.onSync?.("heartbeat", ownerId, activityRef.current).then((ok) => {
-          if (!ok) pause()
+          if (!ok) pause(false)
         })
       }
     }, 30000)
@@ -90,5 +120,19 @@ export function useInterviewLifecycle(options: Options) {
     }
     // Latest callbacks are read from refs; only a different attempt resets the clock.
   }, [options.enabled, options.sessionId, ownerId, pause, resume])
-  return { paused, warning, pause, resume, activityRef, generationRef, ownerId }
+  return {
+    paused,
+    pauseForRestore: (sessionId: string) => {
+      restoredSessionRef.current = sessionId
+      pause()
+    },
+    isPaused: () => pausedRef.current,
+    warning,
+    blockedByOtherTab,
+    pause,
+    resume,
+    activityRef,
+    generationRef,
+    ownerId,
+  }
 }

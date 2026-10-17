@@ -83,7 +83,9 @@ export function buildPreLLMInterviewerPolicy(ctx: PreLLMPolicyContext): PreLLMIn
       ],
       requiredAction: ctx.hasSubmitted
         ? "Debrief using the candidate's evidence and changes."
-        : "Ask one grounded question about the next investigation or verification step; do not reveal the root cause.",
+        : ctx.phase === "clarification"
+          ? "Stay in reading/clarification mode and answer a specifically named requirement from public task facts."
+          : "Ask one grounded question about the next investigation or verification step; do not reveal the root cause.",
     }
   const rules: string[] = []
   let requiredAction: string | undefined

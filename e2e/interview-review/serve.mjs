@@ -16,6 +16,7 @@ const server = await createServer({
   resolve: {
     dedupe: ["react", "react-dom"],
     alias: [
+      { find: "@/lib/firestore-helpers", replacement: resolve(root, "lifecycle-persistence.ts") },
       { find: "next/navigation", replacement: resolve(root, "navigation.ts") },
       { find: "@/lib/auth-context", replacement: browserServices },
       { find: "@/lib/analytics", replacement: browserServices },

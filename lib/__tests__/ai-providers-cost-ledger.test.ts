@@ -96,7 +96,12 @@ describe("cost ledger uses measured provider usage", () => {
       service: "interview-chat",
     })
 
-    expect(mocks.calculateCost).toHaveBeenCalledWith(1500, 8000, "gemini")
+    expect(mocks.calculateCost).toHaveBeenCalledWith(
+      1500,
+      8000,
+      "gemini",
+      expect.objectContaining({ at: expect.any(Date) })
+    )
     expect(result.tokensUsed).toBe(9500)
 
     const tracked = mocks.trackUsageEvent.mock.calls[0][0] as Record<string, unknown>

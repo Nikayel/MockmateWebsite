@@ -1,5 +1,7 @@
 "use client"
 
+import { isPausedAttempt } from "@/lib/interview/session-lifecycle/policy"
+
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
@@ -759,7 +761,7 @@ export default function DashboardPage() {
                               )}
                               {isInProgress && (
                                 <Badge className="border-0 bg-amber-500/10 px-1.5 py-0 text-[10px] text-amber-400">
-                                  In Progress
+                                  {isPausedAttempt(session) ? "Paused" : "In Progress"}
                                 </Badge>
                               )}
                             </div>

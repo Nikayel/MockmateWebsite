@@ -255,7 +255,7 @@ export async function POST(request: NextRequest) {
     // LLM-based conversation extraction is prepared here but runs after the
     // response is generated so chat latency does not wait on a secondary LLM call.
     const enhancedTracker = conversationTracker as unknown as ConversationTracker | undefined
-    const ENABLE_LLM_EXTRACTION = true
+    const ENABLE_LLM_EXTRACTION = !(sessionContext && scenarioType === "bugfix")
     const extractionJob: ConversationExtractionJob | null =
       ENABLE_LLM_EXTRACTION && role === "interviewer" && conversationTracker && context && message
         ? {
@@ -330,7 +330,12 @@ export async function POST(request: NextRequest) {
       sessionContext && !sessionContext.testsMatchCurrentRevision ? [] : testResults
     const consoleLogsArray = consoleLogs
 
-    const consoleContext = buildConsoleContext(testResultsArray, consoleLogsArray)
+    const consoleContext = buildConsoleContext(
+      testResults,
+      consoleLogsArray,
+      scenarioType,
+      !sessionContext || sessionContext.testsMatchCurrentRevision
+    )
 
     // How the candidate runs code (Run Tests / Submit buttons; no terminal exists).
     // Goes to BOTH roles: the debugging partner was the one telling candidates to
@@ -450,7 +455,7 @@ export async function POST(request: NextRequest) {
     // This ensures the AI always has accurate state information
     // =================================================================
     let toolResultsContext = ""
-    if (role === "interviewer") {
+    if (role === "interviewer" && !isBugFix) {
       const toolContext: ToolContext = {
         tracker: (enhancedTracker || conversationTracker) as ConversationTracker | undefined,
         phase: currentPhase,
@@ -521,6 +526,7 @@ export async function POST(request: NextRequest) {
 
     // Build interviewer prompt using consolidated function
     const interviewerPromptContext: PromptContext = {
+      scenarioType,
       phase: currentPhase,
       problemTitle: scenarioTitle || "",
       problemDifficulty: scenarioPattern || patternMeta?.name || "medium",
@@ -758,6 +764,7 @@ GROUNDING RULES (prevent hallucination):
       userId,
       sessionId,
       service: "interview-chat",
+      abortSignal: request.signal,
       eventType: "chat_message",
     })
 
@@ -857,6 +864,7 @@ Generate a compliant response NOW:`
             userId,
             sessionId,
             service: "interview-chat",
+            abortSignal: request.signal,
             eventType: "chat_message",
             skipCache: true, // Regeneration must bypass the response cache
           }
@@ -913,6 +921,7 @@ Generate a compliant response NOW:`
             userId,
             sessionId,
             service: "interview-chat",
+            abortSignal: request.signal,
             eventType: "chat_message",
           })
           return { text: result.text }
@@ -961,7 +970,7 @@ Generate a compliant response NOW:`
       })
     }
 
-    runConversationExtractionAfterResponse(extractionJob)
+    if (!request.signal?.aborted) runConversationExtractionAfterResponse(extractionJob)
 
     const finalizedResponse = {
       reply: aiResponse.text,

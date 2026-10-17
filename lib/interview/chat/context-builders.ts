@@ -253,7 +253,9 @@ function formatTestResults(results: TestResultItem[]): string {
 
 export function buildConsoleContext(
   testResultsArray: TestResultItem[] | undefined,
-  consoleLogsArray: ConsoleLogItem[] | undefined
+  consoleLogsArray: ConsoleLogItem[] | undefined,
+  scenarioType?: string,
+  testsAreCurrent = true
 ): string {
   let consoleContext = ""
   if (testResultsArray && Array.isArray(testResultsArray) && testResultsArray.length > 0) {
@@ -272,8 +274,12 @@ Tests have been run: ${passed}/${total} passed ${allPassed ? "✓ ALL PASSING" :
 ${formatTestResults(testResultsArray)}
 
 ${
-  allPassed
-    ? `INTERVIEWER BEHAVIOR WHEN ALL TESTS PASS:
+  !testsAreCurrent
+    ? "HISTORICAL RUN: these results belong to an older or unknown code revision. Use them to discuss the observed failure; request a fresh run before verifying the current code."
+    : allPassed && scenarioType === "bugfix"
+      ? "DEBUGGING VERIFICATION: ask what this run demonstrates about the changed code and what regression would prevent recurrence. Do not require a generic time/space-complexity checklist."
+      : allPassed
+        ? `INTERVIEWER BEHAVIOR WHEN ALL TESTS PASS:
 - DO NOT say "let's run the tests" - they already did and passed!
 - If complexity AND edge cases were already discussed: guide them to Submit
   * Say: "Tests are passing. When you're ready, click Submit to wrap up the interview."
@@ -281,15 +287,15 @@ ${
 - If edge cases NOT discussed: ask ONE question about edge cases
 - After ONE follow-up question, guide them to Submit on your next turn
 - DO NOT keep asking endless questions - wrap up promptly`
-    : harnessFailure
-      ? `INTERVIEWER BEHAVIOR WHEN OUR TEST HARNESS IS BROKEN:
+        : harnessFailure
+          ? `INTERVIEWER BEHAVIOR WHEN OUR TEST HARNESS IS BROKEN:
 The failures above come from the PLATFORM'S OWN test tooling, not from the candidate's code.
 Their solution has not been judged, and nothing they write can make these tests pass.
 - Do NOT ask them to debug these failures.
 - Do NOT suggest or imply the error is in their code.
 - If they say the tests look broken, they are RIGHT. Say so plainly and immediately.
 - Acknowledge it once, briefly, and carry on discussing their approach on its merits.`
-      : `INTERVIEWER BEHAVIOR WHEN TESTS FAIL:
+          : `INTERVIEWER BEHAVIOR WHEN TESTS FAIL:
 - Acknowledge the failing tests
 - Ask them to debug: "Looks like test ${testResultsArray.findIndex((t) => !t.passed) + 1} is failing - what do you think is happening there?"
 - Help them trace through the failing case`

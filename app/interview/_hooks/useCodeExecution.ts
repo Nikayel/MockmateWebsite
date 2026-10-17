@@ -438,8 +438,8 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
               code,
               selectedLanguage,
               elapsedTime,
-              chatMessages: chatMessages.slice(-50),
-              interviewerMessages: interviewerMessages.slice(-50),
+              chatMessages: chatMessages,
+              interviewerMessages: interviewerMessages,
               testResults: data.results.slice(0, 20).map((r: any) => ({
                 description: r.description || "",
                 passed: r.passed || false,

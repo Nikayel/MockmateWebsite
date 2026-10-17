@@ -358,6 +358,8 @@ export async function PUT(request: NextRequest) {
         is_post_interview_discussion: sessionState.isPostInterviewDiscussion,
         real_interview_mode: sessionState.realInterviewMode,
         strict_time_limit: sessionState.strictTimeLimit,
+        test_run_revision: sessionState.testRunRevision,
+        strict_deadline_at: sessionState.strictDeadlineAt,
         paused: sessionState.paused,
         interviewer_input: sessionState.interviewerInput,
         chat_input: sessionState.chatInput,

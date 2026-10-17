@@ -19,11 +19,12 @@ export async function updateSessionLifecycle(input: {
     const previous = session.session_lifecycle as SessionLifecycle | undefined
     if (previous && previous.ownerId !== input.ownerId && previous.leaseUntil > now)
       return { status: 409 }
+    if (input.action === "heartbeat" && previous?.status === "paused") return { status: 409 }
     if (input.action !== "activate" && previous?.ownerId !== input.ownerId) return { status: 409 }
     const lifecycle: SessionLifecycle = {
       status: input.action === "pause" ? "paused" : "active",
       ownerId: input.ownerId,
-      lastActivityAt: Math.min(now, input.lastActivityAt),
+      lastActivityAt: Math.max(previous?.lastActivityAt ?? 0, Math.min(now, input.lastActivityAt)),
       leaseUntil: input.action === "pause" ? 0 : now + SESSION_LEASE_MS,
       nudgeCount: previous?.nudgeCount ?? 0,
       ...(previous?.lastNudgedActivityAt !== undefined

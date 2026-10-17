@@ -1,5 +1,7 @@
 "use client"
 
+import type { RestoredSessionInputs } from "@/lib/interview/session-lifecycle/checkpoint"
+
 import { buildSessionContext, workspaceRevision } from "@/lib/interview/session-context/snapshot"
 import { SessionPauseNotice } from "./_components/SessionPauseNotice"
 import { useInterviewLifecycle } from "./_hooks/useInterviewLifecycle"
@@ -360,6 +362,7 @@ function InterviewPageContent() {
   const [efficiencyMetrics, setEfficiencyMetrics] = useState<EfficiencyMetrics | null>(null)
 
   const [starterCode, setStarterCode] = useState("")
+  const [canCheckpoint, setCanCheckpoint] = useState(true)
   const [isSessionPaused, setIsSessionPaused] = useState(false)
 
   // Timer
@@ -404,6 +407,7 @@ function InterviewPageContent() {
             workspace: workspaceContext,
             code,
             starterCode: starterCode || undefined,
+            includeSolution: !isWorkspaceScenario(selectedScenario),
             interviewerMessages,
             partnerMessages: chatMessages,
             testRunRevision,
@@ -1149,13 +1153,15 @@ function InterviewPageContent() {
   const lifecycle = useInterviewLifecycle({
     enabled: isInterviewStarted && !showFeedback,
     sessionId: currentSessionId,
-    onPause: () => {
+    onPause: (saveCheckpoint = true) => {
+      setCanCheckpoint(saveCheckpoint)
       setIsSessionPaused(true)
       interviewerVoice.cancelCountdown()
       if (interviewerVoice.isRecording) interviewerVoice.stopRecording()
       resetProactiveState()
     },
     onResume: () => {
+      setCanCheckpoint(true)
       setIsSessionPaused(false)
       if (!strictTimeLimit) setStartTime(Date.now() - elapsedTime * 1000)
     },
@@ -1341,6 +1347,21 @@ function InterviewPageContent() {
     router,
   })
 
+  const displayedSessionRef = useRef<string | null>(null)
+  displayedSessionRef.current = isInterviewStarted ? currentSessionId : null
+  const isShowingSession = useCallback(
+    (sessionId: string) => displayedSessionRef.current === sessionId,
+    []
+  )
+  const restoreSessionInputs = (state: RestoredSessionInputs) => {
+    if (state.strictDeadlineAt && state.strictTimeLimit)
+      setStartTime(state.strictDeadlineAt - state.strictTimeLimit * 1000)
+    setTestRunRevision(state.testRunRevision ?? null)
+    setChatInput(state.chatInput ?? "")
+    setInterviewerInput(state.interviewerInput ?? "")
+    lifecycle.pauseForRestore(state.sessionId)
+  }
+
   useSessionReopen({
     router,
     searchParams,
@@ -1357,6 +1378,7 @@ function InterviewPageContent() {
     refreshUsageLimit,
     startInterview,
     isShowingPostSubmitSession,
+    isShowingSession,
     resetBugfixSessionState,
     setIsLoading,
     setSelectedScenario,
@@ -1378,11 +1400,7 @@ function InterviewPageContent() {
     setBugfixEvidenceEvents,
     setShowPostInterviewDiscussion,
     recordedBugfixEditPathsRef,
-    onSessionRestored: (state) => {
-      setChatInput(state.chatInput ?? "")
-      setInterviewerInput(state.interviewerInput ?? "")
-      if (!state.isPostInterviewDiscussion) lifecycle.pause()
-    },
+    onSessionRestored: restoreSessionInputs,
   })
 
   const { saveNow } = useInterviewAutosave({
@@ -1409,11 +1427,15 @@ function InterviewPageContent() {
     interviewerInput,
     chatInput,
     paused: isSessionPaused,
+    strictDeadlineAt: strictTimeLimit && startTime ? startTime + strictTimeLimit * 1000 : null,
+    canCheckpoint,
+    testRunRevision,
+    ownerId: lifecycle.ownerId,
   })
 
   useEffect(() => {
-    if (isSessionPaused) void saveNow()
-  }, [isSessionPaused, saveNow])
+    if (isSessionPaused && canCheckpoint) void saveNow()
+  }, [isSessionPaused, canCheckpoint, saveNow])
 
   const saveAndExit = async () => {
     lifecycle.pause()
@@ -1424,12 +1446,13 @@ function InterviewPageContent() {
           ? "Saved on this device. Cloud backup is pending."
           : "Could not save. Please stay and try again."
       )
-      return
+      if (!saved.localSaved) return
     }
     router.push("/dashboard")
   }
 
   useSessionRestore({
+    onSessionRestored: restoreSessionInputs,
     firebaseUser,
     isGuestMode,
     guestId,
@@ -1837,6 +1860,7 @@ function InterviewPageContent() {
 
   const { handleSendMessage, handleAutoSend } = useInterviewChat({
     sessionContext,
+    isActive: () => !lifecycle.isPaused(),
     paused: isSessionPaused,
     generationRef: lifecycle.generationRef,
     ownerId: lifecycle.ownerId,
@@ -1880,7 +1904,10 @@ function InterviewPageContent() {
   // Usage: analyzeCodeEfficiency(code, (selectedScenario as any)?.optimalComplexity)
 
   const { runCode, submitCode } = useCodeExecution({
-    onTestsCompleted: () => setTestRunRevision(workspaceRevision(workspaceContext, code)),
+    onTestsCompleted: () =>
+      setTestRunRevision(
+        workspaceRevision(workspaceContext, code, !isWorkspaceScenario(selectedScenario))
+      ),
     selectedScenario,
     code,
     selectedLanguage,
@@ -2177,8 +2204,9 @@ function InterviewPageContent() {
       <SessionPauseNotice
         paused={isInterviewStarted && isSessionPaused && !showFeedback}
         warning={lifecycle.warning}
+        blockedByOtherTab={lifecycle.blockedByOtherTab}
         onResume={lifecycle.resume}
-        onExit={saveAndExit}
+        onExit={lifecycle.blockedByOtherTab ? () => router.push("/dashboard") : saveAndExit}
       />
       {!isInterviewMode && <Header />}
 

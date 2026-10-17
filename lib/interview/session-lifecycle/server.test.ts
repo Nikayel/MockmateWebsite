@@ -25,6 +25,25 @@ beforeEach(() => {
   }
 })
 describe("owned lifecycle writes", () => {
+  it("does not let a delayed heartbeat reactivate a paused attempt", async () => {
+    mocks.session.session_lifecycle = {
+      status: "paused",
+      ownerId: "tab",
+      leaseUntil: 0,
+      nudgeCount: 0,
+      lastActivityAt: Date.now(),
+    }
+    expect(
+      await updateSessionLifecycle({
+        sessionId: "s",
+        userId: "u",
+        ownerId: "tab",
+        action: "heartbeat",
+        lastActivityAt: Date.now(),
+      })
+    ).toEqual({ status: 409 })
+    expect(mocks.update).not.toHaveBeenCalled()
+  })
   it("never lets another account or live tab claim the session", async () => {
     expect(await claimProactiveNudge("s", "foreign", "tab")).toBe(false)
     expect(
