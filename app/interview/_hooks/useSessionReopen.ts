@@ -94,6 +94,12 @@ export interface UseSessionReopenOptions {
   setBugfixEvidenceEvents: Dispatch<SetStateAction<BugfixEvidenceEvent[]>>
   setShowPostInterviewDiscussion: Dispatch<SetStateAction<boolean>>
 
+  onSessionRestored?: (state: {
+    chatInput?: string
+    interviewerInput?: string
+    isPostInterviewDiscussion?: boolean
+  }) => void
+
   // Refs
   recordedBugfixEditPathsRef: { current: Set<string> }
 }
@@ -243,6 +249,11 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
               if (sessionState.test_results?.length) {
                 opts.setTestResults(sessionState.test_results as TestResult[])
               }
+              opts.onSessionRestored?.({
+                chatInput: sessionState.chat_input,
+                interviewerInput: sessionState.interviewer_input,
+                isPostInterviewDiscussion: sessionState.is_post_interview_discussion,
+              })
               toast.success("Session resumed")
             } else {
               opts.setCode(initialCode)
@@ -500,6 +511,7 @@ Let's continue!`
               }
               toast.success("Resuming post-interview discussion")
             } else {
+              opts.onSessionRestored?.(savedState ?? {})
               toast.success("Session resumed")
             }
           } else {

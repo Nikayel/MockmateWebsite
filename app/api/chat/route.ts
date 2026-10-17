@@ -1,3 +1,4 @@
+import { claimProactiveNudge } from "@/lib/interview/session-lifecycle/server"
 import { NextRequest, NextResponse } from "next/server"
 import { enforceMeteredAiRequest } from "@/lib/ai/metered-request"
 import {
@@ -217,6 +218,16 @@ export async function POST(request: NextRequest) {
     // userId would let a caller spoof another user's identity and drain their
     // budget. requireAuth guarantees rateLimitUserId is a real uid here.
     const userId = rateLimitUserId
+    if (isProactive) {
+      const claimed =
+        sessionId && (await claimProactiveNudge(sessionId, userId, parseResult.data.ownerId))
+      if (!claimed)
+        return NextResponse.json({
+          reply: null,
+          skipped: true,
+          reason: "Session is paused or check-in budget is exhausted",
+        })
+    }
 
     // For proactive messages (interviewer jumping in), message might be empty
     if (!message && !isProactive) {

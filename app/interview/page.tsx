@@ -1,5 +1,7 @@
 "use client"
 
+import { SessionPauseNotice } from "./_components/SessionPauseNotice"
+import { useInterviewLifecycle } from "./_hooks/useInterviewLifecycle"
 import { InterviewSurfaceFrame } from "./_components/InterviewSurfaceFrame"
 
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react"
@@ -356,9 +358,11 @@ function InterviewPageContent() {
   })
   const [efficiencyMetrics, setEfficiencyMetrics] = useState<EfficiencyMetrics | null>(null)
 
+  const [isSessionPaused, setIsSessionPaused] = useState(false)
+
   // Timer
   const { startTime, setStartTime, elapsedTime, setElapsedTime } = useInterviewTimer(
-    isInterviewStarted && !showFeedback
+    isInterviewStarted && !showFeedback && !isSessionPaused
   )
 
   // Hints
@@ -1106,8 +1110,43 @@ function InterviewPageContent() {
     setConversationTracker,
   })
 
+  const lifecycle = useInterviewLifecycle({
+    enabled: isInterviewStarted && !showFeedback,
+    sessionId: currentSessionId,
+    onPause: () => {
+      setIsSessionPaused(true)
+      interviewerVoice.cancelCountdown()
+      if (interviewerVoice.isRecording) interviewerVoice.stopRecording()
+      resetProactiveState()
+    },
+    onResume: () => {
+      setIsSessionPaused(false)
+      if (!strictTimeLimit) setStartTime(Date.now() - elapsedTime * 1000)
+    },
+    onSync: async (action, ownerId, lastActivityAt) => {
+      if (!firebaseUser || !currentSessionId) return true
+      try {
+        const token = await firebaseUser.getIdToken()
+        const response = await fetch("/api/interview/lifecycle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ sessionId: currentSessionId, ownerId, action, lastActivityAt }),
+        })
+        return response.status !== 409 && response.status !== 404
+      } catch {
+        return true
+      }
+    },
+  })
+
   const { resetProactiveState } = useInterviewProactiveAI({
-    isInterviewStarted,
+    isInterviewStarted: isInterviewStarted && !isSessionPaused,
+    currentSessionId,
+    ownerId: lifecycle.ownerId,
+    activityRef: lifecycle.activityRef,
+    generationRef: lifecycle.generationRef,
+    chatMessages,
+    chatInput,
     showFeedback,
     showPostInterviewDiscussion,
     isLoadingInterviewer,
@@ -1302,6 +1341,11 @@ function InterviewPageContent() {
     setBugfixEvidenceEvents,
     setShowPostInterviewDiscussion,
     recordedBugfixEditPathsRef,
+    onSessionRestored: (state) => {
+      setChatInput(state.chatInput ?? "")
+      setInterviewerInput(state.interviewerInput ?? "")
+      if (!state.isPostInterviewDiscussion) lifecycle.pause()
+    },
   })
 
   const { saveNow } = useInterviewAutosave({
@@ -1327,12 +1371,15 @@ function InterviewPageContent() {
     strictTimeLimit,
     interviewerInput,
     chatInput,
+    paused: isSessionPaused,
   })
 
+  useEffect(() => {
+    if (isSessionPaused) void saveNow()
+  }, [isSessionPaused, saveNow])
+
   const saveAndExit = async () => {
-    interviewerVoice.cancelCountdown()
-    if (interviewerVoice.isRecording) interviewerVoice.stopRecording()
-    resetProactiveState()
+    lifecycle.pause()
     const saved = await saveNow()
     if (!saved.cloudSaved) {
       toast.warning(
@@ -1750,6 +1797,9 @@ function InterviewPageContent() {
   }
 
   const { handleSendMessage, handleAutoSend } = useInterviewChat({
+    paused: isSessionPaused,
+    generationRef: lifecycle.generationRef,
+    ownerId: lifecycle.ownerId,
     chatInput,
     interviewerInput,
     chatMessages,
@@ -2083,6 +2133,12 @@ function InterviewPageContent() {
   return (
     <main className="bg-background min-h-dvh">
       <h1 className="sr-only">Mock Interview Environment</h1>
+      <SessionPauseNotice
+        paused={isInterviewStarted && isSessionPaused && !showFeedback}
+        warning={lifecycle.warning}
+        onResume={lifecycle.resume}
+        onExit={saveAndExit}
+      />
       {!isInterviewMode && <Header />}
 
       {/* Guest Mode Banner - fixed below the header when it exists, at the very

@@ -1,4 +1,4 @@
-import { useRef } from "react"
+import { useEffect, useRef } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -61,6 +61,9 @@ interface ChatApiResponse {
 }
 
 export interface UseInterviewChatOptions {
+  paused?: boolean
+  generationRef?: { current: number }
+  ownerId?: string
   // ---- live inputs read inside handleSendMessage ----
   chatInput: string
   interviewerInput: string
@@ -260,6 +263,13 @@ export function buildChatErrorToast(
  */
 export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewChatReturn {
   const router = useRouter()
+  const controllers = useRef(new Set<AbortController>())
+  useEffect(() => {
+    const active = controllers.current
+    if (opts.paused) active.forEach((controller) => controller.abort())
+    return () => active.forEach((controller) => controller.abort())
+  }, [opts.paused, opts.currentSessionId])
+
   /** Whether a send is already in flight, per conversation lane. See handleSendMessage. */
   const sendInFlightRef = useRef({ interviewer: false, partner: false })
   /**
@@ -313,6 +323,9 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
     const input = messageOverride ?? (isInterviewer ? interviewerInput : chatInput)
     const setInput = isInterviewer ? setInterviewerInput : setChatInput
     const messages = isInterviewer ? interviewerMessages : chatMessages
+    if (opts.paused) return
+    const requestGeneration = opts.generationRef?.current
+    const isCurrent = () => opts.generationRef?.current === requestGeneration
     const setMessages = isInterviewer ? setInterviewerMessages : setChatMessages
     const setLoading = isInterviewer ? setIsLoadingInterviewer : setIsLoadingChat
 
@@ -332,6 +345,8 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
       const lane = isInterviewer ? "interviewer" : "partner"
       if (sendInFlightRef.current[lane]) return
       sendInFlightRef.current[lane] = true
+      const controller = new AbortController()
+      controllers.current.add(controller)
 
       const newUserMessage: ChatMessage = { type: "user", message: userMessage }
       setMessages((prev) => [...prev, newUserMessage])
@@ -490,7 +505,9 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
           return
         }
         const idToken = await firebaseUser.getIdToken()
+        if (!isCurrent()) return
         const response = await fetch("/api/chat", {
+          signal: controller.signal,
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -506,6 +523,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             // Without it the monthly total accumulated while every session
             // row read $0.0000.
             sessionId: currentSessionId ?? undefined,
+            ownerId: opts.ownerId,
             userContext: userProfile
               ? {
                   email: user?.email,
@@ -537,6 +555,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
           }),
         })
 
+        if (!isCurrent()) return
         if (!response.ok) {
           const data = (await response.json().catch(() => null)) as ChatApiResponse | null
           console.warn("[API] Request failed:", response.status, response.url, data)
@@ -561,6 +580,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
           streamingResponseId = `interviewer-stream-${Date.now()}-${Math.random().toString(36).slice(2)}`
 
           const streamResponse = await readValidatedChatStream(response, (delta) => {
+            if (!isCurrent()) return
             revealedReply += delta
 
             if (!hasStartedRevealing) {
@@ -586,6 +606,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             )
           })
 
+          if (!isCurrent()) return
           data = streamResponse
           if (hasStartedRevealing) {
             setMessages((previous) =>
@@ -601,6 +622,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
           data = (await response.json()) as ChatApiResponse
         }
 
+        if (!isCurrent()) return
         // The model has now seen this code state; diff future sends against it.
         // Not updated on failure: the retry should still carry the change note.
         lastSentCodeRef.current.lanes[lane] = codeSnapshot
@@ -689,6 +711,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
           reportSendFailure(response.status, data, newUserMessage)
         }
       } catch (error) {
+        if (controller.signal.aborted || !isCurrent()) return
         console.error("Chat error:", error)
         if (streamingResponseId) {
           setMessages((previous) =>
@@ -699,6 +722,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
         // that as retryable, which is right: a dropped connection usually is.
         reportSendFailure(0, null, newUserMessage)
       } finally {
+        controllers.current.delete(controller)
         setLoading(false)
         sendInFlightRef.current[lane] = false
       }

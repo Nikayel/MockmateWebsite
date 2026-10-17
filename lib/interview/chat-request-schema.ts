@@ -37,7 +37,12 @@ export const chatRequestSchema = z
     scenarioPattern: z.string().optional(),
     scenarioCompany: z.string().nullish(),
     elapsedTime: z.number().optional(),
-    sessionId: z.string().optional(),
+    sessionId: z
+      .string()
+      .max(200)
+      .regex(/^[\w-]+$/)
+      .optional(),
+    ownerId: z.string().uuid().optional(),
     userId: z.string().optional(),
     partnerMessagesCount: z.number().optional(),
     lastPartnerExchange: z.string().optional(),

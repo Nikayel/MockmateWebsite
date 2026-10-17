@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
 
+vi.mock("@/lib/interview/session-lifecycle/server", () => ({
+  claimProactiveNudge: vi.fn(async () => true),
+}))
+
 vi.mock("@/lib/rate-limiting", () => ({
   enforceChatRateLimit: vi.fn(),
   enforceAiFeedbackRateLimit: vi.fn(),
@@ -150,6 +154,16 @@ describe("/api/chat route", () => {
     expect(enforceChatRateLimit).toHaveBeenCalledWith("user-1", "free")
   })
 
+  it("does not call the model for an unowned or missing proactive session", async () => {
+    const { generateAIResponse } = await setupMocks()
+    const { POST } = await import("./route")
+    const response = await POST(
+      createRequest({ role: "interviewer", isProactive: true, timeSinceLastMessage: 600 })
+    )
+    expect(response.data).toMatchObject({ skipped: true, reply: null })
+    expect(generateAIResponse).not.toHaveBeenCalled()
+  })
+
   it("requires a message unless the request is proactive", async () => {
     const { generateAIResponse, enforceChatRateLimit } = await setupMocks()
     const { POST } = await import("./route")
@@ -170,6 +184,7 @@ describe("/api/chat route", () => {
       createRequest({
         role: "interviewer",
         isProactive: true,
+        sessionId: "session-1",
         currentCode: "let i = 0",
         timeSinceLastMessage: 30,
       })
