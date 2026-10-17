@@ -25,6 +25,24 @@ beforeEach(() => {
   }
 })
 describe("owned lifecycle writes", () => {
+  it("allows an explicit manual resume to claim the attempt in this tab", async () => {
+    expect(
+      await updateSessionLifecycle({
+        sessionId: "s",
+        userId: "u",
+        ownerId: "new-tab",
+        action: "activate",
+        lastActivityAt: Date.now(),
+        manual: true,
+      })
+    ).toEqual({ status: 200 })
+    expect(mocks.update).toHaveBeenCalledWith(
+      "session-ref",
+      expect.objectContaining({
+        session_lifecycle: expect.objectContaining({ ownerId: "new-tab", status: "active" }),
+      })
+    )
+  })
   it("does not let a delayed heartbeat reactivate a paused attempt", async () => {
     mocks.session.session_lifecycle = {
       status: "paused",

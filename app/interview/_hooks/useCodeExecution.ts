@@ -1,3 +1,9 @@
+import {
+  captureSessionRequest,
+  type SessionRequestGuard,
+} from "@/lib/interview/session-lifecycle/request"
+import { workspaceRevision } from "@/lib/interview/session-context/snapshot"
+import { isWorkspaceScenario } from "../_utils/workspace"
 import { useRef } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import { toast } from "sonner"
@@ -47,7 +53,7 @@ function applyGuidedLabGating(scenarioId: string | undefined, results: TestResul
  * persistence, post-interview discussion) are injected as callbacks so the run
  * / submit flow stays byte-identical to the previous inline implementation.
  */
-export interface UseCodeExecutionOptions {
+export interface UseCodeExecutionOptions extends SessionRequestGuard {
   onTestsCompleted?: () => void
   // ---- live inputs read inside run / submit ----
   selectedScenario: Scenario | null
@@ -90,7 +96,11 @@ export interface UseCodeExecutionOptions {
     summary: { passed: number; total: number; failed: number },
     results: TestResult[] | undefined
   ) => void
-  triggerPostInterviewDiscussion: (testResults: TestResult[], summary: any) => unknown
+  triggerPostInterviewDiscussion: (
+    testResults: TestResult[],
+    summary: TestSummary,
+    revision?: string
+  ) => unknown
   markQuestionEvaluating: (scenarioId: string) => void
 }
 
@@ -151,7 +161,8 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
   const announcedFailureRef = useRef<string | null>(null)
 
   const runCode = async () => {
-    if (!selectedScenario) return
+    if (!selectedScenario || opts.isActive?.() === false) return
+    const isCurrent = captureSessionRequest(opts)
 
     setIsRunningTests(true)
     setTestResults([])
@@ -169,6 +180,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
         selectedLanguage,
         workspaceContext,
       })
+      if (!isCurrent()) return
       const data = execution.data
 
       // Handle API errors (scenario not found, execution timeout, etc.)
@@ -304,7 +316,8 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
 
   // Submit code - runs tests and triggers post-interview discussion/feedback
   const submitCode = async () => {
-    if (!selectedScenario) return
+    if (!selectedScenario || opts.isActive?.() === false) return
+    const isCurrent = captureSessionRequest(opts)
 
     setIsRunningTests(true)
     setTestResults([])
@@ -322,6 +335,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
         selectedLanguage,
         workspaceContext,
       })
+      if (!isCurrent()) return
       const data = execution.data
 
       // Handle API errors (scenario not found, execution timeout, etc.)
@@ -435,6 +449,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
         if (currentSessionId && user) {
           try {
             await saveSessionState(currentSessionId, {
+              ownerId: opts.ownerId,
               code,
               selectedLanguage,
               elapsedTime,
@@ -523,7 +538,11 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
         setIsRunningTests(false)
         setShowPostInterviewDiscussion(true)
         if (user) {
-          triggerPostInterviewDiscussion(data.results, data.summary)
+          triggerPostInterviewDiscussion(
+            data.results,
+            data.summary,
+            workspaceRevision(workspaceContext, code, !isWorkspaceScenario(selectedScenario))
+          )
         }
       }
     } catch (error) {

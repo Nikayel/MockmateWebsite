@@ -1,8 +1,21 @@
 import { useEffect, useState } from "react"
+import { SESSION_IDLE_MS } from "@/lib/interview/session-lifecycle/policy"
 
 /** Whole seconds elapsed between `startTime` and `now` (both epoch ms). */
 export function computeElapsedSeconds(startTime: number, now: number): number {
   return Math.floor((now - startTime) / 1000)
+}
+
+/** Background throttling must not count hours away as active practice. */
+export function computePausedElapsedSeconds(
+  startTime: number,
+  lastActivityAt: number,
+  now: number
+): number {
+  return Math.max(
+    0,
+    computeElapsedSeconds(startTime, Math.min(now, lastActivityAt + SESSION_IDLE_MS))
+  )
 }
 
 export interface UseInterviewTimerReturn {

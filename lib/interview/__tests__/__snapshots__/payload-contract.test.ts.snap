@@ -266,6 +266,7 @@ exports[`interview payload contract (Slice 0 oracle) > captures every API reques
     [
       "action",
       "lastActivityAt",
+      "manual",
       "ownerId",
       "sessionId",
     ],
@@ -472,6 +473,7 @@ exports[`interview payload contract (Slice 0 oracle) > captures every API reques
       "interviewerInput",
       "interviewerMessages",
       "isPostInterviewDiscussion",
+      "ownerId",
       "paused",
       "realInterviewMode",
       "scenarioId",
@@ -518,6 +520,7 @@ exports[`interview payload contract (Slice 0 oracle) > captures every API reques
       "elapsedTime",
       "interviewerMessages",
       "isPostInterviewDiscussion",
+      "ownerId",
       "realInterviewMode",
       "selectedLanguage",
       "strictTimeLimit",

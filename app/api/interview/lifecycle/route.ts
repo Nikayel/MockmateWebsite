@@ -12,6 +12,7 @@ const schema = z.object({
   ownerId: z.string().uuid(),
   action: z.enum(["activate", "heartbeat", "pause"]),
   lastActivityAt: z.number().finite().nonnegative(),
+  manual: z.boolean().optional(),
 })
 
 export async function POST(request: NextRequest) {

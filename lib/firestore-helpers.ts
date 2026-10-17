@@ -1,3 +1,4 @@
+import { normalizeStoredCheckpoint } from "./interview/session-lifecycle/recovery"
 import {
   serializeCheckpoint,
   type SessionCheckpoint,
@@ -920,6 +921,7 @@ export async function saveSessionState(sessionId: string, state: SessionCheckpoi
  * Get session state for recovery
  */
 export async function getSessionState(sessionId: string): Promise<{
+  ownerId?: string
   code?: string
   language?: string
   elapsedTime?: number
@@ -958,6 +960,7 @@ export async function getSessionState(sessionId: string): Promise<{
 
     // Return completion info even if no session_state (session was submitted)
     const result: {
+      ownerId?: string
       code?: string
       language?: string
       elapsedTime?: number
@@ -986,6 +989,7 @@ export async function getSessionState(sessionId: string): Promise<{
       performanceScore?: number
       feedback?: string
     } = {
+      ownerId: data.session_lifecycle?.ownerId,
       completedAt: data.completed_at,
       feedbackStatus: data.feedback_status,
       performanceScore: data.performance_score,
@@ -994,29 +998,10 @@ export async function getSessionState(sessionId: string): Promise<{
 
     // Add session state if available
     if (data.session_state) {
-      result.code = data.session_state.code
-      result.language = data.session_state.language
-      result.elapsedTime = data.session_state.elapsed_time
-      result.chatMessages = data.session_state.chat_messages
-      result.interviewerMessages = data.session_state.interviewer_messages
-      result.testResults = data.session_state.test_results
-      result.testSummary = data.session_state.test_summary
-      result.workspaceContext = data.session_state.workspace_context
-      result.activeWorkspacePath = data.session_state.active_workspace_path
-      result.consoleLogs = data.session_state.console_logs
-      result.bugfixEvidenceEvents = data.session_state.bugfix_evidence_events
+      Object.assign(result, normalizeStoredCheckpoint(data.session_state) ?? {})
       result.bugfixHypothesis = data.session_state.bugfix_hypothesis
       result.bugfixRootCause = data.session_state.bugfix_root_cause
       result.bugfixPrevention = data.session_state.bugfix_prevention
-      result.isPostInterviewDiscussion = data.session_state.is_post_interview_discussion ?? false
-      result.realInterviewMode = data.session_state.real_interview_mode
-      result.strictTimeLimit = data.session_state.strict_time_limit
-      result.strictDeadlineAt = data.session_state.strict_deadline_at
-      result.paused = data.session_state.paused
-      result.interviewerInput = data.session_state.interviewer_input
-      result.chatInput = data.session_state.chat_input
-      result.testRunRevision = data.session_state.test_run_revision
-      result.savedAt = data.session_state.saved_at
     }
 
     return result

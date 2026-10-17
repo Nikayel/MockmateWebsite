@@ -6,6 +6,7 @@ export async function updateSessionLifecycle(input: {
   sessionId: string
   userId: string
   ownerId: string
+  manual?: boolean
   action: "activate" | "heartbeat" | "pause"
   lastActivityAt: number
 }) {
@@ -17,7 +18,12 @@ export async function updateSessionLifecycle(input: {
     if (session.completed_at || session.feedback_status === "pending") return { status: 409 }
     const now = Date.now()
     const previous = session.session_lifecycle as SessionLifecycle | undefined
-    if (previous && previous.ownerId !== input.ownerId && previous.leaseUntil > now)
+    if (
+      previous &&
+      previous.ownerId !== input.ownerId &&
+      previous.leaseUntil > now &&
+      !(input.action === "activate" && input.manual)
+    )
       return { status: 409 }
     if (input.action === "heartbeat" && previous?.status === "paused") return { status: 409 }
     if (input.action !== "activate" && previous?.ownerId !== input.ownerId) return { status: 409 }

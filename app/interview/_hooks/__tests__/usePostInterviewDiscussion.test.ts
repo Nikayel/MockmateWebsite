@@ -1,3 +1,5 @@
+/** @vitest-environment jsdom */
+import { renderHook } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/firebase-lazy", () => ({ getCurrentUserToken: vi.fn(async () => "token-1") }))
@@ -69,7 +71,8 @@ describe("usePostInterviewDiscussion", () => {
       json: async () => ({ reply: "Nice work. What is the time complexity?" }),
     })
     const { options, getSavedMessages } = buildOptions()
-    const { triggerPostInterviewDiscussion } = usePostInterviewDiscussion(options as never)
+    const { result } = renderHook(() => usePostInterviewDiscussion(options as never))
+    const { triggerPostInterviewDiscussion } = result.current
 
     const started = await triggerPostInterviewDiscussion([], {
       passed: 1,
@@ -97,7 +100,8 @@ describe("usePostInterviewDiscussion", () => {
   it("reports that kickoff did not start when the API returns no reply", async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
     const { options } = buildOptions()
-    const { triggerPostInterviewDiscussion } = usePostInterviewDiscussion(options as never)
+    const { result } = renderHook(() => usePostInterviewDiscussion(options as never))
+    const { triggerPostInterviewDiscussion } = result.current
 
     await expect(
       triggerPostInterviewDiscussion([], { passed: 0, total: 1, failed: 1, passRate: 0 })

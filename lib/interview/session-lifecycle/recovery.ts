@@ -8,9 +8,11 @@ const message = z.object({
   id: z.string().optional(),
   timestamp: z.number().optional(),
   sequence: z.number().optional(),
+  phase: z.literal("post_interview").optional(),
 })
 const checkpoint = z.object({
   sessionId: z.string(),
+  ownerId: z.string().optional(),
   timestamp: z.number(),
   code: z.string(),
   selectedLanguage: z.enum(EDITOR_LANGUAGES),
@@ -35,6 +37,40 @@ const checkpoint = z.object({
   strictTimeLimit: z.number().nullable().optional(),
 })
 type SavedState = NonNullable<Awaited<ReturnType<typeof getSessionState>>>
+
+/** The same stored checkpoint contract is used by authenticated and guest recovery. */
+export function normalizeStoredCheckpoint(raw: unknown) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null
+  const stored = raw as Record<string, unknown>
+  const parsed = checkpoint.omit({ sessionId: true, timestamp: true }).partial().safeParse({
+    code: stored.code,
+    selectedLanguage: stored.language,
+    elapsedTime: stored.elapsed_time,
+    chatMessages: stored.chat_messages,
+    interviewerMessages: stored.interviewer_messages,
+    workspaceContext: stored.workspace_context,
+    activeWorkspacePath: stored.active_workspace_path,
+    testResults: stored.test_results,
+    testSummary: stored.test_summary,
+    consoleLogs: stored.console_logs,
+    bugfixEvidenceEvents: stored.bugfix_evidence_events,
+    isPostInterviewDiscussion: stored.is_post_interview_discussion,
+    paused: stored.paused,
+    interviewerInput: stored.interviewer_input,
+    chatInput: stored.chat_input,
+    testRunRevision: stored.test_run_revision,
+    realInterviewMode: stored.real_interview_mode,
+    strictTimeLimit: stored.strict_time_limit,
+    strictDeadlineAt: stored.strict_deadline_at,
+  })
+  if (!parsed.success) return null
+  const { selectedLanguage, ...state } = parsed.data
+  return {
+    ...state,
+    language: selectedLanguage,
+    savedAt: typeof stored.saved_at === "string" ? stored.saved_at : undefined,
+  }
+}
 
 export function localCheckpointSessionId(storageKey: string): string | null {
   try {
@@ -62,6 +98,7 @@ export function recoverLocalCheckpoint(
     const local = parsed.data
     if (
       local.sessionId !== sessionId ||
+      (remote?.ownerId && local.ownerId && remote.ownerId !== local.ownerId) ||
       Date.now() - local.timestamp > 24 * 60 * 60 * 1000 ||
       local.timestamp <= new Date(remote?.savedAt ?? 0).getTime()
     )

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 
 export function SessionPauseNotice(props: {
+  timedPractice?: boolean
   blockedByOtherTab?: boolean
   paused: boolean
   warning: boolean
@@ -31,8 +32,9 @@ export function SessionPauseNotice(props: {
           <DialogTitle>Session paused</DialogTitle>
           <DialogDescription>
             {props.blockedByOtherTab
-              ? "This attempt is open in another tab. Pause or close that tab before resuming here."
+              ? "This attempt is active in another tab. Resume here to move it to this tab."
               : "Your work and conversations are preserved. Resume when you’re ready. Resuming continues this attempt."}
+            {props.timedPractice && " The timed practice deadline still applies."}
           </DialogDescription>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={props.onExit}>

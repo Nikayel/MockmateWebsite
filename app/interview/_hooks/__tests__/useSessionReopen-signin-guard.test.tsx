@@ -46,6 +46,7 @@ vi.mock("@/lib/bugfix", () => ({
 }))
 
 import { useSessionReopen } from "../useSessionReopen"
+import { getScenarioById } from "@/lib/scenarios/index"
 
 function buildOpts(overrides: Record<string, unknown> = {}) {
   return {
@@ -281,6 +282,32 @@ describe("useSessionReopen for a guest mid-trial refresh", () => {
     expect(opts.setIsInterviewStarted).toHaveBeenCalledWith(true)
     const codeArg = (opts.setCode as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]
     expect(codeArg).toMatch(/function solution/)
+  })
+
+  it("restores a fresh guest workspace from public files before its first autosave", async () => {
+    vi.mocked(getScenarioById).mockResolvedValueOnce({
+      id: "debug",
+      title: "Rollup",
+      type: "bugfix",
+      difficulty: "medium",
+      executionMode: "workspace",
+      workspace: {
+        language: "python",
+        primaryFilePath: "rollup.py",
+        files: [{ path: "rollup.py", content: "public baseline", role: "editable" }],
+      },
+    } as never)
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, json: async () => ({ session: { session_state: null } }) }))
+    )
+    const opts = buildGuestOpts()
+    renderHook(() => useSessionReopen(opts as never))
+    await flush()
+    expect(opts.setCode).toHaveBeenCalledWith("public baseline")
+    expect(opts.setWorkspaceContext).toHaveBeenCalledWith([
+      expect.objectContaining({ path: "rollup.py", originalContent: "public baseline" }),
+    ])
   })
 
   it("rehydrates a session only once, not on every searchParams identity change", async () => {

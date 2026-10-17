@@ -16,6 +16,12 @@ function stored(value: unknown) {
   vi.stubGlobal("localStorage", { getItem: () => JSON.stringify(value) })
 }
 describe("local/cloud reconciliation", () => {
+  it("does not restore another tab's stale local write over the owning tab", () => {
+    stored({ ...local, ownerId: "stale-tab" })
+    expect(
+      recoverLocalCheckpoint({ ownerId: "active-tab", code: "active work" }, "key", "attempt")
+    ).toMatchObject({ code: "active work" })
+  })
   it("recovers newer unsynced work with both panels, drafts and the same attempt", () => {
     stored(local)
     expect(

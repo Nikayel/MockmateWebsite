@@ -1,3 +1,8 @@
+import {
+  captureSessionRequest,
+  type SessionRequestGuard,
+} from "@/lib/interview/session-lifecycle/request"
+import { useEffect, useRef } from "react"
 import type { SessionContext } from "@/lib/interview/session-context/schema"
 import { toast } from "sonner"
 import type { Dispatch, SetStateAction } from "react"
@@ -19,7 +24,7 @@ import type {
   TestSummary,
 } from "../_types"
 
-export interface UsePostInterviewDiscussionOptions {
+export interface UsePostInterviewDiscussionOptions extends SessionRequestGuard {
   sessionContext?: SessionContext
   // Auth / entitlement
   user: User | null
@@ -59,7 +64,8 @@ export interface UsePostInterviewDiscussionOptions {
 export interface UsePostInterviewDiscussionResult {
   triggerPostInterviewDiscussion: (
     testResults: TestResult[],
-    summary: TestSummary
+    summary: TestSummary,
+    testRunRevision?: string
   ) => Promise<boolean>
 }
 
@@ -73,10 +79,20 @@ export interface UsePostInterviewDiscussionResult {
 export function usePostInterviewDiscussion(
   opts: UsePostInterviewDiscussionOptions
 ): UsePostInterviewDiscussionResult {
+  const controllerRef = useRef<AbortController | null>(null)
+  useEffect(() => {
+    if (opts.paused) controllerRef.current?.abort()
+    return () => controllerRef.current?.abort()
+  }, [opts.paused, opts.currentSessionId])
   const triggerPostInterviewDiscussion = async (
     testResults: TestResult[],
-    summary: TestSummary
+    summary: TestSummary,
+    testRunRevision?: string
   ): Promise<boolean> => {
+    if (opts.isActive?.() === false) return false
+    const isCurrent = captureSessionRequest(opts)
+    const controller = new AbortController()
+    controllerRef.current = controller
     opts.setIsGeneratingDiscussion(true)
 
     try {
@@ -106,6 +122,7 @@ export function usePostInterviewDiscussion(
         console.warn("LLM complexity analysis failed, using regex fallback:", llmError)
       }
 
+      if (!isCurrent()) return false
       // Build metrics: prefer LLM results, fall back to regex for missing values
       const regexMetrics = analyzeCodeEfficiency(opts.code, optimalComplexity)
 
@@ -161,10 +178,19 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       const chatHeaders: Record<string, string> = { "Content-Type": "application/json" }
       if (authToken) chatHeaders.Authorization = `Bearer ${authToken}`
       const response = await fetch("/api/chat", {
+        signal: controller.signal,
         method: "POST",
         headers: chatHeaders,
         body: JSON.stringify({
-          sessionContext: opts.sessionContext,
+          sessionContext: opts.sessionContext
+            ? {
+                ...opts.sessionContext,
+                testRunRevision: testRunRevision ?? opts.sessionContext.testRunRevision,
+                testsMatchCurrentRevision:
+                  (testRunRevision ?? opts.sessionContext.testRunRevision) ===
+                  opts.sessionContext.currentRevision,
+              }
+            : undefined,
           message: discussionPrompt,
           context: opts.interviewerMessages,
           role: "interviewer",
@@ -208,6 +234,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
       })
 
       const data = await response.json()
+      if (!isCurrent() || controller.signal.aborted) return false
       if (!response.ok) {
         console.warn("[API] Request failed:", response.status, response.url, data)
       }

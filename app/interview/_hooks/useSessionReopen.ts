@@ -1,5 +1,8 @@
 import type { RestoredSessionInputs } from "@/lib/interview/session-lifecycle/checkpoint"
-import { recoverLocalCheckpoint } from "@/lib/interview/session-lifecycle/recovery"
+import {
+  recoverLocalCheckpoint,
+  normalizeStoredCheckpoint,
+} from "@/lib/interview/session-lifecycle/recovery"
 import { createChatMessage } from "@/lib/interview/session-context/conversation"
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react"
 import type { User as FirebaseUser } from "firebase/auth"
@@ -193,7 +196,16 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
             // init covers bugfix and default starter code; workspace and
             // system-design scenarios never start as guest trials.
             let initialCode: string
-            if (scenario.type === "bugfix") {
+            if (isWorkspaceScenario(scenario)) {
+              const files = toWorkspaceScenarioFiles(scenario)
+              const primary =
+                files.find((file) => file.path === scenario.workspace.primaryFilePath) ?? files[0]
+              opts.setWorkspaceContext(files)
+              opts.setActiveWorkspacePath(primary?.path ?? null)
+              if (scenario.workspace.language !== "sql")
+                opts.setSelectedLanguage(scenario.workspace.language)
+              initialCode = primary?.content ?? ""
+            } else if (scenario.type === "bugfix") {
               const scenarioLanguage = getBugfixScenarioLanguage(scenario, opts.selectedLanguage)
               if (scenarioLanguage !== opts.selectedLanguage) {
                 opts.setSelectedLanguage(scenarioLanguage)
@@ -229,6 +241,15 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
               ),
             }
 
+            if (
+              !sessionState &&
+              recoverLocalCheckpoint(
+                null,
+                `interview_autosave_guest_${guestScenarioId}`,
+                guestSessionId
+              )
+            )
+              sessionState = {}
             if (sessionState) {
               opts.setCode(sessionState.code || initialCode)
               if (sessionState.language) {
@@ -250,36 +271,40 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
               if (sessionState.test_results?.length) {
                 opts.setTestResults(sessionState.test_results as TestResult[])
               }
-              const localRecovery = recoverLocalCheckpoint(
-                null,
+              const recovered = recoverLocalCheckpoint(
+                normalizeStoredCheckpoint(sessionState),
                 `interview_autosave_guest_${guestScenarioId}`,
                 guestSessionId
               )
-              if (localRecovery) {
-                opts.setCode(localRecovery.code ?? initialCode)
-                opts.setChatMessages((localRecovery.chatMessages ?? []) as ChatMessage[])
+              if (recovered) {
+                opts.setCode(recovered.code ?? initialCode)
+                opts.setChatMessages((recovered.chatMessages ?? []) as ChatMessage[])
                 opts.setInterviewerMessages(
-                  (localRecovery.interviewerMessages ?? [freshInterviewerMessage]) as ChatMessage[]
+                  (recovered.interviewerMessages ?? [freshInterviewerMessage]) as ChatMessage[]
                 )
-                opts.setElapsedTime(localRecovery.elapsedTime ?? 0)
-                opts.setStartTime(Date.now() - (localRecovery.elapsedTime ?? 0) * 1000)
+                opts.setElapsedTime(recovered.elapsedTime ?? 0)
+                opts.setStartTime(Date.now() - (recovered.elapsedTime ?? 0) * 1000)
+                if (recovered.workspaceContext)
+                  opts.setWorkspaceContext(recovered.workspaceContext as WorkspaceContextFile[])
+                if (recovered.activeWorkspacePath)
+                  opts.setActiveWorkspacePath(recovered.activeWorkspacePath)
+                if (recovered.isPostInterviewDiscussion) opts.setShowPostInterviewDiscussion(true)
+                if (recovered.testSummary) opts.setTestSummary(recovered.testSummary)
+                if (recovered.testResults) opts.setTestResults(recovered.testResults)
+                if (recovered.consoleLogs)
+                  opts.setConsoleLogs(recovered.consoleLogs as ConsoleLogEntry[])
+                if (recovered.bugfixEvidenceEvents)
+                  opts.setBugfixEvidenceEvents(
+                    recovered.bugfixEvidenceEvents as unknown as BugfixEvidenceEvent[]
+                  )
+                opts.onSessionRestored?.({ ...recovered, sessionId: guestSessionId })
               }
-              opts.onSessionRestored?.({
-                ...(localRecovery ?? {
-                  chatInput: sessionState.chat_input,
-                  interviewerInput: sessionState.interviewer_input,
-                  isPostInterviewDiscussion: sessionState.is_post_interview_discussion,
-                  testRunRevision: sessionState.test_run_revision,
-                  strictDeadlineAt: sessionState.strict_deadline_at,
-                  strictTimeLimit: sessionState.strict_time_limit,
-                }),
-                sessionId: guestSessionId,
-              })
               toast.success("Session resumed")
             } else {
               opts.setCode(initialCode)
               opts.setInterviewerMessages([freshInterviewerMessage])
               opts.setChatMessages([])
+              opts.onSessionRestored?.({ sessionId: guestSessionId })
             }
           }
 
@@ -558,6 +583,7 @@ Let's continue!`
             opts.setInterviewerMessages([createChatMessage("ai", initialMessage)])
             const partnerMessage = getInitialPartnerMessage(scenario)
             opts.setChatMessages(partnerMessage ? [createChatMessage("ai", partnerMessage)] : [])
+            opts.onSessionRestored?.({ sessionId })
           }
         } else {
           toast.error("Scenario not found")

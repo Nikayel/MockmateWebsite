@@ -107,6 +107,7 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
       lastRemoteSaveRef.current?.fingerprint !== remoteFingerprint
     const sessionData = {
       sessionId: opts.currentSessionId,
+      ownerId: opts.ownerId,
       scenarioId: selectedScenario.id,
       code: opts.code,
       chatMessages: opts.chatMessages.filter((message) => !message.isStreaming),
@@ -153,7 +154,9 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
               selectedLanguage: opts.selectedLanguage,
               elapsedTime: opts.elapsedTime,
               chatMessages: opts.chatMessages.filter((message) => !message.isStreaming),
-              interviewerMessages: opts.interviewerMessages.filter((message) => !message.isStreaming),
+              interviewerMessages: opts.interviewerMessages.filter(
+                (message) => !message.isStreaming
+              ),
               testResults: opts.testResults,
               testSummary: opts.testSummary,
               workspaceContext: opts.workspaceContext,
@@ -187,7 +190,9 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
                   language: opts.selectedLanguage,
                   elapsedTime: opts.elapsedTime,
                   chatMessages: opts.chatMessages.filter((message) => !message.isStreaming),
-                  interviewerMessages: opts.interviewerMessages.filter((message) => !message.isStreaming),
+                  interviewerMessages: opts.interviewerMessages.filter(
+                    (message) => !message.isStreaming
+                  ),
                   testResults: opts.testResults.slice(-10),
                   testSummary: opts.testSummary,
                   workspaceContext: opts.workspaceContext,
@@ -242,10 +247,24 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
     }
     document.addEventListener("visibilitychange", saveWhenHidden)
 
-    // Cleanup on unmount
+    const identity = {
+      sessionId: opts.currentSessionId,
+      scenarioId: opts.selectedScenario.id,
+      userId: opts.firebaseUser?.uid,
+    }
+    // Navigation inside the app does not fire visibilitychange. Flush the live attempt,
+    // while avoiding a cleared reset or a different attempt that replaced this effect.
     return () => {
       clearInterval(autoSaveInterval)
       document.removeEventListener("visibilitychange", saveWhenHidden)
+      const current = optsRef.current
+      if (
+        current.isInterviewStarted &&
+        current.currentSessionId === identity.sessionId &&
+        current.selectedScenario?.id === identity.scenarioId &&
+        current.firebaseUser?.uid === identity.userId
+      )
+        void saveNow(false)
     }
     // Interval keyed ONLY on session identity — payload fields are read from
     // optsRef.current inside the callback so a value change (e.g. the 1s clock)

@@ -1,3 +1,7 @@
+import {
+  captureSessionRequest,
+  type SessionRequestGuard,
+} from "@/lib/interview/session-lifecycle/request"
 import { createChatMessage } from "@/lib/interview/session-context/conversation"
 import type { SessionContext } from "@/lib/interview/session-context/schema"
 import { useEffect, useRef } from "react"
@@ -62,12 +66,8 @@ interface ChatApiResponse {
   message?: unknown
 }
 
-export interface UseInterviewChatOptions {
+export interface UseInterviewChatOptions extends SessionRequestGuard {
   sessionContext?: SessionContext
-  isActive?: () => boolean
-  paused?: boolean
-  generationRef?: { current: number }
-  ownerId?: string
   // ---- live inputs read inside handleSendMessage ----
   chatInput: string
   interviewerInput: string
@@ -328,9 +328,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
     const setInput = isInterviewer ? setInterviewerInput : setChatInput
     const messages = isInterviewer ? interviewerMessages : chatMessages
     if (opts.paused || opts.isActive?.() === false) return
-    const requestGeneration = opts.generationRef?.current
-    const isCurrent = () =>
-      opts.generationRef?.current === requestGeneration && opts.isActive?.() !== false
+    const isCurrent = captureSessionRequest(opts)
     const setMessages = isInterviewer ? setInterviewerMessages : setChatMessages
     const setLoading = isInterviewer ? setIsLoadingInterviewer : setIsLoadingChat
 

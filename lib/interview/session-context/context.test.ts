@@ -19,6 +19,33 @@ const base = {
   partnerMessages: [],
 }
 describe("full attributed session context", () => {
+  it("tracks the standalone solution alongside read-only supporting files", () => {
+    const context = buildSessionContext({
+      ...base,
+      workspace: [{ ...source, role: "readonly" }],
+      includeSolution: true,
+      starterCode: "baseline",
+      code: "my patch",
+    })
+    expect(context.files).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "solution",
+          originalContent: "baseline",
+          content: "my patch",
+          status: "modified",
+        }),
+      ])
+    )
+    expect(context.currentRevision).not.toBe(
+      buildSessionContext({
+        ...base,
+        includeSolution: true,
+        starterCode: "baseline",
+        code: "baseline",
+      }).currentRevision
+    )
+  })
   it("interleaves both panels and preserves who asked whom", () => {
     const timeline = buildConversationTimeline(
       [{ type: "user", message: "I suspect boundaries", timestamp: 30 }],

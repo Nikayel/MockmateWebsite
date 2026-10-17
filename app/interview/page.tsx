@@ -70,7 +70,7 @@ import type {
   WorkspaceContextFile,
 } from "./_types"
 import { createBugfixEvidenceEvent, type BugfixEvidenceEvent } from "@/lib/bugfix"
-import { useInterviewTimer } from "./_hooks/useInterviewTimer"
+import { useInterviewTimer, computePausedElapsedSeconds } from "./_hooks/useInterviewTimer"
 import { useInterviewModes } from "./_hooks/useInterviewModes"
 import { useGuestQuota, isUsageBlocked } from "./_hooks/useGuestQuota"
 import { confirmGuestSessionMigration, getGuestId } from "@/lib/guest-session"
@@ -1155,6 +1155,10 @@ function InterviewPageContent() {
     sessionId: currentSessionId,
     onPause: (saveCheckpoint = true) => {
       setCanCheckpoint(saveCheckpoint)
+      if (saveCheckpoint && startTime && !strictTimeLimit)
+        setElapsedTime(
+          computePausedElapsedSeconds(startTime, lifecycle.activityRef.current, Date.now())
+        )
       setIsSessionPaused(true)
       interviewerVoice.cancelCountdown()
       if (interviewerVoice.isRecording) interviewerVoice.stopRecording()
@@ -1165,14 +1169,20 @@ function InterviewPageContent() {
       setIsSessionPaused(false)
       if (!strictTimeLimit) setStartTime(Date.now() - elapsedTime * 1000)
     },
-    onSync: async (action, ownerId, lastActivityAt) => {
+    onSync: async (action, ownerId, lastActivityAt, manual) => {
       if (!firebaseUser || !currentSessionId) return true
       try {
         const token = await firebaseUser.getIdToken()
         const response = await fetch("/api/interview/lifecycle", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ sessionId: currentSessionId, ownerId, action, lastActivityAt }),
+          body: JSON.stringify({
+            sessionId: currentSessionId,
+            ownerId,
+            action,
+            lastActivityAt,
+            manual,
+          }),
         })
         return response.status !== 409 && response.status !== 404
       } catch {
@@ -1480,6 +1490,9 @@ function InterviewPageContent() {
   })
 
   const { triggerPostInterviewDiscussion } = usePostInterviewDiscussion({
+    isActive: () => !lifecycle.isPaused(),
+    generationRef: lifecycle.generationRef,
+    paused: isSessionPaused,
     sessionContext,
     user,
     usageLimit,
@@ -1904,6 +1917,9 @@ function InterviewPageContent() {
   // Usage: analyzeCodeEfficiency(code, (selectedScenario as any)?.optimalComplexity)
 
   const { runCode, submitCode } = useCodeExecution({
+    isActive: () => !lifecycle.isPaused(),
+    generationRef: lifecycle.generationRef,
+    ownerId: lifecycle.ownerId,
     onTestsCompleted: () =>
       setTestRunRevision(
         workspaceRevision(workspaceContext, code, !isWorkspaceScenario(selectedScenario))
@@ -2205,6 +2221,7 @@ function InterviewPageContent() {
         paused={isInterviewStarted && isSessionPaused && !showFeedback}
         warning={lifecycle.warning}
         blockedByOtherTab={lifecycle.blockedByOtherTab}
+        timedPractice={!!strictTimeLimit}
         onResume={lifecycle.resume}
         onExit={lifecycle.blockedByOtherTab ? () => router.push("/dashboard") : saveAndExit}
       />

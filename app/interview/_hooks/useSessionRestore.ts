@@ -10,6 +10,7 @@ import type { BugfixEvidenceEvent } from "@/lib/bugfix"
 import {
   localCheckpointSessionId,
   recoverLocalCheckpoint,
+  normalizeStoredCheckpoint,
 } from "@/lib/interview/session-lifecycle/recovery"
 import type { EditorLanguage } from "../_utils/language"
 import type {
@@ -70,7 +71,7 @@ export function useSessionRestore(opts: UseSessionRestoreOptions) {
     if (!sessionId) return
     const restore = async () => {
       try {
-        let remote = null
+        let remote: Awaited<ReturnType<typeof getSessionState>> = null
         if (opts.firebaseUser) remote = await getSessionState(sessionId)
         else if (opts.guestId) {
           const response = await fetch(
@@ -82,6 +83,7 @@ export function useSessionRestore(opts: UseSessionRestoreOptions) {
           }
           if (response.ok) {
             const data = await response.json()
+            remote = normalizeStoredCheckpoint(data.session?.session_state)
             if (data.session?.completed_at) {
               localStorage.removeItem(storageKey)
               return
