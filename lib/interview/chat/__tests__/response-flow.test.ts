@@ -17,11 +17,11 @@ describe("chat response flow helpers", () => {
     ).toEqual({
       reply: null,
       skipped: true,
-      reason: "Not enough code to comment on yet and not silent long enough",
+      reason: "Candidate is not silent long enough for a check-in",
     })
   })
 
-  it("allows proactive interviewer checks after enough silence or code", () => {
+  it("requires enough silence even when substantial starter code exists", () => {
     expect(
       buildProactiveSkipResponse({
         role: "interviewer",
@@ -38,7 +38,7 @@ describe("chat response flow helpers", () => {
         currentCode: "const answer = ".padEnd(120, "x"),
         timeSinceLastMessage: 30,
       })
-    ).toBeNull()
+    ).toMatchObject({ skipped: true, reply: null })
   })
 
   it("detects that the interviewer already ended the session", () => {

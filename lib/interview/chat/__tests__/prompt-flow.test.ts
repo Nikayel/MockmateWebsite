@@ -3,6 +3,55 @@ import { buildChatPromptFlow } from "../prompt-flow"
 import { INTERVIEW_ENDED_MESSAGE } from "../response-flow"
 
 describe("buildChatPromptFlow", () => {
+  it("keeps a time-only check-in instead of overwriting it with assumed code activity", () => {
+    const result = buildChatPromptFlow({
+      role: "interviewer",
+      isProactive: true,
+      timeSinceLastMessage: 300,
+      currentCodeContext: "",
+      workspaceContextStr: "",
+    })
+    expect(result.fullUserMessage).toContain("[TIME-BASED CHECK-IN]")
+    expect(result.fullUserMessage).not.toContain("candidate has been working on code")
+  })
+
+  it("a debugging check-in does not inject a DSA pattern or escalate repeated questions into hints", () => {
+    const result = buildChatPromptFlow({
+      scenarioType: "bugfix",
+      role: "interviewer",
+      isProactive: true,
+      timeSinceLastMessage: 180,
+      currentCode: "starter",
+      currentCodeContext: "PUBLIC CODE",
+      workspaceContextStr: "PUBLIC WORKSPACE",
+      scenarioPattern: "arrays-hashing",
+      recentNudgeTopics: ["debugging evidence"],
+    })
+    expect(result.fullUserMessage).toContain("[DEBUGGING CHECK-IN]")
+    expect(result.fullUserMessage).toContain("PUBLIC WORKSPACE")
+    expect(result.fullUserMessage).not.toContain("arrays-hashing")
+    expect(result.fullUserMessage).not.toContain("CONCRETE hint")
+    expect(result.fullUserMessage).toContain("Do not provide a hint unless asked")
+  })
+
+  it("includes history-derived probe limits on ordinary debugging turns, not just check-ins", () => {
+    const result = buildChatPromptFlow({
+      scenarioType: "bugfix",
+      role: "interviewer",
+      message: "I'll try that and rerun",
+      currentCodeContext: "",
+      workspaceContextStr: "",
+      context: [
+        { type: "ai", message: "What's your hypothesis?" },
+        { type: "user", message: "I think status is checked too late" },
+        { type: "ai", message: "What evidence supports the hypothesis?" },
+      ],
+    })
+    expect(result.fullUserMessage).toContain("debugging hypothesis: 2 probe(s)")
+    expect(result.fullUserMessage).toContain("do not paraphrase it a third time")
+    expect(result.fullUserMessage).toContain("I'll try that and rerun")
+  })
+
   it("returns a proactive skip response before enough signal", () => {
     const result = buildChatPromptFlow({
       role: "interviewer",
@@ -17,7 +66,7 @@ describe("buildChatPromptFlow", () => {
       earlyResponse: {
         reply: null,
         skipped: true,
-        reason: "Not enough code to comment on yet and not silent long enough",
+        reason: "Candidate is not silent long enough for a check-in",
       },
     })
   })
@@ -26,6 +75,7 @@ describe("buildChatPromptFlow", () => {
     const result = buildChatPromptFlow({
       role: "interviewer",
       isProactive: true,
+      timeSinceLastMessage: 120,
       currentCode:
         "function twoSum(nums, target) { const seen = new Map(); for (let i = 0; i < nums.length; i++) { const need = target - nums[i]; } }",
       currentCodeContext: "\nCODE HERE",

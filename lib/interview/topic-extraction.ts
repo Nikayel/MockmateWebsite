@@ -14,6 +14,19 @@ export function extractTopicsFromMessage(message: string): string[] {
   const topics: string[] = []
   const lowerMsg = message.toLowerCase()
 
+  if (/hypothes|\btheory\b|what.*(?:think|suspect).*(?:happen|wrong|caus)/.test(lowerMsg)) {
+    topics.push("debugging hypothesis")
+  }
+  if (/\bevidence\b|what.*observ|what.*led you|trace.*fail/.test(lowerMsg)) {
+    topics.push("debugging evidence")
+  }
+  if (/root cause|why.*(?:fail|broke|broken)|caused the bug/.test(lowerMsg)) {
+    topics.push("debugging root cause")
+  }
+  if (/regression|prevent.*(?:again|recurr|bug)|guardrail/.test(lowerMsg)) {
+    topics.push("debugging prevention")
+  }
+
   // Common interview question patterns
   if (lowerMsg.includes("time complexity") || lowerMsg.includes("time and space")) {
     topics.push("time complexity")
@@ -47,6 +60,26 @@ export function extractTopicsFromMessage(message: string): string[] {
 export function extractUserAnsweredTopics(message: string): string[] {
   const topics: string[] = []
   const lowerMsg = message.toLowerCase()
+
+  // Signals of an expressed idea, never proof that the idea is specific or correct.
+  if (
+    /my hypothes|\bi (?:think|suspect)\b|my theory|might be|maybe.*(?:check|skip|count|row|loop)/.test(
+      lowerMsg
+    )
+  ) {
+    topics.push("debugging hypothesis")
+  }
+  if (
+    /\bi (?:saw|observed|noticed)\b|the (?:test|output|log).*(?:shows|returns|fails)/.test(lowerMsg)
+  ) {
+    topics.push("debugging evidence")
+  }
+  if (/root cause|because|caused (?:it|the bug)/.test(lowerMsg)) {
+    topics.push("debugging root cause")
+  }
+  if (/regression|(?:add|write).*test|prevent.*(?:again|recurr)/.test(lowerMsg)) {
+    topics.push("debugging prevention")
+  }
 
   // Complexity answers - user stating time/space complexity
   if (

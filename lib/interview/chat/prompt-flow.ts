@@ -6,10 +6,13 @@ import {
 } from "./response-flow"
 import type { TestResultItem } from "@/lib/interview/chat-request-schema"
 import { isHarnessError } from "@/lib/workspace-execution/harness-errors"
+import { buildDebuggingPacingGuidance } from "../conversation-pacing"
+import { buildProactivePrompt } from "./proactive-prompt"
 
 type ChatPromptEarlyResponse = ProactiveSkipResponse | EndedConversationResponse
 
 export interface ChatPromptFlowInput {
+  scenarioType?: string
   sessionEvidence?: string
   role?: "interviewer" | "partner"
   message?: string
@@ -43,7 +46,13 @@ export function buildChatPromptFlow(input: ChatPromptFlowInput): ChatPromptFlowR
   const result = buildPromptFlow(input)
   if (result.earlyResponse) return result
   const workspace = input.isProactive || input.isWrapUp ? input.workspaceContextStr : ""
-  return { fullUserMessage: result.fullUserMessage + workspace + (input.sessionEvidence ?? "") }
+  const pacing =
+    input.role === "interviewer" && input.scenarioType === "bugfix"
+      ? buildDebuggingPacingGuidance(input.context)
+      : ""
+  return {
+    fullUserMessage: result.fullUserMessage + workspace + pacing + (input.sessionEvidence ?? ""),
+  }
 }
 
 function buildPromptFlow(input: ChatPromptFlowInput): ChatPromptFlowResult {
@@ -57,111 +66,26 @@ function buildPromptFlow(input: ChatPromptFlowInput): ChatPromptFlowResult {
     currentCodeContext,
     workspaceContextStr,
     timeSinceLastMessage,
-    scenarioPattern,
     partnerMessagesCount,
-    lastPartnerExchange,
-    recentNudgeTopics,
     userAnsweredTopics,
     testResults,
     elapsedMinutes,
   } = input
 
   if (isProactive && role === "interviewer") {
-    const hasSubstantialCode = currentCode && currentCode.trim().length > 100
-    const timeSilentSeconds = timeSinceLastMessage || 0
-    const shouldTimeBasedCheckIn = timeSilentSeconds >= 120
-
     const proactiveSkipResponse = buildProactiveSkipResponse({
       role,
       isProactive,
       currentCode,
       timeSinceLastMessage,
+      context,
     })
 
     if (proactiveSkipResponse) {
       return { earlyResponse: proactiveSkipResponse }
     }
 
-    let fullUserMessage = ""
-
-    if (shouldTimeBasedCheckIn && !hasSubstantialCode) {
-      fullUserMessage = `[TIME-BASED CHECK-IN] The candidate has been quiet for ${Math.floor(timeSilentSeconds / 60)} minutes without writing substantial code.
-
-Act like a real interviewer who notices someone is quiet:
-- "How are you thinking about this problem?"
-- "What's going through your mind?"
-- "Would it help to talk through your approach?"
-- "Are you stuck on something specific?"
-
-Pick ONE natural response (under 20 words). Don't be pushy - they might be thinking.`
-    }
-
-    const proactivePrompts = [
-      "Walk me through what you're doing here.",
-      "What's your approach for this?",
-      "Can you explain your thought process?",
-      "What's the time complexity of this approach?",
-      "Have you considered any edge cases?",
-      "What happens with an empty input?",
-      "Interesting approach - what led you to this?",
-      "Let's trace through an example together.",
-    ]
-
-    const patternSpecificQuestion = scenarioPattern
-      ? `Based on the ${scenarioPattern} pattern, ask a relevant question about their approach or potential issues.`
-      : ""
-
-    const aiPartnerContext =
-      partnerMessagesCount && partnerMessagesCount > 0
-        ? `
-AI PARTNER CONTEXT:
-- Candidate has asked Sparra ${partnerMessagesCount} questions; frequency alone is not evidence of misuse.
-${lastPartnerExchange ? `- Supplied partner exchange: ${lastPartnerExchange}` : ""}
-
-`
-        : ""
-
-    const nudgeAvoidance =
-      recentNudgeTopics && recentNudgeTopics.length > 0
-        ? `
-AVOID REPEATING THESE TOPICS (already asked about):
-${recentNudgeTopics.map((t: string) => `- ${t}`).join("\n")}
-If they're still stuck on these, give a CONCRETE hint instead of asking again.
-`
-        : ""
-
-    // These lists are PROHIBITIONS, not samples, so they are never truncated.
-    // Slicing a "do not ask this again" list silently grants permission for
-    // everything it drops: a candidate who had answered eight topics used to
-    // have five of them named here, leaving the interviewer free to re-ask the
-    // other three while being told it was seeing the full list. They are short
-    // topic labels, so there was never a cost reason to cap them either.
-    const userAnsweredContext =
-      userAnsweredTopics && userAnsweredTopics.length > 0
-        ? `
-CANDIDATE HAS ALREADY ANSWERED (do NOT ask about these again):
-${userAnsweredTopics.map((t: string) => `- ${t}`).join("\n")}
-If you want to discuss these topics, ACKNOWLEDGE their answer first, then probe DEEPER or move on.
-`
-        : ""
-
-    fullUserMessage = `[NATURAL CHECK-IN] The candidate has been working on code. Act like a real interviewer who just noticed something interesting or wants to understand their thinking.
-
-${currentCodeContext}
-${aiPartnerContext}
-${patternSpecificQuestion}
-${nudgeAvoidance}
-${userAnsweredContext}
-
-Options for how to engage:
-${proactivePrompts
-  .slice(0, 3)
-  .map((p) => `- "${p}"`)
-  .join("\n")}
-
-Pick ONE natural response (or create your own). Keep it under 20 words. Sound like a real person in the room, not a robot.`
-
-    return { fullUserMessage }
+    return { fullUserMessage: buildProactivePrompt(input) }
   }
 
   if (isWrapUp && role === "interviewer") {
@@ -258,7 +182,7 @@ Keep it conversational and real - like you're actually debriefing someone after 
 
 [CONTEXT - CANDIDATE HAS ALREADY ANSWERED]:
 ${userAnsweredTopics.map((t: string) => `- ${t}`).join("\n")}
-Remember: Acknowledge what they said, then probe deeper or move on. Do NOT re-ask.`
+Remember: Respond to their current intent. Do not re-ask or automatically probe deeper; an acknowledgment can be enough.`
   }
 
   return { fullUserMessage }

@@ -1,7 +1,6 @@
-type ChatContextMessage = {
-  type?: string
-  message?: string
-}
+import { getProactiveBlockReason, type InterviewTurn } from "../conversation-pacing"
+
+type ChatContextMessage = InterviewTurn
 
 export type ProactiveSkipResponse = {
   reply: null
@@ -23,23 +22,26 @@ export function buildProactiveSkipResponse(params: {
   isProactive?: boolean
   currentCode?: string
   timeSinceLastMessage?: number
+  context?: ChatContextMessage[]
 }): ProactiveSkipResponse | null {
   if (!params.isProactive || params.role !== "interviewer") {
     return null
   }
 
-  const hasSubstantialCode = Boolean(params.currentCode && params.currentCode.trim().length > 100)
+  const blocked = getProactiveBlockReason(params.context)
+  if (blocked) return { reply: null, skipped: true, reason: blocked }
+
   const timeSilentSeconds = params.timeSinceLastMessage || 0
   const shouldTimeBasedCheckIn = timeSilentSeconds >= 120
 
-  if (hasSubstantialCode || shouldTimeBasedCheckIn) {
+  if (shouldTimeBasedCheckIn) {
     return null
   }
 
   return {
     reply: null,
     skipped: true,
-    reason: "Not enough code to comment on yet and not silent long enough",
+    reason: "Candidate is not silent long enough for a check-in",
   }
 }
 

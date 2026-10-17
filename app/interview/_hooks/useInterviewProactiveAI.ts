@@ -6,6 +6,7 @@ import { extractTopicsFromMessage } from "@/lib/interview"
 import type { Scenario } from "@/lib/scenarios"
 import type { ChatMessage } from "../_types"
 import { shouldTriggerSilenceNudge } from "./proactive-silence"
+import { getProactiveBlockReason } from "@/lib/interview/conversation-pacing"
 
 /** Minimal structural shape of the cached profile read into the proactive payload. */
 interface ProactiveUserProfile {
@@ -93,6 +94,7 @@ export function useInterviewProactiveAI(
         !opts.currentSessionId ||
         abortRef.current ||
         attemptsRef.current >= 3 ||
+        getProactiveBlockReason(opts.interviewerMessages) !== null ||
         nudgedActivityRef.current === opts.activityRef.current
       )
         return

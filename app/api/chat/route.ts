@@ -76,6 +76,8 @@ import {
 import { buildChatRequestContext } from "@/lib/interview/chat/request-context"
 import { buildChatPromptFlow } from "@/lib/interview/chat/prompt-flow"
 import { detectDebuggingPhase } from "@/lib/interview/phases/debugging"
+import { getInterviewerTurns } from "@/lib/interview/conversation-pacing"
+import { buildProactiveSkipResponse } from "@/lib/interview/chat/response-flow"
 import { createValidatedChatStream } from "@/lib/interview/chat/validated-response-stream"
 
 type ConversationTrackerWithExtraction = ConversationTracker & {
@@ -235,6 +237,14 @@ export async function POST(request: NextRequest) {
     // userId would let a caller spoof another user's identity and drain their
     // budget. requireAuth guarantees rateLimitUserId is a real uid here.
     const userId = rateLimitUserId
+    const interviewerTurns = getInterviewerTurns(sessionContext, context)
+    const proactiveSkip = buildProactiveSkipResponse({
+      role,
+      isProactive,
+      context: interviewerTurns,
+      timeSinceLastMessage,
+    })
+    if (proactiveSkip) return NextResponse.json(proactiveSkip)
     if (isProactive) {
       const claimed =
         sessionId && (await claimProactiveNudge(sessionId, userId, parseResult.data.ownerId))
@@ -715,7 +725,8 @@ GROUNDING RULES (prevent hallucination):
         : undefined,
       role,
       message,
-      context,
+      context: role === "interviewer" ? interviewerTurns : context,
+      scenarioType,
       isProactive,
       isWrapUp,
       currentCode,

@@ -274,6 +274,63 @@ describe("/api/chat route", () => {
     expect(generateAIResponse).not.toHaveBeenCalled()
   })
 
+  it("blocks an unanswered-question check-in before budget, retrieval, or generation", async () => {
+    const { generateAIResponse, buildRAGContext } = await setupMocks()
+    const { claimProactiveNudge } = await import("@/lib/interview/session-lifecycle/server")
+    const { POST } = await import("./route")
+    const sessionContext = buildSessionContext({
+      task: {
+        id: "matcher",
+        title: "Adjustment matcher",
+        type: "bugfix",
+        description: "Public task",
+      },
+      workspace: [],
+      code: "starter",
+      interviewerMessages: [
+        { type: "user", message: "Two failures", timestamp: 1 },
+        { type: "ai", message: "What evidence supports your hypothesis?", timestamp: 2 },
+      ],
+      partnerMessages: [{ type: "user", message: "Help me inspect this", timestamp: 3 }],
+    })
+    const response = await POST(
+      createRequest({
+        role: "interviewer",
+        isProactive: true,
+        timeSinceLastMessage: 500,
+        sessionId: "session-1",
+        scenarioType: "bugfix",
+        sessionContext,
+        // The attributed timeline takes precedence over an incomplete legacy lane.
+        context: [{ type: "user", message: "Two failures" }],
+      })
+    )
+    expect(response.data).toMatchObject({
+      skipped: true,
+      reply: null,
+      reason: expect.stringContaining("Waiting"),
+    })
+    expect(claimProactiveNudge).not.toHaveBeenCalled()
+    expect(buildRAGContext).not.toHaveBeenCalled()
+    expect(generateAIResponse).not.toHaveBeenCalled()
+  })
+
+  it("still answers a direct candidate question when a prior probe is open", async () => {
+    const { generateAIResponse } = await setupMocks()
+    const { POST } = await import("./route")
+    const response = await POST(
+      createRequest({
+        role: "interviewer",
+        scenarioType: "bugfix",
+        message: "Can amountCents be missing?",
+        context: [{ type: "ai", message: "What did you observe?" }],
+      })
+    )
+    expect(response.status).toBe(200)
+    expect(generateAIResponse).toHaveBeenCalledOnce()
+    expect(vi.mocked(generateAIResponse).mock.calls[0][1]).toContain("Can amountCents be missing?")
+  })
+
   it("requires a message unless the request is proactive", async () => {
     const { generateAIResponse, enforceChatRateLimit } = await setupMocks()
     const { POST } = await import("./route")
@@ -304,7 +361,7 @@ describe("/api/chat route", () => {
     expect(response.data).toEqual({
       reply: null,
       skipped: true,
-      reason: "Not enough code to comment on yet and not silent long enough",
+      reason: "Candidate is not silent long enough for a check-in",
     })
     expect(generateAIResponse).not.toHaveBeenCalled()
     expect(enforceChatRateLimit).toHaveBeenCalledWith("user-1", "free")
@@ -338,7 +395,7 @@ describe("/api/chat route", () => {
     expect(vi.mocked(generateAIResponse).mock.calls[0][1]).toContain("[NATURAL CHECK-IN]")
   })
 
-  it("continues proactive interviewer checks after substantial code", async () => {
+  it("does not use substantial starter code as permission to interrupt", async () => {
     const { generateAIResponse } = await setupMocks()
     const { POST } = await import("./route")
 
@@ -357,14 +414,8 @@ describe("/api/chat route", () => {
     )
 
     expect(response.status).toBe(200)
-    expect(response.data).toEqual(
-      expect.objectContaining({
-        reply: "Mocked assistant reply",
-        provider: "gemini-lite",
-      })
-    )
-    expect(generateAIResponse).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(generateAIResponse).mock.calls[0][1]).toContain("[NATURAL CHECK-IN]")
+    expect(response.data).toMatchObject({ skipped: true, reply: null })
+    expect(generateAIResponse).not.toHaveBeenCalled()
   })
 
   it("stays silent after the interviewer already ended the session", async () => {
