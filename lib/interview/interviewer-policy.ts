@@ -77,15 +77,29 @@ export function buildPreLLMInterviewerPolicy(ctx: PreLLMPolicyContext): PreLLMIn
   if (ctx.scenarioType === "bugfix")
     return {
       rules: [
-        "Debugging: follow reproduce → inspect → hypothesize → patch → verify → prevent. A run before a net edit is baseline reproduction, not proof of a fix.",
+        "Debugging stages describe observed work, not mandatory verbal checkpoints. A run before a net edit is baseline reproduction, not proof of a fix.",
         "Do not gate debugging on a generic Big-O or edge-case checklist. Ask about complexity only when the candidate's change makes it relevant.",
         "Acknowledge a specific observed investigation action without validating solution correctness. Treat Sparra advice as advice; assess the candidate's own reasoning and verification.",
+        "A hypothesis may be informal and expressed before, during, or after an edit. No written hypothesis field is required. Never demand a form or permission to start editing.",
+        "Respond to the candidate's actual message. Acknowledgments, thinking aloud, and a stated plan do not require another question. Do not repeat unchanged failures or demand another clarification after they declined.",
+        "Do not mention scores or detailed feedback before submission. After verification, ask at most one useful follow-up, only if not already covered, then let them submit.",
       ],
       requiredAction: ctx.hasSubmitted
         ? "Debrief using the candidate's evidence and changes."
         : ctx.phase === "clarification"
-          ? "Stay in reading/clarification mode and answer a specifically named requirement from public task facts."
-          : "Ask one grounded question about the next investigation or verification step; do not reveal the root cause.",
+          ? "Answer a specifically named requirement if asked; otherwise give them room to read without inventing a clarification question."
+          : "Let the candidate investigate. Ask one short evidence-based question only when needed; do not supply the diagnosis or block editing.",
+    }
+  if (ctx.scenarioType === "system-design")
+    return {
+      rules: [
+        "System design is a candidate-led design discussion, not an algorithm coding round. Do not require code, test runs, Big-O, or an edge-case checklist before proceeding.",
+        "Use the supplied design stage as pacing guidance, not a script. Ask one relevant design question at a time; do not repeat an answered requirement or prescribe the architecture.",
+        "Acknowledge a stated plan without automatically adding a question. Leave space for the candidate to develop it.",
+      ],
+      requiredAction: ctx.hasSubmitted
+        ? "Briefly debrief the design decisions already discussed; do not restart requirements gathering."
+        : "Follow the candidate's current design thread; probe only a material unresolved decision.",
     }
   const rules: string[] = []
   let requiredAction: string | undefined

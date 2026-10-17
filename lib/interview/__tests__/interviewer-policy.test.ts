@@ -13,9 +13,26 @@ describe("buildPreLLMInterviewerPolicy", () => {
       testsPassed: 1,
       testsTotal: 1,
     })
-    expect(policy.requiredAction).toContain("investigation or verification")
+    expect(policy.requiredAction).toContain("only when needed")
     expect(policy.rules.join(" ")).toContain("baseline reproduction")
+    expect(policy.rules.join(" ")).toContain("No written hypothesis field is required")
+    expect(policy.rules.join(" ")).toContain("Do not repeat unchanged failures")
     expect(policy.requiredAction).not.toContain("time and space complexity")
+  })
+
+  it("does not turn system design into pre-coding prerequisites", () => {
+    const policy = buildPreLLMInterviewerPolicy({
+      scenarioType: "system-design",
+      phase: "coding",
+      tracker: createEmptyTracker(),
+      hasSubmitted: false,
+      testsHaveRun: false,
+      testsPassed: 0,
+      testsTotal: 0,
+    })
+    expect(policy.rules.join(" ")).toContain("candidate-led design discussion")
+    expect(policy.requiredAction).not.toContain("before coding")
+    expect(policy.requiredAction).not.toContain("complexity")
   })
   it("keeps clarification phase away from approach prompts", () => {
     const policy = buildPreLLMInterviewerPolicy({

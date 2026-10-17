@@ -7,8 +7,11 @@ import {
 } from "@/lib/interview/interview-phases"
 import type { Scenario } from "@/lib/scenarios"
 import type { ChatMessage, EfficiencyMetrics, TestResult } from "../_types"
+import { detectDebuggingPhase } from "@/lib/interview/phases/debugging"
 
 export interface PhaseDerivationInput {
+  scenarioType?: string
+  hasCodeChanges?: boolean
   showPostInterviewDiscussion: boolean
   showFeedback: boolean
   testResultsLength: number
@@ -23,6 +26,8 @@ export interface PhaseDerivationInput {
  * without a DOM.
  */
 export function deriveInterviewPhase({
+  scenarioType,
+  hasCodeChanges = false,
   showPostInterviewDiscussion,
   showFeedback,
   testResultsLength,
@@ -34,6 +39,15 @@ export function deriveInterviewPhase({
   if (showPostInterviewDiscussion) return "post_interview"
   // If showing feedback, complete
   if (showFeedback) return "complete"
+  if (scenarioType === "bugfix") {
+    return detectDebuggingPhase({
+      hasSubmitted: false,
+      hasCodeChanges,
+      hasTestResults: testResultsLength > 0,
+      testsAreCurrent: testResultsLength > 0,
+      approachExplained,
+    })
+  }
   // If tests have run, testing phase
   if (testResultsLength > 0) return "testing"
   // If code has been written, coding phase
@@ -88,6 +102,8 @@ export function useInterviewPhaseTracking({
   const getCurrentInterviewPhase = useCallback(
     (): InterviewPhase =>
       deriveInterviewPhase({
+        scenarioType: selectedScenario?.type,
+        hasCodeChanges: code !== starterCode,
         showPostInterviewDiscussion,
         showFeedback,
         testResultsLength: testResults.length,
@@ -99,7 +115,9 @@ export function useInterviewPhaseTracking({
       showPostInterviewDiscussion,
       showFeedback,
       testResults.length,
-      code.length,
+      code,
+      starterCode,
+      selectedScenario?.type,
       conversationTracker.approachExplained,
       interviewerMessages.length,
     ]
@@ -116,11 +134,18 @@ export function useInterviewPhaseTracking({
   // Update tracker when code changes to detect coding phase
   const updateTrackerOnCodeChange = useCallback(
     (newCode: string) => {
-      if (newCode.length > 50 && !conversationTracker.hasStartedCoding) {
+      const hasEdited =
+        selectedScenario?.type === "bugfix" ? newCode !== starterCode : newCode.length > 50
+      if (hasEdited && !conversationTracker.hasStartedCoding) {
         setConversationTracker((prev) => ({ ...prev, hasStartedCoding: true }))
       }
     },
-    [conversationTracker.hasStartedCoding, setConversationTracker]
+    [
+      conversationTracker.hasStartedCoding,
+      selectedScenario?.type,
+      starterCode,
+      setConversationTracker,
+    ]
   )
 
   // Update tracker when tests run

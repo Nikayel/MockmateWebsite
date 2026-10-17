@@ -75,6 +75,7 @@ import {
 } from "@/lib/interview/chat/context-builders"
 import { buildChatRequestContext } from "@/lib/interview/chat/request-context"
 import { buildChatPromptFlow } from "@/lib/interview/chat/prompt-flow"
+import { detectDebuggingPhase } from "@/lib/interview/phases/debugging"
 import { createValidatedChatStream } from "@/lib/interview/chat/validated-response-stream"
 
 type ConversationTrackerWithExtraction = ConversationTracker & {
@@ -398,13 +399,14 @@ export async function POST(request: NextRequest) {
       currentPhase = detectInterviewPhase(phaseContext)
     }
 
-    if (
-      isBugFix &&
-      !hasSubmitted &&
-      sessionContext &&
-      !sessionContext.files.some((file) => file.status === "modified")
-    ) {
-      currentPhase = enhancedTracker?.approachExplained ? "discussion" : "clarification"
+    if (isBugFix && sessionContext) {
+      currentPhase = detectDebuggingPhase({
+        hasSubmitted: hasSubmitted || false,
+        hasCodeChanges: sessionContext.files.some((file) => file.status === "modified"),
+        testsAreCurrent: Boolean(testsHaveRunNow),
+        hasTestResults: Boolean(testResults?.length),
+        approachExplained: Boolean(phaseContext.approachExplained),
+      })
     }
 
     // Debug logging for phase detection
@@ -417,7 +419,8 @@ export async function POST(request: NextRequest) {
     // Evaluation cases are useful once the candidate is discussing an approach,
     // but exposing them while they are still clarifying turns grounding into an
     // answer key. The builder owns that phase boundary.
-    const edgeCaseContext = buildEdgeCaseContext(edgeCases, currentPhase)
+    const edgeCaseContext =
+      isBugFix || isSystemDesign ? "" : buildEdgeCaseContext(edgeCases, currentPhase)
 
     // Build conversation tracking context if available
     // Use enhanced tracker (with LLM extraction) if available
@@ -448,14 +451,15 @@ export async function POST(request: NextRequest) {
     const testingPhaseOverride = ""
 
     // Build complexity context - tells interviewer if solution is optimal
-    const complexityContext = buildComplexityContext(solutionComplexity)
+    const complexityContext =
+      isBugFix || isSystemDesign ? "" : buildComplexityContext(solutionComplexity)
 
     // =================================================================
     // TOOL EXECUTION: Pre-execute tools to give AI structured state
     // This ensures the AI always has accurate state information
     // =================================================================
     let toolResultsContext = ""
-    if (role === "interviewer" && !isBugFix) {
+    if (role === "interviewer" && !isBugFix && !isSystemDesign) {
       const toolContext: ToolContext = {
         tracker: (enhancedTracker || conversationTracker) as ConversationTracker | undefined,
         phase: currentPhase,

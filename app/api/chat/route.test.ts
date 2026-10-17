@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
 import { buildSessionContext } from "@/lib/interview/session-context/snapshot"
+import { createEmptyTracker } from "@/lib/interview/interview-phases"
 
 vi.mock("@/lib/interview/session-lifecycle/server", () => ({
   claimProactiveNudge: vi.fn(async () => true),
@@ -111,6 +112,70 @@ async function setupMocks() {
 describe("/api/chat route", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  it.each([false, true])(
+    "keeps baseline debugging runs in investigation with phase service=%s",
+    async (useService) => {
+      const { generateAIResponse } = await setupMocks()
+      const { getFlag } = await import("@/lib/feature-flags")
+      vi.mocked(getFlag).mockImplementation((flag) => flag === "USE_PHASE_SERVICE" && useService)
+      const { POST } = await import("./route")
+      const sessionContext = buildSessionContext({
+        task: {
+          id: "matcher",
+          title: "Adjustment matcher",
+          type: "bugfix",
+          description: "Only open rows may match.",
+        },
+        workspace: [
+          {
+            path: "matcher.js",
+            role: "editable",
+            content: "original",
+            originalContent: "original",
+          },
+        ],
+        code: "original",
+        interviewerMessages: [],
+        partnerMessages: [],
+      })
+      sessionContext.testRunRevision = sessionContext.currentRevision
+      sessionContext.testsMatchCurrentRevision = true
+      await POST(
+        createRequest({
+          role: "interviewer",
+          message: "Two tests fail",
+          scenarioType: "bugfix",
+          sessionContext,
+          testResults: [{ passed: false }, { passed: false }],
+          edgeCases: [{ description: "empty", input: [] }],
+        })
+      )
+      const [system, turn] = vi.mocked(generateAIResponse).mock.calls[0]
+      expect(turn).toContain("DEBUGGING PHASE: discussion")
+      expect(system + turn).not.toContain("You MUST ask about at least ONE before they run tests")
+      expect(system + turn).not.toContain("Missing before coding")
+    }
+  )
+
+  it("does not inject DSA tool prerequisites into system design", async () => {
+    const { generateAIResponse } = await setupMocks()
+    const { POST } = await import("./route")
+    await POST(
+      createRequest({
+        role: "interviewer",
+        message: "I would separate reads and writes",
+        scenarioType: "system-design",
+        context: Array.from({ length: 6 }, () => ({ type: "user", message: "Thinking" })),
+        conversationTracker: createEmptyTracker(),
+        edgeCases: [{ description: "empty", input: [] }],
+      })
+    )
+    const [system] = vi.mocked(generateAIResponse).mock.calls[0]
+    expect(system).toContain("candidate-led design discussion")
+    expect(system).not.toContain("DO NOT say 'code it up' yet")
+    expect(system).not.toContain("You MUST ask about at least ONE before they run tests")
   })
 
   it("passes the original task, every file, and both attributed panels to the model", async () => {
