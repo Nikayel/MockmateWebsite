@@ -1,3 +1,4 @@
+import type { SessionContext } from "@/lib/interview/session-context/schema"
 /**
  * Streaming Feedback Hook
  *
@@ -191,6 +192,7 @@ export interface StreamingFeedbackState {
 }
 
 export interface StreamingFeedbackRequest {
+  sessionContext?: SessionContext
   sessionId: string
   userId: string
   code: string

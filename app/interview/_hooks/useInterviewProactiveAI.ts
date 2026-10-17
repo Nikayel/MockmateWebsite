@@ -1,3 +1,4 @@
+import type { SessionContext } from "@/lib/interview/session-context/schema"
 import { useEffect, useRef } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import { getCurrentUserToken } from "@/lib/firebase-lazy"
@@ -12,6 +13,7 @@ interface ProactiveUserProfile {
 }
 
 export interface UseInterviewProactiveAIOptions {
+  sessionContext?: SessionContext
   // ---- gates (read by silence effect + trigger guard) ----
   currentSessionId: string | null
   ownerId: string
@@ -129,6 +131,7 @@ export function useInterviewProactiveAI(
           body: JSON.stringify({
             message:
               "Offer one brief, grounded check-in. Do not infer disengagement or penalize silence.",
+            sessionContext: opts.sessionContext,
             context: opts.interviewerMessages,
             role: "interviewer",
             isProactive: true,

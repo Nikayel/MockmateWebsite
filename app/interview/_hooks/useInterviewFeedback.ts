@@ -1,3 +1,5 @@
+import { buildConversationTimeline } from "@/lib/interview/session-context/conversation"
+import type { SessionContext } from "@/lib/interview/session-context/schema"
 import { useRef } from "react"
 import { isHarnessError } from "@/lib/workspace-execution/harness-errors"
 import type { Dispatch, SetStateAction } from "react"
@@ -42,6 +44,7 @@ interface RoadmapWithId {
 }
 
 export interface UseInterviewFeedbackOptions {
+  sessionContext?: SessionContext
   // Auth / entitlement
   user: User | null
   isGuestMode: boolean
@@ -230,18 +233,10 @@ export function useInterviewFeedback(
       if (opts.currentSessionId && opts.code.trim()) {
         try {
           // Prepare conversation transcript - NOW includes ALL messages including post-interview discussion
-          const conversationTranscript = [
-            ...opts.interviewerMessages.map((m) => ({
-              role: m.type === "user" ? "candidate" : "interviewer",
-              content: m.message,
-              timestamp: m.timestamp,
-            })),
-            ...opts.chatMessages.map((m) => ({
-              role: m.type === "user" ? "candidate" : "ai_partner",
-              content: m.message,
-              timestamp: m.timestamp,
-            })),
-          ].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+          const conversationTranscript = buildConversationTimeline(
+            opts.interviewerMessages,
+            opts.chatMessages
+          )
 
           // Build phase tracking info for scoring
           const phaseTracking = {
@@ -267,6 +262,7 @@ export function useInterviewFeedback(
           // ================================================================
           const hintsUsedCount = opts.revealedHintIndices.size + opts.revealedAIHintIndices.size
           const feedbackRequest = {
+            sessionContext: opts.sessionContext,
             sessionId: opts.currentSessionId,
             // Null for guests: the sign-in handler stamps the freshly created
             // uid onto the staged request after the session migrates.

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
+import { buildSessionContext } from "@/lib/interview/session-context/snapshot"
 
 vi.mock("@/lib/interview/session-lifecycle/server", () => ({
   claimProactiveNudge: vi.fn(async () => true),
@@ -112,6 +113,50 @@ describe("/api/chat route", () => {
     vi.clearAllMocks()
   })
 
+  it("passes the original task, every file, and both attributed panels to the model", async () => {
+    const { generateAIResponse } = await setupMocks()
+    const { POST } = await import("./route")
+    const sessionContext = buildSessionContext({
+      task: {
+        id: "debug",
+        title: "Rollup",
+        type: "bugfix",
+        description: "Read task.md and reproduce.",
+      },
+      workspace: [
+        {
+          path: "task.md",
+          content: "Full public task",
+          originalContent: "Full public task",
+          role: "docs",
+        },
+        { path: "rollup.py", content: "after", originalContent: "before", role: "editable" },
+      ],
+      code: "after",
+      interviewerMessages: [{ type: "user", message: "My hypothesis", timestamp: 20 }],
+      partnerMessages: [
+        { type: "ai", message: "Sparra suggested inspecting the boundary", timestamp: 10 },
+      ],
+    })
+    const response = await POST(
+      createRequest({
+        message: "What should I verify?",
+        role: "interviewer",
+        scenarioType: "bugfix",
+        scenarioTitle: "Rollup",
+        sessionContext,
+      })
+    )
+    expect(response.status).toBe(200)
+    const [system, current, history] = vi.mocked(generateAIResponse).mock.calls[0]
+    expect(system).toContain("Read task.md and reproduce.")
+    expect(system).toContain('"originalContent":"before"')
+    expect(current).toContain('"content":"after"')
+    expect(current).toContain('"testsMatchCurrentRevision":false')
+    expect(history?.[0].content).toContain("ai_partner; to=partner")
+    expect(history?.[1].content).toContain("My hypothesis")
+  })
+
   it("returns 400 for invalid request bodies", async () => {
     const { enforceChatRateLimit } = await setupMocks()
     const { POST } = await import("./route")
@@ -131,7 +176,7 @@ describe("/api/chat route", () => {
     const { generateAIResponse, enforceChatRateLimit } = await setupMocks()
     const { POST } = await import("./route")
 
-    const oversizedContext = Array.from({ length: 61 }, (_, index) => ({
+    const oversizedContext = Array.from({ length: 2001 }, (_, index) => ({
       type: "user",
       message: `message ${index}`,
     }))

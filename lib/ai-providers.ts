@@ -667,7 +667,14 @@ async function callOpenAI(
   const usage: ProviderTokenUsage | undefined =
     typeof data.usage?.prompt_tokens === "number" &&
     typeof data.usage?.completion_tokens === "number"
-      ? { inputTokens: data.usage.prompt_tokens, outputTokens: data.usage.completion_tokens }
+      ? {
+          inputTokens: data.usage.prompt_tokens,
+          outputTokens: data.usage.completion_tokens,
+          cachedInputTokens:
+            typeof data.usage.prompt_tokens_details?.cached_tokens === "number"
+              ? data.usage.prompt_tokens_details.cached_tokens
+              : 0,
+        }
       : undefined
 
   logger.debug("[OpenAI] Success", {

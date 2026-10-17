@@ -1,3 +1,8 @@
+import { sessionContextSchema } from "@/lib/interview/session-context/schema"
+import {
+  buildSessionBaselinePrompt,
+  buildSessionEvidencePrompt,
+} from "@/lib/interview/session-context/prompts"
 /**
  * Streaming Feedback API - Edge Function
  *
@@ -267,6 +272,9 @@ interface RawTranscriptMessage {
   role?: string
   message?: string
   content?: string
+  lane?: string
+  timestamp?: number
+  id?: string
 }
 
 /** Clamp one message's text, preserving its shape for every downstream reader. */
@@ -293,6 +301,9 @@ function boundTranscript(raw: unknown): { messages: RawTranscriptMessage[]; trun
 
   return {
     messages: kept.map((entry: RawTranscriptMessage) => ({
+      lane: entry?.lane,
+      timestamp: typeof entry?.timestamp === "number" ? entry.timestamp : undefined,
+      id: entry?.id,
       type: entry?.type,
       role: entry?.role,
       message: boundMessageText(entry?.message),
@@ -509,6 +520,28 @@ export async function POST(request: NextRequest) {
         hintsUsed,
       } = body
 
+      const parsedSessionContext = sessionContextSchema.safeParse(body.sessionContext)
+      if (
+        body.sessionContext !== undefined &&
+        (!parsedSessionContext.success ||
+          new TextEncoder().encode(JSON.stringify(body.sessionContext)).byteLength > 1_000_000)
+      ) {
+        await sendEvent("error", {
+          message: "Session context could not be validated. Your session is preserved.",
+        })
+        return
+      }
+      const sessionContext = parsedSessionContext.success ? parsedSessionContext.data : undefined
+      const workspaceEvidence = sessionContext
+        ? buildSessionBaselinePrompt(sessionContext) + buildSessionEvidencePrompt(sessionContext)
+        : ""
+      const fullAttributedTranscript = sessionContext?.timeline
+        .map(
+          (entry) =>
+            `${entry.role.toUpperCase()} to=${entry.lane} at=${entry.timestamp ?? "unknown (legacy)"} id=${entry.id}: ${entry.content}`
+        )
+        .join("\n\n")
+
       loggedScenarioId = scenarioId
       loggedScenarioType = scenarioType
 
@@ -630,11 +663,21 @@ export async function POST(request: NextRequest) {
         conversationTranscript as unknown as Array<{ role: string; content: string }>
       )
       const aiCodeOverlap = analyzeAICodeOverlap(code, partnerMessages)
-      const hasBlindCopying = aiCodeOverlap.hasHighOverlap && !aiCodeOverlap.modificationsMade
+      const hasBlindCopying =
+        scenarioType !== "bugfix" &&
+        aiCodeOverlap.hasHighOverlap &&
+        !aiCodeOverlap.modificationsMade
       const bugfixEvidenceSummary: BugfixEvidenceSummary | null =
         scenarioType === "bugfix" && Array.isArray(bugfixEvidenceEvents)
           ? summarizeBugfixEvidence({
               events: bugfixEvidenceEvents as BugfixEvidenceEvent[],
+              netModifiedFiles:
+                sessionContext &&
+                sessionContext.files.every((file) => file.status !== "baseline_unknown")
+                  ? sessionContext.files
+                      .filter((file) => file.status === "modified")
+                      .map((file) => file.path)
+                  : undefined,
               expectedTouchedFiles: Array.isArray(bugfixExpectedTouchedFiles)
                 ? bugfixExpectedTouchedFiles
                 : [],
@@ -654,7 +697,9 @@ export async function POST(request: NextRequest) {
                 role:
                   msg.type === "user" || msg.role === "user" || msg.role === "candidate"
                     ? ("user" as const)
-                    : ("interviewer" as const),
+                    : msg.role === "ai_partner"
+                      ? ("ai_partner" as const)
+                      : ("interviewer" as const),
                 content: msg.message || msg.content || "",
               })
             )
@@ -858,11 +903,14 @@ export async function POST(request: NextRequest) {
                   // used to carry them are gone). A hypothesis is stated EARLY, so the
                   // last-10-messages window would routinely cut off the very evidence
                   // hypothesisQuality is scored on. Send the whole conversation.
-                  conversationExcerpt: fitTranscript(
-                    transcriptMessages
-                      .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-                      .join("\n\n")
-                  ),
+                  workspaceEvidence,
+                  conversationExcerpt:
+                    fullAttributedTranscript ??
+                    fitTranscript(
+                      transcriptMessages
+                        .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+                        .join("\n\n")
+                    ),
                 },
                 trackEdgeSpend("bugfix-scoring")
               ).catch((error) => {
@@ -975,29 +1023,35 @@ export async function POST(request: NextRequest) {
       })
 
       const systemInstruction = buildSystemInstruction(scenarioType)
-      const prompt = buildPrompt({
-        scenarioTitle,
-        scenarioType,
-        passRate,
-        finalScores: finalScores as unknown as Record<string, number>,
-        aiValidation: aiValidation as unknown as Record<string, unknown>,
-        extractedEvidence,
-        bugfixEvidenceSummary,
-        bugfixScoreBreakdown,
-        bugfixSemanticScores,
-        bugfixRootCause,
-        bugfixPrevention,
-        // Legacy scenarios: the sealed rubric (client stopped posting it). Packs:
-        // sealedLegacyRubric is null, so the client-sent generic pack rubric is used.
-        bugfixRootCauseRubric:
-          sealedLegacyRubric ?? (Array.isArray(bugfixRootCauseRubric) ? bugfixRootCauseRubric : []),
-        silentNotes: finalSilentNotes,
-        code,
-        language,
-        efficiencyMetrics,
-        testsPassed,
-        testsTotal,
-      })
+      const prompt =
+        workspaceEvidence +
+        (fullAttributedTranscript
+          ? `\nFULL ATTRIBUTED CONVERSATION:\n${fullAttributedTranscript}\n`
+          : "") +
+        buildPrompt({
+          scenarioTitle,
+          scenarioType,
+          passRate,
+          finalScores: finalScores as unknown as Record<string, number>,
+          aiValidation: aiValidation as unknown as Record<string, unknown>,
+          extractedEvidence,
+          bugfixEvidenceSummary,
+          bugfixScoreBreakdown,
+          bugfixSemanticScores,
+          bugfixRootCause,
+          bugfixPrevention,
+          // Legacy scenarios: the sealed rubric (client stopped posting it). Packs:
+          // sealedLegacyRubric is null, so the client-sent generic pack rubric is used.
+          bugfixRootCauseRubric:
+            sealedLegacyRubric ??
+            (Array.isArray(bugfixRootCauseRubric) ? bugfixRootCauseRubric : []),
+          silentNotes: finalSilentNotes,
+          code,
+          language,
+          efficiencyMetrics,
+          testsPassed,
+          testsTotal,
+        })
 
       const aiResponse = await generateFeedbackResponseEdge(systemInstruction, prompt)
 

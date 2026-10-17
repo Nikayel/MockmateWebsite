@@ -11,6 +11,7 @@ export function createBugfixEvidenceEvent(
 
 export function summarizeBugfixEvidence(params: {
   events: BugfixEvidenceEvent[]
+  netModifiedFiles?: string[]
   expectedTouchedFiles?: string[]
 }): BugfixEvidenceSummary {
   const expectedTouchedFiles = params.expectedTouchedFiles || []
@@ -52,7 +53,7 @@ export function summarizeBugfixEvidence(params: {
     }
   }
 
-  const edited = Array.from(editedFiles)
+  const edited = params.netModifiedFiles ?? Array.from(editedFiles)
   const overEditedFiles =
     expectedTouchedFiles.length > 0
       ? edited.filter((path) => !expectedTouchedFiles.includes(path))

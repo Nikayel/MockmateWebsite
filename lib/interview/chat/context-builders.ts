@@ -62,9 +62,6 @@ export function buildUserPersonalizationContext(
     ? `
 CANDIDATE INFORMATION:
 - Name: ${userName} (use first name or last name only, never full name)
-- Email: ${userInfo.email || "Guest User"}
-- Subscription: ${userInfo.subscription_tier || "free"} tier
-- Sessions completed: ${userInfo.sessions_used || 0}
 - Previous topics: ${userInfo.previous_topics?.join(", ") || "None"}
 - Skill level: ${userInfo.skill_level || "Intermediate"}
 

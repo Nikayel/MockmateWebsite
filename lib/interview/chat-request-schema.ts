@@ -1,3 +1,4 @@
+import { sessionContextSchema } from "./session-context/schema"
 import { z } from "zod"
 
 // Schema validation for chat API request body.
@@ -5,15 +6,16 @@ import { z } from "zod"
 export const chatRequestSchema = z
   .object({
     message: z.string().max(10000).optional(),
+    sessionContext: sessionContextSchema.optional(),
     responseMode: z.enum(["json", "validated-stream"]).optional(),
     context: z
       .array(
         z.object({
           type: z.string().max(20),
-          message: z.string().max(8000),
+          message: z.string().max(10000),
         })
       )
-      .max(60)
+      .max(2000)
       .optional(),
     role: z.enum(["interviewer", "partner"]).optional(),
     userContext: z.record(z.unknown()).optional(),
@@ -27,6 +29,7 @@ export const chatRequestSchema = z
           hidden: z.boolean().optional(),
           active: z.boolean().optional(),
           edited: z.boolean().optional(),
+          originalContent: z.string().max(100000).optional(),
         })
       )
       .optional(),

@@ -183,7 +183,10 @@ export interface PromptContext {
   companyName?: string
 }
 
-export function buildInterviewerPrompt(ctx: PromptContext): string {
+export function buildInterviewerPrompt(
+  ctx: PromptContext,
+  section: "all" | "stable" | "turn" = "all"
+): string {
   const phasePrompt = PHASE_PROMPTS[ctx.phase] || PHASE_PROMPTS.discussion
 
   // Render the shared forbidden-phrase list. The 8-then-rest wrap preserves the
@@ -200,6 +203,7 @@ CRITICAL - NEUTRAL BEHAVIOR:
 - NEVER enumerate candidate-discoverable edge cases - ask the candidate to identify or trace them
 - NEVER correct mistakes directly - they find out in the feedback
 - You MAY confirm a specifically requested problem requirement; answer only that fact
+- You MAY acknowledge an observed investigation action without calling the solution correct: "You reproduced the failure before editing; what does the output tell you?"
 - Use varied neutral responses. Don't repeat the same phrase twice.
 
 FORBIDDEN PHRASES (trigger regeneration):
@@ -217,90 +221,100 @@ CORE RULES:
 ${ctx.isGenericCompany !== false ? "- Standard technical interview" : ctx.companyName ? `- Adapt to ${ctx.companyName}'s interview culture` : ""}`
 
   const sections: string[] = [corePersonality]
+  const turnSections: string[] = []
+  const orderedSections: string[] = [corePersonality]
+  const addStable = (text: string) => {
+    sections.push(text)
+    orderedSections.push(text)
+  }
+  const addTurn = (text: string) => {
+    turnSections.push(text)
+    orderedSections.push(text)
+  }
 
   // Add company context if provided
   if (ctx.companyContext) {
-    sections.push(ctx.companyContext)
+    addStable(ctx.companyContext)
   }
 
   // Add user context
   if (ctx.userContextString) {
-    sections.push(ctx.userContextString)
+    addStable(ctx.userContextString)
   }
 
   // Add problem context
   if (ctx.problemContext) {
-    sections.push(ctx.problemContext)
+    addStable(ctx.problemContext)
   }
 
   // Add level context
   if (ctx.levelContext) {
-    sections.push(ctx.levelContext)
+    addStable(ctx.levelContext)
   }
 
   // Add scenario-specific context (system design, bug fix, or pattern)
   if (ctx.scenarioContext) {
-    sections.push(ctx.scenarioContext)
+    addStable(ctx.scenarioContext)
   }
 
   // Add edge case context
   if (ctx.edgeCaseContext) {
-    sections.push(ctx.edgeCaseContext)
+    addTurn(ctx.edgeCaseContext)
   }
 
   // Add console/test context
   if (ctx.consoleContext) {
-    sections.push(ctx.consoleContext)
+    addTurn(ctx.consoleContext)
   }
 
   // Add phase prompt
-  sections.push(phasePrompt)
+  addTurn(phasePrompt)
 
   // Add tracking context
   if (ctx.trackingContext) {
-    sections.push(ctx.trackingContext)
+    addTurn(ctx.trackingContext)
   }
 
   // Add hint guidance
   if (ctx.hintGuidance) {
-    sections.push(ctx.hintGuidance)
+    addTurn(ctx.hintGuidance)
   }
 
   // Add complexity context
   if (ctx.complexityContext) {
-    sections.push(ctx.complexityContext)
+    addTurn(ctx.complexityContext)
   }
 
   // Add enforced checklist (code-level enforcement)
   if (ctx.enforcedChecklist) {
-    sections.push(ctx.enforcedChecklist)
+    addTurn(ctx.enforcedChecklist)
   }
 
   // Add testing phase override
   if (ctx.testingPhaseOverride) {
-    sections.push(ctx.testingPhaseOverride)
+    addTurn(ctx.testingPhaseOverride)
   }
 
   // Add fuzzy mode context (real interview mode)
   if (ctx.fuzzyModeContext) {
-    sections.push(ctx.fuzzyModeContext)
+    addStable(ctx.fuzzyModeContext)
   }
 
   // Add tool results context
   if (ctx.toolResultsContext) {
-    sections.push(ctx.toolResultsContext)
+    addTurn(ctx.toolResultsContext)
   }
 
-  sections.push(FEW_SHOT_EXAMPLES)
+  addStable(FEW_SHOT_EXAMPLES)
 
   // Add candidate environment (what they can actually click; there is no terminal).
   // Sits next to PLATFORM ISSUES because both describe the platform, not the candidate.
   if (ctx.environmentContext) {
-    sections.push(ctx.environmentContext)
+    addStable(ctx.environmentContext)
   }
 
   // Add platform issues
-  sections.push(`PLATFORM ISSUES:
+  addStable(`PLATFORM ISSUES:
 - If they can't edit code, ask them to explain verbally instead
 - Don't repeat instructions they said they can't follow
 - If they report the tests or the platform are broken, believe them before you doubt them.
@@ -310,10 +324,12 @@ ${ctx.isGenericCompany !== false ? "- Standard technical interview" : ctx.compan
 
   // Add problem title if provided
   if (ctx.problemTitle) {
-    sections.push(`Problem: ${ctx.problemTitle}`)
+    addStable(`Problem: ${ctx.problemTitle}`)
   }
 
-  sections.push("Continue naturally. Use their first name only.")
+  addStable("Continue naturally. Use their first name only.")
 
-  return sections.join("\n\n")
+  return (
+    section === "stable" ? sections : section === "turn" ? turnSections : orderedSections
+  ).join("\n\n")
 }

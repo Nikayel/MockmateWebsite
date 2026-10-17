@@ -1,5 +1,6 @@
 "use client"
 
+import { buildSessionContext, workspaceRevision } from "@/lib/interview/session-context/snapshot"
 import { SessionPauseNotice } from "./_components/SessionPauseNotice"
 import { useInterviewLifecycle } from "./_hooks/useInterviewLifecycle"
 import { InterviewSurfaceFrame } from "./_components/InterviewSurfaceFrame"
@@ -358,6 +359,7 @@ function InterviewPageContent() {
   })
   const [efficiencyMetrics, setEfficiencyMetrics] = useState<EfficiencyMetrics | null>(null)
 
+  const [starterCode, setStarterCode] = useState("")
   const [isSessionPaused, setIsSessionPaused] = useState(false)
 
   // Timer
@@ -382,6 +384,41 @@ function InterviewPageContent() {
         edited: file.originalContent !== undefined && file.content !== file.originalContent,
       })),
     [activeWorkspacePath, workspaceContext]
+  )
+  const [testRunRevision, setTestRunRevision] = useState<string | null>(null)
+  const sessionContext = useMemo(
+    () =>
+      selectedScenario
+        ? buildSessionContext({
+            task: {
+              id: selectedScenario.id,
+              title: selectedScenario.title,
+              type: selectedScenario.type,
+              description:
+                realInterviewMode &&
+                "fuzzyStatement" in selectedScenario &&
+                typeof selectedScenario.fuzzyStatement === "string"
+                  ? selectedScenario.fuzzyStatement
+                  : selectedScenario.description,
+            },
+            workspace: workspaceContext,
+            code,
+            starterCode: starterCode || undefined,
+            interviewerMessages,
+            partnerMessages: chatMessages,
+            testRunRevision,
+          })
+        : undefined,
+    [
+      selectedScenario,
+      realInterviewMode,
+      workspaceContext,
+      code,
+      starterCode,
+      interviewerMessages,
+      chatMessages,
+      testRunRevision,
+    ]
   )
   const activeWorkspaceFile =
     activeWorkspacePath && isWorkspaceScenario(selectedScenario)
@@ -597,7 +634,6 @@ function InterviewPageContent() {
   const [protectedElements, setProtectedElements] = useState<ReturnType<
     typeof extractProtectedElements
   > | null>(null)
-  const [starterCode, setStarterCode] = useState("")
 
   // The last-feedback-request ref + applyFallbackFeedback live in useInterviewFeedback.
 
@@ -1140,6 +1176,7 @@ function InterviewPageContent() {
   })
 
   const { resetProactiveState } = useInterviewProactiveAI({
+    sessionContext,
     isInterviewStarted: isInterviewStarted && !isSessionPaused,
     currentSessionId,
     ownerId: lifecycle.ownerId,
@@ -1420,6 +1457,7 @@ function InterviewPageContent() {
   })
 
   const { triggerPostInterviewDiscussion } = usePostInterviewDiscussion({
+    sessionContext,
     user,
     usageLimit,
     experienceLevel,
@@ -1484,6 +1522,7 @@ function InterviewPageContent() {
   })
 
   const { proceedToFinalFeedback } = useInterviewFeedback({
+    sessionContext,
     user,
     isGuestMode,
     guestId,
@@ -1797,6 +1836,7 @@ function InterviewPageContent() {
   }
 
   const { handleSendMessage, handleAutoSend } = useInterviewChat({
+    sessionContext,
     paused: isSessionPaused,
     generationRef: lifecycle.generationRef,
     ownerId: lifecycle.ownerId,
@@ -1840,6 +1880,7 @@ function InterviewPageContent() {
   // Usage: analyzeCodeEfficiency(code, (selectedScenario as any)?.optimalComplexity)
 
   const { runCode, submitCode } = useCodeExecution({
+    onTestsCompleted: () => setTestRunRevision(workspaceRevision(workspaceContext, code)),
     selectedScenario,
     code,
     selectedLanguage,

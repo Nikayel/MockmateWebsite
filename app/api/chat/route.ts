@@ -1,3 +1,9 @@
+import {
+  buildSessionBaselinePrompt,
+  buildSessionEvidencePrompt,
+} from "@/lib/interview/session-context/prompts"
+import { timelineProviderHistory } from "@/lib/interview/session-context/conversation"
+import type { PromptContext } from "@/lib/interview/interviewer-prompts"
 import { claimProactiveNudge } from "@/lib/interview/session-lifecycle/server"
 import { NextRequest, NextResponse } from "next/server"
 import { enforceMeteredAiRequest } from "@/lib/ai/metered-request"
@@ -160,6 +166,15 @@ export async function POST(request: NextRequest) {
   try {
     // Parse and validate request body with Zod schema
     const rawBody = await request.json()
+    if (new TextEncoder().encode(JSON.stringify(rawBody)).byteLength > 1_000_000) {
+      return NextResponse.json(
+        {
+          error:
+            "This session context is too large to send safely. Your saved history is preserved.",
+        },
+        { status: 413 }
+      )
+    }
     const parseResult = chatRequestSchema.safeParse(rawBody)
 
     if (!parseResult.success) {
@@ -177,6 +192,7 @@ export async function POST(request: NextRequest) {
 
     const requestContext = buildChatRequestContext(parseResult.data)
     const {
+      sessionContext,
       message,
       responseMode,
       context,
@@ -293,10 +309,10 @@ export async function POST(request: NextRequest) {
     const levelContext = buildInterviewerLevelContext(candidateLevel)
 
     // Manage workspace context with sliding window
-    const workspaceContextStr = buildWorkspaceContextString(workspaceContext)
+    const workspaceContextStr = sessionContext ? "" : buildWorkspaceContextString(workspaceContext)
 
     // Add current code context (truncate if too long)
-    const currentCodeContext = buildCurrentCodeContext(currentCode)
+    const currentCodeContext = sessionContext ? "" : buildCurrentCodeContext(currentCode)
 
     // Define system prompts based on role with enhanced context awareness
     const problemContext = buildProblemContext(scenarioTitle, scenarioType)
@@ -310,7 +326,8 @@ export async function POST(request: NextRequest) {
 
     // Build console/test results context for interviewer awareness
     // TestResultItem and ConsoleLogItem interfaces defined at module level
-    const testResultsArray = testResults
+    const testResultsArray =
+      sessionContext && !sessionContext.testsMatchCurrentRevision ? [] : testResults
     const consoleLogsArray = consoleLogs
 
     const consoleContext = buildConsoleContext(testResultsArray, consoleLogsArray)
@@ -336,7 +353,8 @@ export async function POST(request: NextRequest) {
 
     // Build phase-specific context using DETERMINISTIC signals
     // No longer relies on frontend-passed interviewPhase - we compute it here
-    const testsHaveRunNow = testsHaveRun
+    const testsHaveRunNow =
+      testsHaveRun && (!sessionContext || sessionContext.testsMatchCurrentRevision)
     const currentCodeLen = currentCodeLength
     const starterLen = starterCodeLength
 
@@ -375,6 +393,15 @@ export async function POST(request: NextRequest) {
       currentPhase = detectInterviewPhase(phaseContext)
     }
 
+    if (
+      isBugFix &&
+      !hasSubmitted &&
+      sessionContext &&
+      !sessionContext.files.some((file) => file.status === "modified")
+    ) {
+      currentPhase = enhancedTracker?.approachExplained ? "discussion" : "clarification"
+    }
+
     // Debug logging for phase detection
     logger.info("[Chat API] Phase detection", {
       currentPhase,
@@ -404,6 +431,7 @@ export async function POST(request: NextRequest) {
     const tracker = (enhancedTracker || conversationTracker) as ConversationTracker | undefined
 
     const preLLMPolicy = buildPreLLMInterviewerPolicy({
+      scenarioType,
       phase: currentPhase,
       tracker,
       hasSubmitted: hasSubmitted || false,
@@ -492,35 +520,40 @@ export async function POST(request: NextRequest) {
         : ""
 
     // Build interviewer prompt using consolidated function
+    const interviewerPromptContext: PromptContext = {
+      phase: currentPhase,
+      problemTitle: scenarioTitle || "",
+      problemDifficulty: scenarioPattern || patternMeta?.name || "medium",
+      userLevel: candidateLevel,
+      companyContext,
+      userContextString,
+      problemContext,
+      levelContext,
+      scenarioContext: isSystemDesign
+        ? systemDesignContext
+        : isBugFix
+          ? bugFixContext
+          : patternContext,
+      edgeCaseContext,
+      consoleContext,
+      trackingContext,
+      hintGuidance,
+      complexityContext,
+      enforcedChecklist,
+      testingPhaseOverride,
+      fuzzyModeContext,
+      toolResultsContext,
+      environmentContext,
+      isGenericCompany,
+      companyName: companyStyle.company,
+    }
     const interviewerPrompt =
       role === "interviewer"
-        ? buildInterviewerPrompt({
-            phase: currentPhase,
-            problemTitle: scenarioTitle || "",
-            problemDifficulty: scenarioPattern || patternMeta?.name || "medium",
-            userLevel: candidateLevel,
-            companyContext,
-            userContextString,
-            problemContext,
-            levelContext,
-            scenarioContext: isSystemDesign
-              ? systemDesignContext
-              : isBugFix
-                ? bugFixContext
-                : patternContext,
-            edgeCaseContext,
-            consoleContext,
-            trackingContext,
-            hintGuidance,
-            complexityContext,
-            enforcedChecklist,
-            testingPhaseOverride,
-            fuzzyModeContext,
-            toolResultsContext,
-            environmentContext,
-            isGenericCompany,
-            companyName: companyStyle.company,
-          })
+        ? buildInterviewerPrompt(interviewerPromptContext, sessionContext ? "stable" : "all")
+        : ""
+    const interviewerTurnGuidance =
+      role === "interviewer" && sessionContext
+        ? buildInterviewerPrompt(interviewerPromptContext, "turn")
         : ""
 
     const systemPrompts = {
@@ -589,8 +622,11 @@ Keep responses brief, actionable, and helpful.You're a tool they can use, but th
 
     let systemPrompt = systemPrompts[role as keyof typeof systemPrompts] || systemPrompts.partner
 
+    const stableSystemPrompt = systemPrompt
+    let ragTurnContext = ""
+
     // Derive scenarioId from title for complexity lookup (e.g., "Two Sum" -> "dsa-two-sum")
-    const scenarioId = buildScenarioId(scenarioTitle)
+    const scenarioId = sessionContext?.task.id ?? buildScenarioId(scenarioTitle)
 
     // Enhance both interviewer and partner roles with RAG context
     // Now includes DYNAMIC context based on the user's current message
@@ -655,9 +691,18 @@ GROUNDING RULES (prevent hallucination):
     }
 
     // Convert to provider-agnostic format
-    const history = buildProviderHistory(context)
+    if (sessionContext) {
+      ragTurnContext = systemPrompt.slice(stableSystemPrompt.length)
+      systemPrompt = stableSystemPrompt + buildSessionBaselinePrompt(sessionContext)
+    }
+    const history = sessionContext
+      ? timelineProviderHistory(sessionContext.timeline)
+      : buildProviderHistory(context)
 
     const promptFlow = buildChatPromptFlow({
+      sessionEvidence: sessionContext
+        ? interviewerTurnGuidance + ragTurnContext + buildSessionEvidencePrompt(sessionContext)
+        : undefined,
       role,
       message,
       context,

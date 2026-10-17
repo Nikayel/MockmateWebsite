@@ -39,6 +39,7 @@ export interface BugfixSemanticScorerInput {
   evidenceSummary: BugfixEvidenceSummary
   rootCauseRubric: string[]
   bugDescription: string
+  workspaceEvidence?: string
   conversationExcerpt: string
 }
 
@@ -163,7 +164,11 @@ Bug description (internal ground truth, do NOT echo in output):
 ${renderCandidateReasoning(e)}
 
 ═══ CONVERSATION TRANSCRIPT (the primary evidence) ═══
+${input.workspaceEvidence || "[No original/current workspace evidence supplied; do not infer authorship.]"}
+
 ${input.conversationExcerpt || "[no conversation]"}
+
+Speaker attribution is mandatory: AI_PARTNER is Sparra advice, not candidate reasoning. Assess what the candidate independently questioned, explained and verified; baseline code is not candidate-authored.
 
 ═══ SCORING TASK ═══
 Score 0-100 on each dimension. Use the ground truth rubric strictly for rootCauseAccuracy.

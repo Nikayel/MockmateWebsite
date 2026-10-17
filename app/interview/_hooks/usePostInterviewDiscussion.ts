@@ -1,3 +1,4 @@
+import type { SessionContext } from "@/lib/interview/session-context/schema"
 import { toast } from "sonner"
 import type { Dispatch, SetStateAction } from "react"
 import { getCurrentUserToken } from "@/lib/firebase-lazy"
@@ -19,6 +20,7 @@ import type {
 } from "../_types"
 
 export interface UsePostInterviewDiscussionOptions {
+  sessionContext?: SessionContext
   // Auth / entitlement
   user: User | null
   usageLimit: { used?: number } | null
@@ -162,6 +164,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
         method: "POST",
         headers: chatHeaders,
         body: JSON.stringify({
+          sessionContext: opts.sessionContext,
           message: discussionPrompt,
           context: opts.interviewerMessages,
           role: "interviewer",

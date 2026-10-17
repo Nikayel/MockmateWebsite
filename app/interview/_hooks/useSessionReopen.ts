@@ -1,3 +1,4 @@
+import { createChatMessage } from "@/lib/interview/session-context/conversation"
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react"
 import type { User as FirebaseUser } from "firebase/auth"
 import type { ReadonlyURLSearchParams } from "next/navigation"
@@ -468,7 +469,7 @@ Let's continue!`
                 savedState.interviewerMessages as Array<{ type: "ai" | "user"; message: string }>
               )
             } else {
-              opts.setInterviewerMessages([{ type: "ai", message: initialMessage }])
+              opts.setInterviewerMessages([createChatMessage("ai", initialMessage)])
             }
             if (savedState?.chatMessages && savedState.chatMessages.length > 0) {
               opts.setChatMessages(
@@ -476,7 +477,7 @@ Let's continue!`
               )
             } else {
               const partnerMessage = getInitialPartnerMessage(scenario)
-              opts.setChatMessages(partnerMessage ? [{ type: "ai", message: partnerMessage }] : [])
+              opts.setChatMessages(partnerMessage ? [createChatMessage("ai", partnerMessage)] : [])
             }
             // Restore elapsed time and test results
             if (savedState?.elapsedTime) {
@@ -530,9 +531,9 @@ Let's continue!`
               ])
             }
 
-            opts.setInterviewerMessages([{ type: "ai", message: initialMessage }])
+            opts.setInterviewerMessages([createChatMessage("ai", initialMessage)])
             const partnerMessage = getInitialPartnerMessage(scenario)
-            opts.setChatMessages(partnerMessage ? [{ type: "ai", message: partnerMessage }] : [])
+            opts.setChatMessages(partnerMessage ? [createChatMessage("ai", partnerMessage)] : [])
           }
         } else {
           toast.error("Scenario not found")

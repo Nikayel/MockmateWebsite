@@ -1,3 +1,5 @@
+import { createChatMessage } from "@/lib/interview/session-context/conversation"
+import type { SessionContext } from "@/lib/interview/session-context/schema"
 import { useEffect, useRef } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import { useRouter } from "next/navigation"
@@ -61,6 +63,7 @@ interface ChatApiResponse {
 }
 
 export interface UseInterviewChatOptions {
+  sessionContext?: SessionContext
   paused?: boolean
   generationRef?: { current: number }
   ownerId?: string
@@ -348,7 +351,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
       const controller = new AbortController()
       controllers.current.add(controller)
 
-      const newUserMessage: ChatMessage = { type: "user", message: userMessage }
+      const newUserMessage: ChatMessage = createChatMessage("user", userMessage)
       setMessages((prev) => [...prev, newUserMessage])
       setLoading(true)
 
@@ -514,8 +517,12 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             Authorization: `Bearer ${idToken}`,
           },
           body: JSON.stringify({
-            message: userMessage + additionalContext,
+            message:
+              `[CANDIDATE to=${isInterviewer ? "interviewer" : "partner"}; id=${newUserMessage.id}; at=${new Date(newUserMessage.timestamp!).toISOString()}]\n` +
+              userMessage +
+              additionalContext,
             context: messages,
+            sessionContext: opts.sessionContext,
             role: isInterviewer ? "interviewer" : "partner",
             responseMode: isInterviewer ? "validated-stream" : "json",
             // Stamps every chat turn's usage_events row with the interview
@@ -588,9 +595,8 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
               setMessages((previous) => [
                 ...previous,
                 {
+                  ...createChatMessage("ai", revealedReply),
                   id: streamingResponseId!,
-                  type: "ai",
-                  message: revealedReply,
                   isStreaming: true,
                 },
               ])
@@ -652,7 +658,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
         const reply = data.reply
         if (reply) {
           if (!replyAlreadyRendered) {
-            setMessages((prev) => [...prev, { type: "ai", message: reply }])
+            setMessages((prev) => [...prev, createChatMessage("ai", reply)])
           }
 
           // Track topics from interviewer messages to avoid repetitive questions

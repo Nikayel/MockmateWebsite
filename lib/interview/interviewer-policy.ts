@@ -9,6 +9,7 @@
 import type { ConversationTracker, InterviewPhase } from "./interview-phases"
 
 export interface PreLLMPolicyContext {
+  scenarioType?: string
   phase: InterviewPhase
   tracker?: ConversationTracker
   hasSubmitted: boolean
@@ -73,6 +74,17 @@ function buildPreCodingAction(missingTopics: string[]): string | undefined {
 }
 
 export function buildPreLLMInterviewerPolicy(ctx: PreLLMPolicyContext): PreLLMInterviewerPolicy {
+  if (ctx.scenarioType === "bugfix")
+    return {
+      rules: [
+        "Debugging: follow reproduce → inspect → hypothesize → patch → verify → prevent. A run before a net edit is baseline reproduction, not proof of a fix.",
+        "Do not gate debugging on a generic Big-O or edge-case checklist. Ask about complexity only when the candidate's change makes it relevant.",
+        "Acknowledge a specific observed investigation action without validating solution correctness. Treat Sparra advice as advice; assess the candidate's own reasoning and verification.",
+      ],
+      requiredAction: ctx.hasSubmitted
+        ? "Debrief using the candidate's evidence and changes."
+        : "Ask one grounded question about the next investigation or verification step; do not reveal the root cause.",
+    }
   const rules: string[] = []
   let requiredAction: string | undefined
 

@@ -1,3 +1,4 @@
+import { createChatMessage } from "@/lib/interview/session-context/conversation"
 import { useRef, useState } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import type { User as FirebaseUser } from "firebase/auth"
@@ -500,12 +501,12 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
       problemType
     )
 
-    opts.setInterviewerMessages([{ type: "ai", message: initialMessage }])
+    opts.setInterviewerMessages([createChatMessage("ai", initialMessage)])
     opts.setRecentNudgeTopics([]) // Reset tracked topics for new interview
     // Only set chat messages for non-DSA scenarios (DSA has no AI partner)
     const partnerMessage = getInitialPartnerMessage(scenario)
     if (partnerMessage) {
-      opts.setChatMessages([{ type: "ai", message: partnerMessage }])
+      opts.setChatMessages([createChatMessage("ai", partnerMessage)])
     } else {
       opts.setChatMessages([]) // Clear chat messages for DSA
     }

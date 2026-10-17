@@ -19,6 +19,7 @@ export type ChatMessage = {
   message: string
   /** A validated interviewer reply that is still being revealed to the candidate. */
   isStreaming?: boolean
+  sequence?: number
   timestamp?: number
   phase?: "post_interview"
 }

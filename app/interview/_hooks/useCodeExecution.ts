@@ -48,6 +48,7 @@ function applyGuidedLabGating(scenarioId: string | undefined, results: TestResul
  * / submit flow stays byte-identical to the previous inline implementation.
  */
 export interface UseCodeExecutionOptions {
+  onTestsCompleted?: () => void
   // ---- live inputs read inside run / submit ----
   selectedScenario: Scenario | null
   code: string
@@ -184,6 +185,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
       }
 
       if (data.results) {
+        opts.onTestsCompleted?.()
         setTestResults(data.results)
         setPackRun(data.kind === "pack" ? data.packRun : null)
         setTestSummary(data.summary)
@@ -336,6 +338,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
       }
 
       if (data.results) {
+        opts.onTestsCompleted?.()
         setTestResults(data.results)
         setPackRun(data.kind === "pack" ? data.packRun : null)
         setTestSummary(data.summary)

@@ -3,6 +3,20 @@ import { createEmptyTracker } from "../interview-phases"
 import { buildPreLLMInterviewerPolicy, formatPreLLMInterviewerPolicy } from "../interviewer-policy"
 
 describe("buildPreLLMInterviewerPolicy", () => {
+  it("uses debugging investigation and verification instead of the DSA complexity gate", () => {
+    const policy = buildPreLLMInterviewerPolicy({
+      scenarioType: "bugfix",
+      phase: "testing",
+      tracker: { ...createEmptyTracker(), approachExplained: true },
+      hasSubmitted: false,
+      testsHaveRun: true,
+      testsPassed: 1,
+      testsTotal: 1,
+    })
+    expect(policy.requiredAction).toContain("investigation or verification")
+    expect(policy.rules.join(" ")).toContain("baseline reproduction")
+    expect(policy.requiredAction).not.toContain("time and space complexity")
+  })
   it("keeps clarification phase away from approach prompts", () => {
     const policy = buildPreLLMInterviewerPolicy({
       phase: "clarification",

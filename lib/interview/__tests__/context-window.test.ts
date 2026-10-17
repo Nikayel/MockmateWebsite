@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, it } from "vitest"
-import { manageContextWindow, MAX_MESSAGE_LENGTH } from "../context-window"
+import { manageContextWindow, manageWorkspaceContext, MAX_MESSAGE_LENGTH } from "../context-window"
 
 /** A conversation longer than every window this module has ever had. */
 function conversation(length: number): Array<{ type: string; message: string }> {
@@ -25,6 +25,19 @@ function conversation(length: number): Array<{ type: string; message: string }> 
 }
 
 describe("manageContextWindow", () => {
+  it("includes every public file, including task docs beyond the former five-file limit", () => {
+    const files = Array.from({ length: 15 }, (_, index) => ({
+      path: index === 14 ? "task.md" : `src/${index}.py`,
+      content: `public ${index}`,
+    }))
+    const result = manageWorkspaceContext([
+      ...files,
+      { path: "sealed.py", content: "answer", hidden: true },
+    ])
+    expect(result).toHaveLength(15)
+    expect(result.at(-1)?.path).toBe("task.md")
+    expect(result.some((file) => file.hidden)).toBe(false)
+  })
   it("keeps every message in a conversation longer than the old 30-message cap", () => {
     const result = manageContextWindow(conversation(43))
 

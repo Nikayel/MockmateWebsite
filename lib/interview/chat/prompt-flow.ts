@@ -10,6 +10,7 @@ import { isHarnessError } from "@/lib/workspace-execution/harness-errors"
 type ChatPromptEarlyResponse = ProactiveSkipResponse | EndedConversationResponse
 
 export interface ChatPromptFlowInput {
+  sessionEvidence?: string
   role?: "interviewer" | "partner"
   message?: string
   context?: Array<{ type: string; message: string }>
@@ -39,6 +40,13 @@ export type ChatPromptFlowResult =
     }
 
 export function buildChatPromptFlow(input: ChatPromptFlowInput): ChatPromptFlowResult {
+  const result = buildPromptFlow(input)
+  if (result.earlyResponse) return result
+  const workspace = input.isProactive || input.isWrapUp ? input.workspaceContextStr : ""
+  return { fullUserMessage: result.fullUserMessage + workspace + (input.sessionEvidence ?? "") }
+}
+
+function buildPromptFlow(input: ChatPromptFlowInput): ChatPromptFlowResult {
   const {
     role,
     message,
@@ -106,11 +114,10 @@ Pick ONE natural response (under 20 words). Don't be pushy - they might be think
     const aiPartnerContext =
       partnerMessagesCount && partnerMessagesCount > 0
         ? `
-AI PARTNER USAGE ALERT:
-- Candidate has used AI Partner ${partnerMessagesCount} times this session
-${lastPartnerExchange ? `- Last AI interaction: "${lastPartnerExchange.slice(0, 200)}..."` : ""}
-${partnerMessagesCount >= 5 ? `- HIGH AI USAGE: Consider asking them to explain their understanding of the AI suggestions` : ""}
-${partnerMessagesCount >= 3 ? `- When they explain code, verify they understand it vs. blindly copied it` : ""}
+AI PARTNER CONTEXT:
+- Candidate has asked Sparra ${partnerMessagesCount} questions; frequency alone is not evidence of misuse.
+${lastPartnerExchange ? `- Supplied partner exchange: ${lastPartnerExchange}` : ""}
+
 `
         : ""
 

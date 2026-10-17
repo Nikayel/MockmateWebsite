@@ -10,6 +10,7 @@
 
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest"
 import type { NextRequest } from "next/server"
+import { buildSessionContext } from "@/lib/interview/session-context/snapshot"
 
 const mocks = vi.hoisted(() => ({
   verifyAuthEdge: vi.fn(),
@@ -122,6 +123,36 @@ describe("/api/feedback/stream cost bounds", () => {
   })
 
   describe("authentication", () => {
+    it("keeps Sparra attribution and sends original/current workspace evidence to grading", async () => {
+      const sessionContext = buildSessionContext({
+        task: { id: "debug", title: "Rollup", type: "bugfix", description: "Reproduce first" },
+        workspace: [
+          { path: "rollup.py", role: "editable", originalContent: "before", content: "after" },
+        ],
+        code: "after",
+        interviewerMessages: [{ type: "user", message: "I tested the boundary", timestamp: 20 }],
+        partnerMessages: [{ type: "ai", message: "Inspect the boundary", timestamp: 10 }],
+      })
+      const { POST } = await import("./route")
+      await drain(
+        await POST(
+          makeRequest({
+            code: "after",
+            sessionContext,
+            conversationTranscript: sessionContext.timeline,
+          })
+        )
+      )
+      expect(mocks.validateConversationEdge.mock.calls[0][0]).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ role: "ai_partner", content: "Inspect the boundary" }),
+        ])
+      )
+      const prompt = mocks.generateFeedbackResponseEdge.mock.calls[0][1]
+      expect(prompt).toContain('"originalContent":"before"')
+      expect(prompt).toContain('"content":"after"')
+      expect(prompt).toContain("AI_PARTNER to=partner")
+    })
     it("refuses an unauthenticated caller before any AI call", async () => {
       mocks.verifyAuthEdge.mockResolvedValue({ authenticated: false })
       const { POST } = await import("./route")
@@ -136,8 +167,9 @@ describe("/api/feedback/stream cost bounds", () => {
   describe("stream heartbeat", () => {
     it("keeps the SSE connection active while feedback generation is idle", async () => {
       vi.useFakeTimers()
-      let resolveFeedback: ((value: { text: string; provider: string; latencyMs: number }) => void) |
-        undefined
+      let resolveFeedback:
+        | ((value: { text: string; provider: string; latencyMs: number }) => void)
+        | undefined
       mocks.generateFeedbackResponseEdge.mockReturnValue(
         new Promise((resolve) => {
           resolveFeedback = resolve
