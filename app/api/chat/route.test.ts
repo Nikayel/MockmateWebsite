@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { NextRequest } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { buildSessionContext } from "@/lib/interview/session-context/snapshot"
 import { createEmptyTracker } from "@/lib/interview/interview-phases"
 import { createHash } from "node:crypto"
@@ -332,6 +332,49 @@ describe("/api/chat route", () => {
       })
     )
     expect(enforceChatRateLimit).toHaveBeenCalledWith("user-1", "free")
+  })
+
+  it("rejects unauthenticated requests before reading the body or doing chat work", async () => {
+    const { generateAIResponse, buildRAGContext } = await setupMocks()
+    const { enforceQuota } = await import("@/lib/quota-enforcement")
+    vi.mocked(enforceQuota).mockResolvedValueOnce({
+      allowed: false,
+      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    })
+    const request = createRequest({ role: "interviewer", message: "Hello" })
+    request.json = vi.fn(request.json)
+    const { POST } = await import("./route")
+    expect((await POST(request)).status).toBe(401)
+    expect(request.json).not.toHaveBeenCalled()
+    expect(buildRAGContext).not.toHaveBeenCalled()
+    expect(generateAIResponse).not.toHaveBeenCalled()
+  })
+
+  it("rejects oversized session payloads before model calls", async () => {
+    const { generateAIResponse } = await setupMocks()
+    const { POST } = await import("./route")
+    const response = await POST(createRequest({ message: "Hello", extra: "x".repeat(1_000_001) }))
+    expect(response.status).toBe(413)
+    expect(generateAIResponse).not.toHaveBeenCalled()
+  })
+
+  it("does not start background extraction after the request is aborted", async () => {
+    await setupMocks()
+    const { shouldRunExtraction, extractConversationState } =
+      await import("@/lib/interview/conversation-extraction")
+    vi.mocked(shouldRunExtraction).mockReturnValue(true)
+    const request = createRequest({
+      role: "interviewer",
+      message: "My approach",
+      context: [{ type: "user", message: "Thinking" }],
+      conversationTracker: createEmptyTracker(),
+    })
+    const controller = new AbortController()
+    controller.abort()
+    Object.defineProperty(request, "signal", { value: controller.signal })
+    const { POST } = await import("./route")
+    expect((await POST(request)).status).toBe(200)
+    expect(extractConversationState).not.toHaveBeenCalled()
   })
 
   it("returns the validated retry while preserving identity, cancellation, and cache bypass", async () => {

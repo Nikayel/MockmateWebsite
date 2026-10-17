@@ -6,7 +6,7 @@ import type {
   UserContext,
 } from "@/lib/interview/chat-request-schema"
 
-type ChatRequestData = z.infer<typeof chatRequestSchema>
+export type ChatRequestData = z.infer<typeof chatRequestSchema>
 
 export interface ChatSolutionComplexity {
   estimated?: string
