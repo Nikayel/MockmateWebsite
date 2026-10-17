@@ -1,0 +1,205 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`/api/chat route > preserves model input for 'bugfix'/'interviewer'/session=false 1`] = `
+{
+  "history": "33047ddd8784191ca1b201f4fe3e49f0bc1959e4c089faf837a5737d068cc843",
+  "options": {
+    "abortSignal": undefined,
+    "complexity": "dialogue",
+    "eventType": "chat_message",
+    "preferredProvider": "openai-none",
+    "service": "interview-chat",
+    "sessionId": undefined,
+    "userId": "user-1",
+  },
+  "system": "05d518dea84d6c9b4edada85ef524e3c16af7d53485403de846c3cb6e78d3321",
+  "turn": "3bff5e4e72a6558f818e9714d41426f189f0431683f66226a1088ca7e383bfbc",
+}
+`;
+
+exports[`/api/chat route > preserves model input for 'bugfix'/'interviewer'/session=true 1`] = `
+{
+  "history": "43c63350a81884588aabedc5b45b96e73f334d40f028ef0b3cd1daad91233ede",
+  "options": {
+    "abortSignal": undefined,
+    "complexity": "dialogue",
+    "eventType": "chat_message",
+    "preferredProvider": "openai-none",
+    "service": "interview-chat",
+    "sessionId": undefined,
+    "userId": "user-1",
+  },
+  "system": "f99171d292181f01e68433b6fc85e1040cdc72ef1675bf5fd9b982d8ab23e157",
+  "turn": "ba44095cb7340acc9220d93fd8828d6c53f4360b53cf7604e48dbc6c39f31880",
+}
+`;
+
+exports[`/api/chat route > preserves model input for 'bugfix'/'partner'/session=false 1`] = `
+{
+  "history": "33047ddd8784191ca1b201f4fe3e49f0bc1959e4c089faf837a5737d068cc843",
+  "options": {
+    "abortSignal": undefined,
+    "complexity": "code",
+    "eventType": "chat_message",
+    "preferredProvider": "openai-none",
+    "service": "interview-chat",
+    "sessionId": undefined,
+    "userId": "user-1",
+  },
+  "system": "148954ed512351e59ce0d7ff7881c0596dd4f674d28d2ec878efe5cd1c4edb84",
+  "turn": "3bff5e4e72a6558f818e9714d41426f189f0431683f66226a1088ca7e383bfbc",
+}
+`;
+
+exports[`/api/chat route > preserves model input for 'bugfix'/'partner'/session=true 1`] = `
+{
+  "history": "43c63350a81884588aabedc5b45b96e73f334d40f028ef0b3cd1daad91233ede",
+  "options": {
+    "abortSignal": undefined,
+    "complexity": "code",
+    "eventType": "chat_message",
+    "preferredProvider": "openai-none",
+    "service": "interview-chat",
+    "sessionId": undefined,
+    "userId": "user-1",
+  },
+  "system": "3ea373dcfaf94ee7b0d05d9ddd1f4597e9c554483565b2a7c66d33a05e571b1f",
+  "turn": "124a76fdaead091583864b9102ccfc1c773088343c83baa189c4b6d07bf33a97",
+}
+`;
+
+exports[`/api/chat route > preserves model input for 'dsa'/'interviewer'/session=false 1`] = `
+{
+  "history": "33047ddd8784191ca1b201f4fe3e49f0bc1959e4c089faf837a5737d068cc843",
+  "options": {
+    "abortSignal": undefined,
+    "complexity": "dialogue",
+    "eventType": "chat_message",
+    "preferredProvider": "openai-none",
+    "service": "interview-chat",
+    "sessionId": undefined,
+    "userId": "user-1",
+  },
+  "system": "6a236137529897cfafc8d96609d2dca499709034a37ed50912a540ee4b2d5f56",
+  "turn": "3bff5e4e72a6558f818e9714d41426f189f0431683f66226a1088ca7e383bfbc",
+}
+`;
+
+exports[`/api/chat route > preserves model input for 'dsa'/'interviewer'/session=true 1`] = `
+{
+  "history": "43c63350a81884588aabedc5b45b96e73f334d40f028ef0b3cd1daad91233ede",
+  "options": {
+    "abortSignal": undefined,
+    "complexity": "dialogue",
+    "eventType": "chat_message",
+    "preferredProvider": "openai-none",
+    "service": "interview-chat",
+    "sessionId": undefined,
+    "userId": "user-1",
+  },
+  "system": "57d17e189efcffe1f0891cdc72b9d6b6a49f043e85017d99a0d8889b112b7500",
+  "turn": "b3b79dd9efd0a57d11cf3ebe88ee810ead5a87425e130fd42e80a26486081263",
+}
+`;
+
+exports[`/api/chat route > preserves model input for 'dsa'/'partner'/session=false 1`] = `
+{
+  "history": "33047ddd8784191ca1b201f4fe3e49f0bc1959e4c089faf837a5737d068cc843",
+  "options": {
+    "abortSignal": undefined,
+    "complexity": "code",
+    "eventType": "chat_message",
+    "preferredProvider": "openai-none",
+    "service": "interview-chat",
+    "sessionId": undefined,
+    "userId": "user-1",
+  },
+  "system": "8c7785dfa468b3d1a12f8c33d5f0a416e79f30fda3ebd56d5b39edb84d976206",
+  "turn": "3bff5e4e72a6558f818e9714d41426f189f0431683f66226a1088ca7e383bfbc",
+}
+`;
+
+exports[`/api/chat route > preserves model input for 'dsa'/'partner'/session=true 1`] = `
+{
+  "history": "43c63350a81884588aabedc5b45b96e73f334d40f028ef0b3cd1daad91233ede",
+  "options": {
+    "abortSignal": undefined,
+    "complexity": "code",
+    "eventType": "chat_message",
+    "preferredProvider": "openai-none",
+    "service": "interview-chat",
+    "sessionId": undefined,
+    "userId": "user-1",
+  },
+  "system": "e10ae9f2c154b8621595fbf680fb8a48295cc1f3436a65decf0c36798a025423",
+  "turn": "535247fead2b4624a77722332e5abc6c78fc60810633ec993014bf080d78e1ae",
+}
+`;
+
+exports[`/api/chat route > preserves model input for 'system-design'/'interviewer'/session=false 1`] = `
+{
+  "history": "33047ddd8784191ca1b201f4fe3e49f0bc1959e4c089faf837a5737d068cc843",
+  "options": {
+    "abortSignal": undefined,
+    "complexity": "dialogue",
+    "eventType": "chat_message",
+    "preferredProvider": "openai-none",
+    "service": "interview-chat",
+    "sessionId": undefined,
+    "userId": "user-1",
+  },
+  "system": "eec8246d9e0e291a6ed51767f85bea0a50e23d9d728642d226761cb25aabebca",
+  "turn": "3bff5e4e72a6558f818e9714d41426f189f0431683f66226a1088ca7e383bfbc",
+}
+`;
+
+exports[`/api/chat route > preserves model input for 'system-design'/'interviewer'/session=true 1`] = `
+{
+  "history": "43c63350a81884588aabedc5b45b96e73f334d40f028ef0b3cd1daad91233ede",
+  "options": {
+    "abortSignal": undefined,
+    "complexity": "dialogue",
+    "eventType": "chat_message",
+    "preferredProvider": "openai-none",
+    "service": "interview-chat",
+    "sessionId": undefined,
+    "userId": "user-1",
+  },
+  "system": "541537f5d6a89d7a02554ec23eb8fed9467806a913747814a710b2b95d999b31",
+  "turn": "1635d482ad6d65a2141cc9f0eb391d3aa331fac03a59855797a4be684ae019c2",
+}
+`;
+
+exports[`/api/chat route > preserves model input for 'system-design'/'partner'/session=false 1`] = `
+{
+  "history": "33047ddd8784191ca1b201f4fe3e49f0bc1959e4c089faf837a5737d068cc843",
+  "options": {
+    "abortSignal": undefined,
+    "complexity": "code",
+    "eventType": "chat_message",
+    "preferredProvider": "openai-none",
+    "service": "interview-chat",
+    "sessionId": undefined,
+    "userId": "user-1",
+  },
+  "system": "7ba60e98977b7446ad2b8e7b6302c434b67226a4f8e8ff051ffa93f4b2ea4ef6",
+  "turn": "3bff5e4e72a6558f818e9714d41426f189f0431683f66226a1088ca7e383bfbc",
+}
+`;
+
+exports[`/api/chat route > preserves model input for 'system-design'/'partner'/session=true 1`] = `
+{
+  "history": "43c63350a81884588aabedc5b45b96e73f334d40f028ef0b3cd1daad91233ede",
+  "options": {
+    "abortSignal": undefined,
+    "complexity": "code",
+    "eventType": "chat_message",
+    "preferredProvider": "openai-none",
+    "service": "interview-chat",
+    "sessionId": undefined,
+    "userId": "user-1",
+  },
+  "system": "9e96e2cc1d43fd3bccb82c64e0fa1423e392bc189cfc9e8b72fd02472fffc8c4",
+  "turn": "124a76fdaead091583864b9102ccfc1c773088343c83baa189c4b6d07bf33a97",
+}
+`;
