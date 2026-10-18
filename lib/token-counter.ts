@@ -80,8 +80,8 @@ export const MODEL_FAMILIES = {
   "gemini-3.5-flash-lite": "cl100k_base",
   "gemini-3.6-flash": "cl100k_base",
 
-  // DeepSeek - cl100k_base approximation. The v4-* ids are the live pins; the
-  // bare names are retired models kept so historical rows still resolve.
+  // DeepSeek - cl100k_base approximation. Keep older ids for historical rows.
+  "deepseek-flash": "cl100k_base",
   "deepseek-v4-flash": "cl100k_base",
   "deepseek-v4-pro": "cl100k_base",
   deepseek: "cl100k_base",
@@ -293,7 +293,8 @@ export const MODEL_CONTEXT_LIMITS = {
   "gpt-5.6-luna": 1050000,
   "gpt-5.6-terra": 1050000,
   "gpt-5.6-sol": 1050000,
-  "deepseek-v4-flash": 1000000, // V4 raised both tiers from 128K to 1M
+  "deepseek-flash": 1000000,
+  "deepseek-v4-flash": 1000000, // Compatibility alias for V4.1 Flash
   "deepseek-v4-pro": 1000000,
   deepseek: 128000, // retired V3 ids, kept for historical rows
   "deepseek-chat": 128000,

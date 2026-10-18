@@ -137,7 +137,7 @@ describe("provider routing", () => {
     // same retired model, so this distinction was decorative.
     const status = getProviderStatus()
     expect(status["deepseek"].model).toBe("deepseek-v4-pro")
-    expect(status["deepseek-chat"].model).toBe("deepseek-v4-flash")
+    expect(status["deepseek-chat"].model).toBe("deepseek-flash")
   })
 
   it("orders every capability OpenAI -> DeepSeek -> Gemini", () => {

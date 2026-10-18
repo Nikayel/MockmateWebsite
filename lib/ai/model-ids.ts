@@ -58,12 +58,18 @@ export type OpenAIReasoningEffort = (typeof OPENAI_REASONING_EFFORTS)[number]
  * DeepSeek pins — the second vendor in the chain.
  *
  * V4 replaced V3 on 2026-04-24 and the legacy `deepseek-chat` / `deepseek-reasoner`
- * names were RETIRED on 2026-07-24, which silently killed this fallback. Both
- * tiers carry a 1M context window and a cache-hit input rate at ~1/50th of the
+ * names were RETIRED on 2026-07-24, which silently killed this fallback.
+ * `deepseek-flash` serves V4.1-Flash-1017 (2026-10-17); `deepseek-v4-flash`
+ * is only a temporary compatibility alias. DeepSeek's direct API exposes the
+ * latest Flash release through this rolling name, not a dated checkpoint id.
+ * Pro remains V4-Pro-0813 for scoring. Verify future changes against:
+ * https://api-docs.deepseek.com/updates/
+ * https://api-docs.deepseek.com/quick_start/pricing/
+ * Both tiers carry a 1M context window and a cache-hit input rate well below the
  * miss rate, which matters here because the interview system prompt is stable
  * across a session's turns.
  */
 export const DEEPSEEK_MODELS = {
-  flash: process.env.DEEPSEEK_MODEL_FLASH || "deepseek-v4-flash",
+  flash: process.env.DEEPSEEK_MODEL_FLASH || "deepseek-flash",
   pro: process.env.DEEPSEEK_MODEL_PRO || "deepseek-v4-pro",
 } as const

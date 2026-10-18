@@ -226,7 +226,7 @@ const PROVIDERS: Record<AIProvider, ProviderConfig> = {
     enabled: !!process.env.DEEPSEEK_API_KEY,
     apiKey: process.env.DEEPSEEK_API_KEY,
     baseUrl: "https://api.deepseek.com/v1",
-    model: DEEPSEEK_MODELS.flash, // V4.1 Flash alias - time/cache-priced in lib/pricing.ts
+    model: DEEPSEEK_MODELS.flash, // V4.1 Flash current API name - time/cache-priced in lib/pricing.ts
     maxTokens: 1024,
     temperature: 0.7,
   },

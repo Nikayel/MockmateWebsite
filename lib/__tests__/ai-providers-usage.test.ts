@@ -183,6 +183,14 @@ describe("generateAIResponse provider-reported token usage", () => {
 
     expect(result.provider).toBe("deepseek-chat")
     expect(result.text).toBe("deepseek reply")
+    const [, init] = vi.mocked(fetch).mock.calls[0]
+    expect(JSON.parse(init?.body as string)).toMatchObject({
+      model: "deepseek-flash",
+      messages: [
+        { role: "system", content: "system prompt" },
+        { role: "user", content: "user message" },
+      ],
+    })
     expect(result.tokensIn).toBe(300)
     expect(result.tokensOut).toBe(80)
     expect(mocks.calculateCost).toHaveBeenCalledWith(
