@@ -1,10 +1,11 @@
 "use client"
 
-import { memo, useState, useRef, useEffect, type ReactNode } from "react"
+import { memo, useMemo, useState, useRef, useEffect, type ReactNode } from "react"
 import { Check, X, ChevronDown, Building2, Code2, SlidersHorizontal } from "lucide-react"
 import {
   SCENARIO_LANGUAGE_LABELS,
   scenarios,
+  type Scenario,
   type ScenarioType,
   type DifficultyLevel,
   type Company,
@@ -46,6 +47,8 @@ interface ScenarioFiltersProps {
 
   /** Restrict which type pills are shown (per tab). Empty array hides the row. */
   availableTypes?: ScenarioType[]
+  /** Unfiltered catalog for this view, used for scoped counts. */
+  catalogScenarios?: Scenario[]
 }
 
 const DIFFICULTIES = [
@@ -90,12 +93,6 @@ const COMPANIES = [
   ...ALL_COMPANIES.filter((c) => !PRIORITY_COMPANIES.includes(c)),
 ] as Company[]
 
-// Number of scenarios per company, for the company dropdown counts.
-const COMPANY_COUNTS = scenarios.reduce<Record<string, number>>((acc, s) => {
-  for (const company of s.companies) acc[company] = (acc[company] ?? 0) + 1
-  return acc
-}, {})
-
 export const ScenarioFilters = memo(function ScenarioFilters({
   viewControl,
   searchQuery,
@@ -113,6 +110,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
   onRemoveCompany,
   onClearCompanies,
   availableTypes,
+  catalogScenarios = scenarios,
   availableLanguages = [],
   filterLanguages,
   onToggleLanguage,
@@ -135,9 +133,18 @@ export const ScenarioFilters = memo(function ScenarioFilters({
     ? EXERCISE_TYPES.filter((t) => availableTypes.includes(t.id as ScenarioType))
     : EXERCISE_TYPES
 
-  const visibleCompanies = companyQuery
-    ? COMPANIES.filter((c) => c.toLowerCase().includes(companyQuery.toLowerCase()))
-    : COMPANIES
+  const companyCounts = useMemo(
+    () =>
+      catalogScenarios.reduce<Record<string, number>>((counts, scenario) => {
+        for (const company of scenario.companies) counts[company] = (counts[company] ?? 0) + 1
+        return counts
+      }, {}),
+    [catalogScenarios]
+  )
+  const visibleCompanies = COMPANIES.filter(
+    (company) =>
+      companyCounts[company] && company.toLowerCase().includes(companyQuery.toLowerCase())
+  )
 
   const closeCompanyDropdown = (returnFocus = true) => {
     setShowCompanyDropdown(false)
@@ -195,7 +202,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
           <div role="group" aria-label="Problem type" className="flex flex-wrap gap-2">
             {visibleTypes.map((type) => {
               const isActive = filterType.includes(type.id as ScenarioType)
-              const count = scenarios.filter((scenario) => scenario.type === type.id).length
+              const count = catalogScenarios.filter((scenario) => scenario.type === type.id).length
               return (
                 <button
                   key={type.id}
@@ -365,7 +372,7 @@ export const ScenarioFilters = memo(function ScenarioFilters({
                           </span>
                           <span className="flex items-center gap-2">
                             <span className="text-muted-foreground text-xs">
-                              {COMPANY_COUNTS[company] ?? 0}
+                              {companyCounts[company] ?? 0}
                             </span>
                             {isActive && (
                               <Check className="text-foreground h-3.5 w-3.5" aria-hidden="true" />

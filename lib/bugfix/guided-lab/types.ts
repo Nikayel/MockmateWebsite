@@ -8,7 +8,7 @@
  *
  * Milestones unlock in order. A code-fix milestone is "done" once a set of test
  * SUITES (matched by the workspace runner's `suite` label) all pass — that is how
- * a second bug stays hidden until the first one is actually fixed and verified.
+ * a later repair stays closed until the current phase is fixed and verified.
  */
 
 /** A single teaching/instruction unit inside a milestone. */
@@ -70,15 +70,17 @@ export interface GuidedLabMilestone {
 }
 
 export interface GuidedLabConfig {
-  version: "bookclub-guided-v1"
+  version: "bookclub-guided-v1" | "bookclub-guided-v2"
+  /** Re-run this final gate after restoring progress or editing source. */
+  verificationMilestoneId?: string
   milestones: GuidedLabMilestone[]
 }
 
 export type GuidedLabMilestoneStatus = "locked" | "active" | "done"
 
-/** Per-run progress, persisted on `InterviewSession.session_state`. */
+/** Per-run progress, currently persisted locally per scenario. */
 export interface GuidedLabProgress {
-  version: "bookclub-guided-v1"
+  version: GuidedLabConfig["version"]
   currentMilestoneId: string
   milestoneStatus: Record<string, GuidedLabMilestoneStatus>
   activeBugId?: string

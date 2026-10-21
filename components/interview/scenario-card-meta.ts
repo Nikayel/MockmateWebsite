@@ -56,6 +56,13 @@ export function getScenarioCardContext(scenario: Scenario): ScenarioCardContext 
     case "bugfix": {
       // bugDescription is deliberately excluded: it states the root cause and
       // must never render on a candidate-visible surface before the debrief.
+      if (scenario.guidedLab) {
+        return {
+          typeLabel: "Guided lab",
+          contextLine: scenario.description,
+          signal: `${scenario.guidedLab.milestones.length} phases · Easy to hard`,
+        }
+      }
       const contextLine = firstNonEmpty(
         scenario.observedSymptoms?.[0],
         scenario.userReport,

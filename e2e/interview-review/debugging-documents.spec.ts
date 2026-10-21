@@ -11,7 +11,11 @@ test("debugging release reveals the question and remembers dismissal", async ({
       await page.goto(`/?view=picker&track=debugging&theme=${theme}`)
       const banner = page.getByRole("complementary", { name: "New Python debugging question" })
       await expect(banner).toBeVisible()
-      await expect(page.getByText("Beta", { exact: true })).toBeVisible()
+      await expect(
+        page
+          .getByRole("region", { name: "Debugging problem browser" })
+          .getByText("Beta", { exact: true })
+      ).toBeVisible()
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true
       )
@@ -39,9 +43,17 @@ test("debugging release reveals the question and remembers dismissal", async ({
   await expect(
     page.getByRole("complementary", { name: "New Python debugging question" })
   ).toBeHidden()
-  await expect(page.getByText("Beta", { exact: true })).toBeVisible()
+  await expect(
+    page
+      .getByRole("region", { name: "Debugging problem browser" })
+      .getByText("Beta", { exact: true })
+  ).toBeVisible()
   await page.goto("/?view=picker&track=dsa&theme=light")
-  await expect(page.getByText("Beta", { exact: true })).toBeHidden()
+  await expect(
+    page
+      .getByRole("region", { name: "Debugging problem browser" })
+      .getByText("Beta", { exact: true })
+  ).toBeHidden()
   await expect(
     page.getByRole("complementary", { name: "New Python debugging question" })
   ).toBeHidden()

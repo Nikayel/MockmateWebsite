@@ -136,12 +136,21 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
               <div className="h-full space-y-5 overflow-y-auto px-4 pb-4">
                 {guidedLab && selectedScenario && (
                   <div className="border-border/60 bg-muted/20 rounded-lg border p-3">
+                    {taskFile && (
+                      <button
+                        type="button"
+                        className="text-accent-strong focus-visible:ring-ring mb-2 min-h-11 underline underline-offset-4 focus-visible:ring-2"
+                        onClick={() => onWorkspaceFileSelect(taskFile, { readable: true })}
+                      >
+                        Open task.md for the full incident and product contract
+                      </button>
+                    )}
                     <GuidedLabRail config={guidedLab} scenarioId={selectedScenario.id} />
                   </div>
                 )}
                 {selectedScenario && (
                   <>
-                    {isDebuggingTask && taskFile ? (
+                    {guidedLab ? null : isDebuggingTask && taskFile ? (
                       <WorkspaceTaskBrief
                         summary={selectedScenario.task ?? selectedScenario.description}
                         onOpenTask={() => onWorkspaceFileSelect(taskFile, { readable: true })}

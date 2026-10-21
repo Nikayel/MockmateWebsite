@@ -9,7 +9,25 @@
  * into InterviewSession.session_state.guided_lab_progress for cross-device resume.
  */
 
+import { z } from "zod"
 import type { GuidedLabProgress } from "./types"
+
+const progressSchema = z.object({
+  version: z.enum(["bookclub-guided-v1", "bookclub-guided-v2"]),
+  currentMilestoneId: z.string(),
+  milestoneStatus: z.record(z.enum(["locked", "active", "done"])),
+  activeBugId: z.string().optional(),
+  quizAnswers: z.array(
+    z.object({ quizId: z.string(), selectedIndex: z.number().int().nonnegative() })
+  ),
+  checkpointAcks: z.array(z.string()),
+  updatedAt: z.string(),
+})
+
+export function parseGuidedLabProgress(value: unknown): GuidedLabProgress | null {
+  const parsed = progressSchema.safeParse(value)
+  return parsed.success ? parsed.data : null
+}
 
 const keyFor = (scenarioId: string) => `codesparring:guided-lab:${scenarioId}`
 
@@ -18,11 +36,7 @@ export function loadGuidedLabProgress(scenarioId: string): GuidedLabProgress | n
   try {
     const raw = window.localStorage.getItem(keyFor(scenarioId))
     if (!raw) return null
-    const parsed = JSON.parse(raw) as GuidedLabProgress
-    if (parsed && typeof parsed === "object" && typeof parsed.version === "string") {
-      return parsed
-    }
-    return null
+    return parseGuidedLabProgress(JSON.parse(raw))
   } catch {
     return null
   }

@@ -117,3 +117,16 @@ export function trackProgress(
     completed: owned.filter((scenario) => completed.has(scenario.id)).length,
   }
 }
+
+/** Partition guided labs from independent rounds without duplicating the registry. */
+export function scenariosInTrackView(
+  track: InterviewTrack,
+  candidates: Scenario[],
+  guidedLabs: boolean
+): Scenario[] {
+  return scenariosInTrack(track, candidates).filter(
+    (scenario) =>
+      track.id !== "debugging" ||
+      Boolean(scenario.type === "bugfix" && scenario.guidedLab) === guidedLabs
+  )
+}

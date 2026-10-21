@@ -260,3 +260,18 @@ describe("trackProgress", () => {
     expect(trackProgress(dsa, scenarios, [dsaId, dsaId, dsaId]).completed).toBe(1)
   })
 })
+
+import { scenariosInTrackView } from "../interview-track-browsing"
+
+it("partitions guided labs and rounds with scoped counts", () => {
+  const labs = scenariosInTrackView(debugging, scenarios, true)
+  const rounds = scenariosInTrackView(debugging, scenarios, false)
+  expect(labs.map((scenario) => scenario.id)).toContain("bugfix-bookclub-reading-streak-workspace")
+  expect(rounds.map((scenario) => scenario.id)).not.toContain(
+    "bugfix-bookclub-reading-streak-workspace"
+  )
+  expect(labs.length + rounds.length).toBe(scenariosInTrack(debugging, scenarios).length)
+  expect(
+    trackProgress(debugging, labs, ["bugfix-bookclub-reading-streak-workspace"])
+  ).toMatchObject({ total: labs.length, completed: 1 })
+})
