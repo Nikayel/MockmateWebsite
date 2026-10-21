@@ -3,87 +3,82 @@ import { bugfixBookclubReadingStreakWorkspaceScenario as scenario } from "@/lib/
 import { isGuidedLabComplete, revealedTestSuites } from "@/lib/bugfix/guided-lab/gating"
 import { getGuidedChatState, useGuidedLabStore } from "./guided-lab-store"
 
-// End-to-end wiring check: drives the REAL BookClub guided-lab config through the
-// REAL store + reveal + chat-state + gating, exactly as the UI does. This is the
-// automated stand-in for a manual click-through (the live UI also needs an
-// auth'd Run Tests call, which this bypasses by feeding suite results directly).
+const config = scenario.guidedLab!
+const suites = config.milestones.at(-1)!.gate
+if (suites.kind !== "tests-pass") throw new Error("Missing release gate")
+const ALL_FIXED = suites.testSuites.map((suite) => ({ suite, passed: true }))
+const store = () => useGuidedLabStore.getState()
+const progress = () => store().progress!
+function investigate() {
+  store().initGuidedLab(scenario.id, config)
+  store().ackCheckpoint("investigation#0")
+  store().ackCheckpoint("investigation#1")
+  store().ackMilestone("m1-investigate")
+}
+function complete() {
+  investigate()
+  for (let n = 0; n < 5; n++) store().applyTestResults(ALL_FIXED)
+}
 
-const config = scenario.guidedLab
-const SID = scenario.id
-
-const STREAK_FIXED = [
-  { suite: "visible streak", passed: true },
-  { suite: "hidden streak", passed: true },
-  { suite: "visible history order", passed: false },
-  { suite: "hidden history", passed: false },
-]
-const ALL_FIXED = [
-  { suite: "visible streak", passed: true },
-  { suite: "hidden streak", passed: true },
-  { suite: "visible history order", passed: true },
-  { suite: "hidden history", passed: true },
-]
-
-describe("BookClub guided lab — store wiring end to end", () => {
-  beforeEach(() => useGuidedLabStore.getState().clear())
-
-  it("ships a guided lab config", () => {
-    expect(config).toBeTruthy()
-    expect(config?.milestones.map((m) => m.id)).toEqual([
-      "m1-read",
-      "m2-reproduce",
-      "m3-streak",
-      "m4-history",
-    ])
+describe("BookClub guided lab store", () => {
+  beforeEach(() => store().clear())
+  it("requires investigation checkpoints before moving on", () => {
+    store().initGuidedLab(scenario.id, config)
+    store().ackMilestone("m1-investigate")
+    expect(progress().currentMilestoneId).toBe("m1-investigate")
+    expect(revealedTestSuites(config, progress())).toEqual(["visible baseline"])
+    expect(getGuidedChatState(scenario.id)?.aiRestraint).toBe(false)
   })
-
-  it("starts on M1 with nothing revealed and no AI restraint", () => {
-    if (!config) throw new Error("guidedLab missing")
-    useGuidedLabStore.getState().initGuidedLab(SID, config)
-    const p = useGuidedLabStore.getState().progress!
-    expect(p.milestoneStatus["m1-read"]).toBe("active")
-    expect(p.milestoneStatus["m4-history"]).toBe("locked")
-    expect(revealedTestSuites(config, p)).toEqual([])
-    expect(getGuidedChatState(SID)?.milestoneId).toBe("m1-read")
-    expect(getGuidedChatState(SID)?.aiRestraint).toBe(false)
+  it("advances one phase per run and needs a separate final release run", () => {
+    investigate()
+    expect(getGuidedChatState(scenario.id)?.aiRestraint).toBe(true)
+    for (const next of ["m3-history", "m4-calendar", "m5-cache", "m6-release"]) {
+      store().applyTestResults(ALL_FIXED)
+      expect(progress().currentMilestoneId).toBe(next)
+      expect(isGuidedLabComplete(config, progress())).toBe(false)
+    }
+    store().applyTestResults(ALL_FIXED)
+    expect(isGuidedLabComplete(config, progress())).toBe(true)
   })
-
-  it("keeps Bug 2 + its test suite hidden until Bug 1 passes, then reveals them", () => {
-    if (!config) throw new Error("guidedLab missing")
-    const store = useGuidedLabStore.getState()
-    store.initGuidedLab(SID, config)
-    store.ackMilestone("m1-read")
-    store.ackMilestone("m2-reproduce")
-
-    let p = useGuidedLabStore.getState().progress!
-    expect(p.milestoneStatus["m3-streak"]).toBe("active")
-    expect(p.milestoneStatus["m4-history"]).toBe("locked")
-    // On the streak step the AI must withhold (find-it-yourself) and the history
-    // suite must NOT be visible yet.
-    expect(getGuidedChatState(SID)?.activeBugId).toBe("bug-1-streak")
-    expect(getGuidedChatState(SID)?.aiRestraint).toBe(true)
-    expect(revealedTestSuites(config, p)).not.toContain("visible history order")
-
-    // Fix Bug 1: streak suites green, history still red → M4 unlocks, Bug 2 revealed.
-    useGuidedLabStore.getState().applyTestResults(STREAK_FIXED)
-    p = useGuidedLabStore.getState().progress!
-    expect(p.milestoneStatus["m3-streak"]).toBe("done")
-    expect(p.milestoneStatus["m4-history"]).toBe("active")
-    expect(getGuidedChatState(SID)?.activeBugId).toBe("bug-2-history")
-    expect(revealedTestSuites(config, p)).toContain("visible history order")
-    expect(isGuidedLabComplete(config, p)).toBe(false)
-
-    // Fix Bug 2: everything green → lab complete (Submit unlocks).
-    useGuidedLabStore.getState().applyTestResults(ALL_FIXED)
-    p = useGuidedLabStore.getState().progress!
-    expect(p.milestoneStatus["m4-history"]).toBe("done")
-    expect(isGuidedLabComplete(config, p)).toBe(true)
+  it("does not complete later phases just because their suites happen to pass", () => {
+    investigate()
+    store().applyTestResults(ALL_FIXED.filter((r) => !r.suite.includes("streak")))
+    expect(progress().milestoneStatus["m5-cache"]).toBe("locked")
+    expect(revealedTestSuites(config, progress())).not.toContain("visible cache")
   })
-
-  it("ignores test runs from a different scenario id", () => {
-    if (!config) throw new Error("guidedLab missing")
-    useGuidedLabStore.getState().initGuidedLab(SID, config)
-    // A guided lab for another scenario must not read this one's state.
-    expect(getGuidedChatState("some-other-scenario")).toBeUndefined()
+  it("reopens the earliest regressed repair and locks following phases", () => {
+    complete()
+    store().applyTestResults(ALL_FIXED.map((r) => ({ ...r, passed: r.suite !== "hidden history" })))
+    expect(progress().milestoneStatus["m2-streak"]).toBe("done")
+    expect(progress().milestoneStatus["m3-history"]).toBe("active")
+    expect(progress().milestoneStatus["m6-release"]).toBe("locked")
   })
+  it("requires fresh final verification after edits and resume", () => {
+    complete()
+    const saved = progress()
+    store().invalidateVerification("other-scenario")
+    expect(isGuidedLabComplete(config, progress())).toBe(true)
+    store().invalidateVerification(scenario.id)
+    expect(progress().milestoneStatus["m6-release"]).toBe("active")
+    store().initGuidedLab(scenario.id, config, saved)
+    expect(progress().milestoneStatus["m6-release"]).toBe("active")
+  })
+  it("resets incompatible old progress and malformed local state", () => {
+    investigate()
+    store().initGuidedLab(scenario.id, config, { ...progress(), version: "bookclub-guided-v1" })
+    expect(progress().currentMilestoneId).toBe("m1-investigate")
+    expect(getGuidedChatState("other-scenario")).toBeUndefined()
+  })
+})
+
+it("ignores a green run if source changed while it was executing", () => {
+  useGuidedLabStore.getState().clear()
+  complete()
+  store().invalidateVerification(scenario.id)
+  const revision = store().sourceRevision
+  store().invalidateVerification(scenario.id)
+  store().applyTestResults(ALL_FIXED, revision)
+  expect(isGuidedLabComplete(config, progress())).toBe(false)
+  store().applyTestResults(ALL_FIXED, store().sourceRevision)
+  expect(isGuidedLabComplete(config, progress())).toBe(true)
 })

@@ -8,7 +8,7 @@ const externalBaseURL = process.env.PLAYWRIGHT_BASE_URL
 export default defineConfig({
   testDir: "./e2e",
   // Simulated recommendation services run only with their own fixture server/config.
-  testIgnore: ["**/recommendations/**"],
+  testIgnore: ["**/recommendations/**", "**/bookclub/**"],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

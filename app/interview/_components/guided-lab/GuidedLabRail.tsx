@@ -1,17 +1,14 @@
 "use client"
 
-import { useEffect } from "react"
-import { ArrowRight, CheckCircle2, Lock, Trophy } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { ArrowRight, Trophy } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
-import type {
-  GuidedLabBlock,
-  GuidedLabConfig,
-  GuidedLabProgress,
-} from "@/lib/bugfix/guided-lab/types"
+import type { GuidedLabConfig, GuidedLabProgress } from "@/lib/bugfix/guided-lab/types"
+import { isMilestoneReady } from "@/lib/bugfix/guided-lab/gating"
 import { useGuidedLabStore } from "@/lib/stores/guided-lab-store"
 import { loadGuidedLabProgress, saveGuidedLabProgress } from "@/lib/bugfix/guided-lab/persistence"
 import { GuidedCheckpoint, GuidedInstruction, GuidedQuiz, KnowledgeCard } from "./GuidedLabBlocks"
+import { GuidedLabSteps } from "./GuidedLabSteps"
 
 interface GuidedLabRailProps {
   config: GuidedLabConfig
@@ -21,127 +18,104 @@ interface GuidedLabRailProps {
 
 export function GuidedLabRail({ config, scenarioId, savedProgress }: GuidedLabRailProps) {
   const storeScenarioId = useGuidedLabStore((state) => state.scenarioId)
+  const storeConfig = useGuidedLabStore((state) => state.config)
   const progress = useGuidedLabStore((state) => state.progress)
-  const initGuidedLab = useGuidedLabStore((state) => state.initGuidedLab)
-  const ackMilestone = useGuidedLabStore((state) => state.ackMilestone)
-  const answerQuiz = useGuidedLabStore((state) => state.answerQuiz)
-  const ackCheckpoint = useGuidedLabStore((state) => state.ackCheckpoint)
+  const init = useGuidedLabStore((state) => state.initGuidedLab)
+  const ack = useGuidedLabStore((state) => state.ackMilestone)
+  const answer = useGuidedLabStore((state) => state.answerQuiz)
+  const checkpoint = useGuidedLabStore((state) => state.ackCheckpoint)
+  const [review, setReview] = useState<{ id: string; phase: string } | null>(null)
+  const heading = useRef<HTMLHeadingElement>(null)
+  const previousPhase = useRef<string | undefined>(undefined)
+  const currentId = progress?.currentMilestoneId
 
   useEffect(() => {
-    if (storeScenarioId !== scenarioId) {
-      // Resume from the explicit prop, else from local persistence, else fresh.
-      initGuidedLab(scenarioId, config, savedProgress ?? loadGuidedLabProgress(scenarioId))
+    if (storeScenarioId !== scenarioId || storeConfig !== config) {
+      init(scenarioId, config, savedProgress ?? loadGuidedLabProgress(scenarioId))
     }
-  }, [storeScenarioId, scenarioId, config, savedProgress, initGuidedLab])
-
-  // Persist progress so a reload doesn't reset a long lab to milestone 1.
+  }, [storeScenarioId, storeConfig, scenarioId, config, savedProgress, init])
   useEffect(() => {
-    if (progress && storeScenarioId === scenarioId) {
+    if (progress && storeScenarioId === scenarioId && progress.version === config.version) {
       saveGuidedLabProgress(scenarioId, progress)
     }
-  }, [progress, storeScenarioId, scenarioId])
+  }, [progress, storeScenarioId, scenarioId, config.version])
+  useEffect(() => {
+    if (previousPhase.current && previousPhase.current !== currentId) heading.current?.focus()
+    previousPhase.current = currentId
+  }, [currentId])
 
-  if (!progress || storeScenarioId !== scenarioId) return null
-
-  const total = config.milestones.length
-  const doneCount = config.milestones.filter(
-    (m) => progress.milestoneStatus[m.id] === "done"
-  ).length
-  const activeMilestone = config.milestones.find((m) => progress.milestoneStatus[m.id] === "active")
-  const isComplete = doneCount === total
-
-  // A manual-ack milestone only advances once its formative work is engaged:
-  // every quiz answered and every checkpoint item ticked.
-  const quizBlocks = activeMilestone?.blocks.filter((block) => block.kind === "quiz") ?? []
-  const checkpointBlocks =
-    activeMilestone?.blocks.filter(
-      (block): block is Extract<GuidedLabBlock, { kind: "checkpoint" }> =>
-        block.kind === "checkpoint"
-    ) ?? []
-  const allQuizzesAnswered = quizBlocks.every((quiz) =>
-    progress.quizAnswers.some((answer) => answer.quizId === quiz.id)
-  )
-  const allCheckpointsAcked = checkpointBlocks.every((checkpoint) =>
-    checkpoint.items.every((_, index) =>
-      progress.checkpointAcks.includes(`${checkpoint.id}#${index}`)
-    )
-  )
-  const canContinue = allQuizzesAnswered && allCheckpointsAcked
-
+  if (!progress || storeScenarioId !== scenarioId || progress.version !== config.version)
+    return null
+  const done = config.milestones.filter((m) => progress.milestoneStatus[m.id] === "done").length
+  const complete = done === config.milestones.length
+  const active = config.milestones.find((m) => progress.milestoneStatus[m.id] === "active")
+  const viewed =
+    review && review.phase === currentId
+      ? (config.milestones.find((m) => m.id === review.id) ?? active)
+      : active
+  const reviewing = viewed && progress.milestoneStatus[viewed.id] === "done"
+  const index = config.milestones.findIndex((m) => m.id === active?.id)
   return (
-    <div className="space-y-3" data-guided-lab="rail">
-      <div>
-        <div className="text-muted-foreground mb-1 flex items-center justify-between text-[11px] font-medium tracking-wide uppercase">
-          <span>Guided lab</span>
-          <span>
-            {Math.min(doneCount + (isComplete ? 0 : 1), total)} of {total}
-          </span>
-        </div>
-        <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
-          <div
-            className="bg-accent h-full rounded-full transition-all"
-            style={{ width: `${Math.round((doneCount / total) * 100)}%` }}
-          />
-        </div>
+    <section aria-label="Guided debugging lab" className="space-y-3" data-guided-lab="rail">
+      <p className="text-muted-foreground text-xs">
+        Follow the phases in order. Passing the current checks opens the next repair.
+      </p>
+      <p className="text-foreground text-sm font-medium" role="status" aria-live="polite">
+        {complete
+          ? "All phases verified"
+          : `Phase ${index + 1} of ${config.milestones.length} · ${active?.title}`}
+      </p>
+      <div
+        role="progressbar"
+        aria-label="Completed phases"
+        aria-valuemin={0}
+        aria-valuemax={config.milestones.length}
+        aria-valuenow={done}
+        className="bg-muted h-1.5 overflow-hidden rounded-full"
+      >
+        <div
+          className="bg-accent h-full"
+          style={{ width: `${(done / config.milestones.length) * 100}%` }}
+        />
       </div>
-
-      {/* Milestone stepper */}
-      <ol className="space-y-1">
-        {config.milestones.map((milestone, index) => {
-          const status = progress.milestoneStatus[milestone.id]
-          return (
-            <li
-              key={milestone.id}
-              className={cn(
-                "flex items-center gap-2 rounded-md border px-2 py-1.5 text-xs transition-colors",
-                status === "active" && "border-accent/40 bg-accent/10 text-foreground font-medium",
-                status === "done" && "border-transparent text-muted-foreground",
-                status === "locked" && "border-transparent text-muted-foreground/55"
-              )}
-            >
-              <span
-                className={cn(
-                  "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
-                  status === "active" && "bg-accent text-accent-foreground",
-                  status === "done" && "bg-accent/15 text-accent",
-                  status === "locked" && "bg-muted text-muted-foreground/70"
-                )}
-                aria-hidden="true"
-              >
-                {status === "done" ? (
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                ) : status === "locked" ? (
-                  <Lock className="h-3 w-3" />
-                ) : (
-                  index + 1
-                )}
-              </span>
-              <span className="truncate">
-                {status === "locked" ? "Locked" : milestone.title}
-              </span>
-            </li>
-          )
-        })}
-      </ol>
-
-      {/* Active milestone content */}
-      {activeMilestone && (
-        <div className="border-border space-y-2 border-t pt-3">
-          <div>
-            <h3 className="text-foreground text-sm font-semibold">{activeMilestone.title}</h3>
-            <p className="text-muted-foreground text-xs">{activeMilestone.purpose}</p>
-          </div>
-
-          {activeMilestone.blocks.map((block) => {
+      <GuidedLabSteps
+        config={config}
+        progress={progress}
+        viewedId={viewed?.id ?? ""}
+        onReview={(id) => setReview({ id, phase: currentId ?? "" })}
+      />
+      {viewed && (
+        <div className="border-border space-y-3 border-t pt-3">
+          <h3
+            ref={heading}
+            tabIndex={-1}
+            className="text-foreground focus-visible:ring-ring text-sm font-semibold focus-visible:ring-2"
+          >
+            {viewed.title}
+            {reviewing ? " · Completed" : ""}
+          </h3>
+          <p className="text-muted-foreground text-xs leading-relaxed">{viewed.purpose}</p>
+          {viewed.blocks.map((block) => {
             switch (block.kind) {
-              case "knowledge-card":
-                return <KnowledgeCard key={block.id} title={block.title} body={block.body} />
               case "instruction":
                 return (
                   <GuidedInstruction
                     key={block.id}
                     body={block.body}
                     aiRestraint={block.aiRestraint}
+                  />
+                )
+              case "knowledge-card":
+                return <KnowledgeCard key={block.id} title={block.title} body={block.body} />
+              case "quiz":
+                return (
+                  <GuidedQuiz
+                    key={block.id}
+                    block={block}
+                    selectedIndex={
+                      progress.quizAnswers.find((a) => a.quizId === block.id)?.selectedIndex
+                    }
+                    onAnswer={(n) => answer(block.id, n)}
                   />
                 )
               case "checkpoint":
@@ -152,68 +126,52 @@ export function GuidedLabRail({ config, scenarioId, savedProgress }: GuidedLabRa
                     ackedIndices={
                       new Set(
                         block.items
-                          .map((_, index) => index)
-                          .filter((index) =>
-                            progress.checkpointAcks.includes(`${block.id}#${index}`)
-                          )
+                          .map((_, n) => n)
+                          .filter((n) => progress.checkpointAcks.includes(`${block.id}#${n}`))
                       )
                     }
-                    onAck={(index) => ackCheckpoint(`${block.id}#${index}`)}
+                    onAck={(n) => checkpoint(`${block.id}#${n}`)}
                   />
                 )
-              case "quiz":
-                return (
-                  <GuidedQuiz
-                    key={block.id}
-                    block={block}
-                    selectedIndex={
-                      progress.quizAnswers.find((answer) => answer.quizId === block.id)
-                        ?.selectedIndex
-                    }
-                    onAnswer={(index) => answerQuiz(block.id, index)}
-                  />
-                )
-              default:
-                return null
             }
           })}
-
-          {activeMilestone.gate.kind === "manual-ack" ? (
-            <div className="space-y-1.5">
-              <Button
-                type="button"
-                onClick={() => ackMilestone(activeMilestone.id)}
-                disabled={!canContinue}
-                className="bg-accent hover:bg-accent/80 text-accent-foreground h-8 w-full text-xs disabled:opacity-50"
-              >
-                Continue
-                <ArrowRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
+          {reviewing ? (
+            !complete && (
+              <Button variant="outline" className="min-h-11 w-full" onClick={() => setReview(null)}>
+                Return to current phase
               </Button>
-              {!canContinue && (
-                <p className="text-muted-foreground text-center text-[11px]">
-                  {allQuizzesAnswered
-                    ? "Tick each checkpoint item to continue."
-                    : "Answer the question to continue."}
+            )
+          ) : viewed.gate.kind === "manual-ack" ? (
+            <div className="space-y-2">
+              <Button
+                className="min-h-11 w-full"
+                disabled={!isMilestoneReady(viewed, progress)}
+                onClick={() => ack(viewed.id)}
+              >
+                Continue to {config.milestones[index + 1]?.title ?? "completion"}
+                <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+              </Button>
+              {!isMilestoneReady(viewed, progress) && (
+                <p className="text-muted-foreground text-xs">
+                  Complete the checkpoints and questions above to continue.
                 </p>
               )}
             </div>
           ) : (
-            <p className="text-muted-foreground border-border rounded-md border border-dashed px-2.5 py-2 text-[11px]">
-              Make your fix, then <span className="text-foreground font-medium">Run Tests</span>.
-              This step completes automatically once the tests for it pass.
+            <p className="border-border text-muted-foreground rounded-md border border-dashed p-3 text-xs leading-relaxed">
+              {viewed.id === config.verificationMilestoneId
+                ? "Run Tests now. All phases must pass together before Submit opens."
+                : `Run Tests after your repair. All checks for ${viewed.title} must pass to open ${config.milestones[index + 1]?.title ?? "completion"}.`}
             </p>
           )}
         </div>
       )}
-
-      {isComplete && (
-        <div className="border-t border-emerald-400/30 pt-3">
-          <div className="flex items-center gap-2 rounded-md border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs text-emerald-100">
-            <Trophy className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>Both bugs fixed and verified. You can submit now.</span>
-          </div>
-        </div>
+      {complete && (
+        <p className="border-accent/40 bg-accent/10 text-foreground flex items-center gap-2 rounded-lg border p-3 text-sm">
+          <Trophy className="h-4 w-4 shrink-0" aria-hidden="true" />
+          All phases passed the release check. You can submit now.
+        </p>
       )}
-    </div>
+    </section>
   )
 }

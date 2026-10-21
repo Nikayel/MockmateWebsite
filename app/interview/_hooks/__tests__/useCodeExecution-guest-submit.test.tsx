@@ -41,14 +41,13 @@ vi.mock("@/lib/interview", () => ({
   }),
 }))
 
-vi.mock("@/lib/stores/guided-lab-store", () => ({
-  useGuidedLabStore: { getState: () => ({ config: null, scenarioId: null }) },
-}))
-
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }))
 
+import { useGuidedLabStore } from "@/lib/stores/guided-lab-store"
+import { bugfixBookclubReadingStreakWorkspaceScenario as bookclub } from "@/lib/scenarios/real-world/bugfix/bugfix-bookclub-reading-streak-workspace"
+import { toast } from "sonner"
 import { useCodeExecution } from "../useCodeExecution"
 
 function buildOpts(overrides: Record<string, unknown> = {}) {
@@ -92,6 +91,7 @@ function buildOpts(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  useGuidedLabStore.getState().clear()
   executeScenario.mockResolvedValue({
     ok: true,
     data: {
@@ -151,5 +151,55 @@ describe("submitCode handoff for a signed-in user", () => {
 
     expect(opts.setShowPostInterviewDiscussion).toHaveBeenCalledWith(true)
     expect(opts.triggerPostInterviewDiscussion).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("guided lab submit handoff", () => {
+  it("does not submit an unfinished lab even when later suites pass", async () => {
+    useGuidedLabStore.getState().initGuidedLab(bookclub.id, bookclub.guidedLab!)
+    const opts = buildOpts({ selectedScenario: bookclub })
+    const { result } = renderHook(() => useCodeExecution(opts as never))
+    await act(async () => {
+      await result.current.submitCode()
+    })
+    expect(opts.setShowPostInterviewDiscussion).not.toHaveBeenCalled()
+    expect(opts.setIsRunningTests).toHaveBeenLastCalledWith(false)
+    expect(toast.error).toHaveBeenCalledWith(
+      "Complete the current lab phase before submitting",
+      expect.any(Object)
+    )
+  })
+
+  it("blocks submission when its fresh run finds an earlier regression", async () => {
+    const store = useGuidedLabStore.getState()
+    const config = bookclub.guidedLab!
+    store.initGuidedLab(bookclub.id, config)
+    store.ackCheckpoint("investigation#0")
+    store.ackCheckpoint("investigation#1")
+    store.ackMilestone("m1-investigate")
+    const gate = config.milestones.at(-1)!.gate
+    if (gate.kind !== "tests-pass") throw new Error("Missing release gate")
+    const results = gate.testSuites.map((suite) => ({ suite, passed: true }))
+    for (let n = 0; n < 5; n++) store.applyTestResults(results)
+    executeScenario.mockResolvedValue({
+      ok: true,
+      data: {
+        kind: "scenario",
+        results: results.map((r) => ({
+          input: r.suite,
+          passed: r.suite !== "hidden history",
+          error: null,
+        })),
+        summary: { total: results.length, passed: results.length - 1, failed: 1, passRate: 89 },
+        consoleLogs: [],
+      },
+    })
+    const opts = buildOpts({ selectedScenario: bookclub })
+    const { result } = renderHook(() => useCodeExecution(opts as never))
+    await act(async () => {
+      await result.current.submitCode()
+    })
+    expect(useGuidedLabStore.getState().progress?.currentMilestoneId).toBe("m3-history")
+    expect(opts.setShowPostInterviewDiscussion).not.toHaveBeenCalled()
   })
 })

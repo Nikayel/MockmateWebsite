@@ -40,7 +40,9 @@ export const ScenarioSearchBar = memo(function ScenarioSearchBar({
         )}
       </div>
       <div className="text-muted-foreground flex items-center gap-3 text-sm">
-        <span>{resultsCount} problems</span>
+        <span>
+          {resultsCount} {resultsCount === 1 ? "problem" : "problems"}
+        </span>
         {hasActiveFilters && (
           <button
             onClick={onClearFilters}

@@ -14,7 +14,7 @@ import type { GuidedLabConfig, GuidedLabProgress } from "@/lib/bugfix/guided-lab
 import {
   acknowledgeMilestone,
   applyTestRunToProgress,
-  initialGuidedLabProgress,
+  invalidateFinalVerification,
   isGuidedLabComplete,
   revealedTestSuites,
   type SuiteResult,
@@ -24,12 +24,16 @@ import {
   type GuidedLabProgressSummary,
 } from "@/lib/bugfix/guided-lab/mastery"
 
+import { restoreGuidedLabProgress } from "@/lib/bugfix/guided-lab/progress-state"
+import { parseGuidedLabProgress } from "@/lib/bugfix/guided-lab/persistence"
+
 const nowIso = () => new Date().toISOString()
 
 interface GuidedLabState {
   scenarioId: string | null
   config: GuidedLabConfig | null
   progress: GuidedLabProgress | null
+  sourceRevision: number
 
   /** Load a lab for a scenario, resuming saved progress when provided. */
   initGuidedLab: (
@@ -38,11 +42,12 @@ interface GuidedLabState {
     saved?: GuidedLabProgress | null
   ) => void
   /** Apply a workspace test run; completes any satisfied tests-pass milestones. */
-  applyTestResults: (results: SuiteResult[]) => void
+  applyTestResults: (results: SuiteResult[], sourceRevision?: number) => void
   /** Complete a manual-ack milestone. */
   ackMilestone: (milestoneId: string) => void
   answerQuiz: (quizId: string, selectedIndex: number) => void
   ackCheckpoint: (checkpointId: string) => void
+  invalidateVerification: (scenarioId: string) => void
   clear: () => void
 }
 
@@ -52,20 +57,26 @@ export const useGuidedLabStore = create<GuidedLabState>()(
       scenarioId: null,
       config: null,
       progress: null,
+      sourceRevision: 0,
 
-      initGuidedLab: (scenarioId, config, saved) =>
+      initGuidedLab: (scenarioId, config, saved) => {
+        const parsed = parseGuidedLabProgress(saved)
         set({
           scenarioId,
           config,
-          progress:
-            saved && saved.version === config.version
-              ? saved
-              : initialGuidedLabProgress(config, nowIso()),
-        }),
+          sourceRevision: 0,
+          progress: restoreGuidedLabProgress(config, parsed, nowIso()),
+        })
+      },
 
-      applyTestResults: (results) => {
+      applyTestResults: (results, sourceRevision) => {
         const { config, progress } = get()
-        if (!config || !progress) return
+        if (
+          !config ||
+          !progress ||
+          (sourceRevision !== undefined && sourceRevision !== get().sourceRevision)
+        )
+          return
         set({ progress: applyTestRunToProgress(config, progress, results, nowIso()) })
       },
 
@@ -100,7 +111,16 @@ export const useGuidedLabStore = create<GuidedLabState>()(
         })
       },
 
-      clear: () => set({ scenarioId: null, config: null, progress: null }),
+      invalidateVerification: (scenarioId) => {
+        const { config, progress, scenarioId: activeId } = get()
+        if (!config || !progress || activeId !== scenarioId) return
+        set({
+          sourceRevision: get().sourceRevision + 1,
+          progress: invalidateFinalVerification(config, progress, nowIso()),
+        })
+      },
+
+      clear: () => set({ scenarioId: null, config: null, progress: null, sourceRevision: 0 }),
     }),
     { name: "guided-lab-store" }
   )
@@ -154,7 +174,7 @@ export const useGuidedLabComplete = (): boolean =>
 /**
  * Test suites that should be visible in the panel. Memoized on config/progress so
  * the returned array keeps a stable identity (a fresh array from a selector would
- * loop). Empty array means "no guided lab active → show everything".
+ * loop). The caller also checks whether this scenario has an active guided lab.
  */
 export const useRevealedTestSuites = (): string[] => {
   const config = useGuidedLabStore((state) => state.config)
