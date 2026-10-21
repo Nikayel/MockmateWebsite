@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { LayoutGrid, List, Target } from "lucide-react"
+import { BookOpen, LayoutGrid, List, Target } from "lucide-react"
 import { useShallow } from "zustand/react/shallow"
 
 import { useScenarioFilters } from "@/lib/hooks/useScenarioFilters"
@@ -10,6 +10,7 @@ import { getScenarioLanguages, SCENARIO_LANGUAGES, scenarios, type Scenario } fr
 import { STARTER_SCENARIO_ID } from "./scenario-card-meta"
 import { useInterviewStore, type UsageLimit } from "@/lib/stores"
 
+import { GuidedLabsEntry } from "./GuidedLabsEntry"
 import { DSARoadmap } from "./DSARoadmap"
 import { InterviewTrackHeader } from "./InterviewTrackHeader"
 import { InterviewResumeNotice, InterviewTrackLanding } from "./InterviewTrackLanding"
@@ -19,7 +20,7 @@ import { ScenarioFilters } from "./ScenarioFilters"
 import { ScenarioList } from "./ScenarioList"
 import { TrackViewTabs, type TrackViewTab } from "./TrackViewTabs"
 import {
-  scenariosInTrack,
+  scenariosInTrackView,
   showsRoadmapPitch,
   trackProgress,
   willResumeExistingSession,
@@ -71,6 +72,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   const searchParams = useSearchParams()
   const track = findInterviewTrack(searchParams?.get(INTERVIEW_TRACK_PARAM))
   const trackId = track?.id ?? null
+  const browsingLabs = trackId === "debugging" && searchParams?.get("view") === "guided-labs"
 
   const [dsaView, setDsaView] = useState<DsaView>("roadmap")
 
@@ -113,7 +115,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   })
   useEffect(() => {
     clearAllFiltersRef.current()
-  }, [trackId])
+  }, [trackId, browsingLabs])
 
   // Narrowed to the track before anything renders it, so a track can never show another track's
   // problems whatever the shared filter store holds. Memoized because ScenarioList resets its
@@ -121,28 +123,30 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   // to the front when present: the bugfix bank otherwise leads with its heaviest
   // webhook/billing titles, and a first-time visitor's first click should land on the designed
   // 15-minute warm-up, not whatever the registry happens to list first.
+  const viewScenarios = useMemo(
+    () => (track ? scenariosInTrackView(track, scenarios, browsingLabs) : []),
+    [track, browsingLabs]
+  )
   const trackScenarios = useMemo(() => {
     if (!track) return []
-    const list = scenariosInTrack(track, filteredScenarios)
+    const list = scenariosInTrackView(track, filteredScenarios, browsingLabs)
     const starterIndex = list.findIndex((scenario) => scenario.id === STARTER_SCENARIO_ID)
     if (starterIndex <= 0) return list
     return [list[starterIndex], ...list.slice(0, starterIndex), ...list.slice(starterIndex + 1)]
-  }, [track, filteredScenarios])
+  }, [track, filteredScenarios, browsingLabs])
 
   // Counted off the full registry rather than the filtered view: the header states how big the
   // track is, which is not a fact about the current search.
   const progress = useMemo(
-    () => (track ? trackProgress(track, scenarios, completedProblems) : null),
-    [track, completedProblems]
+    () => (track ? trackProgress(track, viewScenarios, completedProblems) : null),
+    [track, viewScenarios, completedProblems]
   )
 
   const availableLanguages = useMemo(() => {
     if (!track || track.id !== "debugging") return []
-    const supported = new Set(
-      scenariosInTrack(track, scenarios).flatMap((scenario) => getScenarioLanguages(scenario))
-    )
+    const supported = new Set(viewScenarios.flatMap((scenario) => getScenarioLanguages(scenario)))
     return SCENARIO_LANGUAGES.filter((language) => supported.has(language))
-  }, [track])
+  }, [track, viewScenarios])
 
   // Dynamic padding: clear the floating navbar (64px) plus comfortable breathing room below it;
   // extra when the guest banner (~40px) is also shown.
@@ -160,7 +164,14 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
         // Security chips against zero scenarios, so clicking one could only empty the list. A
         // single-type track shows no row at all, because a chip that can only reselect everything
         // already on screen is the same kind of dead control.
-        availableTypes={track && track.types.length > 1 ? track.types : []}
+        catalogScenarios={viewScenarios}
+        availableTypes={
+          track &&
+          track.types.filter((type) => viewScenarios.some((scenario) => scenario.type === type))
+            .length > 1
+            ? track.types.filter((type) => viewScenarios.some((scenario) => scenario.type === type))
+            : []
+        }
         filterType={filterType}
         onToggleType={toggleTypeFilter}
         onRemoveType={removeTypeFilter}
@@ -194,7 +205,22 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
     if (!track || !progress) return null
     return (
       <>
-        <InterviewTrackHeader track={track} total={progress.total} completed={progress.completed} />
+        <InterviewTrackHeader
+          track={
+            browsingLabs
+              ? {
+                  ...track,
+                  label: "Guided debugging labs",
+                  shortLabel: "Guided lab",
+                  blurb:
+                    "Repair a codebase in phases, from easy to hard. Each verified fix opens the next phase.",
+                  Icon: BookOpen,
+                }
+              : track
+          }
+          total={progress.total}
+          completed={progress.completed}
+        />
         {track.id === "dsa" ? (
           <>
             <TrackViewTabs
@@ -219,7 +245,10 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
             {dsaView === "all" && renderProblemList()}
           </>
         ) : (
-          renderProblemList()
+          <>
+            <GuidedLabsEntry browsingLabs={browsingLabs} />
+            {renderProblemList()}
+          </>
         )}
       </>
     )

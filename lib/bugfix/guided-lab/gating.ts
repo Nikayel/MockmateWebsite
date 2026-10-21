@@ -10,12 +10,10 @@
  * the store.
  */
 
-import type {
-  GuidedLabConfig,
-  GuidedLabMilestone,
-  GuidedLabMilestoneStatus,
-  GuidedLabProgress,
-} from "./types"
+import type { GuidedLabConfig, GuidedLabMilestone, GuidedLabProgress } from "./types"
+
+import { deriveStatuses, doneSetFrom } from "./progress-state"
+export { initialGuidedLabProgress, invalidateFinalVerification } from "./progress-state"
 
 export interface SuiteResult {
   suite: string
@@ -36,66 +34,8 @@ export function passedSuiteSet(results: SuiteResult[]): Set<string> {
   )
 }
 
-interface DerivedStatuses {
-  milestoneStatus: Record<string, GuidedLabMilestoneStatus>
-  currentMilestoneId: string
-  activeBugId?: string
-}
-
-function deriveStatuses(config: GuidedLabConfig, done: Set<string>): DerivedStatuses {
-  const milestoneStatus: Record<string, GuidedLabMilestoneStatus> = {}
-  let currentMilestoneId = config.milestones[0]?.id ?? ""
-  let activeBugId: string | undefined
-  let activeAssigned = false
-
-  config.milestones.forEach((milestone, index) => {
-    if (done.has(milestone.id)) {
-      milestoneStatus[milestone.id] = "done"
-      return
-    }
-    const prevDone = index === 0 || done.has(config.milestones[index - 1].id)
-    const depsDone = (milestone.dependsOn ?? []).every((dep) => done.has(dep))
-    if (!activeAssigned && prevDone && depsDone) {
-      milestoneStatus[milestone.id] = "active"
-      currentMilestoneId = milestone.id
-      activeBugId = milestone.bugId
-      activeAssigned = true
-    } else {
-      milestoneStatus[milestone.id] = "locked"
-    }
-  })
-
-  // Whole lab done → keep the last milestone as the focused one.
-  if (!activeAssigned && config.milestones.length > 0) {
-    currentMilestoneId = config.milestones[config.milestones.length - 1].id
-  }
-
-  return { milestoneStatus, currentMilestoneId, activeBugId }
-}
-
-function doneSetFrom(
-  config: GuidedLabConfig,
-  status: Record<string, GuidedLabMilestoneStatus>
-): Set<string> {
-  return new Set(config.milestones.filter((m) => status[m.id] === "done").map((m) => m.id))
-}
-
-export function initialGuidedLabProgress(config: GuidedLabConfig, now: string): GuidedLabProgress {
-  const derived = deriveStatuses(config, new Set())
-  return {
-    version: config.version,
-    currentMilestoneId: derived.currentMilestoneId,
-    milestoneStatus: derived.milestoneStatus,
-    activeBugId: derived.activeBugId,
-    quizAnswers: [],
-    checkpointAcks: [],
-    updatedAt: now,
-  }
-}
-
-/** Recompute progress after a test run: completes any `tests-pass` milestone
- * whose required suites are now all green, then unlocks dependents. Monotonic —
- * a milestone that was `done` stays `done`. */
+/** Apply only the phase active at the start of this run. Reopen the earliest
+ * completed coding phase whose contract regressed, including missing suites. */
 export function applyTestRunToProgress(
   config: GuidedLabConfig,
   progress: GuidedLabProgress,
@@ -104,23 +44,44 @@ export function applyTestRunToProgress(
 ): GuidedLabProgress {
   const passed = passedSuiteSet(results)
   const done = doneSetFrom(config, progress.milestoneStatus)
-
+  const activeId = config.milestones.find((m) => progress.milestoneStatus[m.id] === "active")?.id
+  let regressed = false
   for (const milestone of config.milestones) {
-    if (done.has(milestone.id)) continue
-    if (milestone.gate.kind !== "tests-pass") continue
-    if (milestone.gate.testSuites.every((suite) => passed.has(suite))) {
-      done.add(milestone.id)
+    if (regressed) done.delete(milestone.id)
+    if (!done.has(milestone.id) || milestone.gate.kind !== "tests-pass") continue
+    if (
+      !milestone.gate.testSuites.length ||
+      !milestone.gate.testSuites.every((suite) => passed.has(suite))
+    ) {
+      done.delete(milestone.id)
+      regressed = true
     }
   }
-
-  const derived = deriveStatuses(config, done)
-  return {
-    ...progress,
-    currentMilestoneId: derived.currentMilestoneId,
-    milestoneStatus: derived.milestoneStatus,
-    activeBugId: derived.activeBugId,
-    updatedAt: now,
+  const active = config.milestones.find((m) => m.id === activeId)
+  if (
+    !regressed &&
+    active?.gate.kind === "tests-pass" &&
+    active.gate.testSuites.length > 0 &&
+    active.gate.testSuites.every((suite) => passed.has(suite))
+  ) {
+    done.add(active.id)
   }
+  return { ...progress, ...deriveStatuses(config, done), updatedAt: now }
+}
+
+export function isMilestoneReady(
+  milestone: GuidedLabMilestone,
+  progress: GuidedLabProgress
+): boolean {
+  return milestone.blocks.every((block) => {
+    if (block.kind === "quiz")
+      return progress.quizAnswers.some((answer) => answer.quizId === block.id)
+    if (block.kind === "checkpoint")
+      return block.items.every((_, index) =>
+        progress.checkpointAcks.includes(`${block.id}#${index}`)
+      )
+    return true
+  })
 }
 
 /** Complete a `manual-ack` milestone (no-op for `tests-pass` milestones). */
@@ -132,7 +93,8 @@ export function acknowledgeMilestone(
 ): GuidedLabProgress {
   const milestone = config.milestones.find((m) => m.id === milestoneId)
   if (!milestone || milestone.gate.kind !== "manual-ack") return progress
-  if (progress.milestoneStatus[milestoneId] !== "active") return progress
+  if (progress.milestoneStatus[milestoneId] !== "active" || !isMilestoneReady(milestone, progress))
+    return progress
 
   const done = doneSetFrom(config, progress.milestoneStatus)
   done.add(milestoneId)

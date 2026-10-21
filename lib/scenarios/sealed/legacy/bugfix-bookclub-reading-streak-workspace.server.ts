@@ -1,98 +1,118 @@
-// Sealed legacy-bugfix answer content (SERVER-ONLY). Moved out of the client
-// scenario module so the root cause, ground truth, rubric, and reference solution
-// never ship in the browser bundle. The window guard is the runtime seal.
-//
-// Note: this lab's guidedLab overlay is intentionally instructional and stays on
-// the client (it teaches the fix step by step). Only the machine-graded answer
-// fields and the two fixed reference files are sealed here.
 import type { SealedLegacyScenario } from "../legacy-registry.server"
 
 if (typeof window !== "undefined") {
   throw new Error("Sealed legacy scenario content must never load in the browser.")
 }
 
-const mirrorStatsServiceFixed = `from datetime import date, timedelta
-
-from app.seed import BOOKS
-from app.services.reading_service import get_reading_history
-
-
-def calculate_streak(user_id, today=None):
-    """Return the user's current reading streak: the number of consecutive
-    calendar days, ending on the given day, on which they finished at least one book.
-
-    Books that are still in progress never count toward the streak.
-    """
-    if today is None:
-        today = date.today()
-    events = get_reading_history(user_id)
-    finished_days = {event.finished_at for event in events}
-    streak = 0
-    day = today
-    while day in finished_days:
-        streak += 1
-        day = day - timedelta(days=1)
-    return streak
-
-
-def books_this_month(user_id, today=None):
-    """Count how many books the user finished in the given day's calendar month."""
-    if today is None:
-        today = date.today()
-    events = get_reading_history(user_id)
-    return sum(
-        1
-        for event in events
-        if event.finished_at.year == today.year and event.finished_at.month == today.month
-    )
-
-
-def total_pages_read(user_id):
-    """Sum the page counts of every book the user has finished."""
-    pages_by_book = {book.id: book.pages for book in BOOKS}
-    events = get_reading_history(user_id)
-    return sum(pages_by_book[event.book_id] for event in events)
-`
-
-const mirrorReadingServiceFixed = `from app.seed import READING_EVENTS
-
-
-def get_reading_history(user_id):
-    """Return the user's finished reading events, most recently finished first.
-
-    Books that are still in progress (no finish date) are excluded.
-    """
-    finished = [
-        event
-        for event in READING_EVENTS
-        if event.user_id == user_id and event.finished_at is not None
-    ]
-    return sorted(finished, key=lambda event: event.finished_at, reverse=True)
-`
-
 export const sealed: SealedLegacyScenario = {
   id: "bugfix-bookclub-reading-streak-workspace",
   bugDescription:
-    "Two independent defects in the reading services: the streak aggregates events by their start date rather than their finish date, and the history list sorts by start date rather than finish date.",
+    "Completion dates, stable cursors, reader-local month boundaries, and cached dashboard identity drifted from the product contract.",
   groundTruth:
-    "Two independent one-field defects: calculate_streak builds its set of days from started_at instead of finished_at, and get_reading_history sorts by started_at instead of finished_at. Both read fine in isolation because started_at is always set, which is why they survived review; only seeded data where a book is started days before it is finished reveals them. The two passing stats, books_this_month and total_pages_read, share the same get_reading_history input, proving the shared dependency is fine and isolating each bug to its own function. Terrain and herrings, all provably innocent: (1) Nadia (user 5) re-logged book 1, so a user can carry more than one event for the same book; the stat code tolerates duplicates and the finish-day streak collapses same-day finishes via a set; (2) the SQLAlchemy reference model declares a uq_user_book unique constraint that the in-memory mirror deliberately does not enforce, so the duplicate looks like a constraint violation but is intended terrain, not the bug; (3) in-progress books (finished_at is None) are already excluded by get_reading_history and never reach either calculation.",
+    "Streaks aggregate started_at instead of finished_at. History sorts by started_at and its cursor drops equal-time events. Monthly totals compare UTC year/month instead of reader-local values. Dashboard caching uses a global key and aliases mutable response objects; key by reader, date, offset and revision, and copy snapshots on read/write.",
   rootCauseRubric: [
-    "Identifies that the streak and history are computed from the wrong date field.",
-    "Explains why the finish date (not the start date) defines both a completion streak and a most-recently-finished ordering.",
-    "Confirms in-progress books are excluded and the monthly/total stats are unaffected.",
+    "Reproduces each failure before editing.",
+    "Distinguishes identity, ordering, calendar and cache ownership contracts.",
+    "Preserves existing behavior and verifies the full request path.",
   ],
   referenceFiles: [
     {
-      path: "app/services/stats_service.py",
+      path: "app/services/dashboard_service.py",
       role: "editable",
       language: "python",
-      content: mirrorStatsServiceFixed,
+      content: `from copy import deepcopy
+
+from app import cache, repository
+from app.services.stats_service import books_this_month, calculate_streak, total_pages_read
+
+
+def dashboard(user_id, today):
+    """Return a fresh, reader-scoped snapshot; callers may modify their response."""
+    key = (user_id, today.isoformat(), repository.reader(user_id).utc_offset_minutes, repository.revision())
+    cached = cache.get(key)
+    if cached is not None:
+        return deepcopy(cached)
+    result = {
+        "user_id": user_id,
+        "reading_streak": calculate_streak(user_id, today),
+        "books_this_month": books_this_month(user_id, today),
+        "total_pages_read": total_pages_read(user_id),
+    }
+    cache.put(key, deepcopy(result))
+    return result
+`,
     },
     {
       path: "app/services/reading_service.py",
       role: "editable",
       language: "python",
-      content: mirrorReadingServiceFixed,
+      content: `from datetime import datetime
+
+from app import repository
+
+
+def get_reading_history(user_id, limit=2, cursor=None):
+    """Return finished events newest first, breaking ties by descending event ID.
+
+    Cursor is '<ISO completion timestamp>|<event ID>'. Pages exclude the cursor
+    event and must visit every event exactly once, including equal timestamps.
+    """
+    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 50:
+        raise ValueError("Page size must be between 1 and 50")
+    events = [event for event in repository.events_for(user_id) if event.finished_at is not None]
+    events.sort(key=lambda event: (event.finished_at, event.id), reverse=True)
+    if cursor is not None:
+        try:
+            timestamp, event_id = cursor.rsplit("|", 1)
+            boundary = datetime.fromisoformat(timestamp)
+            int(event_id)
+            if boundary.tzinfo is None:
+                raise ValueError("Missing timezone")
+        except (ValueError, AttributeError):
+            raise ValueError("Invalid history cursor") from None
+        events = [event for event in events if (event.finished_at, event.id) < (boundary, int(event_id))]
+    page = events[:limit]
+    next_cursor = None
+    if len(events) > limit:
+        last = page[-1]
+        next_cursor = f"{last.finished_at.isoformat()}|{last.id}"
+    return {"events": page, "next_cursor": next_cursor}
+`,
+    },
+    {
+      path: "app/services/stats_service.py",
+      role: "editable",
+      language: "python",
+      content: `from datetime import timedelta
+
+from app import repository
+from app.calendar import reader_day
+
+
+def calculate_streak(user_id, today):
+    """Count consecutive completion days ending today in the reader's calendar."""
+    events = [event for event in repository.events_for(user_id) if event.finished_at is not None]
+    days = {reader_day(event.finished_at, user_id) for event in events}
+    streak = 0
+    day = today
+    while day in days:
+        streak += 1
+        day -= timedelta(days=1)
+    return streak
+
+
+def books_this_month(user_id, today):
+    """Count completed reading events in today's local year and month, including rereads."""
+    events = [event for event in repository.events_for(user_id) if event.finished_at is not None]
+    return sum(1 for event in events
+               if (reader_day(event.finished_at, user_id).year, reader_day(event.finished_at, user_id).month) == (today.year, today.month))
+
+
+def total_pages_read(user_id):
+    """Count pages for each completed reading event; in-progress books contribute zero."""
+    return sum(repository.pages_for(event.book_id) for event in repository.events_for(user_id)
+               if event.finished_at is not None)
+`,
     },
   ],
 }

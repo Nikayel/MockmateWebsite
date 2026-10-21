@@ -158,3 +158,36 @@ describe("guided lab gating", () => {
     ])
   })
 })
+
+describe("sequential gate regressions", () => {
+  it("does not complete any locked phase when a later suite passes", () => {
+    const p = applyTestRunToProgress(
+      config,
+      initialGuidedLabProgress(config, NOW),
+      [
+        { suite: "visible streak", passed: true },
+        { suite: "hidden streak", passed: true },
+        { suite: "visible history order", passed: true },
+        { suite: "hidden history", passed: true },
+      ],
+      NOW
+    )
+    expect(p.milestoneStatus).toEqual({ m1: "active", m2: "locked", m3: "locked", m4: "locked" })
+  })
+  it("missing suites and empty gates cannot complete a repair", () => {
+    let p = acknowledgeMilestone(config, initialGuidedLabProgress(config, NOW), "m1", NOW)
+    p = acknowledgeMilestone(config, p, "m2", NOW)
+    p = applyTestRunToProgress(config, p, [{ suite: "visible streak", passed: true }], NOW)
+    expect(p.milestoneStatus.m3).toBe("active")
+    const empty = {
+      ...config,
+      milestones: [
+        { ...config.milestones[2], gate: { kind: "tests-pass" as const, testSuites: [] } },
+      ],
+    }
+    expect(
+      applyTestRunToProgress(empty, initialGuidedLabProgress(empty, NOW), [], NOW).milestoneStatus
+        .m3
+    ).toBe("active")
+  })
+})

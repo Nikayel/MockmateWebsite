@@ -195,6 +195,20 @@ export const ProblemColumn = memo(function ProblemColumn({
               <div className="h-full space-y-5 overflow-y-auto p-3">
                 {guidedLab && selectedScenario && (
                   <div className="border-border/60 bg-muted/20 rounded-lg border p-3">
+                    <p className="text-muted-foreground text-sm">
+                      Start with{" "}
+                      <button
+                        type="button"
+                        className="text-accent-strong focus-visible:ring-ring min-h-11 underline underline-offset-4 focus-visible:ring-2"
+                        onClick={() => {
+                          const task = workspaceContext.find((file) => file.path === "task.md")
+                          if (task) onWorkspaceFileSelect(task)
+                        }}
+                      >
+                        task.md
+                      </button>{" "}
+                      for the full incident and product contract.
+                    </p>
                     <GuidedLabRail config={guidedLab} scenarioId={selectedScenario.id} />
                   </div>
                 )}
@@ -202,7 +216,7 @@ export const ProblemColumn = memo(function ProblemColumn({
                   <>
                     {/* Bug-fix: one brief, single source of truth. Everything else keeps
                   the classic Description block. */}
-                    {isBugfix ? (
+                    {guidedLab ? null : isBugfix ? (
                       <BugfixBrief
                         task={scenarioDetails?.task}
                         symptom={scenarioDetails?.symptom}
@@ -244,34 +258,36 @@ export const ProblemColumn = memo(function ProblemColumn({
 
                     {/* Repro steps and logs are evidence, not narrative: they stay, but
                   below the brief and without a second telling of the incident. */}
-                    {isBugfix && (reproductionSteps.length > 0 || visibleLogs.length > 0) && (
-                      <div className="space-y-3">
-                        {reproductionSteps.length > 0 && (
-                          <div>
-                            <p className="text-muted-foreground/70 mb-1 font-mono text-[10px] tracking-[0.14em] uppercase">
-                              Repro steps
-                            </p>
-                            <ol className="text-muted-foreground list-decimal space-y-1 pl-4 text-[12px]">
-                              {reproductionSteps.map((step: string, index: number) => (
-                                <li key={`${step}-${index}`}>{step}</li>
-                              ))}
-                            </ol>
-                          </div>
-                        )}
-                        {visibleLogs.length > 0 && (
-                          <div>
-                            <p className="text-muted-foreground/70 mb-1 font-mono text-[10px] tracking-[0.14em] uppercase">
-                              Visible logs
-                            </p>
-                            <div className="border-border/60 bg-background/50 text-muted-foreground space-y-1 overflow-x-auto rounded border p-2 font-mono text-[11px] whitespace-pre">
-                              {visibleLogs.map((log: string, index: number) => (
-                                <p key={`${log}-${index}`}>{log}</p>
-                              ))}
+                    {isBugfix &&
+                      !guidedLab &&
+                      (reproductionSteps.length > 0 || visibleLogs.length > 0) && (
+                        <div className="space-y-3">
+                          {reproductionSteps.length > 0 && (
+                            <div>
+                              <p className="text-muted-foreground/70 mb-1 font-mono text-[10px] tracking-[0.14em] uppercase">
+                                Repro steps
+                              </p>
+                              <ol className="text-muted-foreground list-decimal space-y-1 pl-4 text-[12px]">
+                                {reproductionSteps.map((step: string, index: number) => (
+                                  <li key={`${step}-${index}`}>{step}</li>
+                                ))}
+                              </ol>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                          )}
+                          {visibleLogs.length > 0 && (
+                            <div>
+                              <p className="text-muted-foreground/70 mb-1 font-mono text-[10px] tracking-[0.14em] uppercase">
+                                Visible logs
+                              </p>
+                              <div className="border-border/60 bg-background/50 text-muted-foreground space-y-1 overflow-x-auto rounded border p-2 font-mono text-[11px] whitespace-pre">
+                                {visibleLogs.map((log: string, index: number) => (
+                                  <p key={`${log}-${index}`}>{log}</p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                     {/* IMPROVED: Examples with better visual hierarchy */}
                     {selectedScenario.type === "dsa" &&

@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, type RefObject } from "react"
+import { memo, useEffect, useRef, type RefObject } from "react"
 import { Code, PlayCircle, RotateCcw } from "lucide-react"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -115,15 +115,31 @@ export const EditorColumn = memo(function EditorColumn({
     : null
   const ActiveRoleIcon = activeRoleStyle?.Icon
 
-  // Guided labs reveal a later bug's test suite only once its milestone unlocks,
-  // so the candidate discovers Bug 2 by verifying rather than seeing it up front.
-  // An empty revealed set means "no guided lab active → show everything".
+  const guidedLabActiveForScenario = useGuidedLabStore(
+    (state) => Boolean(state.config) && state.scenarioId === selectedScenario?.id
+  )
+  const sourceSnapshot = workspaceContext
+    .filter((file) => file.role === "editable")
+    .map((file) => `${file.path}:${file.content}`)
+    .join("\n")
+  const previousSource = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (
+      previousSource.current !== undefined &&
+      previousSource.current !== sourceSnapshot &&
+      selectedScenario
+    ) {
+      useGuidedLabStore.getState().invalidateVerification(selectedScenario.id)
+    }
+    previousSource.current = sourceSnapshot
+  }, [sourceSnapshot, selectedScenario])
   const revealedSuites = useRevealedTestSuites()
-  const guideFiltered = revealedSuites.length > 0
+  const guideFiltered = guidedLabActiveForScenario
+  const allowedSuites = new Set(
+    revealedSuites.flatMap((suite) => [suite, suite.replace(/^visible /, "hidden ")])
+  )
   const visibleTestResults = guideFiltered
-    ? testResults.filter((result) =>
-        revealedSuites.includes(String((result as { input?: unknown }).input ?? ""))
-      )
+    ? testResults.filter((result) => allowedSuites.has(String(result.input ?? "")))
     : testResults
   const visiblePassed = visibleTestResults.filter((result) => result.passed).length
   const visibleTestSummary = guideFiltered
@@ -152,16 +168,13 @@ export const EditorColumn = memo(function EditorColumn({
     const hasPassingSuite = states.some(Boolean)
     const hasFailingSuite = states.some((ok) => !ok)
     return hasPassingSuite && hasFailingSuite
-      ? "A new check unlocked when you fixed the first bug — and it's already failing. That's the next bug to fix, not a regression you caused."
+      ? "Results cover the current and completed phases. Repair any failing checks before continuing."
       : undefined
   })()
 
   // Block Submit while a guided lab for this scenario is unfinished, so the user
   // can't submit before discovering and fixing the later bug.
   const guidedLabComplete = useGuidedLabComplete()
-  const guidedLabActiveForScenario = useGuidedLabStore(
-    (state) => Boolean(state.config) && state.scenarioId === selectedScenario?.id
-  )
   const guidedLabBlocksSubmit = guidedLabActiveForScenario && !guidedLabComplete
 
   const editorSurface = (
