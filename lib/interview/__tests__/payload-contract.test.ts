@@ -30,10 +30,7 @@ const SCAN_DIRS = ["app/interview", "lib/interview"]
 
 // Interview hooks/services that live alongside non-interview code in lib/hooks.
 // Listed explicitly so the contract stays scoped as the refactor adopts them.
-const SCAN_FILES = [
-  "lib/hooks/useHintAgent.ts",
-  "lib/hooks/use-streaming-feedback.ts",
-]
+const SCAN_FILES = ["lib/hooks/useHintAgent.ts", "lib/hooks/use-streaming-feedback.ts"]
 
 function collectSourceFiles(): string[] {
   const out: string[] = []
@@ -177,6 +174,24 @@ describe("interview payload contract (Slice 0 oracle)", () => {
   it("captures every API request/persistence field set across the interview feature", () => {
     const contract = scanContract()
     expect(contract).toMatchSnapshot()
+  })
+
+  it("persists guided assessment and scoped progress through each recovery boundary", () => {
+    // Intentional feature change: assessment replaces the old quiz-summary payload;
+    // phase evidence must also survive authenticated, guest and local autosave.
+    const contract = scanContract()
+    const feedback = contract["fetch POST /api/feedback/persist"]
+    expect(feedback.some((keys) => keys.includes("guidedLabAssessment"))).toBe(true)
+    expect(feedback.every((keys) => !keys.includes("guidedLabMastery"))).toBe(true)
+    for (const boundary of [
+      "saveSessionState(sessionId, {...})",
+      "guest-session sessionState",
+      "localStorage sessionData",
+    ])
+      expect(
+        contract[boundary].some((keys) => keys.includes("guidedLabProgress")),
+        boundary
+      ).toBe(true)
   })
 
   it("still sends the core endpoints with their key fields", () => {

@@ -1,5 +1,10 @@
 import type { WorkspaceScenarioFile } from "@/lib/scenarios/types"
 
+export const bookclubProblemStatement = "Repair the reader dashboard one phase at a time."
+export const bookclubSuccessCriteria = [
+  "Complete each repair phase and the full 36-check release run.",
+]
+
 export const bookclubDocumentationFiles: WorkspaceScenarioFile[] = [
   {
     path: "README.md",
@@ -45,6 +50,8 @@ contract. Dates passed to services are already the reader's local 'today'.
     language: "markdown",
     content: `# Repair the reader dashboard
 
+${bookclubProblemStatement}
+
 ## Incident
 Support has escalated inconsistent reading profiles after the dashboard rollout.
 Alex's streak is zero despite three consecutive completion days. As you verify
@@ -83,6 +90,8 @@ closed until then. You can revisit completed instructions without losing progres
   reader. Repeating a completion is safe and does not double-count pages or books.
 
 ## Definition of done
+${bookclubSuccessCriteria.join("\n")}
+
 All 36 checks pass against the final workspace. Explain one reproduction, cause,
 fix, and regression check for each repair. Use the Release check phase to verify
 the whole route → service → repository → response flow before submitting.

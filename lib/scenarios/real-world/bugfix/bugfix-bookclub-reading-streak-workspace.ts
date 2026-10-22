@@ -1,5 +1,9 @@
 import type { BugFixScenario } from "../../types"
-import { bookclubDocumentationFiles } from "./bookclub/docs"
+import {
+  bookclubDocumentationFiles,
+  bookclubProblemStatement,
+  bookclubSuccessCriteria,
+} from "./bookclub/docs"
 import { bookclubSourceFiles } from "./bookclub/source"
 import { bookclubTestFiles } from "./bookclub/tests"
 import { bookclubGuidedLab } from "./bookclub/milestones"
@@ -29,8 +33,7 @@ export const bugfixBookclubReadingStreakWorkspaceScenario: BugFixScenario = {
     "My streak says zero after three days of finishing books. Other readers are also reporting inconsistent profiles after the rollout.",
   tags: ["python", "guided-lab", "real-codebase", "pagination", "time-zones", "caching"],
   estimatedTime: 90,
-  problemStatement:
-    "Repair the reader dashboard one phase at a time. Open task.md for the incident and acceptance criteria.",
+  problemStatement: bookclubProblemStatement,
   buggyCode: {
     python: bookclubSourceFiles.find((file) => file.path === "app/services/stats_service.py")!
       .content,
@@ -55,7 +58,7 @@ export const bugfixBookclubReadingStreakWorkspaceScenario: BugFixScenario = {
     "Open task.md and docs/incident.md.",
     "Follow the current phase and Run Tests before editing.",
   ],
-  successCriteria: ["Complete each repair phase and the full 36-check release run."],
+  successCriteria: bookclubSuccessCriteria,
   debuggingSkills: [
     "reproduction",
     "codebase navigation",

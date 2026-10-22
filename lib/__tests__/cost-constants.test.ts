@@ -57,8 +57,11 @@ describe("AI cost constants", () => {
       "openai-xhigh": { inputPer1M: 0.2, outputPer1M: 1.2 },
       gemini: { inputPer1M: 1.5, outputPer1M: 7.5 },
       "gemini-lite": { inputPer1M: 0.3, outputPer1M: 2.5 },
-      deepseek: { inputPer1M: 0.435, outputPer1M: 0.87 },
-      "deepseek-chat": { inputPer1M: 0.14, outputPer1M: 0.28 },
+      // Direct API off-peak, cache-miss rates, verified 2026-10-22:
+      // https://api-docs.deepseek.com/quick_start/pricing/
+      // The runtime applies peak/cache adjustments separately.
+      deepseek: { inputPer1M: 0.66, outputPer1M: 1.98 },
+      "deepseek-chat": { inputPer1M: 0.15, outputPer1M: 0.6 },
       claude: { inputPer1M: 1.0, outputPer1M: 5.0 },
     }
 
