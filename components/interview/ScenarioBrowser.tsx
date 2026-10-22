@@ -2,16 +2,15 @@
 
 import { memo, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { BookOpen, LayoutGrid, List, Target } from "lucide-react"
+import { LayoutGrid, List, Target } from "lucide-react"
 import { useShallow } from "zustand/react/shallow"
 
 import { useScenarioFilters } from "@/lib/hooks/useScenarioFilters"
 import { getScenarioLanguages, SCENARIO_LANGUAGES, scenarios, type Scenario } from "@/lib/scenarios"
-import { FLAGSHIP_SCENARIO_ID, prioritizeDebuggingScenarios } from "./scenario-discovery"
-import { DebuggingReleaseBanner } from "./DebuggingReleaseBanner"
+import { prioritizeDebuggingScenarios } from "./scenario-discovery"
 import { useInterviewStore, type UsageLimit } from "@/lib/stores"
 
-import { GuidedLabsEntry } from "./GuidedLabsEntry"
+import { DebuggingFormatNavigation } from "./DebuggingFormatNavigation"
 import { DSARoadmap } from "./DSARoadmap"
 import { InterviewTrackHeader } from "./InterviewTrackHeader"
 import { InterviewResumeNotice, InterviewTrackLanding } from "./InterviewTrackLanding"
@@ -55,8 +54,6 @@ const DSA_VIEWS: readonly TrackViewTab<DsaView>[] = [
   { id: "all", label: "All problems", Icon: List },
 ]
 
-const pythonRelease = scenarios.find((scenario) => scenario.id === FLAGSHIP_SCENARIO_ID)
-
 /**
  * `/interview`: one track, addressed by `?track=`.
  *
@@ -81,7 +78,6 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
 
   const [dsaView, setDsaView] = useState<DsaView>("roadmap")
   const { density, updateDensity } = useScenarioDensity()
-  const problemListRef = useRef<HTMLDivElement>(null)
 
   const { selectedScenario, setSelectedScenario } = useInterviewStore(
     useShallow((state) => ({
@@ -156,7 +152,9 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
 
   const renderFilters = () => (
     <ScenarioFilters
-      viewControl={<ScenarioViewControl value={density} onChange={updateDensity} />}
+      viewControl={
+        browsingLabs ? null : <ScenarioViewControl value={density} onChange={updateDensity} />
+      }
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       resultsCount={trackScenarios.length}
@@ -192,14 +190,13 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
 
   const renderProblemList = () => (
     <div
-      ref={problemListRef}
       role="region"
       aria-label="Practice problems"
       tabIndex={-1}
       className="focus-visible:ring-ring rounded-xl focus-visible:ring-2 focus-visible:outline-none"
     >
       <ScenarioList
-        density={density}
+        density={browsingLabs ? "cards" : density}
         scenarios={trackScenarios}
         selectedScenarioId={selectedScenario?.id ?? null}
         completedProblems={completedProblems}
@@ -218,41 +215,31 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
     return (
       <>
         <InterviewTrackHeader
-          track={
-            browsingLabs
-              ? {
-                  ...track,
-                  label: "Guided debugging labs",
-                  shortLabel: "Guided lab",
-                  blurb:
-                    "Repair a codebase in phases, from easy to hard. Each verified fix opens the next phase.",
-                  Icon: BookOpen,
-                }
-              : track
-          }
+          track={track}
           total={progress.total}
           completed={progress.completed}
+          collectionLabel={
+            track.id === "debugging" ? (browsingLabs ? "labs" : "rounds") : undefined
+          }
+          navigation={
+            track.id === "debugging" && (
+              <DebuggingFormatNavigation
+                browsingLabs={browsingLabs}
+                roundCount={scenariosInTrackView(track, scenarios, false).length}
+                labCount={scenariosInTrackView(track, scenarios, true).length}
+              />
+            )
+          }
+          collectionDescription={
+            track.id === "debugging"
+              ? browsingLabs
+                ? "Repair one codebase in phases. Verified fixes open the next phase."
+                : "Work through an incident independently, with an AI interviewer."
+              : undefined
+          }
         >
           {track.id === "debugging" && renderFilters()}
         </InterviewTrackHeader>
-        {track.id === "debugging" &&
-          (browsingLabs ? (
-            <GuidedLabsEntry browsingLabs />
-          ) : (
-            <div className="mb-4 grid gap-3 lg:grid-cols-2 [&>aside]:mb-0 [&>section]:mb-0">
-              {pythonRelease && !hasActiveFilters && (
-                <DebuggingReleaseBanner
-                  scenario={pythonRelease}
-                  onView={(scenario) => {
-                    setSelectedScenario(scenario)
-                    setSearchQuery(scenario.title)
-                    requestAnimationFrame(() => problemListRef.current?.focus())
-                  }}
-                />
-              )}
-              <GuidedLabsEntry />
-            </div>
-          ))}
         {track.id === "dsa" ? (
           <>
             <TrackViewTabs

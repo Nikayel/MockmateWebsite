@@ -2,10 +2,15 @@
 export const STARTER_SCENARIO_ID = "bugfix-onboarding"
 export const FLAGSHIP_SCENARIO_ID = "generic-cache-eviction-mutation"
 
-export function getScenarioDiscoveryLabel(id: string, completed: boolean): string | null {
+export function getScenarioDiscoveryLabel(
+  id: string,
+  completed: boolean,
+  now = Date.now()
+): string | null {
   if (completed) return null
   if (id === STARTER_SCENARIO_ID) return "Start here"
-  if (id === FLAGSHIP_SCENARIO_ID) return "Fix + extend"
+  if (id === FLAGSHIP_SCENARIO_ID)
+    return now < Date.UTC(2026, 10, 16) ? "New · Fix + extend" : "Fix + extend"
   return null
 }
 

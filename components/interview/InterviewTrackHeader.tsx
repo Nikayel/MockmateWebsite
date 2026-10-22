@@ -4,6 +4,7 @@ import Link from "next/link"
 import type { ReactNode } from "react"
 import { ArrowLeft } from "lucide-react"
 
+import { cn } from "@/lib/utils"
 import { Progress } from "@/components/ui/progress"
 
 import type { InterviewTrack } from "./interview-tracks"
@@ -14,6 +15,9 @@ interface InterviewTrackHeaderProps {
   total: number
   /** How many of those the user has finished. */
   completed: number
+  navigation?: ReactNode
+  collectionLabel?: "rounds" | "labs"
+  collectionDescription?: string
   children?: ReactNode
 }
 
@@ -30,6 +34,9 @@ export function InterviewTrackHeader({
   total,
   completed,
   children,
+  navigation,
+  collectionLabel,
+  collectionDescription,
 }: InterviewTrackHeaderProps) {
   const solvedPercent = total > 0 ? Math.round((completed / total) * 100) : 0
 
@@ -52,19 +59,18 @@ export function InterviewTrackHeader({
             <div className="flex min-w-0 items-center gap-2">
               <track.Icon className="text-muted-foreground h-4 w-4 shrink-0" aria-hidden="true" />
               <h2 className="text-foreground text-lg font-semibold sm:text-xl">{track.label}</h2>
-              {track.id === "debugging" && (
-                <span className="border-border bg-muted text-muted-foreground rounded border px-1.5 text-xs leading-5 font-medium">
-                  Beta
-                </span>
-              )}
             </div>
             <div className="text-muted-foreground flex shrink-0 items-center gap-2 text-xs">
               <span className="tabular-nums">
-                {completed}/{total} solved
+                {completed}/{total} {collectionLabel ? `${collectionLabel} completed` : "solved"}
               </span>
               <Progress
                 value={solvedPercent}
-                aria-label={`${completed} of ${total} ${track.shortLabel} problems solved`}
+                aria-label={
+                  collectionLabel
+                    ? `${completed} of ${total} ${collectionLabel} completed`
+                    : `${completed} of ${total} ${track.shortLabel} problems solved`
+                }
                 className="bg-muted hidden h-1 w-16 sm:block"
               />
             </div>
@@ -72,13 +78,14 @@ export function InterviewTrackHeader({
           <p className="text-muted-foreground mt-1 max-w-3xl text-sm leading-5 text-pretty">
             {track.blurb}
           </p>
-          {track.id === "debugging" && (
-            <p className="text-muted-foreground mt-1 text-xs leading-5">
-              We’re working with recruiters to align these interviews with industry standards.
-            </p>
-          )}
         </div>
-        {children && <div className="border-border mt-3 border-t pt-3">{children}</div>}
+        {navigation}
+        {collectionDescription && (
+          <p className="text-muted-foreground mt-4 text-sm leading-6">{collectionDescription}</p>
+        )}
+        {children && (
+          <div className={cn("mt-3", !navigation && "border-border border-t pt-3")}>{children}</div>
+        )}
       </section>
     </header>
   )

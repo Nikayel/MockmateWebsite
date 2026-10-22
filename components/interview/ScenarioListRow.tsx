@@ -36,6 +36,10 @@ export const ScenarioListRow = memo(function ScenarioListRow({
 }: ScenarioListRowProps) {
   const typeConfig = getTypeConfig(scenario.type)
   const discoveryLabel = getScenarioDiscoveryLabel(scenario.id, isCompleted)
+  const companies =
+    scenario.type === "dsa"
+      ? scenario.companies
+      : scenario.companies.filter((company) => company !== "Generic")
   const isLocked = !!(usageLimit && usageLimit.allowed === false && scenario.type !== "dsa")
 
   return (
@@ -95,10 +99,10 @@ export const ScenarioListRow = memo(function ScenarioListRow({
             <Clock className="h-3 w-3" aria-hidden="true" />
             {scenario.estimatedTime} min
           </span>
-          {scenario.companies.length > 0 && (
+          {companies.length > 0 && (
             <span className="hidden truncate md:inline">
-              {scenario.companies.slice(0, 2).join(", ")}
-              {scenario.companies.length > 2 && ` +${scenario.companies.length - 2}`}
+              {companies.slice(0, 2).join(", ")}
+              {companies.length > 2 && ` +${companies.length - 2}`}
             </span>
           )}
         </span>
@@ -132,7 +136,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
       <div className="flex-shrink-0">
         {isLocked ? (
           <Link href="/limit-reached" onClick={(e) => e.stopPropagation()}>
-            <Button size="sm" variant="outline" className="h-8 rounded-full px-3 text-xs">
+            <Button size="sm" variant="outline" className="min-h-11 rounded-full px-3 text-xs">
               Upgrade
             </Button>
           </Link>
@@ -148,7 +152,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
             disabled={isStarting}
             loading={isStarting && isSelected}
             aria-label={`Start practice: ${scenario.title}`}
-            className="bg-accent text-accent-foreground hover:bg-accent/90 focus-visible:ring-accent/50 h-8 rounded-full px-3 text-xs font-semibold"
+            className="bg-accent text-accent-foreground hover:bg-accent/90 focus-visible:ring-accent/50 min-h-11 rounded-full px-3 text-xs font-semibold"
           >
             {!(isStarting && isSelected) && <Play className="mr-1 h-3 w-3" aria-hidden="true" />}
             {isStarting && isSelected ? "Starting..." : "Start"}

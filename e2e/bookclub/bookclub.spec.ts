@@ -17,16 +17,28 @@ async function run(page: Page) {
 
 test("discovers guided labs separately from rounds", async ({ page }) => {
   await page.goto("/interview?track=debugging")
-  const entry = page.getByRole("region", { name: "Guided debugging labs" })
-  await expect(entry.getByText("New & improved")).toBeVisible()
+  const entry = page.getByRole("navigation", { name: "Debugging practice format" })
   await expect(entry.getByText("Beta", { exact: true })).toBeVisible()
   await expect(
     page.getByText("BookClub: Repair the Reader Dashboard", { exact: true })
   ).toHaveCount(0)
-  await entry.getByRole("link", { name: "Explore guided labs" }).click()
+  await entry.getByRole("link", { name: /^Guided labs/ }).click()
   await expect(page).toHaveURL(/view=guided-labs/)
   await expect(
     page.getByText("BookClub: Repair the Reader Dashboard", { exact: true })
+  ).toBeVisible()
+  await expect(entry.getByRole("link", { name: /^Guided labs/ })).toHaveAttribute(
+    "aria-current",
+    "page"
+  )
+  const preview = page.getByText("View phases", { exact: true })
+  await preview.focus()
+  await page.keyboard.press("Enter")
+  await expect(
+    page.getByRole("list", { name: "Lab phase preview" }).getByRole("listitem")
+  ).toHaveCount(6)
+  await expect(
+    page.getByText(/Complete the investigation checklist to open the first repair/)
   ).toBeVisible()
   await page.screenshot({ path: "test-results/bookclub-gallery-desktop.png", fullPage: true })
   await page.getByText("BookClub: Repair the Reader Dashboard", { exact: true }).click()
@@ -37,6 +49,56 @@ test("discovers guided labs separately from rounds", async ({ page }) => {
     })
     .click()
   await expect(page.getByRole("heading", { name: "Investigate", exact: true })).toBeVisible()
+})
+
+test("format links preserve back navigation and lab previews fit narrow screens", async ({
+  page,
+}, testInfo) => {
+  const errors: string[] = []
+  page.on("pageerror", (error) => errors.push(error.message))
+  await page.goto("/interview?track=debugging")
+  await page.getByRole("button", { name: "List view", exact: true }).click()
+  await page
+    .getByRole("navigation", { name: "Debugging practice format" })
+    .getByRole("link", { name: /^Guided labs/ })
+    .click()
+  await expect(
+    page.getByRole("heading", { name: "BookClub: Repair the Reader Dashboard", exact: true })
+  ).toBeVisible()
+  await page.goBack()
+  await expect(page.getByRole("button", { name: "List view", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  )
+  await page.goForward()
+  await expect(
+    page
+      .getByRole("navigation", { name: "Debugging practice format" })
+      .getByRole("link", { name: /^Guided labs/ })
+  ).toHaveAttribute("aria-current", "page")
+  for (const width of [1440, 375, 320, 812]) {
+    await page.setViewportSize({ width, height: width === 812 ? 375 : 900 })
+    for (const theme of ["light", "dark"]) {
+      await page.goto(`/interview?track=debugging&view=guided-labs&theme=${theme}`)
+      await page.emulateMedia({ reducedMotion: "reduce" })
+      const preview = page.getByText("View phases", { exact: true })
+      await preview.focus()
+      await page.keyboard.press("Enter")
+      await expect(
+        page.getByRole("list", { name: "Lab phase preview" }).getByRole("listitem")
+      ).toHaveCount(6)
+      await expect(page.getByText("6 phases · 4 repairs", { exact: true })).toBeVisible()
+      await expect(page.getByText("Beta", { exact: true })).toHaveCount(1)
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true
+      )
+      await page.screenshot({
+        path: testInfo.outputPath(`labs-${theme}-${width}.png`),
+        fullPage: true,
+      })
+    }
+  }
+  expect(errors).toEqual([])
 })
 
 test("explains unlocks, runs real Python repairs, resumes, and re-verifies edits", async ({

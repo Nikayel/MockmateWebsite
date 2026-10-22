@@ -16,7 +16,7 @@ export const bugfixBookclubReadingStreakWorkspaceScenario: BugFixScenario = {
   executionMode: "workspace",
   difficulty: "medium",
   companies: ["Generic"],
-  description: "A guided debugging lab: four repairs, from streaks to stale dashboards.",
+  description: "Repair broken streaks, missing history, calendar totals, and stale dashboards.",
   task: "Repair BookClub's reader dashboard through the guided phases, using task.md as the product contract.",
   symptom: {
     subject: "Alex",

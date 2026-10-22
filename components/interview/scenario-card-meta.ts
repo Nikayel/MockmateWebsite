@@ -60,7 +60,7 @@ export function getScenarioCardContext(scenario: Scenario): ScenarioCardContext 
         return {
           typeLabel: "Guided lab",
           contextLine: scenario.description,
-          signal: `${scenario.guidedLab.milestones.length} phases · Easy to hard`,
+          signal: `${scenario.guidedLab.milestones.length} phases · ${scenario.guidedLab.milestones.filter((milestone) => milestone.bugId).length} repairs`,
         }
       }
       const contextLine = firstNonEmpty(

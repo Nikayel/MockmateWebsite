@@ -45,7 +45,12 @@ describe("debugging discovery progression", () => {
     const flagship = debugging.find((scenario) => scenario.id === FLAGSHIP_SCENARIO_ID)!
     expect(flagship.difficulty).toBe("medium")
     expect(getScenarioCardContext(flagship).signal).toBe("Real codebase · 4 files")
-    expect(getScenarioDiscoveryLabel(flagship.id, false)).toBe("Fix + extend")
+    expect(getScenarioDiscoveryLabel(flagship.id, false, Date.UTC(2026, 9, 22))).toBe(
+      "New · Fix + extend"
+    )
+    expect(getScenarioDiscoveryLabel(flagship.id, false, Date.UTC(2026, 10, 16))).toBe(
+      "Fix + extend"
+    )
     expect(getScenarioDiscoveryLabel(STARTER_SCENARIO_ID, false)).toBe("Start here")
     expect(getScenarioDiscoveryLabel(flagship.id, true)).toBeNull()
     expect(getScenarioDiscoveryLabel("other", false)).toBeNull()

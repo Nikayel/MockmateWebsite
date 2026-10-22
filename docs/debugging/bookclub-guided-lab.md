@@ -1,6 +1,6 @@
 # BookClub guided debugging lab (beta)
 
-Entry: `/interview?track=debugging` → **Explore guided labs** → BookClub → Start.
+Entry: `/interview?track=debugging` → **Guided labs** → BookClub → Start.
 The shareable gallery is `/interview?track=debugging&view=guided-labs`.
 Guided exercises are identified by `scenario.guidedLab`, not by hand-maintained IDs.
 They remain in the same scenario registry and execution engine, with their own gallery.
@@ -14,7 +14,9 @@ stay behind the existing sealed server registry.
 
 ## Interaction rules and rationale
 
-- The gallery distinguishes guided learning from independent interview rounds.
+- The existing catalog header contains persistent, labelled format links for practice
+  rounds and guided labs, with one Beta marker beside labs. A disclosure on each
+  lab card previews its numbered phases and explains advancement before starting.
 - The rail names every phase and explains exactly what opens it. Status uses text
   and icons, not color alone. One active phase has one clear next action.
 - Current instructions are expanded; completed instructions remain reviewable.

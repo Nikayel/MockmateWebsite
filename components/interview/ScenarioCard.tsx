@@ -2,7 +2,7 @@
 
 import { memo } from "react"
 import Link from "next/link"
-import { Play, Check, Clock, Cpu, Bug } from "lucide-react"
+import { Play, Check, Clock, Cpu, Bug, ListTree } from "lucide-react"
 import { EXERCISE_TYPES } from "./scenario-display"
 import { Button } from "@/components/ui/button"
 import type { Scenario, ScenarioType } from "@/lib/scenarios"
@@ -12,6 +12,7 @@ import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { getScenarioLabLink } from "@/lib/labs/lab-links"
 import { getScenarioCardContext } from "./scenario-card-meta"
 import { getScenarioDiscoveryLabel } from "./scenario-discovery"
+import { GuidedLabPreview } from "./GuidedLabPreview"
 import { ScenarioLanguageTags } from "./ScenarioLanguageTags"
 
 interface ScenarioCardProps {
@@ -41,31 +42,43 @@ export const ScenarioCard = memo(function ScenarioCard({
   onSelect,
   onStart,
 }: ScenarioCardProps) {
-  const TypeIcon = TYPE_ICONS[scenario.type] ?? Cpu
+  const guidedLab = scenario.type === "bugfix" ? scenario.guidedLab : undefined
+  const CardSurface = guidedLab ? "article" : "div"
+  const TypeIcon = guidedLab ? ListTree : (TYPE_ICONS[scenario.type] ?? Cpu)
   const { typeLabel, contextLine, signal } = getScenarioCardContext(scenario)
   const labLink = getScenarioLabLink(scenario.id)
   const discoveryLabel = getScenarioDiscoveryLabel(scenario.id, isCompleted)
   const isLocked = !!(usageLimit && usageLimit.allowed === false && scenario.type !== "dsa")
-  const companies = scenario.companies.slice(0, 2).join(", ")
-  const extraCompanies = scenario.companies.length > 2 ? ` +${scenario.companies.length - 2}` : ""
+  const visibleCompanies =
+    scenario.type === "dsa"
+      ? scenario.companies
+      : scenario.companies.filter((company) => company !== "Generic")
+  const companies = visibleCompanies.slice(0, 2).join(", ")
+  const extraCompanies = visibleCompanies.length > 2 ? ` +${visibleCompanies.length - 2}` : ""
+
   // Debugging-track scenarios open with a reported symptom, not a task statement. The quote
   // bar marks the line as an incoming report — the visual language of a ticket, which is the
   // fiction those tracks sell.
-  const contextIsReport = scenario.type === "bugfix" || scenario.type === "add-functionality"
+  const contextIsReport =
+    !guidedLab && (scenario.type === "bugfix" || scenario.type === "add-functionality")
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={() => onSelect(scenario)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault()
-          onSelect(scenario)
-        }
-      }}
-      aria-pressed={isSelected}
-      className={`group focus-visible:ring-accent/50 relative flex cursor-pointer flex-col rounded-xl border p-5 shadow-xs transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none ${
+    <CardSurface
+      role={guidedLab ? undefined : "button"}
+      tabIndex={guidedLab ? undefined : 0}
+      onClick={guidedLab ? undefined : () => onSelect(scenario)}
+      onKeyDown={
+        guidedLab
+          ? undefined
+          : (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault()
+                onSelect(scenario)
+              }
+            }
+      }
+      aria-pressed={guidedLab ? undefined : isSelected}
+      className={`${guidedLab ? "md:col-span-2 lg:col-span-3" : "cursor-pointer"} group focus-visible:ring-accent/50 relative flex flex-col rounded-xl border p-5 shadow-xs transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none ${
         isSelected
           ? "border-accent/50 bg-accent/5"
           : "border-border bg-card hover:border-accent/40 hover:bg-accent/5"
@@ -78,11 +91,13 @@ export const ScenarioCard = memo(function ScenarioCard({
             <TypeIcon className="h-3.5 w-3.5" aria-hidden="true" />
             {typeLabel}
           </span>
-          <span
-            className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${difficultyColorClass(scenario.difficulty, "badgeOnLight")}`}
-          >
-            {scenario.difficulty}
-          </span>
+          {!guidedLab && (
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${difficultyColorClass(scenario.difficulty, "badgeOnLight")}`}
+            >
+              {scenario.difficulty}
+            </span>
+          )}
           <ScenarioLanguageTags scenario={scenario} />
           {/* Quiet progression cue, shared with list view; solved status replaces it. */}
           {discoveryLabel && (
@@ -114,6 +129,8 @@ export const ScenarioCard = memo(function ScenarioCard({
         ) : (
           <p className="text-muted-foreground mb-4 line-clamp-2 text-sm leading-6">{contextLine}</p>
         ))}
+
+      {guidedLab && <GuidedLabPreview config={guidedLab} />}
 
       {/* Guided-version pointer. The four Case Lab Build exercises also live here as
           standalone scenarios, where they are scored as full interviews; without this
@@ -179,7 +196,7 @@ export const ScenarioCard = memo(function ScenarioCard({
             disabled={isStarting}
             loading={isStarting && isSelected}
             aria-label={`Start practice: ${scenario.title}`}
-            className="bg-accent text-accent-foreground hover:bg-accent/90 focus-visible:ring-accent/50 w-full font-semibold"
+            className={`bg-accent text-accent-foreground hover:bg-accent/90 focus-visible:ring-accent/50 min-h-11 w-full font-semibold ${guidedLab ? "sm:w-auto sm:px-6" : ""}`}
           >
             {!(isStarting && isSelected) && <Play className="mr-2 h-4 w-4" aria-hidden="true" />}
             {isStarting && isSelected ? "Starting..." : "Start practice"}
@@ -192,6 +209,6 @@ export const ScenarioCard = memo(function ScenarioCard({
           )}
         </div>
       )}
-    </div>
+    </CardSurface>
   )
 })

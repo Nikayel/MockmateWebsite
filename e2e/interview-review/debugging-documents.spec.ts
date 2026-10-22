@@ -1,62 +1,38 @@
 import { expect, test } from "@playwright/test"
 
-test("debugging release reveals the question and remembers dismissal", async ({
+test("debugging puts format navigation and release context in the catalog", async ({
   page,
 }, testInfo) => {
   const errors: string[] = []
   page.on("pageerror", (error) => errors.push(error.message))
-  for (const width of [1440, 375]) {
+  for (const width of [1440, 375, 320]) {
     await page.setViewportSize({ width, height: 900 })
     for (const theme of ["light", "dark"]) {
       await page.goto(`/?view=picker&track=debugging&theme=${theme}`)
-      const banner = page.getByRole("complementary", { name: "New Python debugging question" })
-      await expect(banner).toBeVisible()
+      const formats = page.getByRole("navigation", { name: "Debugging practice format" })
+      const rounds = formats.getByRole("link", { name: /^Practice rounds/ })
+      const labs = formats.getByRole("link", { name: /^Guided labs/ })
+      await expect(rounds).toHaveAttribute("aria-current", "page")
+      await expect(labs).toHaveAttribute("href", "/interview?track=debugging&view=guided-labs")
+      await expect(page.getByText("Beta", { exact: true })).toHaveCount(1)
       await expect(
-        page
-          .getByRole("region", { name: "Debugging problem browser" })
-          .getByText("Beta", { exact: true })
-      ).toBeVisible()
+        page.getByRole("complementary", { name: "New Python debugging question" })
+      ).toHaveCount(0)
+      await expect(page.getByText("New & improved", { exact: true })).toHaveCount(0)
+      const results = page.getByRole("region", { name: "Practice problems" })
+      await expect(
+        results.getByRole("heading", {
+          name: "Cache cleanup: reconcile the overnight report",
+          exact: true,
+        })
+      ).toHaveCount(1)
+      expect((await labs.boundingBox())!.height).toBeGreaterThanOrEqual(44)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true
       )
       await page.screenshot({ path: testInfo.outputPath(`debugging-${theme}-${width}.png`) })
-      await banner.getByRole("button", { name: "View question" }).click()
-      await expect(banner).toBeHidden()
-      await expect(page.getByRole("region", { name: "Practice problems" })).toBeFocused()
-      await expect(page.getByPlaceholder("Search problems...")).toHaveValue(
-        "Cache cleanup: reconcile the overnight report"
-      )
-      await expect(
-        page.getByRole("button", {
-          name: "Start practice: Cache cleanup: reconcile the overnight report",
-          exact: true,
-        })
-      ).toHaveCount(1)
-      // The picker remains open: viewing the question never starts a session.
-      await expect(page.getByText("1 problem", { exact: true })).toBeVisible()
-      await page.getByRole("button", { name: "Clear filters", exact: true }).click()
-      await expect(banner).toBeVisible()
     }
   }
-  await page.getByRole("button", { name: "Dismiss new question banner" }).click()
-  await page.reload()
-  await expect(
-    page.getByRole("complementary", { name: "New Python debugging question" })
-  ).toBeHidden()
-  await expect(
-    page
-      .getByRole("region", { name: "Debugging problem browser" })
-      .getByText("Beta", { exact: true })
-  ).toBeVisible()
-  await page.goto("/?view=picker&track=dsa&theme=light")
-  await expect(
-    page
-      .getByRole("region", { name: "Debugging problem browser" })
-      .getByText("Beta", { exact: true })
-  ).toBeHidden()
-  await expect(
-    page.getByRole("complementary", { name: "New Python debugging question" })
-  ).toBeHidden()
   expect(errors).toEqual([])
 })
 
