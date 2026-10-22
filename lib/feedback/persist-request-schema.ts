@@ -1,3 +1,4 @@
+import { labAssessmentSchema } from "@/lib/bugfix/guided-lab/assessment/schema"
 import { z } from "zod"
 import { clampScore } from "@/lib/constants"
 
@@ -66,6 +67,7 @@ export const persistRequestSchema = z
     // (bugfixScoreBreakdown is additionally normalized in the validator below:
     // the dashboard averages breakdown.overall, so its numbers must be clamped.)
 
+    guidedLabAssessment: labAssessmentSchema.nullish(),
     isGuidedLab: z.boolean().optional(),
     guidedLabMastery: z
       .object({

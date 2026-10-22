@@ -1,3 +1,4 @@
+import { restoreLabAttempt } from "@/lib/bugfix/guided-lab/assessment/restore"
 import type { RestoredSessionInputs } from "@/lib/interview/session-lifecycle/checkpoint"
 import {
   recoverLocalCheckpoint,
@@ -294,6 +295,7 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
                 if (recovered.testResults) opts.setTestResults(recovered.testResults)
                 if (recovered.consoleLogs)
                   opts.setConsoleLogs(recovered.consoleLogs as ConsoleLogEntry[])
+                restoreLabAttempt(scenario.id, guestSessionId, recovered.guidedLabProgress)
                 if (recovered.bugfixEvidenceEvents)
                   opts.setBugfixEvidenceEvents(
                     recovered.bugfixEvidenceEvents as unknown as BugfixEvidenceEvent[]
@@ -536,6 +538,7 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
               opts.setConsoleLogs(savedState.consoleLogs as typeof opts.consoleLogs)
             }
             if (scenario.type === "bugfix") {
+              restoreLabAttempt(scenario.id, sessionId, savedState.guidedLabProgress)
               opts.setBugfixEvidenceEvents(
                 (savedState.bugfixEvidenceEvents as unknown as BugfixEvidenceEvent[]) || []
               )

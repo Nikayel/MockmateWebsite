@@ -1,3 +1,4 @@
+import { parseGuidedLabProgress } from "@/lib/bugfix/guided-lab/persistence"
 /**
  * Zod Validation Schemas for API Routes
  *
@@ -203,6 +204,7 @@ export const GuestSessionUpdateSchema = z.object({
         .optional(),
       activeWorkspacePath: z.string().max(1000).nullable().optional(),
       consoleLogs: z.array(BoundedStateElement).max(500, "Too many console logs").optional(),
+      guidedLabProgress: z.unknown().transform(parseGuidedLabProgress).optional(),
       bugfixEvidenceEvents: z
         .array(BoundedStateElement)
         .max(500, "Too many evidence events")

@@ -118,6 +118,7 @@ export async function POST(request: NextRequest) {
       bugfixPostSessionReport,
       isGuidedLab,
       guidedLabMastery,
+      guidedLabAssessment,
       conversationTranscript,
     } = validation.data
 
@@ -180,7 +181,7 @@ export async function POST(request: NextRequest) {
     }
 
     const masteryResult = calculateMasteryScore(masteryInput)
-    const masteryScore = masteryResult.masteryScore
+    let masteryScore = masteryResult.masteryScore
 
     // Technical = Mastery: the persisted technical_score is the mastery score (test pass rate,
     // time, and independence), the single technical signal shared with spaced repetition. This
@@ -194,12 +195,25 @@ export async function POST(request: NextRequest) {
     // readiness fields, and store a labeled mastery/practice signal instead. The
     // mastery NUMBER is the test-pass-rate mastery (same basis as Case Labs).
     const passRate = testsTotal > 0 ? Math.round((testsPassed / testsTotal) * 100) : 0
-    const scenarioForRun = scenarioId ? getScenarioById(scenarioId) : undefined
+    const ownedScenarioId = sessionSnapshot.get("scenario_id")
+    const scenarioForRun =
+      typeof ownedScenarioId === "string"
+        ? getScenarioById(ownedScenarioId)
+        : scenarioId
+          ? getScenarioById(scenarioId)
+          : undefined
     const isGuidedLabRun =
       Boolean(isGuidedLab) ||
       (scenarioForRun?.type === "bugfix" && Boolean(scenarioForRun.guidedLab))
+    if (isGuidedLabRun) masteryScore = passRate
     const guidedLabMasterySummary = isGuidedLabRun
-      ? { masteryScore, passRate, testsPassed, testsTotal, ...(guidedLabMastery ?? {}) }
+      ? {
+          masteryScore,
+          passRate,
+          testsPassed,
+          testsTotal,
+          ...(guidedLabMastery ?? {}),
+        }
       : undefined
 
     logger.info("[Feedback Persist] Scores calculated", {
@@ -260,16 +274,18 @@ export async function POST(request: NextRequest) {
       performance_score: isGuidedLabRun ? masteryScore : scores.overall,
       mastery_score: masteryScore,
       technical_score: isGuidedLabRun ? null : technicalScore,
-      efficiency_score: masteryResult.components.timeEfficiencyScore,
+      efficiency_score: isGuidedLabRun ? null : masteryResult.components.timeEfficiencyScore,
 
       // Score breakdown (for detailed display)
-      score_breakdown: {
-        understandingScore: scores.understanding,
-        problemSolvingScore: scores.problemSolving,
-        codeQualityScore: scores.codeQuality,
-        communicationScore: scores.communication,
-        overallScore: scores.overall,
-      },
+      score_breakdown: isGuidedLabRun
+        ? null
+        : {
+            understandingScore: scores.understanding,
+            problemSolvingScore: scores.problemSolving,
+            codeQualityScore: scores.codeQuality,
+            communicationScore: scores.communication,
+            overallScore: scores.overall,
+          },
 
       // Structured feedback
       structured_feedback: {
@@ -294,14 +310,17 @@ export async function POST(request: NextRequest) {
       ...(isGuidedLabRun && {
         is_guided_lab: true,
         guided_lab_mastery: guidedLabMasterySummary,
+        guided_lab_assessment: guidedLabAssessment ?? null,
       }),
 
       // Mastery breakdown (for analytics/debugging)
-      mastery_breakdown: {
-        masteryScore: masteryScore,
-        components: masteryResult.components,
-        timeAnalysis: masteryResult.timeAnalysis,
-      },
+      mastery_breakdown: isGuidedLabRun
+        ? null
+        : {
+            masteryScore: masteryScore,
+            components: masteryResult.components,
+            timeAnalysis: masteryResult.timeAnalysis,
+          },
 
       // Timestamps
       feedback_persisted_at: FieldValue.serverTimestamp(),
@@ -352,8 +371,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       masteryScore,
-      technicalScore,
-      overallScore: scores.overall,
+      technicalScore: isGuidedLabRun ? null : technicalScore,
+      overallScore: isGuidedLabRun ? masteryScore : scores.overall,
       silentNotesCount: silentNotes.length,
       latencyMs,
     })

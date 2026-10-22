@@ -10,18 +10,22 @@
  */
 
 import { z } from "zod"
+import { labEvidenceSchema } from "./assessment/schema"
 import type { GuidedLabProgress } from "./types"
 
 const progressSchema = z.object({
   version: z.enum(["bookclub-guided-v1", "bookclub-guided-v2"]),
-  currentMilestoneId: z.string(),
-  milestoneStatus: z.record(z.enum(["locked", "active", "done"])),
-  activeBugId: z.string().optional(),
-  quizAnswers: z.array(
-    z.object({ quizId: z.string(), selectedIndex: z.number().int().nonnegative() })
-  ),
-  checkpointAcks: z.array(z.string()),
-  updatedAt: z.string(),
+  currentMilestoneId: z.string().max(100),
+  milestoneStatus: z
+    .record(z.enum(["locked", "active", "done"]))
+    .refine((status) => Object.keys(status).length <= 20),
+  activeBugId: z.string().max(100).optional(),
+  quizAnswers: z
+    .array(z.object({ quizId: z.string().max(100), selectedIndex: z.number().int().nonnegative() }))
+    .max(100),
+  checkpointAcks: z.array(z.string().max(100)).max(100),
+  updatedAt: z.string().max(100),
+  evidence: labEvidenceSchema.optional().catch(undefined),
 })
 
 export function parseGuidedLabProgress(value: unknown): GuidedLabProgress | null {

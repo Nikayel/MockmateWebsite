@@ -1,3 +1,4 @@
+import type { LabAssessment, LabEvidence } from "@/lib/bugfix/guided-lab/assessment/schema"
 import type { SessionContext } from "@/lib/interview/session-context/schema"
 /**
  * Streaming Feedback Hook
@@ -23,7 +24,6 @@ import type { SessionContext } from "@/lib/interview/session-context/schema"
 
 import { useState, useCallback, useRef } from "react"
 import { logger } from "@/lib/logger"
-import { getGuidedLabMasterySummary } from "@/lib/stores/guided-lab-store"
 import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import { REFUSAL_TITLES, isKnownRefusalCode } from "@/lib/interview/refusal-copy"
 import { trackEvent } from "@/lib/analytics"
@@ -54,6 +54,7 @@ export interface StreamingFeedback {
   silentNotes?: SilentNote[]
   bugfixEvidenceSummary?: unknown
   bugfixScoreBreakdown?: unknown
+  guidedLabAssessment?: LabAssessment | null
   bugfixPostSessionReport?: unknown
   scores: StreamingScores
 }
@@ -211,6 +212,7 @@ export interface StreamingFeedbackRequest {
   efficiencyMetrics?: unknown
   submittedFromPhase?: string
   testsRanBeforeSubmit?: boolean
+  guidedLabEvidence?: LabEvidence
   bugfixEvidenceEvents?: unknown[]
   bugfixExpectedTouchedFiles?: string[]
   bugfixHypothesis?: string
@@ -326,6 +328,7 @@ export function useStreamingFeedback() {
             bugfixEvidenceSummary: feedback.bugfixEvidenceSummary,
             bugfixScoreBreakdown: feedback.bugfixScoreBreakdown,
             bugfixPostSessionReport: feedback.bugfixPostSessionReport,
+            guidedLabAssessment: feedback.guidedLabAssessment,
             testsPassed: request.testsPassed,
             testsTotal: request.testsTotal,
             // Use the real elapsed time; a 0-second session must persist as 0
@@ -340,7 +343,6 @@ export function useStreamingFeedback() {
             // Guided-lab practice signal (quiz accuracy / milestone completion);
             // undefined for non-guided runs. Server also detects guided runs via
             // scenarioId, so this only ENRICHES the mastery summary.
-            guidedLabMastery: getGuidedLabMasterySummary(request.scenarioId),
             scenarioPattern: request.scenarioPattern,
             conversationTranscript: request.conversationTranscript,
             efficiencyMetrics: request.efficiencyMetrics,

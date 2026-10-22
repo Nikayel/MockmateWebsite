@@ -1,3 +1,4 @@
+import { getGuidedAttemptProgress } from "@/lib/stores/guided-lab-store"
 import { useCallback, useEffect, useRef } from "react"
 import type { User as FirebaseUser } from "firebase/auth"
 import type { Scenario } from "@/lib/scenarios"
@@ -91,6 +92,7 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
       activeWorkspacePath: opts.activeWorkspacePath,
       consoleLogs: opts.consoleLogs,
       bugfixEvidenceEvents: opts.bugfixEvidenceEvents,
+      guidedLabProgress: getGuidedAttemptProgress(selectedScenario.id, opts.currentSessionId),
       isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
       testRunRevision: opts.testRunRevision ?? null,
       realInterviewMode: opts.realInterviewMode,
@@ -120,6 +122,7 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
       activeWorkspacePath: opts.activeWorkspacePath,
       consoleLogs: opts.consoleLogs,
       bugfixEvidenceEvents: opts.bugfixEvidenceEvents,
+      guidedLabProgress: getGuidedAttemptProgress(selectedScenario.id, opts.currentSessionId),
       isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
       testRunRevision: opts.testRunRevision ?? null,
       realInterviewMode: opts.realInterviewMode,
@@ -163,6 +166,10 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
               activeWorkspacePath: opts.activeWorkspacePath,
               consoleLogs: opts.consoleLogs,
               bugfixEvidenceEvents: opts.bugfixEvidenceEvents,
+              guidedLabProgress: getGuidedAttemptProgress(
+                selectedScenario.id,
+                opts.currentSessionId
+              ),
               isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
               realInterviewMode: opts.realInterviewMode,
               strictTimeLimit: opts.strictTimeLimit,
@@ -199,6 +206,10 @@ export function useInterviewAutosave(opts: UseInterviewAutosaveOptions) {
                   activeWorkspacePath: opts.activeWorkspacePath,
                   consoleLogs: opts.consoleLogs,
                   bugfixEvidenceEvents: opts.bugfixEvidenceEvents,
+                  guidedLabProgress: getGuidedAttemptProgress(
+                    selectedScenario.id,
+                    opts.currentSessionId
+                  ),
                   isPostInterviewDiscussion: opts.showPostInterviewDiscussion,
                   realInterviewMode: opts.realInterviewMode,
                   strictTimeLimit: opts.strictTimeLimit,

@@ -1,3 +1,5 @@
+import { applyGuidedLabGating } from "@/lib/bugfix/guided-lab/assessment/execution"
+import { captureLabCheckpoint } from "@/lib/bugfix/guided-lab/assessment/capture"
 import {
   captureSessionRequest,
   type SessionRequestGuard,
@@ -31,24 +33,6 @@ import {
 import { isGuidedLabComplete } from "@/lib/bugfix/guided-lab/gating"
 import { useGuidedLabStore } from "@/lib/stores/guided-lab-store"
 import { persistGuestPostSubmitState } from "../_lib/persist-guest-post-submit"
-
-/**
- * Feed workspace test results into the guided-lab gating store. For workspace
- * scenarios the execute API encodes each result's suite as `input`, so we map
- * that to {suite, passed}. No-op unless a guided lab is active.
- */
-function applyGuidedLabGating(
-  scenarioId: string | undefined,
-  results: TestResult[],
-  sourceRevision: number
-): void {
-  const store = useGuidedLabStore.getState()
-  if (!store.config || !scenarioId || store.scenarioId !== scenarioId) return
-  store.applyTestResults(
-    results.map((result) => ({ suite: String(result.input ?? ""), passed: result.passed })),
-    sourceRevision
-  )
-}
 
 /**
  * Inputs/dependencies for {@link useCodeExecution}. The interview page owns the
@@ -169,7 +153,9 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
   const runCode = async () => {
     if (!selectedScenario || opts.isActive?.() === false) return
     const isCurrent = captureSessionRequest(opts)
+    captureLabCheckpoint(selectedScenario.id, workspaceContext)
     const sourceRevision = useGuidedLabStore.getState().sourceRevision
+    const labPhaseId = useGuidedLabStore.getState().progress?.currentMilestoneId
 
     setIsRunningTests(true)
     setTestResults([])
@@ -208,7 +194,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
         setTestResults(data.results)
         setPackRun(data.kind === "pack" ? data.packRun : null)
         setTestSummary(data.summary)
-        applyGuidedLabGating(selectedScenario.id, data.results, sourceRevision)
+        applyGuidedLabGating(selectedScenario.id, data.results, sourceRevision, labPhaseId)
         updateTrackerOnTestsRun()
         if (selectedScenario.type === "bugfix") {
           recordBugfixEvidence({
@@ -325,7 +311,9 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
   const submitCode = async () => {
     if (!selectedScenario || opts.isActive?.() === false) return
     const isCurrent = captureSessionRequest(opts)
+    captureLabCheckpoint(selectedScenario.id, workspaceContext)
     const sourceRevision = useGuidedLabStore.getState().sourceRevision
+    const labPhaseId = useGuidedLabStore.getState().progress?.currentMilestoneId
 
     setIsRunningTests(true)
     setTestResults([])
@@ -364,7 +352,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
         setTestResults(data.results)
         setPackRun(data.kind === "pack" ? data.packRun : null)
         setTestSummary(data.summary)
-        applyGuidedLabGating(selectedScenario.id, data.results, sourceRevision)
+        applyGuidedLabGating(selectedScenario.id, data.results, sourceRevision, labPhaseId)
         const guided = useGuidedLabStore.getState()
         if (
           guided.scenarioId === selectedScenario.id &&

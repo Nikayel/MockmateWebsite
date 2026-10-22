@@ -1,3 +1,5 @@
+import type { LabEvidence } from "./assessment/schema"
+
 /**
  * Guided Bug-Fix Lab
  *
@@ -87,4 +89,5 @@ export interface GuidedLabProgress {
   quizAnswers: { quizId: string; selectedIndex: number }[]
   checkpointAcks: string[]
   updatedAt: string
+  evidence?: LabEvidence
 }

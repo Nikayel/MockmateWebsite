@@ -270,7 +270,7 @@ export default function SessionDetailPage() {
                     {Math.round(session.performance_score)}%
                   </div>
                   <div className="text-muted-foreground text-[10px] tracking-wider uppercase">
-                    Score
+                    {session.is_guided_lab ? "Workspace checks" : "Score"}
                   </div>
                 </div>
               )}
@@ -284,6 +284,8 @@ export default function SessionDetailPage() {
           session.completed_at &&
           (feedbackStatus === "complete" || !feedbackStatus) ? (
             <PracticeFeedback
+              isGuidedLab={session.is_guided_lab}
+              guidedLabAssessment={session.guided_lab_assessment}
               sessionId={session.id}
               feedbackSurface="saved_session"
               feedback={session.feedback}

@@ -1,3 +1,4 @@
+import { parseGuidedLabProgress } from "@/lib/bugfix/guided-lab/persistence"
 import { z } from "zod"
 import { EDITOR_LANGUAGES } from "@/lib/interview/languages"
 import type { getSessionState } from "@/lib/firestore-helpers"
@@ -26,6 +27,7 @@ const checkpoint = z.object({
     .object({ total: z.number(), passed: z.number(), failed: z.number(), passRate: z.number() })
     .optional(),
   consoleLogs: z.array(z.record(z.unknown())).optional(),
+  guidedLabProgress: z.unknown().transform(parseGuidedLabProgress).optional(),
   bugfixEvidenceEvents: z.array(z.record(z.unknown())).optional(),
   isPostInterviewDiscussion: z.boolean().optional(),
   strictDeadlineAt: z.number().nullable().optional(),
@@ -54,6 +56,7 @@ export function normalizeStoredCheckpoint(raw: unknown) {
     testSummary: stored.test_summary,
     consoleLogs: stored.console_logs,
     bugfixEvidenceEvents: stored.bugfix_evidence_events,
+    guidedLabProgress: stored.guided_lab_progress,
     isPostInterviewDiscussion: stored.is_post_interview_discussion,
     paused: stored.paused,
     interviewerInput: stored.interviewer_input,

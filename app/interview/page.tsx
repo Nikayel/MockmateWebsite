@@ -2,6 +2,8 @@
 
 import type { RestoredSessionInputs } from "@/lib/interview/session-lifecycle/checkpoint"
 
+import { useGuidedLabStore } from "@/lib/stores/guided-lab-store"
+
 import { buildSessionContext, workspaceRevision } from "@/lib/interview/session-context/snapshot"
 import { SessionPauseNotice } from "./_components/SessionPauseNotice"
 import { useInterviewLifecycle } from "./_hooks/useInterviewLifecycle"
@@ -462,6 +464,12 @@ function InterviewPageContent() {
     },
     [currentSessionId, selectedScenario?.type]
   )
+
+  const activeLabScenarioId = useGuidedLabStore((state) => state.scenarioId)
+  useEffect(() => {
+    if (currentSessionId && selectedScenario?.id === activeLabScenarioId)
+      useGuidedLabStore.getState().bindAttempt(selectedScenario.id, currentSessionId)
+  }, [currentSessionId, selectedScenario, activeLabScenarioId])
 
   const buildBugfixEvidencePayload = useCallback((): BugfixEvidenceEvent[] => {
     if (selectedScenario?.type !== "bugfix") return []
@@ -2079,7 +2087,21 @@ function InterviewPageContent() {
       fileInputRef,
       focusMode,
       handleFileUpload,
-      hintAgent: { revealHint: hintAgent.revealHint },
+      hintAgent: {
+        revealHint: (hintId: string) => {
+          hintAgent.revealHint(hintId)
+          if (selectedScenario) {
+            const hint = ragHints.find((entry) => entry.id === hintId)
+            useGuidedLabStore
+              .getState()
+              .observe(selectedScenario.id, {
+                kind: "hint",
+                text: (hint?.hint ?? "A generated hint was revealed.").slice(0, 3000),
+                truncated: (hint?.hint.length ?? 0) > 3000,
+              })
+          }
+        },
+      },
       hintFeedback,
       hintFetchStatus,
       hintsStale: hintAgent.hintsStale,
@@ -2393,6 +2415,10 @@ function InterviewPageContent() {
             />
           ) : (
             <InterviewFeedbackView
+              isGuidedLab={
+                selectedScenario?.type === "bugfix" && Boolean(selectedScenario.guidedLab)
+              }
+              guidedLabAssessment={streamingFeedback.state.feedback?.guidedLabAssessment}
               showPostInterviewDiscussion={showPostInterviewDiscussion}
               isFeedbackLoading={isFeedbackLoading}
               isFromRoadmap={isFromRoadmap}

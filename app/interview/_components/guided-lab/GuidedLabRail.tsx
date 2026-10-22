@@ -58,7 +58,9 @@ export function GuidedLabRail({ config, scenarioId, savedProgress }: GuidedLabRa
   return (
     <section aria-label="Guided debugging lab" className="space-y-3" data-guided-lab="rail">
       <p className="text-muted-foreground text-xs">
-        Follow the phases in order. Passing the current checks opens the next repair.
+        Follow the phases in order. Passing the current checks opens the next repair. Your chat
+        explanations, code checkpoints and test runs inform phase feedback. Hints and retries carry
+        no point penalty.
       </p>
       <p className="text-foreground text-sm font-medium" role="status" aria-live="polite">
         {complete

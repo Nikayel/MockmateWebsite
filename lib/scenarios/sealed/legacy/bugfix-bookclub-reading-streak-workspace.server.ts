@@ -11,6 +11,11 @@ export const sealed: SealedLegacyScenario = {
   groundTruth:
     "Streaks aggregate started_at instead of finished_at. History sorts by started_at and its cursor drops equal-time events. Monthly totals compare UTC year/month instead of reader-local values. Dashboard caching uses a global key and aliases mutable response objects; key by reader, date, offset and revision, and copy snapshots on read/write.",
   rootCauseRubric: [
+    "Restore streaks: explain completion-day semantics; use finished_at, unique dates, and consecutive days without changing page totals.",
+    "Repair history: explain finished_at/event-ID ordering and cursor ties; preserve rereads and verify multiple pages.",
+    "Reconcile calendars: explain reader-local month/year boundaries, fractional offsets and New Year; preserve UTC storage.",
+    "Refresh dashboards: explain reader/date/offset/revision identity, post-mutation freshness and object ownership across repeated requests.",
+    "Release check: verify all contracts together on the final code revision; passing checks alone do not prove causal understanding.",
     "Reproduces each failure before editing.",
     "Distinguishes identity, ordering, calendar and cache ownership contracts.",
     "Preserves existing behavior and verifies the full request path.",

@@ -1,3 +1,4 @@
+import { getGuidedAttemptProgress } from "@/lib/stores/guided-lab-store"
 import { buildConversationTimeline } from "@/lib/interview/session-context/conversation"
 import type { SessionContext } from "@/lib/interview/session-context/schema"
 import { useRef } from "react"
@@ -287,6 +288,10 @@ export function useInterviewFeedback(
             // For mastery score calculation in persist endpoint
             hintsUsed: hintsUsedCount,
             elapsedTimeSeconds: opts.elapsedTime,
+            guidedLabEvidence: getGuidedAttemptProgress(
+              opts.selectedScenario.id,
+              opts.currentSessionId
+            )?.evidence,
             bugfixEvidenceEvents: bugfixEvidencePayload,
             bugfixExpectedTouchedFiles,
             // The root-cause rubric and ground truth are NOT posted from the client:

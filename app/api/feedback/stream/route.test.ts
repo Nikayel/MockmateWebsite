@@ -15,6 +15,7 @@ import { buildSessionContext } from "@/lib/interview/session-context/snapshot"
 const mocks = vi.hoisted(() => ({
   verifyAuthEdge: vi.fn(),
   generateFeedbackResponseEdge: vi.fn(),
+  generateAIResponseEdge: vi.fn(),
   validateConversationEdge: vi.fn(),
   extractConversationEvidenceEdge: vi.fn(),
   analyzeTranscriptForMistakesEdge: vi.fn(),
@@ -27,6 +28,7 @@ vi.mock("@/lib/auth-edge", () => ({ verifyAuthEdge: mocks.verifyAuthEdge }))
 
 vi.mock("@/lib/ai-providers-edge", () => ({
   generateFeedbackResponseEdge: mocks.generateFeedbackResponseEdge,
+  generateAIResponseEdge: mocks.generateAIResponseEdge,
   validateConversationEdge: mocks.validateConversationEdge,
   extractConversationEvidenceEdge: mocks.extractConversationEvidenceEdge,
 }))
@@ -609,5 +611,82 @@ describe("/api/feedback/stream cost bounds", () => {
       expect(feedbackPrompt).toContain("Approach explained: YES")
       expect(feedbackPrompt).toContain("Complexity discussed: YES")
     })
+  })
+})
+
+describe("guided lab stream integration", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+    mocks.verifyAuthEdge.mockResolvedValue({ authenticated: true, userId: USER_ID })
+    mocks.enforceFeedbackStreamRateLimit.mockResolvedValue(null)
+  })
+  it("returns phase findings instead of the interview rubric and makes only one model call", async () => {
+    const { emptyLabEvidence, appendLabEvidence } =
+      await import("@/lib/bugfix/guided-lab/assessment/evidence")
+    const { unobservedReview } = await import("@/lib/bugfix/guided-lab/assessment/report")
+    const log = {
+      ...appendLabEvidence(emptyLabEvidence(), "m2-streak", {
+        kind: "message",
+        role: "candidate",
+        lane: "interviewer",
+        text: "The completion-day contract requires finished_at.",
+        truncated: false,
+      }),
+      attemptId: "attempt",
+    }
+    const review = unobservedReview("m2-streak")
+    review.communication = {
+      status: "demonstrated",
+      feedback: "Explained the date contract.",
+      evidenceIds: ["e0"],
+    }
+    mocks.generateAIResponseEdge.mockResolvedValue({
+      text: JSON.stringify({ phases: [review] }),
+      provider: "openai",
+      latencyMs: 1,
+    })
+    const { POST } = await import("./route")
+    const stream = await drain(
+      await POST(
+        makeRequest({
+          sessionId: "attempt",
+          scenarioId: "bugfix-bookclub-reading-streak-workspace",
+          scenarioType: "bugfix",
+          code: "pass",
+          guidedLabEvidence: log,
+          testsPassed: 36,
+          testsTotal: 36,
+        })
+      )
+    )
+    const feedback = readSseEvent<{
+      guidedLabAssessment: { phases: Array<{ review: { communication: { status: string } } }> }
+      bugfixScoreBreakdown: unknown
+      tldr: string
+    }>(stream, "feedback")
+    expect(feedback.guidedLabAssessment.phases[1].review.communication.status).toBe("demonstrated")
+    expect(feedback.bugfixScoreBreakdown).toBeNull()
+    expect(feedback.tldr).not.toContain("Interview score")
+    expect(mocks.generateAIResponseEdge).toHaveBeenCalledTimes(1)
+    expect(mocks.generateFeedbackResponseEdge).not.toHaveBeenCalled()
+    expect(mocks.validateConversationEdge).not.toHaveBeenCalled()
+    expect(mocks.extractConversationEvidenceEdge).not.toHaveBeenCalled()
+  })
+  it("rejects evidence from a different attempt before calling a model", async () => {
+    const { emptyLabEvidence } = await import("@/lib/bugfix/guided-lab/assessment/evidence")
+    const { POST } = await import("./route")
+    const stream = await drain(
+      await POST(
+        makeRequest({
+          sessionId: "attempt",
+          scenarioId: "bugfix-bookclub-reading-streak-workspace",
+          scenarioType: "bugfix",
+          guidedLabEvidence: { ...emptyLabEvidence(), attemptId: "another" },
+        })
+      )
+    )
+    expect(readSseEvent<{ message: string }>(stream, "error").message).toContain("another attempt")
+    expect(mocks.generateAIResponseEdge).not.toHaveBeenCalled()
   })
 })

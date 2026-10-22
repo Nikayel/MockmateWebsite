@@ -1,3 +1,4 @@
+import type { GuidedLabProgress } from "@/lib/bugfix/guided-lab/types"
 interface SavedMessage {
   type: string
   message: string
@@ -25,6 +26,7 @@ export interface SessionCheckpoint {
   workspaceContext?: Array<Record<string, unknown>>
   activeWorkspacePath?: string | null
   consoleLogs?: Array<Record<string, unknown>>
+  guidedLabProgress?: GuidedLabProgress
   bugfixEvidenceEvents?: unknown[]
   bugfixHypothesis?: string
   bugfixRootCause?: string
@@ -55,6 +57,7 @@ export function serializeCheckpoint(state: SessionCheckpoint, testResults: unkno
       active_workspace_path: state.activeWorkspacePath,
       console_logs: state.consoleLogs,
       bugfix_evidence_events: state.bugfixEvidenceEvents,
+      guided_lab_progress: state.guidedLabProgress,
       bugfix_hypothesis: state.bugfixHypothesis,
       bugfix_root_cause: state.bugfixRootCause,
       bugfix_prevention: state.bugfixPrevention,

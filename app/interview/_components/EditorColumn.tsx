@@ -1,5 +1,7 @@
 "use client"
 
+import { seedLabCheckpoint } from "@/lib/bugfix/guided-lab/assessment/capture"
+
 import { memo, useMemo, useEffect, useRef, type RefObject, type ReactNode } from "react"
 import { Code, PlayCircle } from "lucide-react"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
@@ -115,6 +117,11 @@ export const EditorColumn = memo(function EditorColumn({
     .filter((file) => file.role === "editable")
     .map((file) => `${file.path}:${file.content}`)
     .join("\n")
+  const captureGeneration = useGuidedLabStore((state) => state.captureGeneration)
+  useEffect(() => {
+    if (selectedScenario && guidedLabActiveForScenario)
+      seedLabCheckpoint(selectedScenario.id, workspaceContext)
+  }, [selectedScenario, guidedLabActiveForScenario, workspaceContext, captureGeneration])
   const previousSource = useRef<string | undefined>(undefined)
   useEffect(() => {
     if (

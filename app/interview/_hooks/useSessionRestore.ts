@@ -1,3 +1,4 @@
+import { restoreLabAttempt } from "@/lib/bugfix/guided-lab/assessment/restore"
 import type { RestoredSessionInputs } from "@/lib/interview/session-lifecycle/checkpoint"
 import { useEffect, type Dispatch, type SetStateAction } from "react"
 import type { User as FirebaseUser } from "firebase/auth"
@@ -99,6 +100,7 @@ export function useSessionRestore(opts: UseSessionRestoreOptions) {
         const saved = recoverLocalCheckpoint(remote, storageKey, sessionId)
         if (!saved) return
         opts.setCurrentSessionId(sessionId)
+        restoreLabAttempt(opts.selectedScenario!.id, sessionId, saved.guidedLabProgress)
         opts.setCode(saved.code ?? "")
         opts.setChatMessages((saved.chatMessages ?? []) as ChatMessage[])
         opts.setInterviewerMessages((saved.interviewerMessages ?? []) as ChatMessage[])

@@ -30,6 +30,8 @@ const ProfilePersonalizationPrompt = nextDynamic(
 type PracticeFeedbackProps = ComponentProps<typeof PracticeFeedback>
 
 interface InterviewFeedbackViewProps {
+  isGuidedLab?: boolean
+  guidedLabAssessment?: PracticeFeedbackProps["guidedLabAssessment"]
   showPostInterviewDiscussion: boolean
   isFeedbackLoading: boolean
   isFromRoadmap: boolean
@@ -101,6 +103,8 @@ interface InterviewFeedbackViewProps {
  * pre-computed in the page; this component only selects and renders.
  */
 export function InterviewFeedbackView({
+  isGuidedLab,
+  guidedLabAssessment,
   showPostInterviewDiscussion,
   isFeedbackLoading,
   isFromRoadmap,
@@ -204,6 +208,8 @@ export function InterviewFeedbackView({
       <ErrorBoundary>
         <PracticeFeedback
           contained
+          isGuidedLab={isGuidedLab}
+          guidedLabAssessment={guidedLabAssessment}
           feedback={feedback}
           sessionId={sessionId}
           performanceScore={performanceScore}

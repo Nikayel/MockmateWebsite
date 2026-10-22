@@ -1,3 +1,4 @@
+import type { GuidedLabProgress } from "@/lib/bugfix/guided-lab/types"
 import { normalizeStoredCheckpoint } from "./interview/session-lifecycle/recovery"
 import {
   serializeCheckpoint,
@@ -932,6 +933,7 @@ export async function getSessionState(sessionId: string): Promise<{
   workspaceContext?: Array<Record<string, unknown>>
   activeWorkspacePath?: string | null
   consoleLogs?: Array<Record<string, unknown>>
+  guidedLabProgress?: GuidedLabProgress | null
   bugfixEvidenceEvents?: Array<Record<string, unknown>>
   bugfixHypothesis?: string
   bugfixRootCause?: string
@@ -971,6 +973,7 @@ export async function getSessionState(sessionId: string): Promise<{
       workspaceContext?: Array<Record<string, unknown>>
       activeWorkspacePath?: string | null
       consoleLogs?: Array<Record<string, unknown>>
+      guidedLabProgress?: GuidedLabProgress | null
       bugfixEvidenceEvents?: Array<Record<string, unknown>>
       bugfixHypothesis?: string
       bugfixRootCause?: string

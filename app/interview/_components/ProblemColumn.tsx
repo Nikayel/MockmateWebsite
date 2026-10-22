@@ -1,5 +1,7 @@
 "use client"
 
+import { useGuidedLabStore } from "@/lib/stores/guided-lab-store"
+
 import { memo, type Dispatch, type RefObject, type SetStateAction } from "react"
 import { ChevronDown, ChevronUp, Clock, HardDrive, HelpCircle, Lightbulb } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -325,6 +327,13 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                                       onClick={() => {
                                         if (!isHintRevealed) {
                                           setRevealedHintIndices((prev) => new Set([...prev, i]))
+                                          useGuidedLabStore
+                                            .getState()
+                                            .observe(selectedScenario.id, {
+                                              kind: "hint",
+                                              text: hint.slice(0, 3000),
+                                              truncated: hint.length > 3000,
+                                            })
                                         }
                                       }}
                                     >

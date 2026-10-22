@@ -47,3 +47,5 @@ These are design decisions informed by guidance, not a claim of usability-study 
 - Browser fixture: `pnpm exec playwright test --config playwright.bookclub.config.ts`
   exercises the real gallery, phase rail, editor, and Python worker with synthetic
   fixtures. Authentication and AI scoring are outside this isolated browser check.
+
+Phase assessment now links recorded explanations, source checkpoints and test runs. See [the assessment design and code walkthrough](phase-assessment.md) for contracts, recovery, failure handling and implementation lessons.

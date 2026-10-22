@@ -1,3 +1,8 @@
+import { captureLabCheckpoint, captureLabMessage } from "@/lib/bugfix/guided-lab/assessment/capture"
+import { applyGuidedLabGating } from "@/lib/bugfix/guided-lab/assessment/execution"
+import { buildLabAssessment } from "@/lib/bugfix/guided-lab/assessment/report"
+import { labAssessmentSchema } from "@/lib/bugfix/guided-lab/assessment/schema"
+import { GuidedLabReview } from "@/components/practice/GuidedLabReview"
 import { useState } from "react"
 import { createRoot } from "react-dom/client"
 import { ScenarioBrowser } from "@/components/interview/ScenarioBrowser"
@@ -34,10 +39,16 @@ function App() {
   const [results, setResults] = useState<TestResult[]>([])
   const [running, setRunning] = useState(false)
   const [error, setError] = useState("")
-  const [submitted, setSubmitted] = useState(false)
+  const [submitted, setSubmitted] = useState(params.has("review"))
+  const [explanation, setExplanation] = useState("")
+  const savedAssessment = labAssessmentSchema.safeParse(
+    JSON.parse(sessionStorage.getItem("bookclub-assessment") ?? "null")
+  )
   const active = files.find((file) => file.path === path)!
   async function run() {
+    captureLabCheckpoint(scenario.id, files)
     const sourceRevision = useGuidedLabStore.getState().sourceRevision
+    const phaseId = useGuidedLabStore.getState().progress?.currentMilestoneId
     setRunning(true)
     const output = await executeWorkspaceScenarioPythonClientSide(
       scenario as WorkspaceScenario,
@@ -54,13 +65,31 @@ function App() {
         error: row.error ?? null,
       }))
     )
-    useGuidedLabStore.getState().applyTestResults(output.results, sourceRevision)
+    applyGuidedLabGating(
+      scenario.id,
+      output.results.map((row) => ({
+        description: row.name,
+        input: row.suite,
+        passed: row.passed,
+        error: row.error ?? null,
+      })),
+      sourceRevision,
+      phaseId
+    )
     setRunning(false)
   }
   const passed = results.filter((result) => result.passed).length
   return (
     <TooltipProvider>
-      {!started ? (
+      {submitted && savedAssessment.success ? (
+        <GuidedLabReview
+          contained
+          assessment={savedAssessment.data}
+          testsPassed={36}
+          testsTotal={36}
+          problemTitle={scenario.title}
+        />
+      ) : !started ? (
         <ScenarioBrowser
           usageLimit={null}
           completedProblems={[]}
@@ -77,6 +106,22 @@ function App() {
               <GuidedLabRail config={scenario.guidedLab!} scenarioId={scenario.id} />
             </aside>
             <section className="min-w-0">
+              <label className="block text-sm">
+                Explain your diagnosis
+                <input
+                  aria-label="Explain your diagnosis"
+                  value={explanation}
+                  onChange={(e) => setExplanation(e.target.value)}
+                />
+              </label>
+              <button
+                onClick={() => {
+                  captureLabMessage(scenario.id, "candidate", "interviewer", explanation)
+                  setExplanation("")
+                }}
+              >
+                Record explanation
+              </button>
               <label className="mb-2 block text-sm">
                 Workspace file
                 <select
@@ -135,7 +180,14 @@ function App() {
                   onClearConsole={noop}
                   onSubmitSystemDesign={noop}
                   onRunCode={run}
-                  onSubmitCode={() => setSubmitted(true)}
+                  onSubmitCode={() => {
+                    const report = buildLabAssessment(
+                      scenario.guidedLab!,
+                      useGuidedLabStore.getState().progress?.evidence
+                    )
+                    sessionStorage.setItem("bookclub-assessment", JSON.stringify(report))
+                    setSubmitted(true)
+                  }}
                   onSelectedLanguageChange={noop}
                   workspaceContext={files}
                 />

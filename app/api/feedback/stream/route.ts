@@ -1,3 +1,9 @@
+import { evidenceMatchesLab } from "@/lib/bugfix/guided-lab/assessment/validation"
+import { summarizeLabFeedback } from "@/lib/bugfix/guided-lab/assessment/summary"
+import { getScenarioById } from "@/lib/scenarios"
+import { labEvidenceSchema } from "@/lib/bugfix/guided-lab/assessment/schema"
+import { buildLabAssessment } from "@/lib/bugfix/guided-lab/assessment/report"
+import { reviewLabAssessment } from "@/lib/bugfix/guided-lab/assessment/review.server"
 import { sessionContextSchema } from "@/lib/interview/session-context/schema"
 import {
   buildSessionBaselinePrompt,
@@ -520,6 +526,40 @@ export async function POST(request: NextRequest) {
         hintsUsed,
       } = body
 
+      const guidedScenario =
+        typeof scenarioId === "string" ? getScenarioById(scenarioId) : undefined
+      const guidedConfig = guidedScenario?.type === "bugfix" ? guidedScenario.guidedLab : undefined
+      const parsedLabEvidence = labEvidenceSchema.safeParse(body.guidedLabEvidence)
+      if (
+        parsedLabEvidence.success &&
+        guidedConfig &&
+        !evidenceMatchesLab(
+          parsedLabEvidence.data,
+          guidedConfig,
+          sessionId,
+          guidedScenario?.type === "bugfix"
+            ? (guidedScenario.workspace?.editableFilePaths ?? [])
+            : []
+        )
+      ) {
+        await sendEvent("error", {
+          message: "Phase evidence belongs to another attempt. Your session is preserved.",
+        })
+        return
+      }
+      if (body.guidedLabEvidence !== undefined && !parsedLabEvidence.success) {
+        await sendEvent("error", {
+          message: "Phase evidence could not be validated. Your session is preserved.",
+        })
+        return
+      }
+      let guidedLabAssessment = guidedConfig
+        ? buildLabAssessment(
+            guidedConfig,
+            parsedLabEvidence.success ? parsedLabEvidence.data : undefined
+          )
+        : null
+
       const parsedSessionContext = sessionContextSchema.safeParse(body.sessionContext)
       if (
         body.sessionContext !== undefined &&
@@ -632,6 +672,14 @@ export async function POST(request: NextRequest) {
       })
 
       const instantScores = calculateInstantScores(signals)
+      if (guidedConfig)
+        Object.assign(instantScores, {
+          understanding: 0,
+          problemSolving: 0,
+          codeQuality: 0,
+          communication: 0,
+          overall: testsTotal ? Math.round((testsPassed / testsTotal) * 100) : 0,
+        })
 
       // Send instant scores immediately
       await sendEvent("scores", {
@@ -668,7 +716,7 @@ export async function POST(request: NextRequest) {
         aiCodeOverlap.hasHighOverlap &&
         !aiCodeOverlap.modificationsMade
       const bugfixEvidenceSummary: BugfixEvidenceSummary | null =
-        scenarioType === "bugfix" && Array.isArray(bugfixEvidenceEvents)
+        !guidedConfig && scenarioType === "bugfix" && Array.isArray(bugfixEvidenceEvents)
           ? summarizeBugfixEvidence({
               events: bugfixEvidenceEvents as BugfixEvidenceEvent[],
               netModifiedFiles:
@@ -828,110 +876,124 @@ export async function POST(request: NextRequest) {
         candidateCode: code,
       }
 
-      const [aiValidation, extractedEvidence, silentNotesAnalysis, bugfixSemanticScores] =
-        await Promise.all([
-          shouldValidateWithAI
-            ? validateConversationEdge(
-                transcriptMessages,
-                code,
-                efficiencyMetrics
-                  ? {
-                      time: efficiencyMetrics.estimatedTimeComplexity,
-                      space: efficiencyMetrics.estimatedSpaceComplexity,
-                    }
-                  : null,
-                trackEdgeSpend("feedback-validation")
-              ).catch((error) => {
-                // A degraded provider silently swaps in neutral defaults, which
-                // changes the score the user is shown. Without a log this is
-                // indistinguishable from a genuinely neutral session.
-                logger.error("[Streaming Feedback] Conversation validation failed", {
-                  scenarioType,
-                  error,
-                })
-                return getDefaultValidation()
+      const [
+        aiValidation,
+        extractedEvidence,
+        silentNotesAnalysis,
+        bugfixSemanticScores,
+        reviewedLab,
+      ] = await Promise.all([
+        !guidedConfig && shouldValidateWithAI
+          ? validateConversationEdge(
+              transcriptMessages,
+              code,
+              efficiencyMetrics
+                ? {
+                    time: efficiencyMetrics.estimatedTimeComplexity,
+                    space: efficiencyMetrics.estimatedSpaceComplexity,
+                  }
+                : null,
+              trackEdgeSpend("feedback-validation")
+            ).catch((error) => {
+              // A degraded provider silently swaps in neutral defaults, which
+              // changes the score the user is shown. Without a log this is
+              // indistinguishable from a genuinely neutral session.
+              logger.error("[Streaming Feedback] Conversation validation failed", {
+                scenarioType,
+                error,
               })
-            : Promise.resolve(getDefaultValidation()),
-          transcriptMessages.length > 0
-            ? extractConversationEvidenceEdge(
-                transcriptMessages,
-                problemContext,
-                trackEdgeSpend("feedback-extraction")
-              ).catch((error) => {
-                logger.error("[Streaming Feedback] Evidence extraction failed", {
-                  scenarioType,
-                  error,
-                })
-                return null
+              return getDefaultValidation()
+            })
+          : Promise.resolve(getDefaultValidation()),
+        !guidedConfig && transcriptMessages.length > 0
+          ? extractConversationEvidenceEdge(
+              transcriptMessages,
+              problemContext,
+              trackEdgeSpend("feedback-extraction")
+            ).catch((error) => {
+              logger.error("[Streaming Feedback] Evidence extraction failed", {
+                scenarioType,
+                error,
               })
-            : Promise.resolve(null),
-          // Generate silent notes if we don't have existing ones and have transcript
-          !existingSilentNotes?.length && transcriptMessages.length >= 2
-            ? analyzeTranscriptForMistakesEdge(
-                transcriptMessages.map((m) => ({
-                  role: m.role,
-                  content: m.content,
-                })),
-                problemContext,
-                trackEdgeSpend("feedback-transcript-analysis")
-              ).catch((error) => {
-                // Degrades the feedback rather than the score, so warn rather than
-                // error, but it still needs to leave the Edge log.
-                logger.warn("[Streaming Feedback] Silent notes analysis failed", {
-                  scenarioType,
-                  error,
-                })
-                return { silentNotes: [], analysisMetadata: null }
+              return null
+            })
+          : Promise.resolve(null),
+        // Generate silent notes if we don't have existing ones and have transcript
+        !guidedConfig && !existingSilentNotes?.length && transcriptMessages.length >= 2
+          ? analyzeTranscriptForMistakesEdge(
+              transcriptMessages.map((m) => ({
+                role: m.role,
+                content: m.content,
+              })),
+              problemContext,
+              trackEdgeSpend("feedback-transcript-analysis")
+            ).catch((error) => {
+              // Degrades the feedback rather than the score, so warn rather than
+              // error, but it still needs to leave the Edge log.
+              logger.warn("[Streaming Feedback] Silent notes analysis failed", {
+                scenarioType,
+                error,
               })
-            : Promise.resolve({ silentNotes: existingSilentNotes || [], analysisMetadata: null }),
-          scenarioType === "bugfix" &&
-          bugfixEvidenceSummary &&
-          bugfixScoreBreakdownPreSemantic &&
-          hasCandidateTurn
-            ? scoreBugfixSemantics(
-                {
-                  deterministicSubScores: bugfixScoreBreakdownPreSemantic,
-                  evidenceSummary: bugfixEvidenceSummary,
-                  rootCauseRubric:
-                    sealedRubric ??
-                    (Array.isArray(bugfixRootCauseRubric) ? bugfixRootCauseRubric : []),
-                  bugDescription:
-                    sealedGroundTruth ??
-                    (typeof bugfixGroundTruth === "string" ? bugfixGroundTruth : ""),
-                  // The transcript is now the ONLY place a candidate states their
-                  // hypothesis, root cause, and prevention (the three textareas that
-                  // used to carry them are gone). A hypothesis is stated EARLY, so the
-                  // last-10-messages window would routinely cut off the very evidence
-                  // hypothesisQuality is scored on. Send the whole conversation.
-                  workspaceEvidence,
-                  conversationExcerpt:
-                    fullAttributedTranscript ??
-                    fitTranscript(
-                      transcriptMessages
-                        .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-                        .join("\n\n")
-                    ),
-                },
-                trackEdgeSpend("bugfix-scoring")
-              ).catch((error) => {
-                // NEUTRAL is reserved for "the scorer itself was unavailable", which
-                // is exactly this branch. Log it so a persistently broken scorer is
-                // distinguishable from sessions that genuinely earned neutral.
-                logger.error("[Streaming Feedback] Bugfix semantic scorer failed", {
-                  scenarioId,
-                  error,
-                })
-                return BUGFIX_SEMANTIC_NEUTRAL
+              return { silentNotes: [], analysisMetadata: null }
+            })
+          : Promise.resolve({ silentNotes: existingSilentNotes || [], analysisMetadata: null }),
+        scenarioType === "bugfix" &&
+        bugfixEvidenceSummary &&
+        bugfixScoreBreakdownPreSemantic &&
+        hasCandidateTurn
+          ? scoreBugfixSemantics(
+              {
+                deterministicSubScores: bugfixScoreBreakdownPreSemantic,
+                evidenceSummary: bugfixEvidenceSummary,
+                rootCauseRubric:
+                  sealedRubric ??
+                  (Array.isArray(bugfixRootCauseRubric) ? bugfixRootCauseRubric : []),
+                bugDescription:
+                  sealedGroundTruth ??
+                  (typeof bugfixGroundTruth === "string" ? bugfixGroundTruth : ""),
+                // The transcript is now the ONLY place a candidate states their
+                // hypothesis, root cause, and prevention (the three textareas that
+                // used to carry them are gone). A hypothesis is stated EARLY, so the
+                // last-10-messages window would routinely cut off the very evidence
+                // hypothesisQuality is scored on. Send the whole conversation.
+                workspaceEvidence,
+                conversationExcerpt:
+                  fullAttributedTranscript ??
+                  fitTranscript(
+                    transcriptMessages
+                      .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+                      .join("\n\n")
+                  ),
+              },
+              trackEdgeSpend("bugfix-scoring")
+            ).catch((error) => {
+              // NEUTRAL is reserved for "the scorer itself was unavailable", which
+              // is exactly this branch. Log it so a persistently broken scorer is
+              // distinguishable from sessions that genuinely earned neutral.
+              logger.error("[Streaming Feedback] Bugfix semantic scorer failed", {
+                scenarioId,
+                error,
               })
-            : // No candidate turn is EARNED silence (hypothesis/root cause/prevention
-              // provably never stated) — score those dimensions low. NEUTRAL stays
-              // reserved for "the scorer itself was unavailable".
-              Promise.resolve(
-                scenarioType === "bugfix" && bugfixEvidenceSummary && !hasCandidateTurn
-                  ? BUGFIX_SEMANTIC_SILENT
-                  : BUGFIX_SEMANTIC_NEUTRAL
-              ),
-        ])
+              return BUGFIX_SEMANTIC_NEUTRAL
+            })
+          : // No candidate turn is EARNED silence (hypothesis/root cause/prevention
+            // provably never stated) — score those dimensions low. NEUTRAL stays
+            // reserved for "the scorer itself was unavailable".
+            Promise.resolve(
+              scenarioType === "bugfix" && bugfixEvidenceSummary && !hasCandidateTurn
+                ? BUGFIX_SEMANTIC_SILENT
+                : BUGFIX_SEMANTIC_NEUTRAL
+            ),
+        guidedConfig && guidedLabAssessment
+          ? reviewLabAssessment(
+              guidedConfig,
+              guidedLabAssessment,
+              [sealedGroundTruth ?? "", ...(sealedRubric ?? [])].join("\n"),
+              trackEdgeSpend("bugfix-scoring")
+            )
+          : Promise.resolve(null),
+      ])
+      guidedLabAssessment = reviewedLab
 
       // Use generated silent notes or existing ones
       const finalSilentNotes = silentNotesAnalysis.silentNotes || existingSilentNotes || []
@@ -1005,6 +1067,17 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      if (guidedLabAssessment) {
+        finalScores = {
+          ...finalScores,
+          understanding: 0,
+          problemSolving: 0,
+          codeQuality: 0,
+          communication: 0,
+          overall: Math.round(passRate),
+        }
+      }
+
       // Send refined scores
       await sendEvent("refined_scores", {
         understanding: finalScores.understanding,
@@ -1053,7 +1126,13 @@ export async function POST(request: NextRequest) {
           testsTotal,
         })
 
-      const aiResponse = await generateFeedbackResponseEdge(systemInstruction, prompt)
+      const aiResponse: import("@/lib/ai-providers-edge").EdgeAIResponse = guidedLabAssessment
+        ? {
+            text: "Guided lab review. Repairs are assessed from recorded workspace checks; reasoning feedback is shown by phase. This practice does not contribute to interview readiness.",
+            provider: "openai" as const,
+            latencyMs: 0,
+          }
+        : await generateFeedbackResponseEdge(systemInstruction, prompt)
 
       const feedback = aiResponse.text
 
@@ -1062,34 +1141,37 @@ export async function POST(request: NextRequest) {
       // dashboard AND to the per-user budget cap that reads the same records.
       // Fire-and-forget by design: accounting must never delay or break the
       // feedback the user is waiting on.
-      reportEdgeUsageInBackground({
-        userId: authenticatedUserId,
-        eventType: "feedback_generation",
-        service: "feedback-generation",
-        provider: aiResponse.provider,
-        promptText: `${systemInstruction}\n${prompt}`,
-        responseText: feedback,
-        // Vendor-measured counts (reasoning tokens included) when the Edge
-        // rung captured them; absent means the reporter estimates from text.
-        inputTokens: aiResponse.tokensIn,
-        outputTokens: aiResponse.tokensOut,
-        latencyMs: aiResponse.latencyMs,
-        sessionId,
-        scenarioId,
-        pattern: scenarioPattern,
-        difficulty: scenarioDifficulty,
-        scenarioTitle,
-      })
+      if (!guidedLabAssessment)
+        reportEdgeUsageInBackground({
+          userId: authenticatedUserId,
+          eventType: "feedback_generation",
+          service: "feedback-generation",
+          provider: aiResponse.provider,
+          promptText: `${systemInstruction}\n${prompt}`,
+          responseText: feedback,
+          // Vendor-measured counts (reasoning tokens included) when the Edge
+          // rung captured them; absent means the reporter estimates from text.
+          inputTokens: aiResponse.tokensIn,
+          outputTokens: aiResponse.tokensOut,
+          latencyMs: aiResponse.latencyMs,
+          sessionId,
+          scenarioId,
+          pattern: scenarioPattern,
+          difficulty: scenarioDifficulty,
+          scenarioTitle,
+        })
 
       // Parse sections
       const parsedSections = parseFeedbackSections(feedback)
-      const sections = completeFeedbackSections(parsedSections, {
-        rawFeedback: feedback,
-        scenarioTitle,
-        testsPassed,
-        testsTotal,
-        overallScore: finalScores.overall,
-      })
+      const sections = guidedLabAssessment
+        ? summarizeLabFeedback(guidedLabAssessment)
+        : completeFeedbackSections(parsedSections, {
+            rawFeedback: feedback,
+            scenarioTitle,
+            testsPassed,
+            testsTotal,
+            overallScore: finalScores.overall,
+          })
 
       // ========================================
       // PHASE 5: Stream Final Results
@@ -1133,6 +1215,7 @@ export async function POST(request: NextRequest) {
         bugfixEvidenceSummary,
         bugfixScoreBreakdown,
         bugfixPostSessionReport,
+        guidedLabAssessment,
         scores: finalScoresPayload,
       })
 
@@ -1160,6 +1243,7 @@ export async function POST(request: NextRequest) {
           bugfixEvidenceSummary: bugfixEvidenceSummary ?? null,
           bugfixScoreBreakdown: bugfixScoreBreakdown ?? null,
           bugfixPostSessionReport: bugfixPostSessionReport ?? null,
+          guidedLabAssessment,
           testsPassed,
           testsTotal,
           timeSpentMinutes: Math.round((Number(elapsedTimeSeconds) || 0) / 60),

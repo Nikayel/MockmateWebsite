@@ -1,5 +1,7 @@
 "use client"
 
+import { GuidedLabReview } from "./practice/GuidedLabReview"
+import type { LabAssessment } from "@/lib/bugfix/guided-lab/assessment/schema"
 import type { ReactNode } from "react"
 import { parseFeedback } from "@/lib/feedback/parsers"
 import { getLetterGrade } from "@/lib/constants"
@@ -21,6 +23,8 @@ interface AlternativeApproach {
 }
 
 interface PracticeFeedbackProps {
+  isGuidedLab?: boolean
+  guidedLabAssessment?: LabAssessment | null
   contained?: boolean
   feedback: string
   performanceScore: number
@@ -81,6 +85,8 @@ interface PracticeFeedbackProps {
 
 export default function PracticeFeedback({
   contained = false,
+  isGuidedLab = false,
+  guidedLabAssessment,
   feedback,
   performanceScore,
   technicalScore,
@@ -116,6 +122,18 @@ export default function PracticeFeedback({
     problemType,
     language,
   })
+  if (isGuidedLab)
+    return (
+      <GuidedLabReview
+        assessment={guidedLabAssessment}
+        contained={contained}
+        problemTitle={problemTitle}
+        testsPassed={testsPassed}
+        testsTotal={testsTotal}
+        onClose={onClose}
+        afterReview={afterScore}
+      />
+    )
   // Parse feedback text, then override with structured data if available from API
   const parsedSections = parseFeedback(feedback)
 

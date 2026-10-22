@@ -1,3 +1,4 @@
+import type { LabAssessment } from "./bugfix/guided-lab/assessment/schema"
 import type { SessionLifecycle } from "./interview/session-lifecycle/policy"
 /**
  * Shared TypeScript types for the application
@@ -194,6 +195,7 @@ export interface InterviewSession {
   // Guided bug-fix lab: marks a scaffolded teaching run so it is kept OUT of the
   // interview-readiness aggregate and shown as a labeled practice/mastery signal
   // rather than an (invalid) interview score.
+  guided_lab_assessment?: LabAssessment | null
   is_guided_lab?: boolean
   guided_lab_mastery?: {
     masteryScore: number

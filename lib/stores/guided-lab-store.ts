@@ -19,13 +19,11 @@ import {
   revealedTestSuites,
   type SuiteResult,
 } from "@/lib/bugfix/guided-lab/gating"
-import {
-  summarizeGuidedLabProgress,
-  type GuidedLabProgressSummary,
-} from "@/lib/bugfix/guided-lab/mastery"
-
 import { restoreGuidedLabProgress } from "@/lib/bugfix/guided-lab/progress-state"
 import { parseGuidedLabProgress } from "@/lib/bugfix/guided-lab/persistence"
+
+import { appendLabEvidence, emptyLabEvidence } from "@/lib/bugfix/guided-lab/assessment/evidence"
+import type { LabObservation } from "@/lib/bugfix/guided-lab/assessment/schema"
 
 const nowIso = () => new Date().toISOString()
 
@@ -34,6 +32,14 @@ interface GuidedLabState {
   config: GuidedLabConfig | null
   progress: GuidedLabProgress | null
   sourceRevision: number
+  captureGeneration: number
+  bindAttempt: (scenarioId: string, attemptId: string) => void
+  observe: (
+    scenarioId: string,
+    observation: LabObservation,
+    phaseId?: string,
+    revision?: number
+  ) => void
 
   /** Load a lab for a scenario, resuming saved progress when provided. */
   initGuidedLab: (
@@ -58,14 +64,54 @@ export const useGuidedLabStore = create<GuidedLabState>()(
       config: null,
       progress: null,
       sourceRevision: 0,
+      captureGeneration: 0,
 
       initGuidedLab: (scenarioId, config, saved) => {
         const parsed = parseGuidedLabProgress(saved)
         set({
           scenarioId,
           config,
-          sourceRevision: 0,
+          captureGeneration: get().captureGeneration + 1,
+          sourceRevision: (parsed?.evidence?.revision ?? -1) + 1,
           progress: restoreGuidedLabProgress(config, parsed, nowIso()),
+        })
+      },
+
+      bindAttempt: (scenarioId, attemptId) => {
+        const { progress, config, scenarioId: activeId } = get()
+        if (
+          !progress ||
+          !config ||
+          activeId !== scenarioId ||
+          progress.evidence?.attemptId === attemptId
+        )
+          return
+        // A fresh attempt cannot inherit another attempt's evidence or completed phases.
+        const next = progress.evidence?.attemptId
+          ? restoreGuidedLabProgress(config, null, nowIso())
+          : progress
+        set({
+          progress: { ...next, evidence: { ...emptyLabEvidence(), attemptId } },
+          sourceRevision: 0,
+          captureGeneration: get().captureGeneration + 1,
+        })
+      },
+
+      observe: (scenarioId, observation, phaseId, revision) => {
+        const { progress, scenarioId: activeId, sourceRevision } = get()
+        if (!progress || activeId !== scenarioId) return
+        const log = { ...(progress.evidence ?? emptyLabEvidence()), revision: sourceRevision }
+        set({
+          progress: {
+            ...progress,
+            evidence: appendLabEvidence(
+              log,
+              phaseId ?? progress.currentMilestoneId,
+              observation,
+              revision
+            ),
+            updatedAt: nowIso(),
+          },
         })
       },
 
@@ -77,13 +123,34 @@ export const useGuidedLabStore = create<GuidedLabState>()(
           (sourceRevision !== undefined && sourceRevision !== get().sourceRevision)
         )
           return
-        set({ progress: applyTestRunToProgress(config, progress, results, nowIso()) })
+        const next = applyTestRunToProgress(config, progress, results, nowIso())
+        set({ progress: next })
+        if (next.currentMilestoneId !== progress.currentMilestoneId) {
+          const from = config.milestones.findIndex((m) => m.id === progress.currentMilestoneId)
+          const to = config.milestones.findIndex((m) => m.id === next.currentMilestoneId)
+          get().observe(
+            get().scenarioId!,
+            {
+              kind: "transition",
+              toPhaseId: next.currentMilestoneId,
+              reason: to < from ? "regression" : "advance",
+            },
+            progress.currentMilestoneId
+          )
+        }
       },
 
       ackMilestone: (milestoneId) => {
         const { config, progress } = get()
         if (!config || !progress) return
-        set({ progress: acknowledgeMilestone(config, progress, milestoneId, nowIso()) })
+        const next = acknowledgeMilestone(config, progress, milestoneId, nowIso())
+        set({ progress: next })
+        if (next.currentMilestoneId !== progress.currentMilestoneId)
+          get().observe(
+            get().scenarioId!,
+            { kind: "transition", toPhaseId: next.currentMilestoneId, reason: "advance" },
+            milestoneId
+          )
       },
 
       answerQuiz: (quizId, selectedIndex) => {
@@ -116,7 +183,13 @@ export const useGuidedLabStore = create<GuidedLabState>()(
         if (!config || !progress || activeId !== scenarioId) return
         set({
           sourceRevision: get().sourceRevision + 1,
-          progress: invalidateFinalVerification(config, progress, nowIso()),
+          progress: {
+            ...invalidateFinalVerification(config, progress, nowIso()),
+            evidence: {
+              ...(progress.evidence ?? emptyLabEvidence()),
+              revision: get().sourceRevision + 1,
+            },
+          },
         })
       },
 
@@ -152,19 +225,6 @@ export function getGuidedChatState(
   }
 }
 
-/**
- * Restraint-resistant understanding signal for scoring a guided lab as practice
- * mastery (first-try quiz accuracy + milestone completion). Returns undefined
- * unless a guided lab for `scenarioId` is active. Read imperatively at submit.
- */
-export function getGuidedLabMasterySummary(
-  scenarioId: string | undefined
-): GuidedLabProgressSummary | undefined {
-  const { config, progress, scenarioId: storeScenarioId } = useGuidedLabStore.getState()
-  if (!config || !progress || !scenarioId || storeScenarioId !== scenarioId) return undefined
-  return summarizeGuidedLabProgress(config, progress)
-}
-
 /** True once every milestone is done. */
 export const useGuidedLabComplete = (): boolean =>
   useGuidedLabStore((state) =>
@@ -183,4 +243,12 @@ export const useRevealedTestSuites = (): string[] => {
     () => (config && progress ? revealedTestSuites(config, progress) : []),
     [config, progress]
   )
+}
+
+/** Never attach another attempt's local evidence to a checkpoint or submission. */
+export function getGuidedAttemptProgress(scenarioId: string, attemptId: string | null) {
+  const state = useGuidedLabStore.getState()
+  return state.scenarioId === scenarioId && state.progress?.evidence?.attemptId === attemptId
+    ? state.progress
+    : undefined
 }

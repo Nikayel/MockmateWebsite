@@ -120,6 +120,12 @@ test("explains unlocks, runs real Python repairs, resumes, and re-verifies edits
     .click()
   await next.click()
   await run(page)
+  await page
+    .getByRole("textbox", { name: "Explain your diagnosis" })
+    .fill(
+      "The streak reads started_at. Completion days require finished_at; I will check that page totals stay unchanged."
+    )
+  await page.getByRole("button", { name: "Record explanation" }).click()
   await expect(rail.getByRole("heading", { name: "Restore streaks", exact: true })).toBeVisible()
   await expect(page.getByRole("button", { name: "Submit fix" })).toBeDisabled()
   const response = await request.get("/__reference")
@@ -150,7 +156,40 @@ test("explains unlocks, runs real Python repairs, resumes, and re-verifies edits
   await expect(rail.getByRole("heading", { name: "Release check", exact: true })).toBeVisible()
   await run(page)
   await page.getByRole("button", { name: "Submit fix" }).click()
-  await expect(page.getByText("Verified fix submitted in browser fixture")).toBeVisible()
+  await expect(page.getByText("Guided practice · excluded from interview readiness")).toBeVisible()
+  await expect(page.getByText("Scores & rubric", { exact: true })).toHaveCount(0)
+  await page.getByText("2. Restore streaks", { exact: true }).click()
+  const feedback = page.getByRole("region", { name: "Phase feedback" })
+  const streakPhase = feedback
+    .locator("details")
+    .filter({ has: page.getByText("2. Restore streaks", { exact: true }) })
+  await streakPhase.getByText("Review recorded evidence", { exact: true }).click()
+  await expect(feedback.getByText("The streak reads started_at.", { exact: false })).toBeVisible()
+  await expect(
+    feedback.getByText("app/services/stats_service.py", { exact: false }).first()
+  ).toBeVisible()
+  const assessment = await page.evaluate(() =>
+    JSON.parse(sessionStorage.getItem("bookclub-assessment")!)
+  )
+  expect(assessment.phases[1].reproducedFailure).toBe(true)
+  expect(assessment.phases[1].evidence.some((e: { kind: string }) => e.kind === "checkpoint")).toBe(
+    true
+  )
+  expect(assessment.phases[1].verification).toBe("passed")
+  expect(assessment.phases[1].review.communication.status).toBe("not_observed")
+  await page.goto(`${lab}&review=1`)
+  await expect(page.getByText("Guided practice · excluded from interview readiness")).toBeVisible()
+  await page.screenshot({ path: "test-results/bookclub-phase-feedback.png", fullPage: true })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByText("2. Restore streaks", { exact: true }).click()
+  await page
+    .getByRole("region", { name: "Phase feedback" })
+    .locator("details")
+    .filter({ has: page.getByText("2. Restore streaks", { exact: true }) })
+    .getByText("Review recorded evidence", { exact: true })
+    .click()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: "test-results/bookclub-phase-feedback-mobile.png", fullPage: true })
   expect(errors).toEqual([])
 })
 

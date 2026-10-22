@@ -1,3 +1,4 @@
+import { captureLabCheckpoint, captureLabMessage } from "@/lib/bugfix/guided-lab/assessment/capture"
 import {
   captureSessionRequest,
   type SessionRequestGuard,
@@ -352,6 +353,10 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
       controllers.current.add(controller)
 
       const newUserMessage: ChatMessage = createChatMessage("user", userMessage)
+      if (selectedScenario?.type === "bugfix") {
+        captureLabCheckpoint(selectedScenario.id, opts.sessionContext?.files ?? [])
+        captureLabMessage(selectedScenario.id, "candidate", lane, userMessage)
+      }
       setMessages((prev) => [...prev, newUserMessage])
       setLoading(true)
 
@@ -657,6 +662,13 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
 
         const reply = data.reply
         if (reply) {
+          if (selectedScenario?.type === "bugfix")
+            captureLabMessage(
+              selectedScenario.id,
+              isInterviewer ? "interviewer" : "ai_partner",
+              lane,
+              reply
+            )
           if (!replyAlreadyRendered) {
             setMessages((prev) => [...prev, createChatMessage("ai", reply)])
           }

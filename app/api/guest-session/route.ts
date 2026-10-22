@@ -1,3 +1,4 @@
+import { parseGuidedLabProgress } from "@/lib/bugfix/guided-lab/persistence"
 /**
  * Guest Session API
  *
@@ -352,6 +353,7 @@ export async function PUT(request: NextRequest) {
         active_workspace_path: sessionState.activeWorkspacePath,
         console_logs: sessionState.consoleLogs,
         bugfix_evidence_events: sessionState.bugfixEvidenceEvents,
+        guided_lab_progress: parseGuidedLabProgress(sessionState.guidedLabProgress),
         bugfix_hypothesis: sessionState.bugfixHypothesis,
         bugfix_root_cause: sessionState.bugfixRootCause,
         bugfix_prevention: sessionState.bugfixPrevention,
