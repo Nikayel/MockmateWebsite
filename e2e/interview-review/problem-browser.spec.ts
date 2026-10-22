@@ -1,13 +1,15 @@
 import { expect, test } from "@playwright/test"
 
-test("debugging groups discovery controls and preserves search, filters, and view preference", async ({
-  page,
-}, testInfo) => {
-  const errors: string[] = []
-  page.on("pageerror", (error) => errors.push(error.message))
-  for (const width of [1440, 1280, 1024, 768, 375, 320, 812]) {
-    await page.setViewportSize({ width, height: width === 812 ? 375 : 900 })
-    for (const theme of ["light", "dark"]) {
+// Each viewport/theme journey gets an isolated page and its own timeout/report.
+// Running all 14 journeys in one test exhausted the shared 30s budget in CI.
+for (const width of [1440, 1280, 1024, 768, 375, 320, 812]) {
+  for (const theme of ["light", "dark"]) {
+    test(`debugging discovery preserves search, filters, and view preference at ${width}px in ${theme}`, async ({
+      page,
+    }, testInfo) => {
+      const errors: string[] = []
+      page.on("pageerror", (error) => errors.push(error.message))
+      await page.setViewportSize({ width, height: width === 812 ? 375 : 900 })
       await page.goto(`/?view=picker&track=debugging&theme=${theme}`)
       await page.screenshot({ path: testInfo.outputPath(`discovery-${theme}-${width}.png`) })
       const browser = page.getByRole("region", { name: "Debugging problem browser" })
@@ -72,10 +74,10 @@ test("debugging groups discovery controls and preserves search, filters, and vie
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true
       )
-    }
+      expect(errors).toEqual([])
+    })
   }
-  expect(errors).toEqual([])
-})
+}
 
 test("DSA all-problems keeps the integrated view control and progressive results", async ({
   page,
