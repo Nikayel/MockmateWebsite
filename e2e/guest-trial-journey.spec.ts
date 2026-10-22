@@ -1,102 +1,88 @@
 import { test, expect } from "@playwright/test"
+import { installGuestBackend } from "./guest-trial/backend"
+import { prepareGuestSubmission, TWO_SUM_SOLUTION } from "./guest-trial/flow"
 
 /**
- * The pre-auth guest trial, end to end, as the persona that found every bug
- * this week: a signed-out visitor in a fresh browser.
- *
- * On 2026-08-25 the score-lock ship dead-ended in production while five green
- * unit-test suites watched: submitCode parked guests in a phase whose only
- * exit lived in the signed-in view, so the lock's CTA flipped state a gate
- * never read, and no prompt could ever open. Every step below is a seam
- * between hooks that unit tests are structurally blind to. This spec needs no
- * auth and no AI backend (guests are walled from both), and the guest session
- * POST failing against a dummy-credential backend is tolerated by design
- * ("Your progress will still be saved locally"), so it runs in CI with the
- * same structurally-valid dummy env the SEO-audit job already boots.
- *
- * The signed-in half (popup sign-in, migration, the deferred stream) needs a
- * seeded Firebase emulator user and stays out of scope here. TODO: cover it
- * once an auth emulator exists in CI.
+ * Real production UI, hooks and in-browser execution, with a contract-validated
+ * guest persistence fixture. CI has no Firebase credentials. A failed create
+ * cannot stand in for a saved session: signup requires a durable recovery point.
+ * Firebase API authorization/validation is covered in app/api/guest-session tests;
+ * authenticated conversion needs a seeded auth emulator and is outside this spec.
  */
-
-const TWO_SUM_SOLUTION = `function twoSum(nums, target) {
-  for (let i = 0; i < nums.length; i++) {
-    for (let j = i + 1; j < nums.length; j++) {
-      if (nums[i] + nums[j] === target) {
-        return [i, j];
-      }
-    }
-  }
-  return [];
-}`
+test.use({ actionTimeout: 20_000, trace: "retain-on-failure", screenshot: "only-on-failure" })
 
 test.describe("Guest trial journey (pre-auth)", () => {
-  test("a guest reaches the score lock and the signup dialog actually opens", async ({ page }) => {
-    // Dev-server first compile of /interview plus the in-browser test runner
-    // make this journey legitimately slow on a cold start.
-    test.setTimeout(300_000)
+  test.beforeEach(async ({ page }) => {
+    test.setTimeout(180_000)
+    await page.route("**/ingest/**", (route) => route.abort())
+  })
 
-    // 1. A fresh browser context is a guest with an unused trial. The consent
-    //    banner covers the footer; dismiss it so nothing intercepts clicks.
-    await page.goto("/interview?track=dsa")
-    await page
-      .getByRole("button", { name: "Necessary Only" })
-      .click({ timeout: 15_000 })
-      .catch(() => {})
+  test("saves the submission before offering signup and the account button reopens the dialog", async ({
+    page,
+  }) => {
+    const backend = await installGuestBackend(page)
+    await prepareGuestSubmission(page)
+    await page.getByRole("button", { name: "Submit solution", exact: true }).click()
 
-    // 2. The DSA track defaults to the roadmap. Open the first pattern node
-    //    and start Two Sum from its problem row. The ROW itself must work:
-    //    PostHog caught a real guest dead-clicking it when only the
-    //    hover-revealed ghost button was wired.
-    await page
-      .getByText(/arrays/i)
-      .first()
-      .click()
-    await page.getByText("Two Sum", { exact: true }).first().click()
-
-    // 3. CompanyPicker: nothing is pre-selected. Picking the freeball option
-    //    and starting exercises the picker that used to swallow clicks
-    //    silently behind pointer-events-none.
-    const picker = page.getByRole("dialog")
-    await expect(picker).toBeVisible()
-    await picker.getByRole("button", { name: /freeballing/i }).click()
-    await picker.getByRole("button", { name: /^start interview$/i }).click()
-
-    // 4. The CodeMirror editor loads with starter code; replace it with a
-    //    passing solution.
-    const editor = page.locator(".cm-content").first()
-    await expect(editor).toBeVisible({ timeout: 120_000 })
-    await editor.fill(TWO_SUM_SOLUTION)
-
-    // 5. Run the tests in the in-browser runner, then submit. The console
-    //    header reports "N/N tests" when every case passes (pass state is
-    //    icon-only per row, so the all-passing header is the text signal).
-    await page.getByRole("button", { name: "Run tests" }).click()
-    await expect(page.getByText(/(\d+)\/\1 tests/).first()).toBeVisible({ timeout: 120_000 })
-    await page.getByRole("button", { name: "Submit solution" }).click()
-
-    // 6. THE SEAM THE P0 LIVED IN. The submission must land on the locked
-    //    panel, never the signed-in feedback view or a dead workspace.
-    const lockHeading = page.getByRole("heading", { name: /your interview is scored/i })
-    await expect(lockHeading).toBeVisible({ timeout: 60_000 })
-    const unlockButton = page.getByRole("button", { name: /unlock your results/i })
-    await expect(unlockButton).toBeVisible()
-
-    // 7. The signup dialog auto-opens (~2s timer armed by auto-finalization,
-    //    which only exists because the hook finalizes the trial itself).
+    const lockHeading = page.getByRole("heading", {
+      name: "Continue with your interviewer",
+      exact: true,
+    })
+    await expect(lockHeading).toBeVisible()
+    expect(backend.acceptedCheckpoints).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sessionId: backend.sessionId,
+          sessionState: expect.objectContaining({
+            code: TWO_SUM_SOLUTION,
+            language: "javascript",
+            isPostInterviewDiscussion: true,
+            testSummary: expect.objectContaining({ failed: 0, passRate: 100 }),
+          }),
+        }),
+      ])
+    )
+    // Pre-auth is a saved submission, not a completed/scored interview.
+    expect(backend.writes.every((body) => body.performanceScore === undefined)).toBe(true)
+    const continueButton = page.getByRole("button", {
+      name: "Create account & continue",
+      exact: true,
+    })
+    await expect(continueButton).toBeVisible()
+    await expect(page.getByRole("dialog")).toBeHidden()
+    await continueButton.click()
     const signupDialog = page.getByRole("dialog")
-    await expect(signupDialog).toBeVisible({ timeout: 10_000 })
+    await expect(signupDialog).toBeVisible()
     await expect(signupDialog.getByText(/create your free account/i)).toBeVisible()
-
-    // 8. The withheld score never leaks into the lock or the dialog.
     await expect(signupDialog.getByText(/\d+\s*%/)).toHaveCount(0)
-
-    // 9. Dismiss, then the lock CTA must REOPEN the dialog. This exact click
-    //    was the production dead click: showSignupPrompt flipped while the
-    //    gate demanded a showFeedback nothing set for guests.
+    await expect(page.getByText(/your interview is scored/i)).toHaveCount(0)
     await page.keyboard.press("Escape")
     await expect(signupDialog).toBeHidden()
-    await unlockButton.click()
-    await expect(page.getByRole("dialog")).toBeVisible()
+    await continueButton.click()
+    await expect(signupDialog).toBeVisible()
   })
+
+  for (const failure of ["creation", "checkpoint"] as const) {
+    test(`keeps the work editable and blocks signup after a failed guest ${failure}`, async ({
+      page,
+    }) => {
+      const backend = await installGuestBackend(page, {
+        failCreation: failure === "creation",
+        failCheckpoint: failure === "checkpoint",
+      })
+      await prepareGuestSubmission(page)
+      await page.getByRole("button", { name: "Submit solution", exact: true }).click()
+      await expect(page.getByText("Couldn't save your interview", { exact: true })).toBeVisible()
+      await expect(
+        page.getByRole("heading", { name: "Continue with your interviewer", exact: true })
+      ).toHaveCount(0)
+      await expect(page.getByRole("dialog")).toBeHidden()
+      await expect(page.locator(".cm-content").first()).toContainText("function twoSum")
+      await expect(page.getByRole("button", { name: "Submit solution", exact: true })).toBeEnabled()
+      expect(
+        backend.acceptedCheckpoints.every((body) => !body.sessionState?.isPostInterviewDiscussion)
+      ).toBe(true)
+      expect(backend.writes.every((body) => body.performanceScore === undefined)).toBe(true)
+    })
+  }
 })

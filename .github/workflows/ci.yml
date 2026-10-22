@@ -162,15 +162,12 @@ jobs:
           path: artifacts/seo-audit/
           if-no-files-found: warn
 
-      # The guest-trial e2e rides the same built server, for the same reason the
-      # SEO gate does: the only expensive things it needs (the build, the boot)
-      # just happened. It runs the PRE-AUTH guest journey only: the dummy env
-      # makes the guest-session POST 500, which the flow tolerates by design
-      # ("Your progress will still be saved locally"), and the score-lock
-      # journey this protects is exactly the one that shipped broken on
-      # 2026-08-25 while every unit suite stayed green. bugfix-journey.spec.ts
-      # is NOT run here: it needs an authenticated session and a live AI
-      # backend (see its header).
+      # Real pre-auth UI/hooks/code execution against the built server. Guest
+      # persistence is a contract-validated browser fixture: dummy CI Firebase
+      # credentials cannot create the durable checkpoint now required by signup.
+      # The suite covers successful handoff plus failed create/save safeguards.
+      # API ownership/validation has unit coverage; authenticated conversion
+      # still requires an auth emulator and is outside this browser suite.
       - name: Install Playwright chromium
         run: npx playwright install --with-deps chromium
 
@@ -182,6 +179,16 @@ jobs:
       # Reuses the Chromium install above; no second app build, credentials or AI calls.
       - name: Interview review layout and workspace regressions
         run: npx playwright test --config playwright.interview-review.config.ts
+
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-failure-evidence
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
 
       - name: Stop built server
         if: always()
