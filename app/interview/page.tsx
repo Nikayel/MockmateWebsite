@@ -1370,7 +1370,7 @@ function InterviewPageContent() {
     setTestRunRevision(state.testRunRevision ?? null)
     setChatInput(state.chatInput ?? "")
     setInterviewerInput(state.interviewerInput ?? "")
-    lifecycle.pauseForRestore(state.sessionId)
+    lifecycle.restoreSession(state.sessionId)
   }
 
   useSessionReopen({
@@ -1449,7 +1449,7 @@ function InterviewPageContent() {
   }, [isSessionPaused, canCheckpoint, saveNow])
 
   const saveAndExit = async () => {
-    lifecycle.pause()
+    lifecycle.pauseForExit()
     const saved = await saveNow()
     if (!saved.cloudSaved) {
       toast.warning(
@@ -1457,7 +1457,10 @@ function InterviewPageContent() {
           ? "Saved on this device. Cloud backup is pending."
           : "Could not save. Please stay and try again."
       )
-      if (!saved.localSaved) return
+      if (!saved.localSaved) {
+        lifecycle.resume()
+        return
+      }
     }
     router.push("/dashboard")
   }
@@ -2219,7 +2222,7 @@ function InterviewPageContent() {
     <main className="bg-background min-h-dvh">
       <h1 className="sr-only">Mock Interview Environment</h1>
       <SessionPauseNotice
-        paused={isInterviewStarted && isSessionPaused && !showFeedback}
+        paused={isInterviewStarted && lifecycle.paused && !showFeedback}
         warning={lifecycle.warning}
         blockedByOtherTab={lifecycle.blockedByOtherTab}
         timedPractice={!!strictTimeLimit}

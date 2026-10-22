@@ -125,7 +125,7 @@ export function useSessionRestore(opts: UseSessionRestoreOptions) {
         url.searchParams.set("session", sessionId)
         url.searchParams.set("scenario", opts.selectedScenario!.id)
         window.history.replaceState({}, "", url)
-        toast.info("Saved attempt restored", { description: "Resume when you’re ready." })
+        toast.success("Saved attempt resumed")
       } catch {
         if (!cancelled) toast.error("Could not restore your saved attempt. Please try again.")
       }

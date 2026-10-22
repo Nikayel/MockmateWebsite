@@ -14,22 +14,6 @@ describe("interview inactivity", () => {
     act(() => vi.advanceTimersByTime(2 * 60000))
     expect(onPause).toHaveBeenCalledOnce()
   })
-  it("keeps restored attempts paused until Resume even when activation finishes late", async () => {
-    let activate: (ok: boolean) => void = () => {}
-    const sync = vi.fn((action: string) =>
-      action === "activate"
-        ? new Promise<boolean>((resolve) => {
-            activate = resolve
-          })
-        : Promise.resolve(true)
-    )
-    const { result } = renderHook(() =>
-      useInterviewLifecycle({ enabled: true, sessionId: "s", onPause: vi.fn(), onSync: sync })
-    )
-    act(() => result.current.pauseForRestore("s"))
-    await act(async () => activate(true))
-    expect(result.current.paused).toBe(true)
-  })
   it("warns at nine minutes, pauses at ten, and requires explicit resume", () => {
     vi.useFakeTimers()
     const onPause = vi.fn()
@@ -59,5 +43,15 @@ describe("interview inactivity", () => {
     expect(result.current.paused).toBe(false)
     act(() => vi.advanceTimersByTime(2 * 60000))
     expect(onPause).toHaveBeenCalledTimes(1)
+  })
+  it("still requires explicit takeover when another live tab rejects ordinary activation", async () => {
+    const onSync = vi.fn().mockResolvedValue(false)
+    const { result } = renderHook(() =>
+      useInterviewLifecycle({ enabled: true, sessionId: "s", onPause: vi.fn(), onSync })
+    )
+    await act(async () => {})
+    expect(result.current.paused).toBe(true)
+    expect(result.current.blockedByOtherTab).toBe(true)
+    expect(onSync).toHaveBeenCalledWith("activate", expect.any(String), expect.any(Number), false)
   })
 })

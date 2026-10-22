@@ -24,19 +24,19 @@ export function useInterviewLifecycle(options: Options) {
   const activityRef = useRef(Date.now())
   const [ownerId] = useState(() => crypto.randomUUID())
   const generationRef = useRef(0)
-  const lastSessionRef = useRef<string | null>(null)
+  const [restoreRevision, setRestoreRevision] = useState(0)
   const restoredSessionRef = useRef<string | null>(null)
   const pause = useCallback(
-    (saveCheckpoint = true, otherTab = false) => {
+    (saveCheckpoint = true, otherTab = false, showNotice = true) => {
       setBlockedByOtherTab(otherTab)
+      setPaused(showNotice)
+      setWarning(false)
+      generationRef.current++
       if (pausedRef.current) {
         if (!saveCheckpoint) latest.current.onPause(false)
         return
       }
       pausedRef.current = true
-      generationRef.current++
-      setPaused(true)
-      setWarning(false)
       latest.current.onPause(saveCheckpoint)
       if (saveCheckpoint) void latest.current.onSync?.("pause", ownerId, activityRef.current)
     },
@@ -44,7 +44,6 @@ export function useInterviewLifecycle(options: Options) {
   )
   const resume = useCallback(
     (manual = true) => {
-      restoredSessionRef.current = null
       const generation = ++generationRef.current
       const activate = () => {
         if (generationRef.current !== generation) return
@@ -70,13 +69,12 @@ export function useInterviewLifecycle(options: Options) {
 
   useEffect(() => {
     if (!options.enabled || !options.sessionId) return
-    if (
-      restoredSessionRef.current !== options.sessionId &&
-      (!pausedRef.current ||
-        (lastSessionRef.current && lastSessionRef.current !== options.sessionId))
-    )
-      resume(false)
-    lastSessionRef.current = options.sessionId
+    // Opening a saved attempt is already an explicit decision to continue it.
+    // Wait for its identity and restored timer state before activating.
+    const restored = restoredSessionRef.current === options.sessionId
+    restoredSessionRef.current = null
+    activityRef.current = Date.now()
+    resume(restored)
     const check = () => {
       if (pausedRef.current) return
       const idle = Date.now() - activityRef.current
@@ -112,8 +110,9 @@ export function useInterviewLifecycle(options: Options) {
     const clock = setInterval(check, 1000)
     const heartbeat = setInterval(() => {
       if (!pausedRef.current && document.visibilityState !== "hidden") {
+        const requestGeneration = generationRef.current
         void latest.current.onSync?.("heartbeat", ownerId, activityRef.current).then((ok) => {
-          if (!ok) pause(false, true)
+          if (!ok && generationRef.current === requestGeneration) pause(false, true)
         })
       }
     }, 30000)
@@ -125,14 +124,15 @@ export function useInterviewLifecycle(options: Options) {
       window.removeEventListener("focus", check)
       generation.current++
     }
-    // Latest callbacks are read from refs; only a different attempt resets the clock.
-  }, [options.enabled, options.sessionId, ownerId, pause, resume])
+    // Latest callbacks are read from refs; activation and explicit restore reset the clock.
+  }, [options.enabled, options.sessionId, ownerId, pause, resume, restoreRevision])
   return {
     paused,
-    pauseForRestore: (sessionId: string) => {
+    restoreSession: (sessionId: string) => {
       restoredSessionRef.current = sessionId
-      pause(false)
+      setRestoreRevision((revision) => revision + 1)
     },
+    pauseForExit: () => pause(true, false, false),
     isPaused: () => pausedRef.current,
     warning,
     blockedByOtherTab,

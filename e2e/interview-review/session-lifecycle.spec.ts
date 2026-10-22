@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
   )
 })
 
-test("idle pause preserves both full conversations and drafts through reload and manual resume", async ({
+test("idle pause preserves full conversations and drafts, and reload continues directly", async ({
   page,
 }) => {
   await page.clock.install()
@@ -33,12 +33,13 @@ test("idle pause preserves both full conversations and drafts through reload and
   expect(saved.chatMessages).toHaveLength(26)
   expect(saved.interviewerMessages).toHaveLength(26)
   await page.reload()
-  await expect(page.getByRole("dialog")).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Rollup debugging session" })).toBeVisible()
+  await expect(page.getByRole("dialog")).not.toBeVisible()
   await expect(page.getByLabel("Code", { exact: true })).toHaveValue("changed rollup")
   await expect(page.getByLabel("Sparra draft")).toHaveValue("unsent partner question")
-  await page.getByRole("button", { name: "Resume session", exact: true }).click()
-  await expect(page.getByRole("dialog")).not.toBeVisible()
   await expect(page.getByText("Sparra messages: 26; Sable messages: 26")).toBeVisible()
+  await page.clock.fastForward(60000)
+  await expect(page.getByRole("dialog")).not.toBeVisible()
 })
 
 test("AI replies do not reset inactivity and save/exit keeps the attempt", async ({ page }) => {
@@ -51,7 +52,64 @@ test("AI replies do not reset inactivity and save/exit keeps the attempt", async
   await page.getByRole("dialog").getByRole("button", { name: "Save and exit" }).click()
   await expect(page.getByRole("heading", { name: "Saved attempt" })).toBeVisible()
   await page.getByRole("button", { name: "Reopen attempt" }).click()
-  await expect(page.getByRole("dialog")).toBeVisible()
-  await page.getByRole("button", { name: "Resume session" }).click()
+  await expect(page.getByRole("dialog")).not.toBeVisible()
   await expect(page.getByText("Attempt: lifecycle-attempt", { exact: false })).toBeVisible()
+  await page.clock.fastForward(60000)
+  await expect(page.getByRole("dialog")).not.toBeVisible()
+})
+
+test("brief tab switches and reopening a saved attempt never demand another resume", async ({
+  page,
+}) => {
+  await page.clock.install()
+  await page.goto("/?view=lifecycle&theme=light")
+  await page.getByLabel("Code", { exact: true }).fill("keep this edit")
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" })
+    document.dispatchEvent(new Event("visibilitychange"))
+  })
+  await page.clock.fastForward(5000)
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" })
+    document.dispatchEvent(new Event("visibilitychange"))
+    window.dispatchEvent(new Event("focus"))
+  })
+  await expect(page.getByRole("dialog")).not.toBeVisible()
+  await page.getByRole("button", { name: "Save and exit", exact: true }).click()
+  await expect(page.getByRole("heading", { name: "Saved attempt" })).toBeVisible()
+  await expect(page.getByRole("dialog")).not.toBeVisible()
+  await page.clock.fastForward(20 * 60000)
+  await page.getByRole("button", { name: "Reopen attempt" }).click()
+  await expect(page.getByRole("dialog")).not.toBeVisible()
+  await expect(page.getByLabel("Code", { exact: true })).toHaveValue("keep this edit")
+  await page.reload()
+  await expect(page.getByRole("heading", { name: "Rollup debugging session" })).toBeVisible()
+  await expect(page.getByRole("dialog")).not.toBeVisible()
+  await expect(page.getByLabel("Code", { exact: true })).toHaveValue("keep this edit")
+  await page.clock.fastForward(10 * 60000)
+  await expect(page.getByRole("dialog")).toBeVisible()
+  await page.getByRole("button", { name: "Resume session", exact: true }).click()
+  await expect(page.getByRole("dialog")).not.toBeVisible()
+})
+
+test("saving and exiting does not flash the pause dialog while cloud backup is pending", async ({
+  page,
+}) => {
+  let releaseBackup: () => void = () => {}
+  const backup = new Promise<void>((resolve) => {
+    releaseBackup = resolve
+  })
+  await page.route("**/api/guest-session", async (route) => {
+    await backup
+    await route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' })
+  })
+  await page.goto("/?view=lifecycle&theme=light")
+  await page.getByLabel("Code", { exact: true }).fill("saved during exit")
+  const request = page.waitForRequest("**/api/guest-session")
+  await page.getByRole("button", { name: "Save and exit", exact: true }).click()
+  await request
+  await expect(page.getByRole("heading", { name: "Rollup debugging session" })).toBeVisible()
+  await expect(page.getByRole("dialog")).not.toBeVisible()
+  releaseBackup()
+  await expect(page.getByRole("heading", { name: "Saved attempt" })).toBeVisible()
 })

@@ -34,7 +34,7 @@ export function SessionLifecycleFixture() {
   useEffect(() => {
     timer.setElapsedTime(restored?.elapsedTime ?? 0)
     timer.setStartTime(Date.now() - (restored?.elapsedTime ?? 0) * 1000)
-    if (restored) lifecycle.pauseForRestore(sessionId)
+    if (restored) lifecycle.restoreSession(sessionId)
     // Cold-load hydration is intentionally one-shot.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -87,7 +87,7 @@ export function SessionLifecycleFixture() {
     return () => window.removeEventListener("fixture-ai-reply", incoming)
   }, [])
   const exit = async () => {
-    lifecycle.pause()
+    lifecycle.pauseForExit()
     await saveNow()
     setGone(true)
   }
@@ -156,7 +156,7 @@ export function SessionLifecycleFixture() {
       </p>
       <Button onClick={exit}>Save and exit</Button>
       <SessionPauseNotice
-        paused={paused}
+        paused={lifecycle.paused}
         warning={lifecycle.warning}
         onResume={lifecycle.resume}
         onExit={exit}
