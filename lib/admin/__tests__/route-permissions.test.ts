@@ -226,9 +226,15 @@ const ROUTE_RULES: RouteRule[] = [
   },
   {
     route: "sessions",
-    method: "GET",
+    method: "GET (list)",
     permission: PERMISSIONS.VIEW_ANALYTICS,
     roles: ANALYTICS_READERS,
+  },
+  {
+    route: "sessions",
+    method: "GET (detail)",
+    permission: PERMISSIONS.VIEW_USER_DETAILS,
+    roles: PEOPLE_HANDLERS,
   },
   {
     route: "usage",

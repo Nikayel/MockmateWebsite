@@ -7,6 +7,7 @@ import { PostInterviewView } from "@/app/interview/_components/PostInterviewView
 import type { ReviewMessage } from "@/app/interview/_components/post-interview/types"
 import PracticeFeedback from "@/components/PracticeFeedback"
 import { SessionLifecycleFixture } from "./SessionLifecycleFixture"
+import { AdminSessionFixture } from "./AdminSessionFixture"
 import { WorkspaceFixture } from "./WorkspaceFixture"
 import { ScenarioBrowser } from "@/components/interview/ScenarioBrowser"
 import "@/app/globals.css"
@@ -35,7 +36,9 @@ function Fixture() {
   const [messages, setMessages] = useState(initialMessages)
   return (
     <main className="bg-background text-foreground">
-      {view === "lifecycle" ? (
+      {view === "admin-sessions" ? (
+        <AdminSessionFixture />
+      ) : view === "lifecycle" ? (
         <SessionLifecycleFixture />
       ) : view === "picker" ? (
         <ScenarioBrowser

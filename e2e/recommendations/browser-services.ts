@@ -1,5 +1,5 @@
 /** Test-only services; this fixture never authenticates against Firebase. */
-const user = { uid: "fixture-owner" }
+const user = { uid: "fixture-owner", getIdToken: async () => "fixture-token" }
 export function useAuth() {
   return { firebaseUser: user }
 }

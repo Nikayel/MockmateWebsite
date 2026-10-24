@@ -20,7 +20,7 @@
 
 import { FieldPath } from "firebase-admin/firestore"
 import { adminDb } from "@/lib/firebase-admin"
-import { withPermission, successResponse, errorResponse } from "@/lib/admin/middleware"
+import { withAdminAuth, successResponse, errorResponse } from "@/lib/admin/middleware"
 import { PERMISSIONS } from "@/lib/admin/rbac"
 import { fetchProfilesById, profileEmail } from "@/lib/usage/profile-lookup"
 import {
@@ -34,11 +34,12 @@ import {
 } from "@/lib/admin/session-query"
 import {
   toSessionListRow,
-  toSessionDetail,
   type SessionListRow,
   type SessionRowSource,
 } from "@/lib/admin/session-rows"
 import { assembleSessionPage } from "@/lib/admin/session-page"
+import { loadSessionInspection } from "@/lib/admin/session-review/load"
+import { logAdminAction } from "@/lib/admin/audit"
 import { logger } from "@/lib/logger"
 
 export const dynamic = "force-dynamic"
@@ -164,37 +165,34 @@ async function countSessions(plan: SessionQueryPlan): Promise<number | null> {
   return snapshot.data().count
 }
 
-async function respondWithDetail(sessionId: string) {
-  if (!SESSION_ID_PATTERN.test(sessionId)) {
-    return errorResponse("sessionId is not a valid session id", 400)
-  }
-
-  const doc = await adminDb.collection(SESSIONS_COLLECTION).doc(sessionId).get()
-  if (!doc.exists) {
-    return errorResponse("Session not found", 404)
-  }
-
-  const session = doc.data() as SessionRowSource
-  const userId = typeof session.user_id === "string" ? session.user_id : null
-  const profiles = userId ? await fetchProfilesById([userId]) : null
-  const email = userId && profiles ? profileEmail(profiles.get(userId), "") : ""
-
-  return successResponse({
-    session: toSessionDetail(doc.id, session, email === "" ? null : email),
-  })
-}
-
-export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async (request) => {
-  if (!adminDb) {
-    return errorResponse("Database not available", 503)
-  }
-
+export const GET = withAdminAuth(async (request, context) => {
   const { searchParams } = new URL(request.url)
-
   const sessionId = searchParams.get("sessionId")
-  if (sessionId !== null && sessionId.trim() !== "") {
+  const isDetail = sessionId !== null
+  // Support can inspect an individual interview; analysts keep list access only.
+  const permission = isDetail ? PERMISSIONS.VIEW_USER_DETAILS : PERMISSIONS.VIEW_ANALYTICS
+  if (!context.permissions.includes(permission)) {
+    return errorResponse("You do not have permission to view these session details", 403)
+  }
+  if (!adminDb) return errorResponse("Database not available", 503)
+
+  if (isDetail) {
+    if (!SESSION_ID_PATTERN.test(sessionId.trim())) {
+      return errorResponse("sessionId is not a valid session id", 400)
+    }
     try {
-      return await respondWithDetail(sessionId.trim())
+      const inspection = await loadSessionInspection(sessionId.trim())
+      if (!inspection) return errorResponse("Session not found", 404)
+      await logAdminAction(
+        context,
+        "view_session_detail",
+        {
+          targetUserId: inspection.session.userId,
+          transcriptSource: inspection.conversations.map((conversation) => conversation.source),
+        },
+        { request, target: { type: SESSIONS_COLLECTION, id: sessionId.trim() } }
+      )
+      return successResponse(inspection)
     } catch (error) {
       logger.error("[Admin Sessions] Failed to load session detail", { error, sessionId })
       return errorResponse("Failed to load session", 500)
@@ -214,6 +212,7 @@ export const GET = withPermission(PERMISSIONS.VIEW_ANALYTICS, async (request) =>
 
     return successResponse({
       sessions: page.rows,
+      canInspect: context.permissions.includes(PERMISSIONS.VIEW_USER_DETAILS),
       pagination: {
         pageSize: plan.pageSize,
         returned: page.rows.length,

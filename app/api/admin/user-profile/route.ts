@@ -274,6 +274,7 @@ async function getRecentSessionsForUser(userId: string) {
         const startedAt = data.started_at?.toDate?.() || data.started_at
         return {
           id: doc.id,
+          inspectionSessionId: doc.id,
           problemId: data.scenario_id || doc.id,
           problemTitle: data.topic || data.scenario_title || data.scenario_id,
           pattern: data.pattern,
@@ -301,6 +302,8 @@ async function getRecentSessionsForUser(userId: string) {
         const data = doc.data()
         return {
           id: doc.id,
+          // Summary IDs are not guaranteed to reference an interview session.
+          inspectionSessionId: null,
           problemId: data.scenarioId || doc.id,
           problemTitle: data.scenarioId,
           pattern: data.pattern,

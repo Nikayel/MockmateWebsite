@@ -22,16 +22,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DataTable, PageHeader, type Column } from "@/components/admin/shared"
-import {
-  Terminal,
-  AlertTriangle,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  Filter,
-  Loader2,
-  X,
-} from "lucide-react"
+import { Terminal, AlertTriangle, ChevronLeft, ChevronRight, Eye, Filter, X } from "lucide-react"
 import { logger } from "@/lib/logger"
 import {
   SESSION_STATUS_DISPLAY,
@@ -43,15 +34,8 @@ import {
   formatDuration,
   formatScore,
 } from "@/lib/admin/session-display"
-import { buildSessionDetailSections, sessionDetailHeadline } from "@/lib/admin/session-detail-view"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import type { SessionListRow, SessionDetail } from "@/lib/admin/session-rows"
+import { SessionDetailDialog } from "@/components/admin/session-detail/SessionDetailDialog"
+import type { SessionListRow } from "@/lib/admin/session-rows"
 import type { SessionListStatus } from "@/lib/admin/session-query"
 
 const PAGE_SIZE = 25
@@ -83,6 +67,7 @@ const EMPTY_FILTERS: SessionFilters = {
 }
 
 interface SessionsResponse {
+  canInspect: boolean
   sessions: SessionListRow[]
   pagination: {
     pageSize: number
@@ -278,6 +263,12 @@ export default function SessionsPage() {
         <Button
           size="sm"
           variant="outline"
+          disabled={!result?.canInspect}
+          title={
+            result?.canInspect
+              ? "Inspect session and conversation"
+              : "Requires user-details permission"
+          }
           onClick={() => setSelectedSessionId(row.sessionId)}
           className="border-gray-700 text-gray-400 hover:border-[#c4703f] hover:text-white"
         >
@@ -503,136 +494,5 @@ export default function SessionsPage() {
         onClose={() => setSelectedSessionId(null)}
       />
     </div>
-  )
-}
-
-/**
- * The drill-in: what the platform actually knows about one session.
- *
- * It fetches on open rather than shipping every field with every row, so the list
- * payload stays the columns the table renders and the heavy fields are read once,
- * for the one session an admin asked about.
- */
-function SessionDetailDialog({
-  sessionId,
-  onClose,
-}: {
-  sessionId: string | null
-  onClose: () => void
-}) {
-  const { firebaseUser } = useAuth()
-  const [detail, setDetail] = useState<SessionDetail | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!sessionId || !firebaseUser) return
-
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    setDetail(null)
-
-    const load = async () => {
-      try {
-        const token = await firebaseUser.getIdToken()
-        const response = await fetch(
-          `/api/admin/sessions?sessionId=${encodeURIComponent(sessionId)}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        )
-        const body = await response.json().catch(() => null)
-        if (!response.ok || !body?.success) {
-          throw new Error(body?.error || `Request failed with status ${response.status}`)
-        }
-        if (!cancelled) setDetail(body.session as SessionDetail)
-      } catch (loadError) {
-        logger.error("Error loading session detail", { error: loadError, sessionId })
-        if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : "Could not load this session")
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    load()
-    // A slow response for a session the admin has already closed must not
-    // overwrite the panel they opened next.
-    return () => {
-      cancelled = true
-    }
-  }, [sessionId, firebaseUser])
-
-  const headline = detail ? sessionDetailHeadline(detail) : null
-
-  return (
-    <Dialog open={sessionId !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto border-gray-800 bg-[#1a1917] text-white">
-        <DialogHeader>
-          <DialogTitle className="text-white">
-            {detail ? detail.scenarioTitle : "Session"}
-          </DialogTitle>
-          <DialogDescription className="font-mono text-xs text-gray-500">
-            {sessionId}
-          </DialogDescription>
-        </DialogHeader>
-
-        {loading && (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-7 w-7 animate-spin text-[#c4703f]" />
-          </div>
-        )}
-
-        {/* Distinct from an empty panel: a failed read says so. */}
-        {error && !loading && (
-          <div className="flex items-start gap-3 rounded-md border border-red-900/50 bg-red-950/20 p-4">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
-            <div>
-              <p className="font-medium text-red-300">Could not load this session</p>
-              <p className="mt-1 text-sm text-red-200/80">{error}</p>
-            </div>
-          </div>
-        )}
-
-        {detail && !loading && (
-          <div className="space-y-6">
-            {headline && (
-              <p className="rounded-md border border-gray-800 bg-gray-900/60 p-3 text-sm text-gray-300">
-                {headline}
-              </p>
-            )}
-
-            {buildSessionDetailSections(detail).map((section) => (
-              <section key={section.title}>
-                <h3 className="mb-2 text-xs font-semibold tracking-wide text-[#c4703f] uppercase">
-                  {section.title}
-                </h3>
-                <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
-                  {section.fields.map((field) => (
-                    <div
-                      key={field.label}
-                      className="flex justify-between gap-4 border-b border-gray-800/60 py-1.5"
-                    >
-                      <dt className="text-sm text-gray-500">{field.label}</dt>
-                      <dd
-                        className={
-                          field.tone === "absent"
-                            ? "text-sm text-gray-600"
-                            : field.tone === "accent"
-                              ? "text-sm font-medium text-[#e0a077]"
-                              : "text-sm text-gray-200"
-                        }
-                      >
-                        {field.value}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </section>
-            ))}
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
   )
 }

@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from "framer-motion"
 // Section moved to ./DrawerSection so sibling sections (LearnUsageSection) can share it;
 // aliased to keep the many call sites below unchanged.
 import { DrawerSection as Section } from "./DrawerSection"
+import { SessionDetailDialog } from "./session-detail/SessionDetailDialog"
 import { LearnUsageSection } from "./LearnUsageSection"
 
 interface UserProfileDrawerProps {
@@ -43,7 +44,7 @@ interface ProfileData {
     behavioral: {
       studyHabits: { preferredDays: string[]; optimalHours: string[] }
       sessionMetrics: { averageDuration: number; completionRate: number }
-      engagementSignals: { hintUsage: string; struggleIndicators: any[] }
+      engagementSignals: { hintUsage: string; struggleIndicators: unknown[] }
     }
     interviewReadiness: {
       overall: number
@@ -80,6 +81,7 @@ interface ProfileData {
   }
   recentSessions: Array<{
     id: string
+    inspectionSessionId: string | null
     problemId: string
     problemTitle?: string
     pattern?: string
@@ -138,9 +140,11 @@ function ProgressBar({
 export function UserProfileDrawer({ isOpen, onClose, userId, token }: UserProfileDrawerProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [data, setData] = useState<ProfileData | null>(null)
 
   useEffect(() => {
+    setSelectedSessionId(null)
     if (isOpen && userId && token) {
       loadProfile()
     }
@@ -164,8 +168,8 @@ export function UserProfileDrawer({ isOpen, onClose, userId, token }: UserProfil
 
       const result = await response.json()
       setData(result)
-    } catch (err: any) {
-      setError(err.message || "Failed to load profile")
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load profile")
     } finally {
       setLoading(false)
     }
@@ -486,14 +490,27 @@ export function UserProfileDrawer({ isOpen, onClose, userId, token }: UserProfil
                     <Section title="Recent Sessions" icon={Clock} defaultOpen={false}>
                       <div className="space-y-2">
                         {data.recentSessions.map((session) => (
-                          <div
+                          <button
+                            type="button"
                             key={session.id}
-                            className="flex items-center justify-between rounded bg-gray-800 p-2"
+                            onClick={() => setSelectedSessionId(session.inspectionSessionId)}
+                            disabled={!session.inspectionSessionId}
+                            title={
+                              session.inspectionSessionId
+                                ? "Inspect session and conversation"
+                                : "Only a legacy summary is available"
+                            }
+                            className="flex w-full items-center justify-between rounded bg-gray-800 p-2 text-left focus-visible:ring-2 focus-visible:ring-[#c4703f] focus-visible:outline-none enabled:hover:bg-gray-700 disabled:cursor-default"
                           >
                             <div>
                               <span className="text-sm text-white">
                                 {session.problemTitle || session.problemId}
                               </span>
+                              <p className="mt-1 text-xs text-[#e0a077]">
+                                {session.inspectionSessionId
+                                  ? "View conversation & details"
+                                  : "Legacy summary only"}
+                              </p>
                               <div className="mt-1 flex gap-2">
                                 {session.pattern && (
                                   <span className="text-xs text-blue-400">{session.pattern}</span>
@@ -531,7 +548,7 @@ export function UserProfileDrawer({ isOpen, onClose, userId, token }: UserProfil
                                 {new Date(session.timestamp).toLocaleDateString()}
                               </div>
                             </div>
-                          </div>
+                          </button>
                         ))}
                       </div>
                     </Section>
@@ -562,6 +579,11 @@ export function UserProfileDrawer({ isOpen, onClose, userId, token }: UserProfil
               )}
             </div>
           </motion.div>
+          <SessionDetailDialog
+            sessionId={isOpen ? selectedSessionId : null}
+            token={token}
+            onClose={() => setSelectedSessionId(null)}
+          />
         </>
       )}
     </AnimatePresence>
