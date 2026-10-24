@@ -1,3 +1,10 @@
+import {
+  executePartnerHandoff,
+  getPartnerHandoffTools,
+  PARTNER_HANDOFF_GUIDANCE,
+} from "../partner-handoff/tool"
+import { PARTNER_HANDOFF_REPLY } from "../partner-handoff/contract"
+import { tracePartnerHandoff } from "../partner-handoff/tracing"
 import { generateAIResponse, type TaskComplexity } from "@/lib/ai-providers"
 import { providerForPhase } from "@/lib/interview/interview-phases"
 import { logger } from "@/lib/logger"
@@ -40,15 +47,34 @@ export async function generateValidatedChatResponse(input: ChatGenerationContext
 
   // Use AI provider abstraction with fallback
   // Pass userId/sessionId for proper cost tracking
-  const aiResponse = await generateAIResponse(systemPrompt, fullUserMessage, history, {
-    complexity,
-    preferredProvider,
-    userId,
-    sessionId,
-    service: "interview-chat",
-    abortSignal: signal,
-    eventType: "chat_message",
-  })
+  const tools = getPartnerHandoffTools(input.request)
+  const generate = async () => {
+    const aiResponse = await generateAIResponse(
+      systemPrompt + (tools ? PARTNER_HANDOFF_GUIDANCE : ""),
+      fullUserMessage,
+      history,
+      {
+        complexity,
+        preferredProvider,
+        userId,
+        sessionId,
+        service: "interview-chat",
+        abortSignal: signal,
+        eventType: "chat_message",
+        ...(tools ? { tools } : {}),
+      }
+    )
+    if (tools) signal?.throwIfAborted()
+    const action = await executePartnerHandoff(aiResponse.toolCalls, input.request)
+    if (action) return { ...aiResponse, text: PARTNER_HANDOFF_REPLY, action }
+    if (!aiResponse.text.trim())
+      throw new Error("The interviewer returned no valid reply or handoff")
+    return { ...aiResponse, action: undefined }
+  }
+  const aiResponse = tools
+    ? await tracePartnerHandoff(generate, { sessionId, phase: currentPhase })
+    : await generate()
+  if (aiResponse.action) return aiResponse
 
   observeChatResponse(aiResponse.text, input.request)
   await validateChatResponse(aiResponse, input)

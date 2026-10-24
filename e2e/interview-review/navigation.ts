@@ -2,3 +2,11 @@
 export function useSearchParams() {
   return new URLSearchParams(window.location.search)
 }
+
+export function useRouter() {
+  return {
+    push: (url: string) => {
+      window.location.href = url
+    },
+  }
+}

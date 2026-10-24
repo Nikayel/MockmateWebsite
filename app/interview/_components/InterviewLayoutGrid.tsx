@@ -1,5 +1,6 @@
 "use client"
 
+import { hasSparraPartner } from "@/lib/interview/partner-handoff/contract"
 import { useRef, type ComponentProps, type CSSProperties, type ReactNode } from "react"
 import dynamic from "next/dynamic"
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react"
@@ -184,7 +185,7 @@ export function InterviewLayoutGrid({
     toggleLab,
     toggleInt,
   } = useWorkspaceRails(containerRef)
-  const hasPartner = Boolean(selectedScenario && selectedScenario.type !== "dsa")
+  const hasPartner = hasSparraPartner(selectedScenario?.type)
   // Multi-file tasks still need navigation in focus mode; only the interviewer rail disappears.
   const focusHasExplorer =
     focusMode && isWorkspaceScenario(selectedScenario) && Boolean(workspaceContext?.length)

@@ -1,5 +1,6 @@
 "use client"
 
+import { hasSparraPartner } from "@/lib/interview/partner-handoff/contract"
 import type { RestoredSessionInputs } from "@/lib/interview/session-lifecycle/checkpoint"
 
 import { useGuidedLabStore } from "@/lib/stores/guided-lab-store"
@@ -1923,6 +1924,11 @@ function InterviewPageContent() {
     recordBugfixEvidence,
     classifyBugfixAIHelpKind,
     proceedToFinalFeedback,
+    onOpenSparra: () => {
+      setFocusMode(false)
+      setActivePanel("problem")
+      setIsAIPartnerExpanded(true)
+    },
   })
 
   // Note: analyzeCodeEfficiency is now imported from @/lib/interview
@@ -2316,7 +2322,7 @@ function InterviewPageContent() {
                   // exclusive to active, resumable interview work.
                   onCloseClick={() => setShowCloseDialog(true)}
                   onOpenSparra={
-                    selectedScenario && selectedScenario.type !== "dsa"
+                    hasSparraPartner(selectedScenario?.type)
                       ? () => {
                           setFocusMode(false)
                           setActivePanel("problem")

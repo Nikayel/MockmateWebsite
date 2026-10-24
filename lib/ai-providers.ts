@@ -18,6 +18,13 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { toGeminiTools } from "./ai/gemini-tools"
+import {
+  readOpenAIToolCalls,
+  readAnthropicToolCalls,
+  type ModelToolCall,
+  type ModelToolDefinition,
+} from "./ai/model-tools"
 import {
   DEEPSEEK_MODELS,
   GEMINI_MODELS,
@@ -64,6 +71,7 @@ export type TaskComplexity = "simple" | "standard" | "complex" | "dialogue" | "c
 
 // Response structure
 export interface AIResponse {
+  toolCalls?: ModelToolCall[]
   text: string
   provider: AIProvider
   tokensUsed?: number
@@ -112,6 +120,7 @@ function normalizeProviderUsage(usage?: ProviderTokenUsage): ProviderTokenUsage 
 
 /** Text plus (when the provider exposes it) measured token usage. */
 interface ProviderCallResult {
+  toolCalls?: ModelToolCall[]
   text: string
   usage?: ProviderTokenUsage
 }
@@ -339,7 +348,8 @@ async function callGemini(
   userMessage: string,
   history: Array<{ role: "user" | "model"; content: string }>,
   config: ProviderConfig,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  tools?: ModelToolDefinition[]
 ): Promise<ProviderCallResult> {
   try {
     const genAI = new GoogleGenerativeAI(config.apiKey || "")
@@ -376,6 +386,7 @@ async function callGemini(
       model: config.model,
       systemInstruction: systemPrompt,
       generationConfig,
+      ...(tools?.length ? { tools: toGeminiTools(tools) } : {}),
     })
 
     const geminiHistory = history.map((msg) => ({
@@ -436,7 +447,17 @@ async function callGemini(
               (typeof thoughtTokens === "number" ? thoughtTokens : 0),
           }
         : undefined
-    return { text: response.text(), usage }
+    return {
+      text: response.text(),
+      usage,
+      ...(tools?.length
+        ? {
+            toolCalls:
+              response.functionCalls?.()?.map((call) => ({ name: call.name, args: call.args })) ??
+              [],
+          }
+        : {}),
+    }
   } catch (error: any) {
     // Extract error message from Gemini SDK error structure
     const errorMessage = error?.message || error?.toString() || "Unknown error"
@@ -481,7 +502,8 @@ async function callDeepseek(
   userMessage: string,
   history: Array<{ role: "user" | "model"; content: string }>,
   config: ProviderConfig,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  tools?: ModelToolDefinition[]
 ): Promise<ProviderCallResult> {
   try {
     if (!config.apiKey) {
@@ -511,6 +533,7 @@ async function callDeepseek(
         messages,
         max_tokens: config.maxTokens,
         temperature: config.temperature,
+        ...(tools?.length ? { tools, tool_choice: "auto" } : {}),
       }),
     })
 
@@ -539,8 +562,9 @@ async function callDeepseek(
 
     const data = await response.json()
     const content = data.choices[0]?.message?.content || ""
+    const toolCalls = tools?.length ? readOpenAIToolCalls(data.choices[0]?.message?.tool_calls) : []
 
-    if (!content) {
+    if (!content && !toolCalls.length) {
       logger.error("[DeepSeek] Empty response", { data })
       throw {
         status: 500,
@@ -563,7 +587,7 @@ async function callDeepseek(
                 : data.usage.prompt_tokens_details?.cached_tokens,
           }
         : undefined
-    return { text: content, usage }
+    return { text: content, usage, ...(toolCalls.length ? { toolCalls } : {}) }
   } catch (error: any) {
     // Re-throw with better context
     if (error.status) {
@@ -596,7 +620,8 @@ async function callOpenAI(
   userMessage: string,
   history: Array<{ role: "user" | "model"; content: string }>,
   config: ProviderConfig,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  tools?: ModelToolDefinition[]
 ): Promise<ProviderCallResult> {
   if (!config.apiKey) {
     throw new Error("OpenAI API key is not configured")
@@ -634,6 +659,7 @@ async function callOpenAI(
         temperature: config.temperature,
       }),
       reasoning_effort: config.reasoningEffort,
+      ...(tools?.length ? { tools, tool_choice: "auto", parallel_tool_calls: false } : {}),
     }),
   })
 
@@ -663,8 +689,9 @@ async function callOpenAI(
 
   const data = await response.json()
   const content = data.choices?.[0]?.message?.content || ""
+  const toolCalls = tools?.length ? readOpenAIToolCalls(data.choices?.[0]?.message?.tool_calls) : []
 
-  if (!content) {
+  if (!content && !toolCalls.length) {
     // A high-effort call that spends its whole budget on thinking returns an
     // empty message with finish_reason "length". That is a real failure — fall
     // through to the next provider rather than handing an empty string to a
@@ -701,7 +728,7 @@ async function callOpenAI(
     reasoningTokens: data.usage?.completion_tokens_details?.reasoning_tokens,
   })
 
-  return { text: content, usage }
+  return { text: content, usage, ...(toolCalls.length ? { toolCalls } : {}) }
 }
 
 /**
@@ -712,7 +739,8 @@ async function callClaude(
   userMessage: string,
   history: Array<{ role: "user" | "model"; content: string }>,
   config: ProviderConfig,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  tools?: ModelToolDefinition[]
 ): Promise<ProviderCallResult> {
   const messages = [
     ...history.map((msg) => ({
@@ -735,6 +763,15 @@ async function callClaude(
       max_tokens: config.maxTokens,
       system: systemPrompt,
       messages,
+      ...(tools?.length
+        ? {
+            tools: tools.map(({ function: fn }) => ({
+              name: fn.name,
+              description: fn.description,
+              input_schema: fn.parameters,
+            })),
+          }
+        : {}),
     }),
   })
 
@@ -749,7 +786,14 @@ async function callClaude(
     typeof data.usage?.input_tokens === "number" && typeof data.usage?.output_tokens === "number"
       ? { inputTokens: data.usage.input_tokens, outputTokens: data.usage.output_tokens }
       : undefined
-  return { text: data.content[0]?.text || "", usage }
+  return {
+    text: data.content
+      .filter((block: { type: string }) => block.type === "text")
+      .map((block: { text: string }) => block.text)
+      .join(""),
+    usage,
+    ...(tools?.length ? { toolCalls: readAnthropicToolCalls(data.content) } : {}),
+  }
 }
 
 /**
@@ -761,7 +805,8 @@ async function callProvider(
   userMessage: string,
   history: Array<{ role: "user" | "model"; content: string }>,
   temperatureOverride?: number,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  tools?: ModelToolDefinition[]
 ): Promise<ProviderCallResult> {
   const config = { ...PROVIDERS[provider] }
 
@@ -778,15 +823,15 @@ async function callProvider(
     case "openai-none":
     case "openai-medium":
     case "openai-high":
-      return callOpenAI(systemPrompt, userMessage, history, config, abortSignal)
+      return callOpenAI(systemPrompt, userMessage, history, config, abortSignal, tools)
     case "gemini":
     case "gemini-lite":
-      return callGemini(systemPrompt, userMessage, history, config, abortSignal)
+      return callGemini(systemPrompt, userMessage, history, config, abortSignal, tools)
     case "deepseek":
     case "deepseek-chat":
-      return callDeepseek(systemPrompt, userMessage, history, config, abortSignal)
+      return callDeepseek(systemPrompt, userMessage, history, config, abortSignal, tools)
     case "claude":
-      return callClaude(systemPrompt, userMessage, history, config, abortSignal)
+      return callClaude(systemPrompt, userMessage, history, config, abortSignal, tools)
     default:
       throw new Error(`Unknown provider: ${provider}`)
   }
@@ -809,6 +854,7 @@ export async function generateAIResponse(
      * compile.
      */
     abortSignal?: AbortSignal
+    tools?: ModelToolDefinition[]
     service: UsageServiceId
     complexity?: TaskComplexity
     preferredProvider?: AIProvider
@@ -844,7 +890,8 @@ export async function generateAIResponse(
   const estimatedInputTokens = Math.ceil(
     (systemPrompt.length +
       userMessage.length +
-      history.reduce((sum, message) => sum + message.content.length, 0)) /
+      history.reduce((sum, message) => sum + message.content.length, 0) +
+      (options.tools?.length ? JSON.stringify(options.tools).length : 0)) /
       4
   )
   const estimatedTokens = estimatedInputTokens + 500
@@ -858,7 +905,7 @@ export async function generateAIResponse(
   }
 
   // 2. Check cache if not skipped (skip chat_message events since context changes constantly)
-  if (!skipCache && eventType !== "chat_message") {
+  if (!skipCache && !options.tools?.length && eventType !== "chat_message") {
     const cacheKey = generateCacheKey({
       type: eventType,
       systemPrompt,
@@ -961,20 +1008,27 @@ export async function generateAIResponse(
           })
         }
 
-        const { text, usage: providerUsage } = await callProvider(
+        const {
+          text,
+          usage: providerUsage,
+          toolCalls,
+        } = await callProvider(
           provider,
           systemPrompt,
           userMessage,
           history,
           temperature,
-          options.abortSignal
+          options.abortSignal,
+          options.tools
         )
 
         const latencyMs = Date.now() - startTime
 
         // Fallback estimate (4 chars per token) for providers that report no
         // usage. Only ever used when `providerUsage` is absent.
-        const estimatedOutputTokens = Math.ceil(text.length / 4)
+        const estimatedOutputTokens = Math.ceil(
+          (text.length + (toolCalls?.length ? JSON.stringify(toolCalls).length : 0)) / 4
+        )
 
         // Prefer the provider's MEASURED usage for everything downstream.
         //
@@ -1048,7 +1102,7 @@ export async function generateAIResponse(
         })
 
         // 5. Cache the response (skip chat_message events since context changes constantly)
-        if (!skipCache && eventType !== "chat_message") {
+        if (!skipCache && !options.tools?.length && eventType !== "chat_message") {
           const cacheKey = generateCacheKey({
             type: eventType,
             systemPrompt,
@@ -1064,6 +1118,7 @@ export async function generateAIResponse(
 
         logger.info("[AI Provider] Success", { provider, latencyMs, tokens: totalTokens })
         return {
+          ...(toolCalls?.length ? { toolCalls } : {}),
           text,
           provider,
           latencyMs,

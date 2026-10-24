@@ -1,3 +1,8 @@
+import {
+  SPARRA_COMPOSER_ID,
+  hasSparraPartner,
+  partnerHandoffActionSchema,
+} from "@/lib/interview/partner-handoff/contract"
 import { captureLabCheckpoint, captureLabMessage } from "@/lib/bugfix/guided-lab/assessment/capture"
 import {
   captureSessionRequest,
@@ -9,7 +14,7 @@ import { useEffect, useRef } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { extractTopicsFromMessage } from "@/lib/interview"
+import { extractTopicsFromMessage } from "@/lib/interview/topic-extraction"
 import {
   REFUSAL_TITLES,
   UPGRADE_PATH,
@@ -56,6 +61,7 @@ interface ChatUserProfile {
 }
 
 interface ChatApiResponse {
+  action?: unknown
   reply?: string | null
   provider?: string
   latencyMs?: number
@@ -111,6 +117,7 @@ export interface UseInterviewChatOptions extends SessionRequestGuard {
   ) => void
   classifyBugfixAIHelpKind: (message: string) => NonNullable<BugfixEvidenceEvent["aiHelpKind"]>
   proceedToFinalFeedback: () => void
+  onOpenSparra?: () => void
 }
 
 export interface UseInterviewChatReturn {
@@ -530,6 +537,10 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             sessionContext: opts.sessionContext,
             role: isInterviewer ? "interviewer" : "partner",
             responseMode: isInterviewer ? "validated-stream" : "json",
+            partnerAvailable:
+              hasSparraPartner(selectedScenario?.type) &&
+              !showPostInterviewDiscussion &&
+              Boolean(opts.onOpenSparra),
             // Stamps every chat turn's usage_events row with the interview
             // session, so the admin per-session cost rows include chat spend.
             // Without it the monthly total accumulated while every session
@@ -671,6 +682,22 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             )
           if (!replyAlreadyRendered) {
             setMessages((prev) => [...prev, createChatMessage("ai", reply)])
+          }
+
+          if (
+            isInterviewer &&
+            !showPostInterviewDiscussion &&
+            hasSparraPartner(selectedScenario?.type) &&
+            partnerHandoffActionSchema.safeParse(data.action).success &&
+            opts.onOpenSparra
+          ) {
+            setChatInput((draft) => (draft.trim() ? draft : userMessage))
+            opts.onOpenSparra()
+            requestAnimationFrame(() => {
+              if (isCurrent())
+                document.getElementById(SPARRA_COMPOSER_ID)?.focus({ preventScroll: true })
+            })
+            toast.info("Sparra is open. Review your question and send it when you’re ready.")
           }
 
           // Track topics from interviewer messages to avoid repetitive questions

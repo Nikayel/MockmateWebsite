@@ -62,6 +62,7 @@ export async function processChatMessage(
       reply: aiResponse.text,
       provider: aiResponse.provider,
       latencyMs: aiResponse.latencyMs,
+      ...(aiResponse.action ? { action: aiResponse.action } : {}),
       _debug: {
         phase: currentPhase,
         messageCount: requestContext.messageCount,

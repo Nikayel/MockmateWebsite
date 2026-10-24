@@ -1,6 +1,7 @@
 "use client"
 
 import { type FormEvent, type RefObject } from "react"
+import { SPARRA_COMPOSER_ID } from "@/lib/interview/partner-handoff/contract"
 import { MessageCircle, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ConversationMessage } from "./ConversationMessage"
@@ -78,6 +79,7 @@ export function SparraPartnerWidget({
 
       <form onSubmit={submitMessage} className="border-border flex gap-2 border-t p-3">
         <input
+          id={SPARRA_COMPOSER_ID}
           value={input}
           onChange={(event) => onInputChange(event.target.value)}
           placeholder={isDebuggingScenario ? "Ask for a debugging nudge…" : "Ask Sparra…"}

@@ -18,6 +18,8 @@ export const chatRequestSchema = z
       .max(2000)
       .optional(),
     role: z.enum(["interviewer", "partner"]).optional(),
+    partnerAvailable: z.boolean().optional(),
+    isPostInterview: z.boolean().optional(),
     userContext: z.record(z.unknown()).optional(),
     workspaceContext: z
       .array(

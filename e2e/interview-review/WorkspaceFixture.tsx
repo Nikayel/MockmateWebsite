@@ -1,3 +1,4 @@
+import { useWorkspaceChatFixture } from "./useWorkspaceChatFixture"
 import { useEffect, useRef, useState } from "react"
 import { InterviewLayoutGrid } from "@/app/interview/_components/InterviewLayoutGrid"
 import { InterviewTopBar } from "@/app/interview/_components/InterviewTopBar"
@@ -18,6 +19,7 @@ import { voiceUnavailableCopy } from "@/lib/voice/voice-availability"
 const noop = () => {}
 export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
   const params = new URLSearchParams(window.location.search)
+  const handoffEnabled = params.get("handoff") === "1"
   const isDsa = params.get("scenario") === "dsa"
   const started = params.get("started") !== "0"
   const scenario = isDsa
@@ -120,7 +122,29 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
     setLanguage(next)
     if (isDsa) setSingleFileCode(dsaTwoSumScenario.starterCode[next] ?? "")
   })
+  const liveChat = useWorkspaceChatFixture({
+    scenario,
+    code: singleFileCode,
+    chatInput: input,
+    setChatInput: setInput,
+    chatMessages: messages,
+    setChatMessages: setMessages,
+    interviewerInput,
+    setInterviewerInput,
+    interviewerMessages,
+    setInterviewerMessages,
+    setIsLoadingInterviewer: setReplyPending,
+    onOpenSparra: () => {
+      setFocusMode(false)
+      setActivePanel("problem")
+      setExpanded(true)
+    },
+  })
   const sendInterviewerMessage = () => {
+    if (handoffEnabled) {
+      void liveChat.handleSendMessage(true)
+      return
+    }
     if (!interviewerInput.trim() || replyPending) return
     setInterviewerMessages((previous) => [...previous, { type: "user", message: interviewerInput }])
     setInterviewerInput("")
@@ -160,6 +184,7 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
   }
   return (
     <>
+      {handoffEnabled && <button onClick={liveChat.pause}>Pause fixture session</button>}
       <InterviewLayoutGrid
         toolbar={
           <InterviewTopBar
@@ -285,8 +310,12 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
         chatEndRef={endRef}
         chatInput={input}
         onChatInputChange={setInput}
-        isLoadingChat={false}
+        isLoadingChat={handoffEnabled && liveChat.isLoadingChat}
         onSendPartnerMessage={() => {
+          if (handoffEnabled) {
+            void liveChat.handleSendMessage(false)
+            return
+          }
           setMessages((previous) => [
             ...previous,
             { type: "user", message: input },

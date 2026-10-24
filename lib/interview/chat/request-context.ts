@@ -26,6 +26,8 @@ export interface ChatRequestContext {
   responseMode?: "json" | "validated-stream"
   context?: Array<{ type: string; message: string }>
   role?: "interviewer" | "partner"
+  partnerAvailable?: boolean
+  isPostInterview?: boolean
   userContext?: UserContext
   workspaceContext?: ChatRequestData["workspaceContext"]
   currentCode?: string
@@ -70,6 +72,8 @@ export function buildChatRequestContext(validatedData: ChatRequestData): ChatReq
     responseMode: validatedData.responseMode,
     context: validatedData.context,
     role: validatedData.role,
+    partnerAvailable: validatedData.partnerAvailable,
+    isPostInterview: validatedData.isPostInterview,
     userContext: validatedData.userContext as UserContext | undefined,
     workspaceContext: validatedData.workspaceContext,
     currentCode,

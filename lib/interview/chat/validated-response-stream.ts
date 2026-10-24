@@ -1,6 +1,9 @@
+import type { PartnerHandoffAction } from "../partner-handoff/contract"
+
 export const VALIDATED_CHAT_STREAM_CONTENT_TYPE = "application/x-ndjson"
 
 export interface ValidatedChatResponse {
+  action?: PartnerHandoffAction
   reply: string
   provider: string
   latencyMs?: number

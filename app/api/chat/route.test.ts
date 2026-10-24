@@ -807,3 +807,106 @@ describe("/api/chat route", () => {
     releaseExtraction()
   })
 })
+
+describe("interviewer native Sparra handoff", () => {
+  beforeEach(() => vi.clearAllMocks())
+  it.each(["json", "validated-stream"] as const)(
+    "returns the action in %s without another provider call",
+    async (responseMode) => {
+      const { generateAIResponse } = await setupMocks()
+      vi.mocked(generateAIResponse).mockResolvedValueOnce({
+        text: "",
+        provider: "openai-none",
+        latencyMs: 12,
+        toolCalls: [{ name: "open_sparra", args: {} }],
+      })
+      const { POST } = await import("./route")
+      const response = await POST(
+        createRequest({
+          message: "Can you walk me through monitor_eval.py with a sample input?",
+          role: "interviewer",
+          scenarioType: "bugfix",
+          partnerAvailable: true,
+          responseMode,
+        })
+      )
+      expect(response.status).toBe(200)
+      const body =
+        responseMode === "validated-stream"
+          ? await (
+              await import("@/lib/interview/chat/validated-response-stream")
+            ).readValidatedChatStream(response, () => {})
+          : (response as unknown as { data: Record<string, unknown> }).data
+      expect(body.action).toEqual({ type: "open_sparra" })
+      expect(body.reply).toContain("Try Sparra, your AI partner")
+      expect(generateAIResponse).toHaveBeenCalledOnce()
+      expect(vi.mocked(generateAIResponse).mock.calls[0][3]?.tools?.[0].function.name).toBe(
+        "open_sparra"
+      )
+    }
+  )
+  it("keeps requirement clarification with the interviewer", async () => {
+    const { generateAIResponse } = await setupMocks()
+    vi.mocked(generateAIResponse).mockResolvedValueOnce({
+      text: "Use the fixed evaluation window from the task.",
+      provider: "openai-none",
+      latencyMs: 12,
+    })
+    const { POST } = await import("./route")
+    const response = await POST(
+      createRequest({
+        message: "Is the time window fixed?",
+        role: "interviewer",
+        scenarioType: "bugfix",
+        partnerAvailable: true,
+      })
+    )
+    expect((response as unknown as { data: Record<string, unknown> }).data.action).toBeUndefined()
+    expect(generateAIResponse).toHaveBeenCalledOnce()
+  })
+  it.each([
+    { partnerAvailable: false },
+    { scenarioType: "dsa" },
+    { role: "partner" },
+    { isPostInterview: true },
+    { hasSubmitted: true },
+  ])("does not execute unexpected tool calls in an unavailable session: %j", async (overrides) => {
+    const { generateAIResponse } = await setupMocks()
+    vi.mocked(generateAIResponse).mockResolvedValueOnce({
+      text: "Let's continue here.",
+      provider: "openai-none",
+      latencyMs: 12,
+      toolCalls: [{ name: "open_sparra", args: {} }],
+    })
+    const { POST } = await import("./route")
+    const response = await POST(
+      createRequest({
+        message: "Explain this function",
+        role: "interviewer",
+        scenarioType: "bugfix",
+        partnerAvailable: true,
+        ...overrides,
+      })
+    )
+    expect((response as unknown as { data: Record<string, unknown> }).data.action).toBeUndefined()
+    expect(vi.mocked(generateAIResponse).mock.calls[0][3]?.tools).toBeUndefined()
+  })
+  it("never interprets an action-looking sentence as a native tool call", async () => {
+    const { generateAIResponse } = await setupMocks()
+    vi.mocked(generateAIResponse).mockResolvedValueOnce({
+      text: 'open_sparra {"type":"open_sparra"}',
+      provider: "openai-none",
+      latencyMs: 12,
+    })
+    const { POST } = await import("./route")
+    const response = await POST(
+      createRequest({
+        message: "Explain this function",
+        role: "interviewer",
+        scenarioType: "bugfix",
+        partnerAvailable: true,
+      })
+    )
+    expect((response as unknown as { data: Record<string, unknown> }).data.action).toBeUndefined()
+  })
+})
