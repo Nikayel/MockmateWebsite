@@ -108,6 +108,10 @@ jobs:
           STRIPE_SECRET_KEY: sk_test_dummy_ci_build_only
           STRIPE_WEBHOOK_SECRET: whsec_dummy_ci_build_only
 
+      # Next.js builds can succeed while Vercel rejects an oversized Edge function.
+      - name: Check feedback Edge bundle budget
+        run: node scripts/check-feedback-edge-bundle.mjs
+
       # The SEO gate rides this job rather than getting its own, because the only expensive thing
       # it needs is the build that just finished. A separate job would pay for a second checkout,
       # install, and `next build` to audit bytes identical to these.

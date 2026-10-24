@@ -1,6 +1,6 @@
 import { evidenceMatchesLab } from "@/lib/bugfix/guided-lab/assessment/validation"
 import { summarizeLabFeedback } from "@/lib/bugfix/guided-lab/assessment/summary"
-import { getScenarioById } from "@/lib/scenarios"
+import { getGuidedLabScenario } from "@/lib/bugfix/guided-lab/scenarios"
 import { labEvidenceSchema } from "@/lib/bugfix/guided-lab/assessment/schema"
 import { buildLabAssessment } from "@/lib/bugfix/guided-lab/assessment/report"
 import { reviewLabAssessment } from "@/lib/bugfix/guided-lab/assessment/review.server"
@@ -527,7 +527,7 @@ export async function POST(request: NextRequest) {
       } = body
 
       const guidedScenario =
-        typeof scenarioId === "string" ? getScenarioById(scenarioId) : undefined
+        typeof scenarioId === "string" ? getGuidedLabScenario(scenarioId) : undefined
       const guidedConfig = guidedScenario?.type === "bugfix" ? guidedScenario.guidedLab : undefined
       const parsedLabEvidence = labEvidenceSchema.safeParse(body.guidedLabEvidence)
       if (
