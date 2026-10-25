@@ -140,8 +140,9 @@ export function getWelcomeEmailHtml(data: WelcomeEmailData): string {
     <p>Thanks for signing up. Quick orientation so you know what you have:</p>
 
     <ul style="padding-left: 20px; color: #333;">
-      <li style="margin-bottom: 6px;">Interview practice with an AI interviewer: DSA (170+ scenarios across 18 patterns) and debugging. You code, it asks follow-ups, you get feedback at the end.</li>
-      <li style="margin-bottom: 6px;">Free courses at <a href="${data.appUrl}/learn" style="color: #0066cc; text-decoration: none;">/learn</a>: Python, SQL and data engineering, system design, and applied JS and React. No paywall on any of them.</li>
+      <li style="margin-bottom: 6px;">Debugging practice in existing codebases: read the incident report, trace the bug across files, make a fix, and verify it with tests.</li>
+      <li style="margin-bottom: 6px;">DSA practice with an AI interviewer: work through a problem, explain your approach, and answer follow-up questions. Both debugging and DSA sessions include feedback at the end.</li>
+      <li style="margin-bottom: 6px;">Free courses at <a href="${data.appUrl}/learn" style="color: #0066cc; text-decoration: none;">/learn</a>: Python, SQL and data engineering, and system design.</li>
     </ul>
 
     <p>Short, regular sessions beat cramming. That's the whole design.</p>
@@ -164,8 +165,9 @@ Hey ${firstName},
 
 Thanks for signing up. Quick orientation so you know what you have:
 
-- Interview practice with an AI interviewer: DSA (170+ scenarios across 18 patterns) and debugging. You code, it asks follow-ups, you get feedback at the end.
-- Free courses at ${data.appUrl}/learn: Python, SQL and data engineering, system design, and applied JS and React. No paywall on any of them.
+- Debugging practice in existing codebases: read the incident report, trace the bug across files, make a fix, and verify it with tests.
+- DSA practice with an AI interviewer: work through a problem, explain your approach, and answer follow-up questions. Both debugging and DSA sessions include feedback at the end.
+- Free courses at ${data.appUrl}/learn: Python, SQL and data engineering, and system design.
 
 Short, regular sessions beat cramming. That's the whole design.
 
@@ -214,7 +216,7 @@ export function getInactivityEmailHtml(
 
     ${data.streakDays && data.streakDays > 0 ? `<p>You also had a <strong>${data.streakDays}-day streak</strong> going.</p>` : ""}
 
-    <p>Even 10 minutes counts.</p>
+    <p>Pick a debugging scenario to practise tracing a bug in an existing codebase, or work through a DSA problem with the AI interviewer. Even 10 minutes counts.</p>
 
     ${ctaButton("Do a quick session", `${data.appUrl}/dashboard`)}
 
@@ -237,7 +239,7 @@ Hey ${firstName},
 It's been ${days} day${days !== 1 ? "s" : ""} since your last session.
 
 ${data.lastTopic ? `You were working on ${data.lastTopic}. A short review now does more than a long session later.\n` : ""}${data.streakDays && data.streakDays > 0 ? `You also had a ${data.streakDays}-day streak going.\n` : ""}
-Even 10 minutes counts.
+Pick a debugging scenario to practise tracing a bug in an existing codebase, or work through a DSA problem with the AI interviewer. Even 10 minutes counts.
 
 Do a quick session: ${data.appUrl}/dashboard
 
@@ -462,7 +464,7 @@ export function getInterviewCountdownEmailHtml(
     <div style="background-color: #f8f8f8; padding: 16px; border-radius: 6px; margin: 16px 0;">
       <p style="margin: 0 0 8px 0; font-weight: 500;">Final stretch:</p>
       <ul style="padding-left: 20px; margin: 0; color: #666; font-size: 14px;">
-        <li>Review patterns you've solved; don't learn new ones now</li>
+        <li>Revisit debugging scenarios or DSA problems you've already worked through</li>
         <li>Get good sleep; it consolidates memory</li>
         <li>Practice explaining your approach out loud</li>
       </ul>
@@ -505,7 +507,7 @@ export function getInterviewCountdownEmailText(
     data.daysUntilInterview <= 3
       ? `
 Final stretch:
-- Review patterns you've solved; don't learn new ones now
+- Revisit debugging scenarios or DSA problems you've already worked through
 - Get good sleep; it consolidates memory
 - Practice explaining your approach out loud
 `
@@ -1018,12 +1020,14 @@ export function getActivationNudgeEmailHtml(
 
     <p>You signed up a couple of days ago but haven't run a session yet. Fair enough, starting is the hard part.</p>
 
-    <p>Two low-pressure ways in:</p>
+    <p>Two low-pressure ways to try a session:</p>
 
     <ul style="padding-left: 20px; color: #333;">
-      <li style="margin-bottom: 6px;">Pick a DSA scenario and try it with the AI interviewer. Ten minutes is enough to see how it works.</li>
-      <li style="margin-bottom: 6px;">Or skip interviews entirely and start a free course at <a href="${data.appUrl}/learn" style="color: #0066cc; text-decoration: none;">/learn</a>: Python, SQL, system design, or JS and React. No paywall.</li>
+      <li style="margin-bottom: 6px;">Try a debugging scenario. You'll get an existing codebase and a bug to investigate. Read the files, trace what went wrong, and test a fix.</li>
+      <li style="margin-bottom: 6px;">Or pick a DSA problem and work through it with the AI interviewer. Explain your approach and answer its follow-up questions.</li>
     </ul>
+
+    <p>Ten minutes is enough to get a feel for either. If you'd rather start with a lesson, the free courses at <a href="${data.appUrl}/learn" style="color: #0066cc; text-decoration: none;">/learn</a> cover Python, SQL and data engineering, and system design.</p>
 
     ${ctaButton("Try a first session", `${data.appUrl}/dashboard`)}
 
@@ -1046,10 +1050,12 @@ Hey ${firstName},
 
 You signed up a couple of days ago but haven't run a session yet. Fair enough, starting is the hard part.
 
-Two low-pressure ways in:
+Two low-pressure ways to try a session:
 
-- Pick a DSA scenario and try it with the AI interviewer. Ten minutes is enough to see how it works.
-- Or skip interviews entirely and start a free course at ${data.appUrl}/learn: Python, SQL, system design, or JS and React. No paywall.
+- Try a debugging scenario. You'll get an existing codebase and a bug to investigate. Read the files, trace what went wrong, and test a fix.
+- Or pick a DSA problem and work through it with the AI interviewer. Explain your approach and answer its follow-up questions.
+
+Ten minutes is enough to get a feel for either. If you'd rather start with a lesson, the free courses at ${data.appUrl}/learn cover Python, SQL and data engineering, and system design.
 
 Try a first session: ${data.appUrl}/dashboard
 
