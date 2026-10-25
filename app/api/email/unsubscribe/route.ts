@@ -1,19 +1,12 @@
-/**
- * No-login unsubscribe endpoint for reminder-class emails.
- *
- * GET renders a small confirmation page (safe, no state change) whose button POSTs
- * back here. POST performs the unsubscribe; it is also the RFC 8058 one-click
- * target mail clients call from the List-Unsubscribe header, so it must succeed
- * with no interaction and no auth beyond the HMAC token minted into the email
- * (lib/email/unsubscribe.ts). The token can only set one category toggle to false
- * for one user, so replay is harmless.
- *
- * The toggle written is the profiles.notification_preferences map field, which is
- * the store the email cron actually checks before sending.
+/** GET confirms without mutation; POST applies the signed token's scope.
+ * New links stop all optional email. Old category links retain their scope.
+ * App preferences and the durable Brevo suppression job commit together.
  */
 
 import { NextRequest, NextResponse } from "next/server"
 import { adminDb } from "@/lib/firebase-admin"
+import { patchEmailPreferences } from "@/lib/email/consent/preferences"
+import { syncEmailSuppression } from "@/lib/email/consent/sync"
 import { logger } from "@/lib/logger"
 import { verifyUnsubscribeToken, UNSUBSCRIBE_CATEGORIES } from "@/lib/email/unsubscribe"
 
@@ -23,6 +16,7 @@ const CATEGORY_LABELS: Record<keyof typeof UNSUBSCRIBE_CATEGORIES, string> = {
   inactivity: "practice nudges",
   spaced_repetition: "review reminders",
   roadmap: "roadmap reminders",
+  marketing: "promotional emails",
 }
 
 function page(title: string, body: string, status = 200): NextResponse {
@@ -41,7 +35,14 @@ function page(title: string, body: string, status = 200): NextResponse {
   ${body}
 </body>
 </html>`,
-    { status, headers: { "Content-Type": "text/html; charset=utf-8" } }
+    {
+      status,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "private, no-store",
+        "Referrer-Policy": "no-referrer",
+      },
+    }
   )
 }
 
@@ -59,7 +60,10 @@ export async function GET(request: NextRequest) {
   const verified = verifyUnsubscribeToken(token)
   if (!verified) return invalidTokenPage()
 
-  const label = CATEGORY_LABELS[verified.category]
+  const label =
+    verified.scope === "optional"
+      ? "all optional emails (promotions and practice reminders)"
+      : CATEGORY_LABELS[verified.category]
   return page(
     "Unsubscribe",
     `<p>Stop receiving <strong>${label}</strong> from CodeSparring?</p>
@@ -78,20 +82,34 @@ export async function POST(request: NextRequest) {
   const { userId, category } = verified
   const preferenceField = UNSUBSCRIBE_CATEGORIES[category]
 
+  let pendingMarketing = false
   try {
-    await adminDb
-      .collection("profiles")
-      .doc(userId)
-      .set({ notification_preferences: { [preferenceField]: false } }, { merge: true })
+    const saved = await patchEmailPreferences(
+      userId,
+      {
+        [preferenceField]: false,
+        ...(verified.scope === "optional"
+          ? { email_notifications_enabled: false, marketing_emails: false }
+          : {}),
+      },
+      "unsubscribe"
+    )
+    if (saved?.marketingSyncPending) pendingMarketing = !(await syncEmailSuppression(userId))
 
     // Audit trail alongside the send log, so an admin can see why sends stopped.
-    await adminDb.collection("email_notifications").add({
-      user_id: userId,
-      email_type: `unsubscribe_${category}`,
-      status: "unsubscribed",
-      created_at: new Date().toISOString(),
-      source: "unsubscribe-link",
-    })
+    await adminDb
+      .collection("email_notifications")
+      .add({
+        user_id: userId,
+        email_type: `unsubscribe_${category}`,
+        status: "unsubscribed",
+        created_at: new Date().toISOString(),
+        source: "unsubscribe-link",
+        scope: verified.scope,
+      })
+      .catch((error) =>
+        logger.warn("Unsubscribe audit log unavailable (preference saved)", { userId, error })
+      )
   } catch (error) {
     logger.error("[Unsubscribe] Failed to persist unsubscribe", { userId, category, error })
     return page(
@@ -104,7 +122,9 @@ export async function POST(request: NextRequest) {
   logger.info("[Unsubscribe] Reminder category disabled", { userId, category })
   return page(
     "Unsubscribed",
-    `<p>Done. You won't get ${CATEGORY_LABELS[category]} anymore.</p>
+    `<p>Done. You won't get ${verified.scope === "optional" ? "optional emails, including promotions and practice reminders," : CATEGORY_LABELS[category]} anymore.</p>
+     ${pendingMarketing ? "<p>Your app reminders are stopped. Promotional-email suppression is still syncing automatically.</p>" : ""}
+     <p>Billing and security messages are separate.</p>
      <p style="font-size: 13px; color: #666;">Changed your mind later? Re-enable them on your <a href="/account" style="color: #666;">account page</a>.</p>`
   )
 }

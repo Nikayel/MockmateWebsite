@@ -15,6 +15,8 @@
  * activity and must always deliver.
  */
 
+import { DEFAULT_EMAIL_PREFERENCES } from "./consent/policy"
+import type { NotificationPreferences } from "@/lib/types"
 import { sendEmail, upsertContact, EmailResult } from "./brevo"
 import { getAppBaseUrl } from "../site-url"
 import { DEFAULT_TIMEZONE, getTodayInTimezone, getDateInTimezone } from "./timezone"
@@ -95,27 +97,30 @@ export async function sendWelcomeEmail(
   email: string,
   displayName?: string
 ): Promise<EmailResult> {
-  // Add to Brevo contacts list
-  await upsertContact(email, {
-    FIRSTNAME: displayName?.split(" ")[0] || "",
-    LASTNAME: displayName?.split(" ").slice(1).join(" ") || "",
-    USER_ID: userId,
-    SIGNUP_DATE: new Date().toISOString(),
-  })
-
   const data: WelcomeEmailData = {
     userName: displayName || "",
     userEmail: email,
     appUrl: getAppBaseUrl(),
   }
 
-  return sendEmail({
+  const result = await sendEmail({
+    consent: { type: "optional", userId, category: "welcome" },
     to: [{ email, name: displayName }],
     subject: getWelcomeEmailSubject(),
     htmlContent: getWelcomeEmailHtml(data),
     textContent: getWelcomeEmailText(data),
     tags: ["welcome", "onboarding"],
   })
+  if (result.success) {
+    // Metadata only, after consent/identity validation; never changes blocklisting.
+    await upsertContact(email, {
+      FIRSTNAME: displayName?.split(" ")[0] || "",
+      LASTNAME: displayName?.split(" ").slice(1).join(" ") || "",
+      USER_ID: userId,
+      SIGNUP_DATE: new Date().toISOString(),
+    })
+  }
+  return result
 }
 
 // ACTIVATION NUDGE (reminder; rides the inactivity unsubscribe category)
@@ -129,6 +134,7 @@ export async function sendActivationNudgeEmail(
   const delivery = reminderDelivery(userId, "inactivity")
 
   return sendEmail({
+    consent: { type: "optional", userId, category: "inactivity" },
     to: [{ email, name: data.userName }],
     subject: getActivationNudgeEmailSubject(),
     htmlContent: getActivationNudgeEmailHtml(emailData, delivery.renderOptions),
@@ -149,6 +155,7 @@ export async function sendFirstSessionFeedbackEmail(
   const delivery = reminderDelivery(userId, "inactivity")
 
   return sendEmail({
+    consent: { type: "optional", userId, category: "inactivity" },
     to: [{ email, name: data.userName }],
     subject: getFirstSessionFeedbackEmailSubject(),
     htmlContent: getFirstSessionFeedbackEmailHtml(emailData, delivery.renderOptions),
@@ -169,6 +176,7 @@ export async function sendInactivityEmail(
   const delivery = reminderDelivery(userId, "inactivity")
 
   return sendEmail({
+    consent: { type: "optional", userId, category: "inactivity" },
     to: [{ email, name: data.userName }],
     subject: getInactivityEmailSubject(data.hoursSinceLastSession, data.lastTopic),
     htmlContent: getInactivityEmailHtml(emailData, delivery.renderOptions),
@@ -189,6 +197,7 @@ export async function sendSpacedRepetitionEmail(
   const delivery = reminderDelivery(userId, "spaced_repetition")
 
   return sendEmail({
+    consent: { type: "optional", userId, category: "spaced_repetition" },
     to: [{ email, name: data.userName }],
     subject: getSpacedRepetitionEmailSubject(emailData),
     htmlContent: getSpacedRepetitionEmailHtml(emailData, delivery.renderOptions),
@@ -209,6 +218,7 @@ export async function sendDailyRoadmapEmail(
   const delivery = reminderDelivery(userId, "roadmap")
 
   return sendEmail({
+    consent: { type: "optional", userId, category: "roadmap" },
     to: [{ email, name: data.userName }],
     subject: getDailyRoadmapEmailSubject(emailData),
     htmlContent: getDailyRoadmapEmailHtml(emailData, delivery.renderOptions),
@@ -229,6 +239,7 @@ export async function sendInterviewCountdownEmail(
   const delivery = reminderDelivery(userId, "roadmap")
 
   return sendEmail({
+    consent: { type: "optional", userId, category: "roadmap" },
     to: [{ email, name: data.userName }],
     subject: getInterviewCountdownEmailSubject(emailData),
     htmlContent: getInterviewCountdownEmailHtml(emailData, delivery.renderOptions),
@@ -249,6 +260,7 @@ export async function sendBehindScheduleEmail(
   const delivery = reminderDelivery(userId, "roadmap")
 
   return sendEmail({
+    consent: { type: "optional", userId, category: "roadmap" },
     to: [{ email, name: data.userName }],
     subject: getBehindScheduleEmailSubject(emailData),
     htmlContent: getBehindScheduleEmailHtml(emailData, delivery.renderOptions),
@@ -267,6 +279,7 @@ export async function sendPaymentFailedEmail(
   const emailData: PaymentFailedEmailData = { ...data, appUrl: getAppBaseUrl() }
 
   return sendEmail({
+    consent: { type: "essential" },
     to: [{ email, name: data.userName }],
     subject: getPaymentFailedEmailSubject(),
     htmlContent: getPaymentFailedEmailHtml(emailData),
@@ -284,6 +297,7 @@ export async function sendSubscriptionConfirmationEmail(
   const emailData: SubscriptionConfirmationEmailData = { ...data, appUrl: getAppBaseUrl() }
 
   return sendEmail({
+    consent: { type: "essential" },
     to: [{ email, name: data.userName }],
     subject: getSubscriptionConfirmationEmailSubject(),
     htmlContent: getSubscriptionConfirmationEmailHtml(emailData),
@@ -301,6 +315,7 @@ export async function sendSubscriptionCancellationEmail(
   const emailData: SubscriptionCancellationEmailData = { ...data, appUrl: getAppBaseUrl() }
 
   return sendEmail({
+    consent: { type: "essential" },
     to: [{ email, name: data.userName }],
     subject: getSubscriptionCancellationEmailSubject(data.isImmediate),
     htmlContent: getSubscriptionCancellationEmailHtml(emailData),
@@ -318,6 +333,7 @@ export async function sendYearlyExpiredEmail(
   const emailData: YearlyExpiredEmailData = { ...data, appUrl: getAppBaseUrl() }
 
   return sendEmail({
+    consent: { type: "essential" },
     to: [{ email, name: data.userName }],
     subject: getYearlyExpiredEmailSubject(),
     htmlContent: getYearlyExpiredEmailHtml(emailData),
@@ -335,6 +351,7 @@ export async function sendYearlyExpiryReminderEmail(
   const emailData: YearlyExpiryReminderEmailData = { ...data, appUrl: getAppBaseUrl() }
 
   return sendEmail({
+    consent: { type: "essential" },
     to: [{ email, name: data.userName }],
     subject: getYearlyExpiryReminderEmailSubject(emailData),
     htmlContent: getYearlyExpiryReminderEmailHtml(emailData),
@@ -352,6 +369,7 @@ export async function sendTrialEndingEmail(
   const emailData: TrialEndingEmailData = { ...data, appUrl: getAppBaseUrl() }
 
   return sendEmail({
+    consent: { type: "essential" },
     to: [{ email, name: data.userName }],
     subject: getTrialEndingEmailSubject(emailData),
     htmlContent: getTrialEndingEmailHtml(emailData),
@@ -362,30 +380,8 @@ export async function sendTrialEndingEmail(
 
 // NOTIFICATION PREFERENCES
 
-export interface NotificationPreferences {
-  email_notifications_enabled: boolean
-  welcome_email: boolean
-  inactivity_reminders: boolean
-  spaced_repetition_reminders: boolean
-  /** Deprecated: milestone emails were removed 2026-08-14; field kept because stored docs carry it. */
-  milestone_celebrations?: boolean
-  roadmap_reminders: boolean
-  marketing_emails: boolean
-  timezone?: string
-  preferred_hours?: number[]
-  last_email_sent_at?: string
-  emails_sent_today?: number
-}
-
-export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
-  email_notifications_enabled: true,
-  welcome_email: true,
-  inactivity_reminders: true,
-  spaced_repetition_reminders: true,
-  roadmap_reminders: true,
-  marketing_emails: false,
-  preferred_hours: [9, 10, 11, 14, 15, 19, 20],
-}
+export type { NotificationPreferences } from "@/lib/types"
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = DEFAULT_EMAIL_PREFERENCES
 
 // EMAIL RATE LIMITING
 

@@ -30,7 +30,13 @@ export async function sendPracticeReminder(
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     return await Promise.race([
-      sendEmail({ ...content, to: [{ email }], tags: ["saved-practice"], singleAttempt: true }),
+      sendEmail({
+        consent: { type: "optional", userId: plan.userId, category: "inactivity" },
+        ...content,
+        to: [{ email }],
+        tags: ["saved-practice"],
+        singleAttempt: true,
+      }),
       new Promise<EmailResult>((resolve) => {
         timer = setTimeout(
           () =>

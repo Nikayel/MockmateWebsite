@@ -13,6 +13,7 @@ import {
   SendSmtpEmail,
   CreateContact,
 } from "@getbrevo/brevo"
+import { checkDeliveryConsent, type DeliveryConsent } from "./consent/guard"
 import { logger } from "@/lib/logger"
 
 // Lazy-initialized API instances with API key configured
@@ -64,6 +65,7 @@ export interface EmailRecipient {
 }
 
 export interface SendEmailOptions {
+  consent: DeliveryConsent
   /** Durable reminder jobs must not replay ambiguous network deliveries. */
   singleAttempt?: boolean
   to: EmailRecipient[]
@@ -82,6 +84,7 @@ export interface SendEmailOptions {
 }
 
 export interface EmailResult {
+  skipped?: boolean
   success: boolean
   messageId?: string
   error?: string
@@ -101,6 +104,14 @@ function sleep(ms: number): Promise<void> {
  * Retries up to 3 times with exponential backoff for transient failures
  */
 export async function sendEmail(options: SendEmailOptions): Promise<EmailResult> {
+  if (
+    options.consent?.type === "optional" &&
+    options.consent.category !== "welcome" &&
+    (!options.headers?.["List-Unsubscribe"] ||
+      options.headers?.["List-Unsubscribe-Post"] !== "List-Unsubscribe=One-Click")
+  ) {
+    return { success: false, error: "Unsubscribe delivery is not configured", retryable: true }
+  }
   // Check if API key is configured
   if (!process.env.BREVO_API_KEY) {
     console.warn("[Brevo] API key not configured, skipping email send")
@@ -122,6 +133,8 @@ export async function sendEmail(options: SendEmailOptions): Promise<EmailResult>
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
+      const blocked = await checkDeliveryConsent(options.consent, options.to)
+      if (blocked) return blocked
       const message = new SendSmtpEmail()
       message.subject = options.subject
       message.htmlContent = options.htmlContent

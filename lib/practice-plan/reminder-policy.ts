@@ -32,6 +32,7 @@ export function reminderDeliveryState(
   result: EmailResult,
   now: Date
 ): Partial<PracticePlan> {
+  if (result.skipped) return { reminderStatus: "cancelled", nextAttemptAt: null }
   if (result.success) return { reminderStatus: "sent", nextAttemptAt: null }
   if (result.deliveryUncertain) return { reminderStatus: "uncertain", nextAttemptAt: null }
   if (!result.retryable || plan.attempts >= 3)

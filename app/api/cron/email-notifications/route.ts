@@ -43,6 +43,7 @@ import {
 import type { Profile, UserLearningState, ProblemMasteryRecord } from "@/lib/types"
 import { checkStreakAtRisk, sendDailyReminderIfNeeded } from "@/lib/services/session-notifications"
 import { updateQuotaToFree, resetYearlySubscriberQuota } from "@/lib/quota/yearly-quota"
+import { maintainEmailConsent } from "@/lib/email/consent/maintenance"
 import { processPracticeReminders } from "@/lib/practice-plan/reminder-worker"
 
 const db = adminDb
@@ -168,6 +169,12 @@ export async function GET(request: NextRequest) {
     // Get current time
     const now = new Date()
     try {
+      await maintainEmailConsent()
+    } catch (error) {
+      logger.error("Email consent reconciliation incomplete", { error })
+      results.errors.push("Email consent reconciliation will retry")
+    }
+    try {
       results.practiceReminders = await processPracticeReminders(now)
     } catch (error) {
       logger.error("Saved practice reminder drain failed", { error })
@@ -286,6 +293,10 @@ async function processWelcomeEmails(now: Date, results: any): Promise<void> {
         logger.info("[Cron Email] Sending welcome email", { email: profile.email, userId })
         const result = await sendWelcomeEmail(userId, profile.email, profile.full_name)
 
+        if (result.skipped) {
+          results.welcomeEmails.skipped++
+          continue
+        }
         if (result.success) {
           results.welcomeEmails.sent++
 
@@ -298,11 +309,6 @@ async function processWelcomeEmails(now: Date, results: any): Promise<void> {
               welcome_notification_sent: true,
               last_email_sent_at: now.toISOString(),
               emails_sent_today: (profile.emails_sent_today || 0) + 1,
-              notification_preferences: {
-                ...profile.notification_preferences,
-                email_notifications_enabled: true,
-                welcome_email: true,
-              },
             })
 
           // Create in-app welcome notification
@@ -447,6 +453,10 @@ async function processActivationNudges(now: Date, results: any): Promise<void> {
           userEmail: profile.email,
         })
 
+        if (result.skipped) {
+          results.activationNudges.skipped++
+          continue
+        }
         if (result.success) {
           results.activationNudges.sent++
           await updateEmailTracking(userId, profile, now)
@@ -548,6 +558,10 @@ async function processFirstSessionFeedback(now: Date, results: any): Promise<voi
           userEmail: profile.email,
         })
 
+        if (result.skipped) {
+          results.firstSessionFeedback.skipped++
+          continue
+        }
         if (result.success) {
           results.firstSessionFeedback.sent++
           await updateEmailTracking(userId, profile, now)
@@ -692,6 +706,10 @@ async function processInactivityReminders(now: Date, results: any): Promise<void
         streakDays: learningState.streak_days,
       })
 
+      if (result.skipped) {
+        results.inactivityEmails.skipped++
+        continue
+      }
       if (result.success) {
         results.inactivityEmails.sent++
 
@@ -847,6 +865,10 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
         scenarioId: mostOverdue.scenario_id,
       })
 
+      if (result.skipped) {
+        results.spacedRepetitionEmails.skipped++
+        continue
+      }
       if (result.success) {
         results.spacedRepetitionEmails.sent++
 
@@ -975,6 +997,10 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
         scenarioId: mostOverdue.topic.scenario_id,
       })
 
+      if (result.skipped) {
+        results.spacedRepetitionEmails.skipped++
+        continue
+      }
       if (result.success) {
         results.spacedRepetitionEmails.sent++
 
@@ -1195,6 +1221,10 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
           patternsToFocus,
         })
 
+        if (result.skipped) {
+          results.roadmapEmails.skipped++
+          continue
+        }
         if (result.success) {
           results.roadmapEmails.sent++
           await updateEmailTracking(userId, profile, now)
@@ -1230,6 +1260,10 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
             suggestedDailyQuestions: Math.max(1, suggestedDaily),
           })
 
+          if (result.skipped) {
+            results.roadmapEmails.skipped++
+            continue
+          }
           if (result.success) {
             results.roadmapEmails.sent++
             await updateEmailTracking(userId, profile, now)
@@ -1256,6 +1290,10 @@ async function processRoadmapReminders(now: Date, results: any): Promise<void> {
           isOnTrack,
         })
 
+        if (result.skipped) {
+          results.roadmapEmails.skipped++
+          continue
+        }
         if (result.success) {
           results.roadmapEmails.sent++
           await updateEmailTracking(userId, profile, now)

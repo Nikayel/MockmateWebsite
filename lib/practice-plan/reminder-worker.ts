@@ -104,11 +104,16 @@ export async function processPracticeReminders(now = new Date()) {
       const result = await sendPracticeReminder(claimed, profile.email)
       const fields = reminderDeliveryState(claimed, result, now)
       await updatePracticePlan(claimed, fields)
-      if (result.success) counts.sent++
+      if (result.skipped) counts.skipped++
+      else if (result.success) counts.sent++
       else if (result.deliveryUncertain) counts.uncertain++
       else counts.failed++
       await trackEventServer(
-        result.success ? "practice_reminder_sent" : "practice_reminder_failed",
+        result.skipped
+          ? "practice_reminder_cancelled"
+          : result.success
+            ? "practice_reminder_sent"
+            : "practice_reminder_failed",
         {
           userId: claimed.userId,
           source_session_id: claimed.sourceSessionId,
@@ -116,7 +121,7 @@ export async function processPracticeReminders(now = new Date()) {
           delivery_uncertain: Boolean(result.deliveryUncertain),
         }
       )
-      if (!result.success)
+      if (!result.success && !result.skipped)
         logger.error("Saved practice reminder failed", {
           userId: claimed.userId,
           revision: claimed.revision,

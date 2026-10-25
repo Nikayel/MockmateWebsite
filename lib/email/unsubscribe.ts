@@ -1,19 +1,9 @@
 /**
- * Tokenized, no-login unsubscribe for reminder-class emails.
- *
- * Reminder emails go to people who may never sign in again; making them log in to
- * stop the emails is how spam reports happen. The token is an HMAC-signed
- * (userId, category) pair, so the unsubscribe link in a reminder email works with
- * zero interaction beyond the click, and one-click mail clients can POST it per
- * RFC 8058 (List-Unsubscribe-Post).
- *
- * The token authorizes exactly one thing: setting that user's category toggle to
- * false. It grants no read access and cannot re-enable anything.
- *
- * Secret: EMAIL_UNSUBSCRIBE_SECRET, falling back to CRON_SECRET (always present in
- * prod since the crons authenticate with it). With neither set, minting returns
- * null and senders simply omit the unsubscribe link and headers: emails still send,
- * escape hatch degrades to the signed-in preferences page.
+ * HMAC unsubscribe links. New tokens explicitly stop all optional email;
+ * historical tokens preserve their original category-only scope.
+ * Neither scope can read data or opt anyone back in. Signing uses
+ * EMAIL_UNSUBSCRIBE_SECRET, falling back to CRON_SECRET. Optional reminders
+ * fail closed when their unsubscribe headers cannot be configured.
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto"
@@ -30,6 +20,7 @@ export const UNSUBSCRIBE_CATEGORIES = {
   inactivity: "inactivity_reminders",
   spaced_repetition: "spaced_repetition_reminders",
   roadmap: "roadmap_reminders",
+  marketing: "marketing_emails",
 } as const
 
 export type UnsubscribeCategory = keyof typeof UNSUBSCRIBE_CATEGORIES
@@ -45,13 +36,15 @@ function sign(payload: string, secret: string): string {
 export function mintUnsubscribeToken(userId: string, category: UnsubscribeCategory): string | null {
   const secret = unsubscribeSecret()
   if (!secret || !userId) return null
-  const payload = Buffer.from(JSON.stringify({ u: userId, c: category })).toString("base64url")
+  const payload = Buffer.from(JSON.stringify({ u: userId, c: category, s: "optional" })).toString(
+    "base64url"
+  )
   return `${payload}.${sign(payload, secret)}`
 }
 
 export function verifyUnsubscribeToken(
   token: string
-): { userId: string; category: UnsubscribeCategory } | null {
+): { userId: string; category: UnsubscribeCategory; scope: "optional" | "category" } | null {
   const secret = unsubscribeSecret()
   if (!secret) return null
 
@@ -70,10 +63,16 @@ export function verifyUnsubscribeToken(
   try {
     const parsed: unknown = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"))
     if (typeof parsed !== "object" || parsed === null) return null
-    const { u, c } = parsed as { u?: unknown; c?: unknown }
+    const { u, c, s } = parsed as { u?: unknown; c?: unknown; s?: unknown }
     if (typeof u !== "string" || u.length === 0) return null
-    if (typeof c !== "string" || !(c in UNSUBSCRIBE_CATEGORIES)) return null
-    return { userId: u, category: c as UnsubscribeCategory }
+    if (typeof c !== "string" || !Object.prototype.hasOwnProperty.call(UNSUBSCRIBE_CATEGORIES, c))
+      return null
+    if (s !== undefined && s !== "optional") return null
+    return {
+      userId: u,
+      category: c as UnsubscribeCategory,
+      scope: s === "optional" ? "optional" : "category",
+    }
   } catch {
     return null
   }

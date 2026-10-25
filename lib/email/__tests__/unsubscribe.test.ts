@@ -3,6 +3,7 @@
  * edges are pinned: roundtrip works, any tampering fails closed, and a missing
  * secret disables minting rather than minting unsigned tokens.
  */
+import { createHmac } from "node:crypto"
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import {
   mintUnsubscribeToken,
@@ -29,6 +30,7 @@ describe("unsubscribe tokens", () => {
     expect(verifyUnsubscribeToken(token!)).toEqual({
       userId: "user-123",
       category: "inactivity",
+      scope: "optional",
     })
   })
 
@@ -85,5 +87,30 @@ describe("unsubscribe tokens", () => {
     expect(headers["List-Unsubscribe"]).toContain("mailto:nikayel@codesparring.dev")
     expect(headers["List-Unsubscribe"]).toContain("/api/email/unsubscribe?token=")
     expect(headers["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click")
+  })
+})
+
+describe("unsubscribe scope compatibility", () => {
+  function signed(payload: Record<string, unknown>) {
+    const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url")
+    return `${encoded}.${createHmac("sha256", "test-secret").update(encoded).digest("base64url")}`
+  }
+  it("keeps old category tokens scoped to the category originally promised", () => {
+    expect(verifyUnsubscribeToken(signed({ u: "legacy", c: "spaced_repetition" }))).toEqual({
+      userId: "legacy",
+      category: "spaced_repetition",
+      scope: "category",
+    })
+  })
+  it("new links explicitly authorize all optional email suppression", () => {
+    expect(verifyUnsubscribeToken(mintUnsubscribeToken("current", "marketing")!)?.scope).toBe(
+      "optional"
+    )
+  })
+  it.each(["toString", "__proto__", "unknown"])("rejects signed non-category %s", (category) => {
+    expect(verifyUnsubscribeToken(signed({ u: "legacy", c: category }))).toBeNull()
+  })
+  it("rejects unknown scopes even with a valid signature", () => {
+    expect(verifyUnsubscribeToken(signed({ u: "legacy", c: "inactivity", s: "admin" }))).toBeNull()
   })
 })

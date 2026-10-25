@@ -13,6 +13,7 @@ vi.mock("@getbrevo/brevo", () => ({
 }))
 import { sendEmail } from "../brevo"
 const options = {
+  consent: { type: "essential" as const },
   to: [{ email: "fixture@example.com" }],
   subject: "Fixture",
   htmlContent: "Fixture",

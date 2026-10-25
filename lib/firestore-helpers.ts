@@ -161,19 +161,10 @@ export async function createOrUpdateProfile(
     "goal",
     // Email/notification fields
     "welcome_email_sent",
-    "notification_preferences",
   ])
 
-  // Set default notification preferences for new profiles (required for email cron to work)
-  if (isNewProfile && !profileDataForFirestore.notification_preferences) {
-    profileDataForFirestore.notification_preferences = {
-      email_notifications_enabled: true,
-      inactivity_reminders: true,
-      spaced_repetition_reminders: true,
-      milestone_celebrations: true,
-      marketing_emails: false,
-    }
-  }
+  // Email consent is owned by the server preference service. Client profile
+  // upserts must never replay cached preferences or seed over a new opt-out.
 
   // First-touch acquisition attribution: stamp the self-declared campaign params
   // once, never overwriting an existing source. This is a first-party write that

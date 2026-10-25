@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { FieldValue } from "firebase-admin/firestore"
 import { adminDb, adminAuth } from "@/lib/firebase-admin"
+import { patchEmailPreferences } from "@/lib/email/consent/preferences"
 import { sendWelcomeEmail } from "@/lib/email"
 
 const db = adminDb
@@ -53,40 +54,9 @@ async function createWelcomeNotification(userId: string, displayName?: string): 
 /**
  * Initialize comprehensive notification preferences for new users
  */
-async function initializeNotificationPreferences(userId: string, timezone?: string): Promise<void> {
+async function initializeNotificationPreferences(userId: string): Promise<void> {
   try {
-    const prefsRef = db.collection("notification_preferences").doc(userId)
-    const prefsSnap = await prefsRef.get()
-
-    if (!prefsSnap.exists) {
-      await prefsRef.set({
-        userId,
-        enabled: true,
-        timezone: timezone || "America/Los_Angeles", // Browser-reported when available
-        channels: {
-          email: true,
-          in_app: true,
-          push: false,
-        },
-        typePreferences: {
-          welcome: { enabled: true, channels: ["email", "in_app"] },
-          spaced_repetition_review: { enabled: true, channels: ["email", "in_app"] },
-          daily_practice_reminder: { enabled: true, channels: ["email", "in_app"] },
-          streak_maintenance: { enabled: true, channels: ["in_app"] },
-          milestone_celebration: { enabled: true, channels: ["email", "in_app"] },
-          interview_countdown: { enabled: true, channels: ["email", "in_app"] },
-          roadmap_behind: { enabled: true, channels: ["email", "in_app"] },
-        },
-        quietHours: {
-          enabled: false,
-          start: 22,
-          end: 8,
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      })
-      console.log("[Welcome API] Initialized notification preferences for user:", userId)
-    }
+    await patchEmailPreferences(userId, {}, "account")
   } catch (error) {
     console.error("[Welcome API] Failed to initialize notification preferences:", error)
   }
@@ -167,10 +137,19 @@ export async function POST(request: NextRequest) {
     const result = await sendWelcomeEmail(userId, email, displayName)
     console.log("[Welcome Email API] Email send result:", result.success, result.error || "success")
 
+    if (result.skipped) {
+      await profileRef.set({ welcome_email_pending_at: FieldValue.delete() }, { merge: true })
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        message: "Email preferences respected",
+      })
+    }
+
     // Always create in-app notification and initialize preferences, even if email fails
     await Promise.all([
       createWelcomeNotification(userId, displayName),
-      initializeNotificationPreferences(userId, timezone ?? undefined),
+      initializeNotificationPreferences(userId),
     ])
 
     if (result.success) {
@@ -183,13 +162,6 @@ export async function POST(request: NextRequest) {
           welcome_notification_sent: true,
           last_email_sent_at: new Date().toISOString(),
           emails_sent_today: FieldValue.increment(1),
-          notification_preferences: {
-            email_notifications_enabled: true,
-            welcome_email: true,
-            inactivity_reminders: true,
-            spaced_repetition_reminders: true,
-            marketing_emails: false,
-          },
         },
         { merge: true }
       )
@@ -234,13 +206,6 @@ export async function POST(request: NextRequest) {
           welcome_email_failed: true,
           welcome_email_error: result.error,
           welcome_email_pending_at: FieldValue.delete(),
-          notification_preferences: {
-            email_notifications_enabled: true,
-            welcome_email: true,
-            inactivity_reminders: true,
-            spaced_repetition_reminders: true,
-            marketing_emails: false,
-          },
         },
         { merge: true }
       )

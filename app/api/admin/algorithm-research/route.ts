@@ -1,3 +1,4 @@
+import { patchEmailPreferences } from "@/lib/email/consent/preferences"
 import { loadUserMetrics } from "@/lib/user-metrics/repository"
 /**
  * Admin Algorithm Research API
@@ -294,17 +295,18 @@ export async function POST(request: NextRequest) {
         const profiles = await adminDb.collection("profiles").get()
         const needsPreferences = profiles.docs.filter((doc) => !doc.data().notification_preferences)
 
-        const result = await commitInChunks(needsPreferences, (batch, doc) => {
-          batch.update(doc.ref, {
-            notification_preferences: {
-              email_notifications_enabled: true,
-              inactivity_reminders: true,
-              spaced_repetition_reminders: true,
-              milestone_celebrations: true,
-              marketing_emails: false,
-            },
-          })
-        })
+        let written = 0
+        let batches = 0
+        for (let offset = 0; offset < needsPreferences.length; offset += 25) {
+          const outcomes = await Promise.all(
+            needsPreferences
+              .slice(offset, offset + 25)
+              .map((doc) => patchEmailPreferences(doc.id, {}, "account"))
+          )
+          written += outcomes.filter(Boolean).length
+          batches++
+        }
+        const result = { written, batches }
 
         await logAdminAction(
           authResult.context!,

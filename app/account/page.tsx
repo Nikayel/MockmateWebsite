@@ -46,11 +46,8 @@ import { Switch } from "@/components/ui/switch"
 import { SubscriptionStatusBanner } from "@/components/ui/subscription-status-banner"
 import { ResearchConsentCard } from "@/components/account/ResearchConsentCard"
 import { SendFeedbackCard } from "@/components/feedback/SendFeedbackCard"
-import { Profile, ProfileQuota, NotificationPreferences, PaymentHistory } from "@/lib/types"
-import {
-  DEFAULT_NOTIFICATION_PREFERENCES as DEFAULT_SMART_NOTIFICATION_PREFERENCES,
-  type NotificationPreferences as SmartNotificationPreferences,
-} from "@/lib/types/notifications"
+import { Profile, ProfileQuota, PaymentHistory } from "@/lib/types"
+import { useEmailPreferences } from "@/components/account/useEmailPreferences"
 import { getSessionsLimitForTier, isPaidTier } from "@/lib/pricing"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -78,16 +75,16 @@ export default function AccountPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["notifications"]))
-  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>({
-    email_notifications_enabled: true,
-    welcome_email: true,
-    inactivity_reminders: true,
-    spaced_repetition_reminders: true,
-    milestone_celebrations: true,
-    roadmap_reminders: true,
-    marketing_emails: false,
-  })
-  const [isSavingPrefs, setIsSavingPrefs] = useState(false)
+  const {
+    preferences: notificationPrefs,
+    loading: isLoadingEmailPrefs,
+    saving: isSavingEmailPreferences,
+    error: emailPreferencesError,
+    changePreference: handleUpdateNotificationPref,
+    reload: reloadEmailPreferences,
+  } = useEmailPreferences(firebaseUser)
+  const [isSavingTimezone, setIsSavingTimezone] = useState(false)
+  const isSavingPrefs = isSavingEmailPreferences || isSavingTimezone
   const [isSyncing, setIsSyncing] = useState(false)
   const [userTimezone, setUserTimezone] = useState("America/Los_Angeles")
   // Practice settings
@@ -97,92 +94,13 @@ export default function AccountPage() {
   })
   const [isSavingPracticeSettings, setIsSavingPracticeSettings] = useState(false)
 
-  const buildSmartNotificationPreferences = (
-    userId: string,
-    profilePrefs: NotificationPreferences,
-    existingPrefs?: Partial<SmartNotificationPreferences>
-  ): SmartNotificationPreferences => {
-    const now = new Date().toISOString()
-    const defaultTypePreferences = DEFAULT_SMART_NOTIFICATION_PREFERENCES.typePreferences
-    const typePreferences: SmartNotificationPreferences["typePreferences"] = {
-      ...DEFAULT_SMART_NOTIFICATION_PREFERENCES.typePreferences,
-      ...existingPrefs?.typePreferences,
-      welcome: {
-        ...defaultTypePreferences.welcome,
-        ...existingPrefs?.typePreferences?.welcome,
-        enabled: profilePrefs.welcome_email,
-        channels: existingPrefs?.typePreferences?.welcome?.channels ||
-          defaultTypePreferences.welcome?.channels || ["email", "in_app"],
-      },
-      spaced_repetition_review: {
-        ...defaultTypePreferences.spaced_repetition_review,
-        ...existingPrefs?.typePreferences?.spaced_repetition_review,
-        enabled: profilePrefs.spaced_repetition_reminders,
-        channels: existingPrefs?.typePreferences?.spaced_repetition_review?.channels ||
-          defaultTypePreferences.spaced_repetition_review?.channels || ["email", "in_app"],
-      },
-      interview_countdown: {
-        ...defaultTypePreferences.interview_countdown,
-        ...existingPrefs?.typePreferences?.interview_countdown,
-        enabled: profilePrefs.roadmap_reminders,
-        channels: existingPrefs?.typePreferences?.interview_countdown?.channels ||
-          defaultTypePreferences.interview_countdown?.channels || ["email", "in_app"],
-      },
-      daily_practice_reminder: {
-        ...defaultTypePreferences.daily_practice_reminder,
-        ...existingPrefs?.typePreferences?.daily_practice_reminder,
-        enabled: profilePrefs.roadmap_reminders,
-        channels: existingPrefs?.typePreferences?.daily_practice_reminder?.channels ||
-          defaultTypePreferences.daily_practice_reminder?.channels || ["in_app"],
-      },
-      roadmap_behind: {
-        ...defaultTypePreferences.roadmap_behind,
-        ...existingPrefs?.typePreferences?.roadmap_behind,
-        enabled: profilePrefs.roadmap_reminders,
-        channels: existingPrefs?.typePreferences?.roadmap_behind?.channels ||
-          defaultTypePreferences.roadmap_behind?.channels || ["in_app"],
-      },
-      milestone_celebration: {
-        ...defaultTypePreferences.milestone_celebration,
-        ...existingPrefs?.typePreferences?.milestone_celebration,
-        enabled: profilePrefs.milestone_celebrations,
-        channels: existingPrefs?.typePreferences?.milestone_celebration?.channels ||
-          defaultTypePreferences.milestone_celebration?.channels || ["in_app"],
-      },
-    }
-
-    return {
-      ...DEFAULT_SMART_NOTIFICATION_PREFERENCES,
-      ...existingPrefs,
-      userId,
-      enabled: existingPrefs?.enabled ?? true,
-      timezone:
-        profilePrefs.timezone ||
-        existingPrefs?.timezone ||
-        DEFAULT_SMART_NOTIFICATION_PREFERENCES.timezone,
-      channels: {
-        ...DEFAULT_SMART_NOTIFICATION_PREFERENCES.channels,
-        ...existingPrefs?.channels,
-        email: profilePrefs.email_notifications_enabled,
-      },
-      quietHours: {
-        ...DEFAULT_SMART_NOTIFICATION_PREFERENCES.quietHours,
-        ...existingPrefs?.quietHours,
-      },
-      typePreferences,
-      createdAt: existingPrefs?.createdAt || now,
-      updatedAt: now,
-    }
-  }
-
   const toggleSection = (section: string) => {
-    const newExpanded = new Set(expandedSections)
-    if (newExpanded.has(section)) {
-      newExpanded.delete(section)
-    } else {
-      newExpanded.add(section)
-    }
-    setExpandedSections(newExpanded)
+    setExpandedSections((previous) => {
+      const next = new Set(previous)
+      if (next.has(section)) next.delete(section)
+      else next.add(section)
+      return next
+    })
   }
 
   useEffect(() => {
@@ -247,9 +165,6 @@ export default function AccountPage() {
 
         if (userProfile) {
           setProfile(userProfile)
-          if (userProfile.notification_preferences) {
-            setNotificationPrefs(userProfile.notification_preferences)
-          }
 
           if (userProfile.stripe_customer_id || userProfile.stripe_subscription_id) {
             firebaseUser.getIdToken().then((idToken) => {
@@ -451,53 +366,12 @@ export default function AccountPage() {
     window.location.reload()
   }
 
-  const handleUpdateNotificationPref = async (
-    key: keyof NotificationPreferences,
-    value: boolean
-  ) => {
-    if (!firebaseUser) return
-
-    const newPrefs = { ...notificationPrefs, [key]: value }
-    setNotificationPrefs(newPrefs)
-    setIsSavingPrefs(true)
-
-    try {
-      const db = await getDbLazy()
-      const profileRef = doc(db, "profiles", firebaseUser.uid)
-      const smartPrefsRef = doc(db, "notification_preferences", firebaseUser.uid)
-      const smartPrefsSnap = await getDoc(smartPrefsRef)
-      const smartPrefs = buildSmartNotificationPreferences(
-        firebaseUser.uid,
-        newPrefs,
-        smartPrefsSnap.exists()
-          ? (smartPrefsSnap.data() as Partial<SmartNotificationPreferences>)
-          : undefined
-      )
-
-      await Promise.all([
-        updateDoc(profileRef, {
-          notification_preferences: newPrefs,
-          updated_at: new Date().toISOString(),
-        }),
-        setDoc(smartPrefsRef, smartPrefs, { merge: true }),
-      ])
-
-      toast.success("Preferences updated")
-    } catch (err) {
-      console.error("Failed to update preferences:", err)
-      setNotificationPrefs(notificationPrefs)
-      toast.error("Update failed")
-    } finally {
-      setIsSavingPrefs(false)
-    }
-  }
-
   const handleUpdateTimezone = async (newTimezone: string) => {
     if (!firebaseUser) return
 
     const previousTimezone = userTimezone
     setUserTimezone(newTimezone)
-    setIsSavingPrefs(true)
+    setIsSavingTimezone(true)
 
     try {
       const db = await getDbLazy()
@@ -515,7 +389,11 @@ export default function AccountPage() {
           userId: firebaseUser.uid,
           enabled: true,
           timezone: newTimezone,
-          channels: { push: true, email: true, in_app: true },
+          channels: {
+            push: true,
+            email: notificationPrefs.email_notifications_enabled,
+            in_app: true,
+          },
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         })
@@ -535,7 +413,7 @@ export default function AccountPage() {
       setUserTimezone(previousTimezone)
       toast.error("Failed to update timezone")
     } finally {
-      setIsSavingPrefs(false)
+      setIsSavingTimezone(false)
     }
   }
 
@@ -844,19 +722,31 @@ export default function AccountPage() {
                           Email Notifications
                         </span>
                         <p className="text-muted-foreground text-xs">
-                          Stay on track with practice reminders
+                          Optional promotions and reminders. Billing and security emails are
+                          separate.
                         </p>
                       </div>
                     </div>
                     <Switch
+                      aria-label="Optional emails"
                       checked={notificationPrefs.email_notifications_enabled}
                       onCheckedChange={(checked) =>
                         handleUpdateNotificationPref("email_notifications_enabled", checked)
                       }
-                      disabled={isSavingPrefs}
+                      disabled={
+                        isSavingPrefs || isLoadingEmailPrefs || Boolean(emailPreferencesError)
+                      }
                     />
                   </div>
 
+                  {emailPreferencesError && (
+                    <div role="alert" className="text-muted-foreground px-3 text-sm">
+                      {emailPreferencesError}{" "}
+                      <Button size="sm" variant="ghost" onClick={reloadEmailPreferences}>
+                        Retry
+                      </Button>
+                    </div>
+                  )}
                   <div
                     className={`space-y-1 ${!notificationPrefs.email_notifications_enabled ? "pointer-events-none opacity-40" : ""}`}
                   >
@@ -874,11 +764,14 @@ export default function AccountPage() {
                         </p>
                       </div>
                       <Switch
+                        aria-label="Practice reminders"
                         checked={notificationPrefs.inactivity_reminders}
                         onCheckedChange={(checked) =>
                           handleUpdateNotificationPref("inactivity_reminders", checked)
                         }
-                        disabled={isSavingPrefs}
+                        disabled={
+                          isSavingPrefs || isLoadingEmailPrefs || Boolean(emailPreferencesError)
+                        }
                       />
                     </div>
 
@@ -896,11 +789,14 @@ export default function AccountPage() {
                         </p>
                       </div>
                       <Switch
+                        aria-label="Review alerts"
                         checked={notificationPrefs.spaced_repetition_reminders}
                         onCheckedChange={(checked) =>
                           handleUpdateNotificationPref("spaced_repetition_reminders", checked)
                         }
-                        disabled={isSavingPrefs}
+                        disabled={
+                          isSavingPrefs || isLoadingEmailPrefs || Boolean(emailPreferencesError)
+                        }
                       />
                     </div>
 
@@ -916,11 +812,14 @@ export default function AccountPage() {
                         </p>
                       </div>
                       <Switch
+                        aria-label="Product updates"
                         checked={notificationPrefs.marketing_emails}
                         onCheckedChange={(checked) =>
                           handleUpdateNotificationPref("marketing_emails", checked)
                         }
-                        disabled={isSavingPrefs}
+                        disabled={
+                          isSavingPrefs || isLoadingEmailPrefs || Boolean(emailPreferencesError)
+                        }
                       />
                     </div>
                   </div>
@@ -952,7 +851,9 @@ export default function AccountPage() {
                         <select
                           value={userTimezone}
                           onChange={(e) => handleUpdateTimezone(e.target.value)}
-                          disabled={isSavingPrefs}
+                          disabled={
+                            isSavingPrefs || isLoadingEmailPrefs || Boolean(emailPreferencesError)
+                          }
                           className="border-border bg-muted text-foreground focus:border-border focus:ring-border rounded-md border px-2 py-1 text-xs focus:ring-1 focus:outline-none"
                         >
                           <option value="America/Los_Angeles">Pacific Time (LA)</option>
