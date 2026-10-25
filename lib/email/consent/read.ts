@@ -1,6 +1,6 @@
 import "server-only"
 import { adminDb } from "@/lib/firebase-admin"
-import { emailPreferences } from "./policy"
+import { effectiveEmailPreferences, needsConsentBootstrap } from "./policy"
 import { readProviderConsent } from "./provider"
 import { providerSuppressionApplies } from "./provider-state"
 import { patchEmailPreferences } from "./preferences"
@@ -10,6 +10,10 @@ export async function readEmailPreferences(userId: string) {
   const ref = adminDb.collection("profiles").doc(userId)
   let profile = (await ref.get()).data()
   if (!profile) return null
+  if (needsConsentBootstrap(profile)) {
+    await patchEmailPreferences(userId, {}, "account")
+    profile = (await ref.get()).data() ?? profile
+  }
   let providerStatus: "available" | "unavailable" = "unavailable"
   let marketingBlocked = false
   try {
@@ -32,7 +36,7 @@ export async function readEmailPreferences(userId: string) {
     /* Account settings remain accessible; optional sends fail closed. */
   }
   return {
-    preferences: emailPreferences(profile.notification_preferences),
+    preferences: effectiveEmailPreferences(profile),
     providerStatus,
     marketingBlocked,
     marketingSyncPending: profile.email_consent_sync?.pending === true,

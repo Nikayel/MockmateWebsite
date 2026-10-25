@@ -14,6 +14,7 @@ vi.mock("@getbrevo/brevo", () => ({
 }))
 import { sendEmail } from "../../brevo"
 import { checkDeliveryConsent } from "../guard"
+import { patchEmailPreferences } from "../preferences"
 
 const consent = {
   type: "optional" as const,
@@ -68,6 +69,25 @@ describe("last-mile email consent", () => {
       expect(upstream).not.toHaveBeenCalled()
     }
   )
+  it.each(["email_notifications_enabled", "spaced_repetition_reminders"] as const)(
+    "keeps a saved %s opt-out when an old tab replays its preferences map",
+    async (key) => {
+      vi.stubEnv("EMAIL_UNSUBSCRIBE_SECRET", "fixture-secret")
+      await patchEmailPreferences("learner", { [key]: false }, "unsubscribe")
+      const raw = profile().notification_preferences as Record<string, unknown>
+      raw[key] = true
+      expect(await sendEmail(options)).toMatchObject({ skipped: true })
+      expect(sdk.send).not.toHaveBeenCalled()
+      expect(upstream).not.toHaveBeenCalled()
+    }
+  )
+  it("allows a fresh explicit opt-in after a saved opt-out", async () => {
+    vi.stubEnv("EMAIL_UNSUBSCRIBE_SECRET", "fixture-secret")
+    await patchEmailPreferences("learner", { spaced_repetition_reminders: false }, "account")
+    await patchEmailPreferences("learner", { spaced_repetition_reminders: true }, "account")
+    expect(await sendEmail(options)).toMatchObject({ success: true })
+    expect(sdk.send).toHaveBeenCalledTimes(1)
+  })
   it("pulls a newsletter unsubscribe into global optional-email suppression", async () => {
     upstream.mockResolvedValue(
       new Response(

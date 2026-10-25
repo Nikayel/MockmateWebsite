@@ -1,7 +1,7 @@
 import "server-only"
 import { adminDb } from "@/lib/firebase-admin"
 import { FieldPath } from "firebase-admin/firestore"
-import { emailPreferences } from "./policy"
+import { effectiveEmailPreferences, needsConsentBootstrap } from "./policy"
 import { patchEmailPreferences } from "./preferences"
 import { syncEmailSuppression, retryEmailSuppressions } from "./sync"
 import { validSuppressionJob } from "./job-auth"
@@ -31,7 +31,8 @@ async function repairHistoricalSuppression() {
         .doc(doc.id)
         .update({ email_normalized: profile.email.toLowerCase() })
     }
-    const prefs = emailPreferences(profile.notification_preferences)
+    if (needsConsentBootstrap(profile)) await patchEmailPreferences(doc.id, {}, "account")
+    const prefs = effectiveEmailPreferences(profile)
     if (
       (!prefs.email_notifications_enabled || !prefs.marketing_emails) &&
       (!profile.email_consent_sync || !validSuppressionJob(doc.id, profile.email_consent_sync))
@@ -41,7 +42,7 @@ async function repairHistoricalSuppression() {
         prefs.email_notifications_enabled
           ? { marketing_emails: false }
           : { email_notifications_enabled: false },
-        "account"
+        "reconciliation"
       )
       await syncEmailSuppression(doc.id)
       repaired++

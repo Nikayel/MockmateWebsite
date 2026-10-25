@@ -16,6 +16,8 @@
 
 The account page PATCHes only `{key, value}` through `/api/email/preferences`. The server authenticates the owner, validates a boolean-key allowlist, and updates that field transactionally. It seeds missing defaults inside the same transaction and preserves existing opt-outs, timezone, and unrelated settings. Smart-notification email projections update in that transaction too.
 
+Each explicit server decision is also recorded in `email_consent.preferences`. A false value in either this record or the legacy preferences map suppresses that category; an authenticated opt-in updates both records atomically. This also honors opt-outs from older clients. An already-open account tab running old JavaScript can overwrite that map, but cannot accidentally erase a newer unsubscribe. New authenticated opt-in actions update the decision record explicitly.
+
 Welcome success/failure handlers and client profile upserts no longer replay default email preferences. Welcome contact metadata is updated only after a successful consent-checked delivery. The legacy admin preference migration uses the same transactional initializer.
 
 An opt-out and its pending provider-suppression job commit together. Jobs live on the existing profile document, so account deletion removes them. Jobs are HMAC-signed for their user ID, revision, address, and intent; the worker also verifies the address against Firebase Auth before any provider access. Editable profile fields cannot authorize a suppression for somebody else's address.
@@ -40,6 +42,6 @@ An email already accepted by the delivery provider cannot be recalled. The last-
 
 ## Verification
 
-Regression coverage includes welcome success/failure, single-field edits after an unrelated unsubscribe, missing defaults, global/category token compatibility, duplicate/late provider events, callback authentication, forged sync jobs, address mismatch, failed synchronization, cancellation due dates, and opt-out between provider retries. Browser checks exercise the real account hook on desktop/mobile, including lost-response recovery and unavailable preference loading. No real email is sent by these checks.
+Regression coverage includes welcome success/failure, single-field edits after an unrelated unsubscribe, missing defaults, global/category token compatibility, duplicate/late provider events, callback authentication, forged sync jobs, address mismatch, failed synchronization, cancellation due dates, opt-out between provider retries, stale legacy-map writes, and explicit opt-ins racing historical reconciliation. Browser checks exercise the real account hook on desktop/mobile, including lost-response recovery and unavailable preference loading. No real email is sent by these checks.
 
 Provider references: [contact suppression](https://developers.brevo.com/reference/update-contact), [marketing unsubscribe events](https://developers.brevo.com/docs/marketing-webhooks), [authenticated webhooks](https://developers.brevo.com/reference/create-webhook).

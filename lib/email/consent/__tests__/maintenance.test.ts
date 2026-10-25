@@ -64,7 +64,8 @@ beforeEach(() => {
   h.rows = []
   h.cursor = null
   h.suppress.mockResolvedValue(true)
-  h.patch.mockImplementation(async (id) => {
+  h.patch.mockImplementation(async (id, _patch, source) => {
+    if (source !== "reconciliation") return
     const row = h.rows.find((row) => row.id === id)!
     row.email_consent_sync = { signature: "trusted" }
   })
@@ -103,7 +104,11 @@ describe("bounded historical consent repair", () => {
       complete: true,
     })
     expect(h.suppress).toHaveBeenCalledTimes(45)
-    expect(h.patch.mock.calls.some(([id]) => id === "z-opted-in")).toBe(false)
+    expect(
+      h.patch.mock.calls.some(
+        ([id, , source]) => id === "z-opted-in" && source === "reconciliation"
+      )
+    ).toBe(false)
     expect(h.cursor).toBeNull()
   })
   it("global opt-outs retain per-category choices during historical repair", async () => {
@@ -112,7 +117,7 @@ describe("bounded historical consent repair", () => {
     expect(h.patch).toHaveBeenCalledWith(
       "global-off",
       { email_notifications_enabled: false },
-      "account"
+      "reconciliation"
     )
   })
 })

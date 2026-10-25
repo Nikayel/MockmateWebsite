@@ -1,30 +1,18 @@
 import "server-only"
 import { randomUUID } from "node:crypto"
 import { adminDb } from "@/lib/firebase-admin"
-import {
-  DEFAULT_EMAIL_PREFERENCES,
-  EMAIL_PREFERENCE_KEYS,
-  emailPreferences,
-  type EmailPreferenceKey,
-} from "./policy"
-import { DEFAULT_NOTIFICATION_PREFERENCES as SMART_DEFAULTS } from "@/lib/types/notifications"
+import { EMAIL_PREFERENCE_KEYS, effectiveEmailPreferences, type EmailPreferenceKey } from "./policy"
+import { smartEmailProjection } from "./projection"
 import { providerSuppressionApplies } from "./provider-state"
 import { signSuppressionJob } from "./job-auth"
 import { FieldValue } from "firebase-admin/firestore"
 
 export type EmailPreferencePatch = Partial<Record<EmailPreferenceKey, boolean>>
-const TYPE_FIELDS: Partial<Record<EmailPreferenceKey, string[]>> = {
-  welcome_email: ["welcome"],
-  spaced_repetition_reminders: ["spaced_repetition_review"],
-  roadmap_reminders: ["interview_countdown", "daily_practice_reminder", "roadmap_behind"],
-  milestone_celebrations: ["milestone_celebration"],
-}
-
 /** Atomic field patches preserve concurrent opt-outs and unrelated settings. */
 export async function patchEmailPreferences(
   userId: string,
   patch: EmailPreferencePatch,
-  source: "account" | "unsubscribe" | "provider",
+  source: "account" | "unsubscribe" | "provider" | "reconciliation",
   providerFingerprint?: string,
   providerEventAt?: number | null
 ) {
@@ -34,6 +22,14 @@ export async function patchEmailPreferences(
     const [snapshot, existingSmart] = await Promise.all([tx.get(ref), tx.get(smartRef)])
     if (!snapshot.exists) return null
     const profile = snapshot.data()!
+    if (source === "reconciliation") {
+      const current = effectiveEmailPreferences(profile)
+      if (current.email_notifications_enabled && current.marketing_emails)
+        return { preferences: current, marketingSyncPending: false }
+      patch = current.email_notifications_enabled
+        ? { marketing_emails: false }
+        : { email_notifications_enabled: false }
+    }
     if (
       source === "provider" &&
       providerFingerprint &&
@@ -44,33 +40,40 @@ export async function patchEmailPreferences(
       })
     ) {
       return {
-        preferences: emailPreferences(profile.notification_preferences),
+        preferences: effectiveEmailPreferences(profile),
         marketingSyncPending: false,
       }
     }
     const unchanged = Object.entries(patch).every(
-      ([key, value]) => profile.notification_preferences?.[key] === value
+      ([key, value]) =>
+        profile.notification_preferences?.[key] === value &&
+        profile.email_consent?.preferences?.[key] === value
     )
     if (
       source !== "account" &&
+      source !== "reconciliation" &&
       unchanged &&
       (!providerFingerprint || profile.email_consent?.provider_fingerprint === providerFingerprint)
     ) {
       return {
-        preferences: emailPreferences(profile.notification_preferences),
+        preferences: effectiveEmailPreferences(profile),
         marketingSyncPending: profile.email_consent_sync?.pending === true,
       }
     }
     const now = new Date().toISOString()
-    const preferences = { ...emailPreferences(profile.notification_preferences), ...patch }
+    const preferences = { ...effectiveEmailPreferences(profile), ...patch }
     const fields: Record<string, unknown> = { updated_at: now }
     // Seed only missing fields INSIDE the transaction; never replay a defaults map.
     for (const key of EMAIL_PREFERENCE_KEYS) {
       if (typeof profile.notification_preferences?.[key] !== "boolean")
-        fields[`notification_preferences.${key}`] = DEFAULT_EMAIL_PREFERENCES[key]
+        fields[`notification_preferences.${key}`] = preferences[key]
+      if (preferences[key] === false && profile.email_consent?.preferences?.[key] !== false)
+        fields[`email_consent.preferences.${key}`] = false
     }
-    for (const [key, value] of Object.entries(patch))
+    for (const [key, value] of Object.entries(patch)) {
       fields[`notification_preferences.${key}`] = value
+      fields[`email_consent.preferences.${key}`] = value
+    }
     if (source === "account" && patch.email_notifications_enabled === true)
       fields["email_consent.explicit_optional_opt_in_at"] = now
     if (providerFingerprint) {
@@ -105,41 +108,14 @@ export async function patchEmailPreferences(
       fields["email_consent_sync.nextAttemptAt"] = FieldValue.delete()
     }
     tx.update(ref, fields)
-    const smart: Record<string, unknown> = {
-      ...(!existingSmart.exists
-        ? {
-            ...SMART_DEFAULTS,
-            createdAt: now,
-            timezone: profile.notification_preferences?.timezone || SMART_DEFAULTS.timezone,
-            channels: {
-              ...SMART_DEFAULTS.channels,
-              email: preferences.email_notifications_enabled,
-            },
-          }
-        : {}),
+    const smart = smartEmailProjection({
       userId,
-      updatedAt: now,
-    }
-    if (patch.email_notifications_enabled !== undefined)
-      smart.channels = {
-        ...(!existingSmart.exists ? SMART_DEFAULTS.channels : {}),
-        email: patch.email_notifications_enabled,
-      }
-    const typePreferences: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(existingSmart.exists ? patch : preferences)) {
-      for (const type of TYPE_FIELDS[key as EmailPreferenceKey] ?? [])
-        typePreferences[type] = {
-          ...(!existingSmart.exists
-            ? SMART_DEFAULTS.typePreferences[type as keyof typeof SMART_DEFAULTS.typePreferences]
-            : {}),
-          enabled: value,
-        }
-    }
-    if (Object.keys(typePreferences).length)
-      smart.typePreferences = {
-        ...(!existingSmart.exists ? SMART_DEFAULTS.typePreferences : {}),
-        ...typePreferences,
-      }
+      preferences,
+      changes: patch,
+      isNew: !existingSmart.exists,
+      now,
+      timezone: profile.notification_preferences?.timezone,
+    })
     tx.set(smartRef, smart, { merge: true })
     return { preferences, marketingSyncPending: requiresSuppression }
   })

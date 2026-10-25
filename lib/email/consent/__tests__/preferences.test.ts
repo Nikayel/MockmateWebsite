@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { patchEmailPreferences } from "../preferences"
 import { syncEmailSuppression } from "../sync"
 import { providerSuppressionApplies } from "../provider-state"
+import { effectiveEmailPreferences } from "../policy"
 
 beforeEach(() => {
   vi.stubEnv("EMAIL_UNSUBSCRIBE_SECRET", "fixture-secret")
@@ -49,6 +50,36 @@ describe("central preference writes", () => {
       email_notifications_enabled: true,
       marketing_emails: false,
     })
+  })
+  it("records historical opt-outs before a legacy tab can replace the raw map", async () => {
+    seedPreferences({ spaced_repetition_reminders: false })
+    await patchEmailPreferences("learner", {}, "account")
+    ;(profile().notification_preferences as Record<string, unknown>).spaced_repetition_reminders =
+      true
+    expect(effectiveEmailPreferences(profile()).spaced_repetition_reminders).toBe(false)
+  })
+  it("honors a legacy opt-out even after a prior explicit opt-in", async () => {
+    await patchEmailPreferences("learner", { spaced_repetition_reminders: true }, "account")
+    ;(profile().notification_preferences as Record<string, unknown>).spaced_repetition_reminders =
+      false
+    expect(effectiveEmailPreferences(profile()).spaced_repetition_reminders).toBe(false)
+  })
+  it("queues historical suppression after bootstrap has already recorded the opt-out", async () => {
+    await patchEmailPreferences("learner", {}, "account")
+    expect(profile().email_consent_sync).toBeUndefined()
+    await patchEmailPreferences("learner", { marketing_emails: false }, "reconciliation")
+    expect(profile().email_consent_sync).toMatchObject({ pending: true, intent: "marketing_only" })
+  })
+  it("rechecks consent rather than replaying a historical scan over a new opt-in", async () => {
+    await patchEmailPreferences("learner", { marketing_emails: true }, "account")
+    fixture.writes.length = 0
+    const result = await patchEmailPreferences(
+      "learner",
+      { marketing_emails: false },
+      "reconciliation"
+    )
+    expect(result?.preferences.marketing_emails).toBe(true)
+    expect(fixture.writes).toHaveLength(0)
   })
   it("patches one field without restoring an unrelated, newer unsubscribe", async () => {
     seedPreferences({ spaced_repetition_reminders: false, timezone: "America/Detroit" })

@@ -52,7 +52,37 @@ export function emailPreferences(raw: unknown): NotificationPreferences {
     result.quietHours = { enabled: quiet.enabled, start: quiet.start, end: quiet.end }
   return result
 }
-export function optionalEmailAllowed(raw: unknown, category: OptionalEmailCategory): boolean {
-  const preferences = emailPreferences(raw)
+export function effectiveEmailPreferences(profile: {
+  notification_preferences?: unknown
+  email_consent?: unknown
+}): NotificationPreferences {
+  const preferences = emailPreferences(profile.notification_preferences)
+  const state = profile.email_consent as { preferences?: Record<string, unknown> } | undefined
+  for (const key of EMAIL_PREFERENCE_KEYS) {
+    const decision = state?.preferences?.[key]
+    if (typeof decision === "boolean") preferences[key] = preferences[key] && decision
+  }
+  return preferences
+}
+
+export function needsConsentBootstrap(profile: {
+  notification_preferences?: unknown
+  email_consent?: unknown
+}): boolean {
+  const prefs = effectiveEmailPreferences(profile)
+  const raw = profile.notification_preferences as Record<string, unknown> | undefined
+  const state = profile.email_consent as { preferences?: Record<string, unknown> } | undefined
+  return EMAIL_PREFERENCE_KEYS.some(
+    (key) =>
+      typeof raw?.[key] !== "boolean" ||
+      (prefs[key] === false && state?.preferences?.[key] !== false)
+  )
+}
+
+export function optionalEmailAllowed(
+  profile: { notification_preferences?: unknown; email_consent?: unknown },
+  category: OptionalEmailCategory
+): boolean {
+  const preferences = effectiveEmailPreferences(profile)
   return preferences.email_notifications_enabled && preferences[CATEGORY_PREFERENCE[category]]
 }

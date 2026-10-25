@@ -1,6 +1,6 @@
 import "server-only"
 import { adminDb } from "@/lib/firebase-admin"
-import { optionalEmailAllowed, type OptionalEmailCategory } from "./policy"
+import { optionalEmailAllowed, needsConsentBootstrap, type OptionalEmailCategory } from "./policy"
 import { readProviderConsent } from "./provider"
 import { patchEmailPreferences } from "./preferences"
 import { providerSuppressionApplies } from "./provider-state"
@@ -28,8 +28,9 @@ export async function checkDeliveryConsent(
   try {
     const ref = adminDb.collection("profiles").doc(consent.userId)
     const profile = (await ref.get()).data()
-    if (!profile || !optionalEmailAllowed(profile.notification_preferences, consent.category))
-      return suppressed()
+    if (!profile) return suppressed()
+    if (needsConsentBootstrap(profile)) await patchEmailPreferences(consent.userId, {}, "account")
+    if (!optionalEmailAllowed(profile, consent.category)) return suppressed()
     if ((await accountEmail(consent.userId)) !== profile.email?.toLowerCase()) return suppressed()
     if (
       typeof profile.email !== "string" ||
@@ -58,7 +59,7 @@ export async function checkDeliveryConsent(
       !latest ||
       typeof latest.email !== "string" ||
       latest.email.toLowerCase() !== recipients[0].email.toLowerCase() ||
-      !optionalEmailAllowed(latest.notification_preferences, consent.category)
+      !optionalEmailAllowed(latest, consent.category)
     )
       return suppressed()
     return null
