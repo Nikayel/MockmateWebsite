@@ -30,6 +30,7 @@ import {
   validateFeedbackFailureReport,
 } from "@/lib/feedback/persist-request-schema"
 import { resolvePersistAction } from "@/lib/feedback/persist-guard"
+import { persistFinalSession } from "@/lib/user-metrics/persist-final"
 import { prepareTranscriptForStorage } from "@/lib/feedback/transcript-storage"
 
 // This route does Firestore writes only, no AI calls, so it does not need a
@@ -327,7 +328,8 @@ export async function POST(request: NextRequest) {
       updated_at: FieldValue.serverTimestamp(),
     }
 
-    await adminDb.collection("interview_sessions").doc(sessionId).update(updateData)
+    const persisted = await persistFinalSession(sessionId, authenticatedUserId, updateData)
+    if (!persisted) return NextResponse.json({ success: true, skipped: "already complete" })
 
     // Archive the conversation. This is the ONLY moment the full transcript
     // exists server-side; before 2026-08-18 it was counted and discarded, so

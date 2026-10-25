@@ -22,12 +22,10 @@ import {
   Crown,
   BarChart3,
   Calendar,
-  Terminal,
   ChevronRight,
   RefreshCw,
   TrendingUp,
   HelpCircle,
-  ShieldCheck,
   AlertCircle,
 } from "lucide-react"
 import { SubscriptionStatusBanner } from "@/components/ui/subscription-status-banner"
@@ -38,6 +36,10 @@ import { SparraLoader } from "@/components/brand/SparraLoader"
 import { resolveFeedbackGenerationStatus } from "@/lib/feedback/generation-stalled"
 import { shouldShowProfilePersonalization } from "@/lib/onboarding/profile-personalization"
 import { SavedPracticeCard } from "@/components/dashboard/SavedPracticeCard"
+import { BugfixMetricsCard } from "@/components/dashboard/BugfixMetricsCard"
+import type { UserMetricsData } from "@/lib/user-metrics/service"
+import { INTERVIEW_AVERAGE_EXPLANATION } from "@/lib/user-metrics/explanations"
+import { formatMetricScore } from "@/lib/user-metrics/display"
 import { RecentActivityHeader } from "@/components/dashboard/RecentActivityHeader"
 
 const InitialInterviewOnboarding = dynamic(
@@ -98,7 +100,8 @@ export default function DashboardPage() {
     periodEnd?: string
   } | null>(null)
   const [sessions, setSessions] = useState<InterviewSession[]>([])
-  const [completedSessions, setCompletedSessions] = useState<InterviewSession[]>([])
+  const [metricsData, setMetricsData] = useState<UserMetricsData | null>(null)
+  const [metricsError, setMetricsError] = useState(false)
   const [reviewStats, setReviewStats] = useState<{
     overdueCount: number
     totalDue: number
@@ -136,7 +139,12 @@ export default function DashboardPage() {
   }, [initialized, authLoading])
 
   useEffect(() => {
+    let disposed = false
+    let latestRequest = 0
+    setMetricsData(null)
+    setMetricsError(false)
     const loadDashboard = async () => {
+      const requestId = ++latestRequest
       if (authLoading || !initialized || !authCheckComplete) return
 
       if (!firebaseUser) {
@@ -146,7 +154,7 @@ export default function DashboardPage() {
 
       try {
         setAccountError(null)
-        const [overviewResponse, sessionsSnap, dueData] = await Promise.all([
+        const [overviewResponse, sessionsSnap, dueData, canonicalMetrics] = await Promise.all([
           (async () => {
             const token = await firebaseUser.getIdToken()
             const response = await fetch("/api/account/overview", {
@@ -163,9 +171,7 @@ export default function DashboardPage() {
           (async () => {
             try {
               const db = await getDbLazy()
-              // The dashboard only shows the 5 most recent sessions and the 5
-              // most recent scored ones; 25 newest covers both without reading
-              // the user's entire history (which grows forever).
+              // Recent activity only. All score metrics come from the canonical API.
               const sessionsQuery = query(
                 collection(db, "interview_sessions"),
                 where("user_id", "==", firebaseUser.uid),
@@ -191,7 +197,26 @@ export default function DashboardPage() {
               return null
             }
           })(),
+          (async () => {
+            try {
+              const token = await firebaseUser.getIdToken()
+              const response = await fetch("/api/user/metrics?days=7", {
+                headers: { Authorization: `Bearer ${token}` },
+                cache: "no-store",
+              })
+              if (!response.ok) throw new Error("Metrics unavailable")
+              const body = await response.json()
+              if (!body.success) throw new Error("Metrics unavailable")
+              return body.data as UserMetricsData
+            } catch {
+              return null
+            }
+          })(),
         ])
+
+        if (disposed || requestId !== latestRequest) return
+        setMetricsData(canonicalMetrics)
+        setMetricsError(canonicalMetrics === null)
 
         const { profile: userProfile, usage: usageData } = overviewResponse
         setProfile(userProfile)
@@ -253,19 +278,16 @@ export default function DashboardPage() {
 
             // For Recent Activity: show up to 5 most recent (any status)
             setSessions(sessionsData.slice(0, 5))
-
-            // For Recent Avg: only use completed sessions with scores
-            const completed = sessionsData.filter(
-              (s) => s.performance_score !== undefined && s.performance_score !== null
-            )
-            setCompletedSessions(completed.slice(0, 5))
+          } else {
+            setSessions([])
           }
         }
       } catch (error) {
         console.error("Failed to load dashboard account overview:", error)
-        setAccountError("We couldn't load your plan or session allowance.")
+        if (!disposed && requestId === latestRequest)
+          setAccountError("We couldn't load your plan or session allowance.")
       } finally {
-        setDataLoading(false)
+        if (!disposed && requestId === latestRequest) setDataLoading(false)
       }
     }
 
@@ -279,6 +301,7 @@ export default function DashboardPage() {
     document.addEventListener("visibilitychange", handleVisibilityChange)
 
     return () => {
+      disposed = true
       document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
   }, [router, firebaseUser, authLoading, initialized, authCheckComplete, reloadKey])
@@ -343,31 +366,6 @@ export default function DashboardPage() {
     return "text-red-400"
   }
 
-  // Guided teaching labs are excluded from interview-readiness — they carry a
-  // separate practice/mastery signal, not a valid interview score.
-  const bugfixSessions = completedSessions.filter(
-    (session) => session.type === "bugfix" && !session.is_guided_lab
-  )
-  const latestBugfixSession = bugfixSessions[0]
-  const latestBugfixEvidence = latestBugfixSession?.bugfix_evidence_summary
-  const latestBugfixScore =
-    latestBugfixSession?.bugfix_score_breakdown?.overall ?? latestBugfixSession?.performance_score
-  const bugfixReadiness =
-    bugfixSessions.length > 0
-      ? Math.round(
-          bugfixSessions.reduce(
-            (sum, session) =>
-              sum + (session.bugfix_score_breakdown?.overall ?? session.performance_score ?? 0),
-            0
-          ) / bugfixSessions.length
-        )
-      : null
-  const shouldRecommendBugfixRamp =
-    latestBugfixEvidence &&
-    (!latestBugfixEvidence.reproducedBeforeEditing ||
-      (latestBugfixEvidence.inspectedFiles?.length || 0) < 2 ||
-      (latestBugfixEvidence.inspectedTestOrDocs?.length || 0) === 0)
-
   return (
     <main className="bg-background min-h-screen">
       <InitialInterviewOnboarding
@@ -402,7 +400,7 @@ export default function DashboardPage() {
           <h1 className="sr-only">Dashboard</h1>
           <SavedPracticeCard isPro={isPro} />
 
-          {shouldShowProfilePersonalization(profile, completedSessions.length) && (
+          {shouldShowProfilePersonalization(profile, metricsData?.overview.totalSessions ?? 0) && (
             <div className="mb-6 sm:mb-8">
               <ProfilePersonalizationPrompt
                 userId={firebaseUser?.uid || ""}
@@ -541,36 +539,33 @@ export default function DashboardPage() {
                   </TooltipTrigger>
                   <TooltipContent className="bg-muted text-foreground max-w-xs">
                     <p>
-                      Interview Score: Your overall performance including code quality (30%),
-                      problem solving (25%), understanding (25%), and communication (20%)
+                      {INTERVIEW_AVERAGE_EXPLANATION} Recent Avg uses your latest five completed
+                      interviews.
                     </p>
                   </TooltipContent>
                 </Tooltip>
               </div>
-              {completedSessions.length > 0 ? (
+              {metricsData?.recentAverage != null ? (
                 <>
                   <span
-                    className={`text-2xl font-light sm:text-3xl ${getScoreColor(
-                      Math.round(
-                        completedSessions.reduce((acc, s) => acc + (s.performance_score || 0), 0) /
-                          completedSessions.length
-                      )
-                    )}`}
+                    className={`text-2xl font-light sm:text-3xl ${getScoreColor(metricsData.recentAverage)}`}
                   >
-                    {Math.round(
-                      completedSessions.reduce((acc, s) => acc + (s.performance_score || 0), 0) /
-                        completedSessions.length
-                    )}
-                    %
+                    {formatMetricScore(metricsData.recentAverage)}
                   </span>
                   <p className="text-muted-foreground mt-1.5 text-[10px]">
-                    Last {completedSessions.length} completed sessions
+                    Last {metricsData.recentAverageCount} completed interviews
                   </p>
                 </>
               ) : (
                 <>
                   <span className="text-muted-foreground text-2xl font-light sm:text-3xl">—</span>
-                  <p className="text-muted-foreground mt-1.5 text-[10px]">No data yet</p>
+                  <p className="text-muted-foreground mt-1.5 text-[10px]">
+                    {metricsError
+                      ? "Couldn't load metrics"
+                      : metricsData
+                        ? "No completed interviews yet"
+                        : "Loading metrics…"}
+                  </p>
                 </>
               )}
             </div>
@@ -732,104 +727,13 @@ export default function DashboardPage() {
 
             {/* Metrics Overview - 2 cols on lg */}
             <div className="space-y-4 lg:col-span-2" data-tour="quick-start">
-              <div className="border-border/50 bg-card/50 rounded-xl border p-4">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                    <span className="text-muted-foreground truncate text-sm font-medium">
-                      Bugfix Readiness
-                    </span>
-                  </div>
-                  {bugfixReadiness !== null && (
-                    <span className={`text-xl font-light ${getScoreColor(bugfixReadiness)}`}>
-                      {bugfixReadiness}%
-                    </span>
-                  )}
-                </div>
+              <BugfixMetricsCard metrics={metricsData} error={metricsError} />
 
-                {bugfixReadiness === null ? (
-                  <div className="space-y-3">
-                    <p className="text-muted-foreground text-sm">
-                      Practice production incidents and build a separate debugging signal.
-                    </p>
-                    <Link href="/interview?track=debugging">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-border text-muted-foreground hover:bg-muted h-8 w-full text-xs"
-                      >
-                        <Terminal className="mr-1.5 h-3.5 w-3.5" />
-                        Start Bugfix
-                      </Button>
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="bg-background/60 rounded-lg p-2">
-                        <p className="text-muted-foreground">Last Score</p>
-                        <p
-                          className={
-                            latestBugfixScore
-                              ? getScoreColor(latestBugfixScore)
-                              : "text-muted-foreground"
-                          }
-                        >
-                          {latestBugfixScore ? `${Math.round(latestBugfixScore)}%` : "—"}
-                        </p>
-                      </div>
-                      <div className="bg-background/60 rounded-lg p-2">
-                        <p className="text-muted-foreground">Files Opened</p>
-                        <p className="text-muted-foreground">
-                          {latestBugfixEvidence?.inspectedFiles?.length || 0}
-                        </p>
-                      </div>
-                      <div className="bg-background/60 rounded-lg p-2">
-                        <p className="text-muted-foreground">Tests Run</p>
-                        <p className="text-muted-foreground">
-                          {latestBugfixEvidence?.visibleTestsRun || 0}
-                        </p>
-                      </div>
-                      <div className="bg-background/60 rounded-lg p-2">
-                        <p className="text-muted-foreground">AI Shortcut</p>
-                        <p
-                          className={
-                            latestBugfixEvidence?.aiShortcutCount
-                              ? "text-amber-400"
-                              : "text-emerald-400"
-                          }
-                        >
-                          {latestBugfixEvidence?.aiShortcutCount || 0}
-                        </p>
-                      </div>
-                    </div>
-
-                    {shouldRecommendBugfixRamp && (
-                      <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3">
-                        <p className="text-neural text-xs font-medium">
-                          Beginner Debugger track recommended
-                        </p>
-                        <p className="text-muted-foreground mt-1 text-xs">
-                          Focus on reproducing before editing and opening the visible test first.
-                        </p>
-                      </div>
-                    )}
-
-                    <Link href="/interview?track=debugging">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-border text-muted-foreground hover:bg-muted h-8 w-full text-xs"
-                      >
-                        <Terminal className="mr-1.5 h-3.5 w-3.5" />
-                        Practice Bugfix
-                      </Button>
-                    </Link>
-                  </div>
-                )}
-              </div>
-
-              <MetricsOverview />
+              <MetricsOverview
+                data={metricsData}
+                error={metricsError}
+                onRetry={() => setReloadKey((key) => key + 1)}
+              />
             </div>
           </div>
 

@@ -1,3 +1,4 @@
+import { loadUserMetrics } from "@/lib/user-metrics/repository"
 /**
  * Admin Algorithm Research API
  *
@@ -612,10 +613,7 @@ async function backfillResearchData(options: { dryRun: boolean }): Promise<Backf
           if (options.dryRun) {
             result.userStatsWouldWrite++
           } else {
-            await adminDb
-              .collection("user_stats")
-              .doc(userId)
-              .set(buildUserStats(userId, sessions), { merge: true })
+            await loadUserMetrics(userId)
             result.userStatsWritten++
           }
         }
@@ -757,62 +755,6 @@ function buildDerivedSummary(
     interval_distribution: intervalDistribution,
     first_review_at: firstReview,
     last_review_at: lastReview,
-  }
-}
-
-/** Rebuild user_stats from the user's real session summaries. */
-function buildUserStats(
-  userId: string,
-  sessions: FirebaseFirestore.DocumentData[]
-): Record<string, unknown> {
-  const patternStats: Record<
-    string,
-    { sessions: number; totalScore: number; averageScore: number; bestScore: number }
-  > = {}
-  const difficultyStats: Record<
-    string,
-    { sessions: number; totalScore: number; averageScore: number }
-  > = {}
-  let totalMinutes = 0
-  let totalScore = 0
-
-  for (const session of sessions) {
-    totalMinutes += session.durationMinutes || 0
-    totalScore += session.performanceScore || 0
-
-    const pattern = session.pattern || "unknown"
-    patternStats[pattern] ??= { sessions: 0, totalScore: 0, averageScore: 0, bestScore: 0 }
-    patternStats[pattern].sessions++
-    patternStats[pattern].totalScore += session.performanceScore || 0
-    patternStats[pattern].bestScore = Math.max(
-      patternStats[pattern].bestScore,
-      session.performanceScore || 0
-    )
-
-    const difficulty = session.difficulty || "medium"
-    difficultyStats[difficulty] ??= { sessions: 0, totalScore: 0, averageScore: 0 }
-    difficultyStats[difficulty].sessions++
-    difficultyStats[difficulty].totalScore += session.performanceScore || 0
-  }
-
-  for (const stats of Object.values(patternStats)) {
-    stats.averageScore = stats.sessions > 0 ? Math.round(stats.totalScore / stats.sessions) : 0
-  }
-  for (const stats of Object.values(difficultyStats)) {
-    stats.averageScore = stats.sessions > 0 ? Math.round(stats.totalScore / stats.sessions) : 0
-  }
-
-  return {
-    userId,
-    totalSessions: sessions.length,
-    totalPracticeMinutes: totalMinutes,
-    totalScore,
-    averageScore: sessions.length > 0 ? Math.round(totalScore / sessions.length) : 0,
-    patternStats,
-    difficultyStats,
-    lastSessionAt: sessions[0]?.completedAt ?? null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
   }
 }
 

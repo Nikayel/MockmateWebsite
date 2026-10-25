@@ -7,6 +7,7 @@
  */
 
 import { adminDb } from "@/lib/firebase-admin"
+import { loadUserMetrics } from "@/lib/user-metrics/repository"
 import type { MasteryLevel } from "./types"
 
 /**
@@ -20,36 +21,19 @@ export async function getUserScoreStats(userId: string): Promise<{
   sumOverallScore: number
   sumTechnicalScore: number
   sumMasteryScore: number
-  averageOverallScore: number
-  averageTechnicalScore: number
-  averageMasteryScore: number
+  averageOverallScore: number | null
+  averageTechnicalScore: number | null
+  averageMasteryScore: number | null
 }> {
-  const doc = await adminDb.collection("user_stats").doc(userId).get()
-
-  const data = doc.data()
-  const totalSessions = data?.totalSessions ?? 0
-
-  // The user_stats writer (updateUserStats in lib/session-metrics.ts) stores these
-  // running totals as `totalScore` / `totalTechnicalScore`. This reader asked for
-  // `sumOverallScore` / `sumTechnicalScore` / `sumMasteryScore`, which no code path
-  // has ever written, so every average returned here was 0 and /api/user/metrics
-  // reported zeroed averages for every user. The sum* names are still read first
-  // in case any document carries them.
-  //
-  // Mastery and technical are the same number by design; the writer sets
-  // `technicalScore = summary.masteryScore`.
-  const sumOverall = data?.sumOverallScore ?? data?.totalScore ?? 0
-  const sumTechnical = data?.sumTechnicalScore ?? data?.totalTechnicalScore ?? sumOverall
-  const sumMastery = data?.sumMasteryScore ?? data?.totalTechnicalScore ?? sumTechnical
-
+  const snapshot = await loadUserMetrics(userId)
   return {
-    totalSessions,
-    sumOverallScore: sumOverall,
-    sumTechnicalScore: sumTechnical,
-    sumMasteryScore: sumMastery,
-    averageOverallScore: totalSessions > 0 ? Math.round(sumOverall / totalSessions) : 0,
-    averageTechnicalScore: totalSessions > 0 ? Math.round(sumTechnical / totalSessions) : 0,
-    averageMasteryScore: totalSessions > 0 ? Math.round(sumMastery / totalSessions) : 0,
+    totalSessions: snapshot.overview.totalSessions,
+    sumOverallScore: snapshot.totals.score,
+    sumTechnicalScore: snapshot.totals.technicalScore,
+    sumMasteryScore: snapshot.totals.technicalScore,
+    averageOverallScore: snapshot.overview.averageScore,
+    averageTechnicalScore: snapshot.overview.averageTechnicalScore,
+    averageMasteryScore: snapshot.overview.averageTechnicalScore,
   }
 }
 

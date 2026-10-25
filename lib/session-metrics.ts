@@ -10,7 +10,7 @@
  */
 
 import { adminDb } from "./firebase-admin"
-import { FieldValue, Timestamp } from "firebase-admin/firestore"
+import { FieldValue } from "firebase-admin/firestore"
 import { trackUsageEvent } from "./usage-tracking"
 import type { InteractionMetrics, ScoreBreakdown } from "./scoring"
 import { calculateUserScore, getPerformanceFeedback } from "./scoring"
@@ -793,208 +793,25 @@ export async function completeSessionMetrics(params: {
  */
 async function storeSessionSummary(summary: SessionSummary): Promise<void> {
   try {
-    // Technical score is now the same as mastery score (objective metrics)
-    const technicalScore = summary.masteryScore
-
-    // Legacy analytics summary: performanceScore is calculated from interaction
-    // metrics before final feedback. Do not use it for user-facing score trends.
-    // Final feedback writes the canonical score to interview_sessions.
-    await adminDb
+    // This is telemetry for RAG, not final feedback. Claim this session once
+    // so retrying completion cannot repeat learning/mastery side effects.
+    const summaryRef = adminDb
       .collection("users")
       .doc(summary.userId)
       .collection("session_summaries")
       .doc(summary.sessionId)
-      .set({
-        ...summary,
-        createdAt: FieldValue.serverTimestamp(),
-      })
-
-    // Sync performance_score to interview_sessions for dashboard consistency
-    // This ensures "Recent Avg" shows the same score as "This Week"
-    // IMPORTANT: Pass isReconstructedSession to prevent overwriting authoritative scores
-    await syncScoreToInterviewSession(
-      summary.sessionId,
-      summary.performanceScore,
-      technicalScore,
-      summary.scoreBreakdown,
-      summary.isReconstructedSession ?? false
-    )
+    const inserted = await adminDb.runTransaction(async (transaction) => {
+      if ((await transaction.get(summaryRef)).exists) return false
+      transaction.set(summaryRef, { ...summary, createdAt: FieldValue.serverTimestamp() })
+      return true
+    })
+    if (!inserted) return
 
     // Update all user learning data in parallel
-    await Promise.all([
-      updateUserAggregateStats(summary),
-      updateUserLearningState(summary),
-      updateUserProblemMastery(summary),
-    ])
+    await Promise.all([updateUserLearningState(summary), updateUserProblemMastery(summary)])
   } catch (error) {
     console.error("[Session Metrics] Failed to store summary:", error)
   }
-}
-
-/**
- * Sync score to interview_sessions collection
- * Ensures dashboard "Recent Avg" matches "This Week" percentage
- *
- * IMPORTANT: Only syncs if no authoritative score exists from generate-feedback API.
- * This prevents race conditions where metrics tracking (with incomplete data) overwrites
- * the proper AI-calculated score from the feedback generation.
- */
-async function syncScoreToInterviewSession(
-  sessionId: string,
-  performanceScore: number,
-  technicalScore: number,
-  scoreBreakdown: ScoreBreakdown,
-  isReconstructedSession: boolean = false
-): Promise<void> {
-  try {
-    // ALWAYS check if authoritative score already exists from generate-feedback API
-    // The feedback API calculates scores with full AI validation - those are the source of truth
-    // Our locally-calculated scores from interaction metrics are less accurate
-    const sessionDoc = await adminDb.collection("interview_sessions").doc(sessionId).get()
-    const existingData = sessionDoc.data()
-
-    // If feedback_status is 'complete' and we have a score_breakdown, the generate-feedback API
-    // already set the authoritative scores - don't overwrite them with our estimated scores
-    if (
-      existingData?.feedback_status === "complete" &&
-      existingData?.score_breakdown &&
-      typeof existingData.score_breakdown.understandingScore === "number"
-    ) {
-      console.log(
-        `[Session Metrics] Skipping score sync for ${sessionId} - authoritative score_breakdown exists from generate-feedback`
-      )
-      return
-    }
-
-    // Only sync scores if no authoritative scores exist (fallback case)
-    await adminDb
-      .collection("interview_sessions")
-      .doc(sessionId)
-      .set(
-        {
-          performance_score: performanceScore,
-          technical_score: technicalScore,
-          score_breakdown: {
-            understandingScore: scoreBreakdown.understandingScore,
-            problemSolvingScore: scoreBreakdown.problemSolvingScore,
-            codeQualityScore: scoreBreakdown.codeQualityScore,
-            communicationScore: scoreBreakdown.communicationScore,
-            overallScore: scoreBreakdown.overallScore,
-          },
-          scores_synced_at: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      )
-  } catch (error) {
-    // Non-blocking - don't fail if sync fails
-    console.error("[Session Metrics] Failed to sync score to interview_sessions:", error)
-  }
-}
-
-/**
- * Update user's aggregate statistics
- */
-async function updateUserAggregateStats(summary: SessionSummary): Promise<void> {
-  const userStatsRef = adminDb.collection("user_stats").doc(summary.userId)
-
-  // Technical score is now the same as mastery score (objective metrics)
-  const technicalScore = summary.masteryScore
-
-  await adminDb.runTransaction(async (transaction) => {
-    const doc = await transaction.get(userStatsRef)
-
-    if (!doc.exists) {
-      // Create new stats document
-      transaction.set(userStatsRef, {
-        userId: summary.userId,
-        totalSessions: 1,
-        totalPracticeMinutes: summary.durationMinutes,
-        totalScore: summary.performanceScore,
-        totalTechnicalScore: technicalScore,
-        averageScore: summary.performanceScore,
-        averageTechnicalScore: technicalScore,
-        patternStats: {
-          [summary.pattern]: {
-            sessions: 1,
-            totalScore: summary.performanceScore,
-            totalTechnicalScore: technicalScore,
-            averageScore: summary.performanceScore,
-            averageTechnicalScore: technicalScore,
-            bestScore: summary.performanceScore,
-            bestTechnicalScore: technicalScore,
-          },
-        },
-        difficultyStats: {
-          [summary.difficulty]: {
-            sessions: 1,
-            totalScore: summary.performanceScore,
-            totalTechnicalScore: technicalScore,
-            averageScore: summary.performanceScore,
-            averageTechnicalScore: technicalScore,
-          },
-        },
-        lastSessionAt: summary.completedAt,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      })
-    } else {
-      const data = doc.data()!
-      const totalSessions = (data.totalSessions || 0) + 1
-      const totalScore = (data.totalScore || 0) + summary.performanceScore
-      const totalTechnicalScore = (data.totalTechnicalScore || 0) + technicalScore
-
-      // Update pattern stats
-      const patternStats = data.patternStats || {}
-      const patternData = patternStats[summary.pattern] || {
-        sessions: 0,
-        totalScore: 0,
-        totalTechnicalScore: 0,
-        averageScore: 0,
-        averageTechnicalScore: 0,
-        bestScore: 0,
-        bestTechnicalScore: 0,
-      }
-      patternData.sessions++
-      patternData.totalScore += summary.performanceScore
-      patternData.totalTechnicalScore = (patternData.totalTechnicalScore || 0) + technicalScore
-      patternData.averageScore = Math.round(patternData.totalScore / patternData.sessions)
-      patternData.averageTechnicalScore = Math.round(
-        patternData.totalTechnicalScore / patternData.sessions
-      )
-      patternData.bestScore = Math.max(patternData.bestScore, summary.performanceScore)
-      patternData.bestTechnicalScore = Math.max(patternData.bestTechnicalScore || 0, technicalScore)
-      patternStats[summary.pattern] = patternData
-
-      // Update difficulty stats
-      const difficultyStats = data.difficultyStats || {}
-      const diffData = difficultyStats[summary.difficulty] || {
-        sessions: 0,
-        totalScore: 0,
-        totalTechnicalScore: 0,
-        averageScore: 0,
-        averageTechnicalScore: 0,
-      }
-      diffData.sessions++
-      diffData.totalScore += summary.performanceScore
-      diffData.totalTechnicalScore = (diffData.totalTechnicalScore || 0) + technicalScore
-      diffData.averageScore = Math.round(diffData.totalScore / diffData.sessions)
-      diffData.averageTechnicalScore = Math.round(diffData.totalTechnicalScore / diffData.sessions)
-      difficultyStats[summary.difficulty] = diffData
-
-      transaction.update(userStatsRef, {
-        totalSessions,
-        totalPracticeMinutes: FieldValue.increment(summary.durationMinutes),
-        totalScore,
-        totalTechnicalScore,
-        averageScore: Math.round(totalScore / totalSessions),
-        averageTechnicalScore: Math.round(totalTechnicalScore / totalSessions),
-        patternStats,
-        difficultyStats,
-        lastSessionAt: summary.completedAt,
-        updatedAt: FieldValue.serverTimestamp(),
-      })
-    }
-  })
 }
 
 /**
@@ -1173,165 +990,5 @@ export async function updateUserProblemMastery(summary: SessionSummary): Promise
     })
   } catch (error) {
     console.error("[Session Metrics] Failed to update problem mastery:", error)
-  }
-}
-
-// =============================================================================
-// RETRIEVAL
-// =============================================================================
-
-/**
- * Get user's aggregate stats
- */
-export async function getUserStats(userId: string): Promise<{
-  totalSessions: number
-  totalPracticeMinutes: number
-  averageScore: number
-  averageTechnicalScore?: number
-  patternStats: Record<
-    string,
-    {
-      sessions: number
-      averageScore: number
-      averageTechnicalScore?: number
-      bestScore: number
-      bestTechnicalScore?: number
-    }
-  >
-  difficultyStats: Record<
-    string,
-    {
-      sessions: number
-      averageScore: number
-      averageTechnicalScore?: number
-    }
-  >
-  lastSessionAt?: string
-} | null> {
-  try {
-    const doc = await adminDb.collection("user_stats").doc(userId).get()
-    if (!doc.exists) return null
-
-    const data = doc.data()!
-    return {
-      totalSessions: data.totalSessions || 0,
-      totalPracticeMinutes: data.totalPracticeMinutes || 0,
-      averageScore: data.averageScore || 0,
-      averageTechnicalScore: data.averageTechnicalScore,
-      patternStats: data.patternStats || {},
-      difficultyStats: data.difficultyStats || {},
-      lastSessionAt: data.lastSessionAt,
-    }
-  } catch (error) {
-    console.error("[Session Metrics] Failed to get user stats:", error)
-    return null
-  }
-}
-
-/**
- * Get user's recent session summaries
- */
-export async function getRecentSessions(
-  userId: string,
-  limit: number = 10
-): Promise<SessionSummary[]> {
-  try {
-    const snapshot = await adminDb
-      .collection("users")
-      .doc(userId)
-      .collection("session_summaries")
-      .orderBy("completedAt", "desc")
-      .limit(limit)
-      .get()
-
-    return snapshot.docs.map((doc) => doc.data() as SessionSummary)
-  } catch (error) {
-    console.error("[Session Metrics] Failed to get recent sessions:", error)
-    return []
-  }
-}
-
-/** Get trends from the same final feedback scores shown on session results. */
-export async function getPerformanceTrends(
-  userId: string,
-  days: number = 30
-): Promise<{
-  daily: Array<{ date: string; score: number; sessions: number }>
-  weeklyAverage: number
-  trend: "improving" | "stable" | "declining"
-}> {
-  try {
-    const now = Date.now()
-    const dailyStart = new Date(now - days * 24 * 60 * 60 * 1000).toISOString()
-    const weeklyStart = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString()
-    const queryStart = dailyStart < weeklyStart ? dailyStart : weeklyStart
-
-    const snapshot = await adminDb
-      .collection("interview_sessions")
-      .where("user_id", "==", userId)
-      .where("completed_at", ">=", queryStart)
-      .orderBy("completed_at", "desc")
-      .get()
-
-    // session_summaries.performanceScore is an older interaction-derived score.
-    // Only feedback persistence writes the final score shown on session results.
-    const dailyMap = new Map<string, { total: number; count: number }>()
-    let weeklyTotal = 0
-    let weeklyCount = 0
-
-    snapshot.docs.forEach((doc) => {
-      const data = doc.data()
-      const score = data.performance_score
-      const completedAt = data.completed_at
-      if (
-        data.feedback_status !== "complete" ||
-        typeof score !== "number" ||
-        !Number.isFinite(score) ||
-        score < 0 ||
-        score > 100 ||
-        typeof completedAt !== "string"
-      )
-        return
-
-      if (completedAt >= weeklyStart) {
-        weeklyTotal += score
-        weeklyCount++
-      }
-      if (completedAt < dailyStart) return
-
-      const date = completedAt.split("T")[0]
-      const existing = dailyMap.get(date) || { total: 0, count: 0 }
-      existing.total += score
-      existing.count++
-      dailyMap.set(date, existing)
-    })
-
-    const daily = Array.from(dailyMap.entries())
-      .map(([date, { total, count }]) => ({
-        date,
-        score: Math.round(total / count),
-        sessions: count,
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date))
-
-    const weeklyAverage = weeklyCount > 0 ? Math.round(weeklyTotal / weeklyCount) : 0
-
-    // Calculate trend
-    let trend: "improving" | "stable" | "declining" = "stable"
-    if (daily.length >= 4) {
-      const firstHalf = daily.slice(0, Math.floor(daily.length / 2))
-      const secondHalf = daily.slice(Math.floor(daily.length / 2))
-
-      const firstAvg = firstHalf.reduce((s, d) => s + d.score, 0) / firstHalf.length
-      const secondAvg = secondHalf.reduce((s, d) => s + d.score, 0) / secondHalf.length
-
-      if (secondAvg - firstAvg > 5) trend = "improving"
-      else if (firstAvg - secondAvg > 5) trend = "declining"
-    }
-
-    return { daily, weeklyAverage, trend }
-  } catch (error) {
-    console.error("[Session Metrics] Failed to get trends:", error)
-    return { daily: [], weeklyAverage: 0, trend: "stable" }
   }
 }

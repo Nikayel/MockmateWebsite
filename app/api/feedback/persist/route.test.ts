@@ -12,6 +12,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/auth-helpers", () => ({ verifyAuth: mocks.verifyAuth }))
 vi.mock("@/lib/firebase-admin", () => ({
   adminDb: {
+    runTransaction: async (run: (transaction: unknown) => Promise<unknown>) =>
+      run({
+        get: mocks.get,
+        update: (_ref: unknown, payload: unknown) => mocks.update(payload),
+        set: mocks.set,
+      }),
     collection: () => ({
       doc: () => ({
         get: mocks.get,

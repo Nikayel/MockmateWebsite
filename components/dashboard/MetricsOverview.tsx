@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
@@ -33,6 +33,8 @@ import {
   Trophy,
   ExternalLink,
 } from "lucide-react"
+import type { UserMetricsData } from "@/lib/user-metrics/service"
+import { formatMetricScore } from "@/lib/user-metrics/display"
 import { ScoreInfoTooltip } from "@/components/ui/score-info-tooltip"
 
 interface MasteredProblem {
@@ -44,43 +46,16 @@ interface MasteredProblem {
   masteredAt: string
 }
 
-interface PatternStat {
-  displayName: string
-  averageScore: number // Overall / interview score for this pattern
-  averageTechnicalScore: number // Technical score for this pattern
-  proficiency: string
-}
-
-interface QuickMetrics {
-  totalSessions: number
-  totalPracticeHours: number
-  averageScore: number // Overall (includes communication)
-  averageTechnicalScore: number // Technical (code-focused, excludes communication)
-  weeklyAverage: number
-  trend: "improving" | "stable" | "declining"
-  patterns: PatternStat[]
-  // Score breakdown from the 4 weighted categories
-  scoreBreakdown?: {
-    codeQuality: number // 30%
-    problemSolving: number // 25%
-    understanding: number // 25%
-    communication: number // 20%
-  }
-  // Mastery statistics for spaced repetition
-  mastery?: {
-    total: number
-    mastered: number
-    reviewing: number
-    learning: number
-    new: number
-    masteryRate: number
-  }
-}
-
-export function MetricsOverview() {
+export function MetricsOverview({
+  data,
+  error = false,
+  onRetry,
+}: {
+  data: UserMetricsData | null
+  error?: boolean
+  onRetry?: () => void
+}) {
   const { firebaseUser } = useAuth()
-  const [metrics, setMetrics] = useState<QuickMetrics | null>(null)
-  const [loading, setLoading] = useState(true)
   const [showOverallScore, setShowOverallScore] = useState(true) // Default to Interview Score (includes communication)
   const [masteredProblems, setMasteredProblems] = useState<MasteredProblem[]>([])
   const [loadingMastered, setLoadingMastered] = useState(false)
@@ -105,65 +80,34 @@ export function MetricsOverview() {
     }
   }
 
-  useEffect(() => {
-    const loadMetrics = async () => {
-      if (!firebaseUser) {
-        setLoading(false)
-        return
+  const metrics = data
+    ? {
+        ...data.overview,
+        ...data.trends,
+        patterns: data.patterns,
+        scoreBreakdown: data.scoreBreakdown,
+        mastery: data.mastery,
       }
-
-      try {
-        const token = await firebaseUser.getIdToken()
-        const response = await fetch("/api/user/metrics?days=7", {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success) {
-            const { overview, patterns, trends } = data.data
-
-            setMetrics({
-              totalSessions: overview.totalSessions,
-              totalPracticeHours: overview.totalPracticeHours,
-              averageScore: overview.averageScore,
-              averageTechnicalScore: overview.averageTechnicalScore || overview.averageScore,
-              weeklyAverage: trends.weeklyAverage,
-              trend: trends.trend,
-              // Keep the full pattern list; strongest/weakest are derived reactively
-              // from whichever score (interview vs technical) is currently displayed,
-              // so the ranking metric always matches the number shown on the badge.
-              patterns: (patterns || []) as PatternStat[],
-              scoreBreakdown: data.data.scoreBreakdown || undefined,
-              mastery: data.data.mastery || undefined,
-            })
-          }
-        }
-      } catch (error) {
-        console.error("Error loading metrics:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadMetrics()
-  }, [firebaseUser])
+    : null
+  const loading = !data && !error
 
   // Derive strongest / focus-area patterns from the metric that is actually
   // displayed (interview vs technical). Ranking and the shown number must use
   // the same score, otherwise the badges can look swapped (e.g. "Strongest"
   // showing a lower % than "Focus Area").
   const { topPattern, weakestPattern } = useMemo(() => {
-    const patterns = metrics?.patterns ?? []
+    const patterns = (metrics?.patterns ?? []).filter(
+      (p) => showOverallScore || p.averageTechnicalScore !== null
+    )
     if (patterns.length === 0) {
       return { topPattern: undefined, weakestPattern: undefined }
     }
-    const scoreOf = (p: PatternStat) =>
-      showOverallScore ? p.averageScore : p.averageTechnicalScore ?? p.averageScore
+    const scoreOf = (p: UserMetricsData["patterns"][number]) =>
+      showOverallScore ? p.averageScore : (p.averageTechnicalScore ?? p.averageScore)
     const sorted = [...patterns].sort((a, b) => scoreOf(b) - scoreOf(a))
     const top = sorted[0]
     const weak = sorted[sorted.length - 1]
-    const toView = (p: PatternStat) => ({
+    const toView = (p: UserMetricsData["patterns"][number]) => ({
       name: p.displayName,
       score: p.averageScore,
       technicalScore: p.averageTechnicalScore ?? p.averageScore,
@@ -175,20 +119,37 @@ export function MetricsOverview() {
     }
   }, [metrics?.patterns, showOverallScore])
 
+  if (error)
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Performance Insights</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p role="alert" className="text-muted-foreground text-sm">
+            Couldn't load your metrics.
+          </p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={onRetry}>
+            Retry
+          </Button>
+        </CardContent>
+      </Card>
+    )
+
   if (loading) {
     return (
       <Card className="border-border bg-card/50">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center text-sm font-medium text-foreground">
+          <CardTitle className="text-foreground flex items-center text-sm font-medium">
             <BarChart3 className="mr-2 h-4 w-4" />
             Performance Insights
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="animate-pulse space-y-3">
-            <div className="h-4 w-3/4 rounded bg-muted"></div>
-            <div className="h-4 w-1/2 rounded bg-muted"></div>
-            <div className="h-4 w-2/3 rounded bg-muted"></div>
+            <div className="bg-muted h-4 w-3/4 rounded"></div>
+            <div className="bg-muted h-4 w-1/2 rounded"></div>
+            <div className="bg-muted h-4 w-2/3 rounded"></div>
           </div>
         </CardContent>
       </Card>
@@ -199,15 +160,17 @@ export function MetricsOverview() {
     return (
       <Card className="border-border bg-card/50">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center text-sm font-medium text-foreground">
+          <CardTitle className="text-foreground flex items-center text-sm font-medium">
             <BarChart3 className="mr-2 h-4 w-4" />
             Performance Insights
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="py-4 text-center">
-            <Sparkles className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
-            <p className="mb-3 text-sm text-muted-foreground">Start practicing to see your insights</p>
+            <Sparkles className="text-muted-foreground mx-auto mb-2 h-8 w-8" />
+            <p className="text-muted-foreground mb-3 text-sm">
+              Complete an interview to see interview insights. Guided practice is shown separately.
+            </p>
             <Link href="/interview">
               <Button size="sm" className="bg-[#c4703f] text-white hover:bg-[#c4703f]/80">
                 Begin Practice
@@ -235,13 +198,17 @@ export function MetricsOverview() {
   return (
     <Card className="border-border bg-card/50">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center justify-between text-sm font-medium text-foreground">
+        <CardTitle className="text-foreground flex items-center justify-between text-sm font-medium">
           <span className="flex items-center">
             <BarChart3 className="mr-2 h-4 w-4" />
             Performance Insights
           </span>
           <Link href="/metrics">
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-[#c4703f] hover:text-foreground">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="hover:text-foreground h-6 px-2 text-[#c4703f]"
+            >
               View All
               <ArrowRight className="ml-1 h-3 w-3" />
             </Button>
@@ -252,39 +219,44 @@ export function MetricsOverview() {
         {/* Quick Stats Row */}
         <div className="grid grid-cols-3 gap-3 text-center">
           <div>
-            <div className="text-2xl font-bold text-foreground">{metrics.totalSessions}</div>
-            <div className="text-xs text-muted-foreground">Sessions</div>
+            <div className="text-foreground text-2xl font-bold">{metrics.totalSessions}</div>
+            <div className="text-muted-foreground text-xs">Interviews</div>
           </div>
           <div>
-            <div className="text-2xl font-bold text-foreground">{metrics.totalPracticeHours}h</div>
-            <div className="text-xs text-muted-foreground">Practice</div>
+            <div className="text-foreground text-2xl font-bold">{metrics.totalPracticeHours}h</div>
+            <div className="text-muted-foreground text-xs">Interview practice</div>
           </div>
           <div>
             <div
               className={`flex items-center justify-center gap-1 text-2xl font-bold ${trendColor}`}
             >
-              {metrics.weeklyAverage}%
+              {formatMetricScore(metrics.weeklyAverage)}
               <TrendIcon className="h-4 w-4" />
             </div>
-            <div className="text-xs text-muted-foreground">This Week</div>
+            <div className="text-muted-foreground text-xs">Last 7 days</div>
           </div>
         </div>
 
         {/* Average Score Progress with Toggle */}
         <div>
           <div className="mb-1 flex items-center justify-between">
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span className="text-muted-foreground flex items-center gap-1 text-xs">
               <Target className="h-3 w-3" />
               {showOverallScore ? "Mock Interview Score" : "Technical Score"}
-              <ScoreInfoTooltip type={showOverallScore ? "overall" : "technical"} />
+              <ScoreInfoTooltip type={showOverallScore ? "interviewAverage" : "technicalAverage"} />
             </span>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-sm text-foreground">
-                {showOverallScore ? metrics.averageScore : metrics.averageTechnicalScore}%
+              <span className="text-foreground font-mono text-sm">
+                {formatMetricScore(
+                  showOverallScore ? metrics.averageScore : metrics.averageTechnicalScore
+                )}
               </span>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
+                    aria-label={
+                      showOverallScore ? "Switch to Technical Score" : "Switch to Interview Score"
+                    }
                     onClick={() => setShowOverallScore(!showOverallScore)}
                     className="text-muted-foreground transition-colors hover:text-[#c4703f]"
                   >
@@ -304,12 +276,14 @@ export function MetricsOverview() {
             </div>
           </div>
           <Progress
-            value={showOverallScore ? metrics.averageScore : metrics.averageTechnicalScore}
+            value={
+              (showOverallScore ? metrics.averageScore : metrics.averageTechnicalScore) ?? undefined
+            }
             className="h-2"
           />
-          <div className="mt-1 text-[10px] text-muted-foreground">
+          <div className="text-muted-foreground mt-1 text-[10px]">
             {showOverallScore
-              ? "What you'd likely get in a real interview (communication matters!)"
+              ? "Final feedback across completed interviews; includes communication."
               : "Objective metrics: test pass rate, time efficiency, independence"}
           </div>
         </div>
@@ -318,11 +292,11 @@ export function MetricsOverview() {
         {metrics.mastery && metrics.mastery.total > 0 && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+              <span className="text-muted-foreground flex items-center gap-1 text-xs font-medium">
                 Mastery Progress
                 <ScoreInfoTooltip type="mastery" />
               </span>
-              <span className="font-mono text-xs text-foreground">
+              <span className="text-foreground font-mono text-xs">
                 {metrics.mastery.masteryRate}% mastered
               </span>
             </div>
@@ -342,7 +316,7 @@ export function MetricsOverview() {
                         {metrics.mastery.mastered}
                       </span>
                     </div>
-                    <div className="flex items-center justify-center text-[10px] text-muted-foreground">
+                    <div className="text-muted-foreground flex items-center justify-center text-[10px]">
                       Mastered
                       <ScoreInfoTooltip type="mastered" iconClassName="h-2.5 w-2.5" asSpan />
                     </div>
@@ -357,9 +331,9 @@ export function MetricsOverview() {
                   </DialogHeader>
                   <div className="space-y-2">
                     {loadingMastered ? (
-                      <div className="py-8 text-center text-muted-foreground">Loading...</div>
+                      <div className="text-muted-foreground py-8 text-center">Loading...</div>
                     ) : masteredProblems.length === 0 ? (
-                      <div className="py-8 text-center text-muted-foreground">
+                      <div className="text-muted-foreground py-8 text-center">
                         No mastered problems yet. Keep practicing!
                       </div>
                     ) : (
@@ -367,11 +341,13 @@ export function MetricsOverview() {
                         <Link
                           key={problem.problemId}
                           href={`/interview?scenario=${problem.scenarioId}`}
-                          className="flex items-center justify-between rounded-lg border border-border bg-card/50 p-3 transition-colors hover:border-emerald-500/30 hover:bg-muted/50"
+                          className="border-border bg-card/50 hover:bg-muted/50 flex items-center justify-between rounded-lg border p-3 transition-colors hover:border-emerald-500/30"
                         >
                           <div className="min-w-0 flex-1">
-                            <div className="truncate font-medium text-foreground">{problem.title}</div>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <div className="text-foreground truncate font-medium">
+                              {problem.title}
+                            </div>
+                            <div className="text-muted-foreground flex items-center gap-2 text-xs">
                               <span className="capitalize">
                                 {problem.pattern.replace(/-/g, " ")}
                               </span>
@@ -389,7 +365,7 @@ export function MetricsOverview() {
                               </span>
                             </div>
                           </div>
-                          <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <ExternalLink className="text-muted-foreground h-4 w-4 shrink-0" />
                         </Link>
                       ))
                     )}
@@ -403,7 +379,7 @@ export function MetricsOverview() {
                     {metrics.mastery.reviewing}
                   </span>
                 </div>
-                <div className="flex items-center justify-center text-[10px] text-muted-foreground">
+                <div className="text-muted-foreground flex items-center justify-center text-[10px]">
                   Reviewing
                   <ScoreInfoTooltip type="reviewing" iconClassName="h-2.5 w-2.5" />
                 </div>
@@ -415,7 +391,7 @@ export function MetricsOverview() {
                     {metrics.mastery.learning}
                   </span>
                 </div>
-                <div className="flex items-center justify-center text-[10px] text-muted-foreground">
+                <div className="text-muted-foreground flex items-center justify-center text-[10px]">
                   Learning
                   <ScoreInfoTooltip type="learning" iconClassName="h-2.5 w-2.5" />
                 </div>
@@ -427,55 +403,64 @@ export function MetricsOverview() {
         {/* Score Breakdown - 4 weighted categories */}
         {metrics.scoreBreakdown && (
           <div className="space-y-2">
-            <div className="mb-2 text-xs font-medium text-muted-foreground">Skill Breakdown</div>
+            <div className="text-muted-foreground mb-2 text-xs font-medium">Skill Breakdown</div>
             <div className="grid grid-cols-2 gap-2">
-              <div className="rounded bg-muted/50 p-2">
+              <div className="bg-muted/50 rounded p-2">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="flex items-center text-xs text-muted-foreground">
+                  <span className="text-muted-foreground flex items-center text-xs">
                     Code Quality
                     <ScoreInfoTooltip type="codeQuality" iconClassName="h-2.5 w-2.5" />
                   </span>
-                  <span className="font-mono text-xs text-foreground">
-                    {metrics.scoreBreakdown.codeQuality}%
+                  <span className="text-foreground font-mono text-xs">
+                    {formatMetricScore(metrics.scoreBreakdown.codeQuality)}
                   </span>
                 </div>
-                <Progress value={metrics.scoreBreakdown.codeQuality} className="h-1" />
+                <Progress value={metrics.scoreBreakdown.codeQuality ?? undefined} className="h-1" />
               </div>
-              <div className="rounded bg-muted/50 p-2">
+              <div className="bg-muted/50 rounded p-2">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="flex items-center text-xs text-muted-foreground">
+                  <span className="text-muted-foreground flex items-center text-xs">
                     Problem Solving
                     <ScoreInfoTooltip type="problemSolving" iconClassName="h-2.5 w-2.5" />
                   </span>
-                  <span className="font-mono text-xs text-foreground">
-                    {metrics.scoreBreakdown.problemSolving}%
+                  <span className="text-foreground font-mono text-xs">
+                    {formatMetricScore(metrics.scoreBreakdown.problemSolving)}
                   </span>
                 </div>
-                <Progress value={metrics.scoreBreakdown.problemSolving} className="h-1" />
+                <Progress
+                  value={metrics.scoreBreakdown.problemSolving ?? undefined}
+                  className="h-1"
+                />
               </div>
-              <div className="rounded bg-muted/50 p-2">
+              <div className="bg-muted/50 rounded p-2">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="flex items-center text-xs text-muted-foreground">
+                  <span className="text-muted-foreground flex items-center text-xs">
                     Understanding
                     <ScoreInfoTooltip type="understanding" iconClassName="h-2.5 w-2.5" />
                   </span>
-                  <span className="font-mono text-xs text-foreground">
-                    {metrics.scoreBreakdown.understanding}%
+                  <span className="text-foreground font-mono text-xs">
+                    {formatMetricScore(metrics.scoreBreakdown.understanding)}
                   </span>
                 </div>
-                <Progress value={metrics.scoreBreakdown.understanding} className="h-1" />
+                <Progress
+                  value={metrics.scoreBreakdown.understanding ?? undefined}
+                  className="h-1"
+                />
               </div>
-              <div className="rounded bg-muted/50 p-2">
+              <div className="bg-muted/50 rounded p-2">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="flex items-center text-xs text-muted-foreground">
+                  <span className="text-muted-foreground flex items-center text-xs">
                     Communication
                     <ScoreInfoTooltip type="communication" iconClassName="h-2.5 w-2.5" />
                   </span>
-                  <span className="font-mono text-xs text-foreground">
-                    {metrics.scoreBreakdown.communication}%
+                  <span className="text-foreground font-mono text-xs">
+                    {formatMetricScore(metrics.scoreBreakdown.communication)}
                   </span>
                 </div>
-                <Progress value={metrics.scoreBreakdown.communication} className="h-1" />
+                <Progress
+                  value={metrics.scoreBreakdown.communication ?? undefined}
+                  className="h-1"
+                />
               </div>
             </div>
           </div>
@@ -488,7 +473,7 @@ export function MetricsOverview() {
               <Brain className="h-4 w-4 text-green-400" />
               <div>
                 <div className="text-xs font-medium text-green-400">Strongest</div>
-                <div className="text-sm text-foreground">{topPattern.name}</div>
+                <div className="text-foreground text-sm">{topPattern.name}</div>
               </div>
             </div>
             <Tooltip>
@@ -510,16 +495,13 @@ export function MetricsOverview() {
               <Flame className="h-4 w-4 text-orange-400" />
               <div>
                 <div className="text-xs font-medium text-orange-400">Focus Area</div>
-                <div className="text-sm text-foreground">{weakestPattern.name}</div>
+                <div className="text-foreground text-sm">{weakestPattern.name}</div>
               </div>
             </div>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge className="cursor-default border-orange-500/30 bg-orange-500/20 text-xs text-orange-400">
-                  {showOverallScore
-                    ? weakestPattern.score
-                    : weakestPattern.technicalScore}
-                  %
+                  {showOverallScore ? weakestPattern.score : weakestPattern.technicalScore}%
                 </Badge>
               </TooltipTrigger>
               <TooltipContent side="left" className="text-xs">

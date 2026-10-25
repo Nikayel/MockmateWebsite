@@ -4,7 +4,6 @@ import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/auth-context"
 import {
   Clock,
@@ -26,53 +25,13 @@ import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { SparraLoader } from "@/components/brand/SparraLoader"
 
-interface MetricsData {
-  overview: {
-    totalSessions: number
-    totalPracticeMinutes: number
-    totalPracticeHours: number
-    averageScore: number // Overall (includes communication)
-    averageTechnicalScore: number // Technical (code-focused)
-    lastSessionAt: string | null
-  }
-  patterns: Array<{
-    pattern: string
-    displayName: string
-    sessions: number
-    averageScore: number
-    averageTechnicalScore: number
-    bestScore: number
-    proficiency: "novice" | "learning" | "practicing" | "proficient" | "expert"
-  }>
-  difficulty: Array<{
-    difficulty: string
-    sessions: number
-    averageScore: number
-    averageTechnicalScore: number
-  }>
-  trends: {
-    daily: Array<{ date: string; score: number; sessions: number }>
-    weeklyAverage: number
-    trend: "improving" | "stable" | "declining"
-    trendDescription: string
-  }
-  recentSessions: Array<{
-    id: string
-    scenarioId: string
-    pattern: string
-    difficulty: string
-    performanceScore: number
-    durationMinutes: number
-    completedAt: string
-    feedback: string
-  }>
-  usage: {
-    totalCost: number
-    totalRequests: number
-    budgetUsedPercent: number
-    budgetRemaining: number
-  } | null
-}
+import type { UserMetricsData as MetricsData } from "@/lib/user-metrics/service"
+import {
+  INTERVIEW_AVERAGE_EXPLANATION,
+  TECHNICAL_AVERAGE_EXPLANATION,
+} from "@/lib/user-metrics/explanations"
+import { formatMetricScore } from "@/lib/user-metrics/display"
+import { BugfixMetricsCard } from "@/components/dashboard/BugfixMetricsCard"
 
 /**
  * Your AI allowance for the month.
@@ -147,7 +106,7 @@ function Sparkline({ data, color = "#fff" }: { data: number[]; color?: string })
 function ActivityHeatmap({
   sessions,
 }: {
-  sessions: Array<{ completedAt: string; performanceScore: number }>
+  sessions: Array<{ date: string; score: number; sessions: number }>
 }) {
   const today = new Date()
   const weeks = 12
@@ -156,17 +115,9 @@ function ActivityHeatmap({
   // Create a map of date -> session data
   const sessionMap = useMemo(() => {
     const map = new Map<string, { count: number; totalScore: number; avgScore: number }>()
-    sessions.forEach((s) => {
-      const date = new Date(s.completedAt).toISOString().split("T")[0]
-      const existing = map.get(date)
-      if (existing) {
-        existing.count++
-        existing.totalScore += s.performanceScore
-        existing.avgScore = Math.round(existing.totalScore / existing.count)
-      } else {
-        map.set(date, { count: 1, totalScore: s.performanceScore, avgScore: s.performanceScore })
-      }
-    })
+    sessions.forEach((s) =>
+      map.set(s.date, { count: s.sessions, totalScore: s.score * s.sessions, avgScore: s.score })
+    )
     return map
   }, [sessions])
 
@@ -211,10 +162,18 @@ function ActivityHeatmap({
 }
 
 // Score ring visualization
-function ScoreRing({ score, size = 120, label }: { score: number; size?: number; label: string }) {
+function ScoreRing({
+  score,
+  size = 120,
+  label,
+}: {
+  score: number | null
+  size?: number
+  label: string
+}) {
   const radius = (size - 12) / 2
   const circumference = 2 * Math.PI * radius
-  const progress = (score / 100) * circumference
+  const progress = ((score ?? 0) / 100) * circumference
   const remaining = circumference - progress
 
   const getScoreColor = (s: number) => {
@@ -239,14 +198,14 @@ function ScoreRing({ score, size = 120, label }: { score: number; size?: number;
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke={getScoreColor(score)}
+          stroke={score === null ? "#777" : getScoreColor(score)}
           strokeWidth="6"
           strokeDasharray={`${progress} ${remaining}`}
           strokeLinecap="round"
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-foreground text-2xl font-bold">{score}%</span>
+        <span className="text-foreground text-2xl font-bold">{formatMetricScore(score)}</span>
         <span className="text-muted-foreground text-[10px] tracking-wider uppercase">{label}</span>
       </div>
     </div>
@@ -254,6 +213,7 @@ function ScoreRing({ score, size = 120, label }: { score: number; size?: number;
 }
 
 const proficiencyConfig: Record<string, { label: string; color: string; bg: string }> = {
+  unobserved: { label: "Not observed", color: "text-muted-foreground", bg: "bg-muted" },
   novice: { label: "Novice", color: "text-muted-foreground", bg: "bg-muted" },
   learning: { label: "Learning", color: "text-sky-400", bg: "bg-sky-500/20" },
   practicing: { label: "Practicing", color: "text-amber-400", bg: "bg-amber-500/20" },
@@ -335,7 +295,6 @@ export default function MetricsPage() {
   const hasData = metrics && metrics.overview.totalSessions > 0
 
   // Calculate trend data for sparkline
-  const trendScores = metrics?.trends.daily.map((d) => d.score) || []
 
   // Get difficulty breakdown
   const easyData = metrics?.difficulty.find((d) => d.difficulty === "easy")
@@ -348,15 +307,23 @@ export default function MetricsPage() {
 
       <div className="pt-24 pb-16">
         <div className="container mx-auto max-w-6xl px-4">
+          {metrics && (
+            <div className="mb-6">
+              <BugfixMetricsCard metrics={metrics} error={false} />
+            </div>
+          )}
           {!hasData ? (
             /* Empty State - Minimal */
             <div className="mx-auto max-w-lg py-24 text-center">
               <div className="border-border bg-card mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border">
                 <Activity className="text-muted-foreground h-8 w-8" />
               </div>
-              <h1 className="text-foreground mb-3 text-2xl font-semibold">No sessions yet</h1>
+              <h1 className="text-foreground mb-3 text-2xl font-semibold">
+                No completed interviews yet
+              </h1>
               <p className="text-muted-foreground mb-8 leading-relaxed">
-                Complete your first practice session to see your performance analytics.
+                Complete an interview to see interview analytics. Guided-lab mastery is shown
+                separately.
               </p>
               <Link href="/interview">
                 <Button className="bg-card text-foreground hover:bg-muted font-medium">
@@ -429,8 +396,8 @@ export default function MetricsPage() {
                         </p>
                         <p className="text-xs">
                           {showOverallScore
-                            ? "Your overall interview performance weighted as: Code Quality (30%) + Problem Solving (25%) + Understanding (25%) + Communication (20%)"
-                            : "Code-focused score excluding communication: Understanding (37.5%) + Problem Solving (31.25%) + Code Quality (31.25%)"}
+                            ? INTERVIEW_AVERAGE_EXPLANATION
+                            : TECHNICAL_AVERAGE_EXPLANATION}
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -444,7 +411,7 @@ export default function MetricsPage() {
                     <span className="text-muted-foreground text-sm">Weekly Trend</span>
                     <div className="mt-2 flex items-center gap-2">
                       <span className="text-foreground text-2xl font-light">
-                        {metrics.trends.weeklyAverage}%
+                        {formatMetricScore(metrics.trends.weeklyAverage)}
                       </span>
                       {metrics.trends.trend === "improving" && (
                         <span className="flex items-center text-sm text-emerald-500">
@@ -482,7 +449,7 @@ export default function MetricsPage() {
                     <span className="text-muted-foreground text-sm">Activity</span>
                     <span className="text-muted-foreground text-xs">Last 12 weeks</span>
                   </div>
-                  <ActivityHeatmap sessions={metrics.recentSessions} />
+                  <ActivityHeatmap sessions={metrics.activity} />
                   <div className="text-muted-foreground mt-4 flex items-center gap-2 text-xs">
                     <span>Less</span>
                     <div className="flex gap-0.5">
@@ -552,10 +519,11 @@ export default function MetricsPage() {
                                   {pattern.sessions} sessions
                                 </span>
                                 <span className="text-muted-foreground w-12 text-right font-mono text-sm">
-                                  {showOverallScore
-                                    ? pattern.averageScore
-                                    : pattern.averageTechnicalScore || pattern.averageScore}
-                                  %
+                                  {formatMetricScore(
+                                    showOverallScore
+                                      ? pattern.averageScore
+                                      : pattern.averageTechnicalScore
+                                  )}
                                 </span>
                               </div>
                             </div>
@@ -590,10 +558,9 @@ export default function MetricsPage() {
                               <div
                                 className={`mb-1 text-3xl font-light ${color === "emerald" ? "text-emerald-400" : ""} ${color === "amber" ? "text-amber-400" : ""} ${color === "red" ? "text-red-400" : ""} `}
                               >
-                                {showOverallScore
-                                  ? data.averageScore
-                                  : data.averageTechnicalScore || data.averageScore}
-                                %
+                                {formatMetricScore(
+                                  showOverallScore ? data.averageScore : data.averageTechnicalScore
+                                )}
                               </div>
                               <div className="text-muted-foreground text-xs">
                                 {data.sessions} sessions
@@ -619,12 +586,12 @@ export default function MetricsPage() {
                     </span>
                   </div>
                   <span className="text-muted-foreground text-xs">
-                    {metrics.recentSessions.length} total
+                    Latest {metrics.recentSessions.length} interviews
                   </span>
                 </div>
                 <div>
                   {metrics.recentSessions.length === 0 ? (
-                    <p className="text-muted-foreground p-6 text-sm">No sessions yet</p>
+                    <p className="text-muted-foreground p-6 text-sm">No completed interviews yet</p>
                   ) : (
                     <div className="divide-border divide-y">
                       {metrics.recentSessions.slice(0, 5).map((session) => (

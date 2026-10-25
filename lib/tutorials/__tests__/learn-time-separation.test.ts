@@ -30,7 +30,12 @@ const LEARN_TIME_MODULES = [
 ]
 
 /** The practice-stat side: the only writer of user_stats and the dashboard read path. */
-const PRACTICE_STAT_MODULES = ["lib/session-metrics.ts", "app/api/user/metrics/route.ts"]
+const PRACTICE_STAT_MODULES = [
+  "lib/session-metrics.ts",
+  "app/api/user/metrics/route.ts",
+  "lib/user-metrics/aggregate.ts",
+  "lib/user-metrics/repository.ts",
+]
 
 describe("learn time never touches the practice stat", () => {
   it.each(LEARN_TIME_MODULES)(

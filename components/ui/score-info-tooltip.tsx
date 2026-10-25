@@ -8,9 +8,15 @@
  */
 
 import { HelpCircle } from "lucide-react"
+import {
+  INTERVIEW_AVERAGE_EXPLANATION,
+  TECHNICAL_AVERAGE_EXPLANATION,
+} from "@/lib/user-metrics/explanations"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 export type ScoreInfoType =
+  | "interviewAverage"
+  | "technicalAverage"
   | "overall"
   | "technical"
   | "mastery"
@@ -31,6 +37,14 @@ interface ScoreExplanation {
 }
 
 const SCORE_EXPLANATIONS: Record<ScoreInfoType, ScoreExplanation> = {
+  interviewAverage: {
+    title: "Average Interview Score",
+    description: INTERVIEW_AVERAGE_EXPLANATION,
+  },
+  technicalAverage: {
+    title: "Average Technical Score",
+    description: TECHNICAL_AVERAGE_EXPLANATION,
+  },
   overall: {
     title: "Mock Interview Score",
     description:
