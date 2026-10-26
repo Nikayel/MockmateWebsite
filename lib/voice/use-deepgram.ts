@@ -1,12 +1,12 @@
-import { sessionFetch } from "@/lib/interview/session-fetch"
 /**
  * useDeepgram Hook
  *
  * React hook for real-time speech-to-text transcription using Deepgram
  * Provides easy integration with interview components
  */
-;("use client")
+"use client"
 
+import { sessionFetch } from "@/lib/interview/session-fetch"
 import { useState, useCallback, useRef, useEffect } from "react"
 import { DeepgramVoiceService, DeepgramConfig, DEFAULT_DEEPGRAM_MODEL } from "./deepgram-service"
 import { repairInterviewTranscript } from "./transcript-repair"
