@@ -36,7 +36,10 @@ No new Firestore index, migration, storage service or automatic AI retry is requ
 `lib/interview/session-fetch.ts` preserves fetch semantics and adds
 `x-deployment-id` only to same-origin browser requests when the build has a pin.
 Chat, lifecycle, guest persistence, feedback, hints, voice and TypeScript
-transpilation use it. It does not replay failed requests or write a cookie shared
+transpilation use it. Public JS/TS/Python worker entry URLs use the corresponding
+`dpl` query pin, and the JavaScript worker carries that pin into its local shims
+and vendored compiler imports. Versioned third-party CDN imports retain their
+existing URLs. It does not replay failed requests or write a cookie shared
 between tabs. A new tab/page load gets that build's identifier.
 
 `next.config.mjs` exposes only the public deployment ID, and only when Vercel sets

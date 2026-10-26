@@ -1,3 +1,4 @@
+import { sessionAssetUrl } from "@/lib/interview/session-fetch"
 import type { DsaExecutionResult } from "../types"
 
 interface PythonWorkerRunResult {
@@ -50,7 +51,7 @@ function resetPythonWorker(): void {
 
 function getPythonWorker(): Worker {
   if (!pythonWorker) {
-    pythonWorker = new Worker("/workers/python-sandbox-worker.js")
+    pythonWorker = new Worker(sessionAssetUrl("/workers/python-sandbox-worker.js"))
 
     pythonWorker.onmessage = (event: MessageEvent) => {
       if (!pendingRun) return

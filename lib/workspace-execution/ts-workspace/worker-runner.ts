@@ -1,3 +1,4 @@
+import { sessionAssetUrl } from "@/lib/interview/session-fetch"
 /**
  * Browser-side persistent-worker runner for TS workspaces, with a TWO-PHASE timeout: transpiling
  * ~60 files can blow the flat 5s budget the plain JS workspace runner uses (see worker-runner.ts
@@ -105,7 +106,7 @@ function resetTsWorker(): void {
 
 function getTsWorker(): Worker {
   if (!tsWorker) {
-    tsWorker = new Worker("/workers/js-sandbox-worker.js")
+    tsWorker = new Worker(sessionAssetUrl("/workers/js-sandbox-worker.js"))
 
     tsWorker.onmessage = (event: MessageEvent) => {
       if (!pendingRun) return

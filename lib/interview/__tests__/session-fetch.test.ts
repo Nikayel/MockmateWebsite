@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { sessionFetch } from "../session-fetch"
+import { sessionAssetUrl, sessionFetch } from "../session-fetch"
 
 const request = vi.fn()
 beforeEach(() => {
@@ -13,6 +13,16 @@ afterEach(() => {
 })
 
 describe("session deployment routing", () => {
+  it("pins worker URLs while preserving existing query parameters", () => {
+    expect(sessionAssetUrl("/workers/js-sandbox-worker.js?mode=ts")).toBe(
+      "/workers/js-sandbox-worker.js?mode=ts&dpl=dpl_page_A"
+    )
+    expect(sessionAssetUrl("https://cdn.example/worker.js")).toBe("https://cdn.example/worker.js")
+    vi.stubEnv("NEXT_PUBLIC_SESSION_DEPLOYMENT_ID", "")
+    expect(sessionAssetUrl("/workers/python-sandbox-worker.js")).toBe(
+      "/workers/python-sandbox-worker.js"
+    )
+  })
   it("pins a request while preserving auth, method, payload and cancellation", async () => {
     const signal = new AbortController().signal
     const headers = new Headers({

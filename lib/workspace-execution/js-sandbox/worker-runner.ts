@@ -1,3 +1,4 @@
+import { sessionAssetUrl } from "@/lib/interview/session-fetch"
 // Function to execute wrapped code string in Web Worker with a 5s timeout
 import { WORKER_START_FAILURE_MESSAGE } from "../harness-errors"
 
@@ -18,7 +19,7 @@ function runInWorkerOnce(
   return new Promise((resolve) => {
     let worker: Worker
     try {
-      worker = new Worker("/workers/js-sandbox-worker.js")
+      worker = new Worker(sessionAssetUrl("/workers/js-sandbox-worker.js"))
     } catch (err) {
       resolve({
         success: false,

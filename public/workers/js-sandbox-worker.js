@@ -1,5 +1,12 @@
 // Web Worker for JavaScript Execution Sandbox
 
+// Classic workers load their own local dependencies outside Next's asset loader.
+// Carry the worker entry's optional deployment pin through that dependency chain.
+function deploymentAsset(path) {
+  const deploymentId = self.location ? new URLSearchParams(self.location.search).get("dpl") : null
+  return deploymentId ? `${path}?dpl=${encodeURIComponent(deploymentId)}` : path
+}
+
 // assert-shim (the `assert` the scenario suites run against) and vitest-shim (describe/it/expect
 // for workspace suites) are the small, always-needed shims. Both are wrapped in a try/catch so a
 // transient failure to fetch either one does not throw at load time — that used to kill the
@@ -8,8 +15,8 @@
 // worker-start failure only when a mode that actually needs the shims runs.
 let bootDependencyError = null
 try {
-  importScripts("/workers/assert-shim.js")
-  importScripts("/workers/vitest-shim.js")
+  importScripts(deploymentAsset("/workers/assert-shim.js"))
+  importScripts(deploymentAsset("/workers/vitest-shim.js"))
 } catch (err) {
   bootDependencyError = err
 }
@@ -31,8 +38,8 @@ function workerStartError(message) {
 function ensureTypeScriptCompiler() {
   if (!typeScriptCompilerLoaded) {
     try {
-      importScripts("/workers/ts-transpiler-loader.js")
-      importScripts("/vendor/typescript/typescript.js")
+      importScripts(deploymentAsset("/workers/ts-transpiler-loader.js"))
+      importScripts(deploymentAsset("/vendor/typescript/typescript.js"))
     } catch (err) {
       throw workerStartError(
         "Could not load the code runner's TypeScript support: " +
