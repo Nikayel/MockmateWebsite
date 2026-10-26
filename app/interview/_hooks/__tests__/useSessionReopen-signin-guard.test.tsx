@@ -46,6 +46,7 @@ vi.mock("@/lib/bugfix", () => ({
 }))
 
 import { useSessionReopen } from "../useSessionReopen"
+import { getScenarioById } from "@/lib/scenarios/index"
 
 function buildOpts(overrides: Record<string, unknown> = {}) {
   return {
@@ -103,6 +104,32 @@ beforeEach(() => {
 })
 
 describe("useSessionReopen when the submitted session is already on screen", () => {
+  it("restores workspace code from the active file even when the saved editor buffer belongs to another file", async () => {
+    const files = [
+      { path: "src/cache_store.py", role: "editable", content: "class CacheStore: pass" },
+      { path: "src/log_reader.py", role: "editable", content: "def read_events(path): pass" },
+    ]
+    vi.mocked(getScenarioById).mockResolvedValueOnce({
+      id: "cache-workspace",
+      title: "Cache report",
+      type: "bugfix",
+      executionMode: "workspace",
+      workspace: { language: "python", primaryFilePath: files[0].path, files },
+    } as never)
+    getSessionState.mockResolvedValue({
+      elapsedTime: 120,
+      code: files[0].content,
+      workspaceContext: files,
+      activeWorkspacePath: files[1].path,
+    })
+    const opts = buildOpts()
+    renderHook(() => useSessionReopen(opts as never))
+    await flush()
+
+    expect(opts.setActiveWorkspacePath).toHaveBeenCalledWith(files[1].path)
+    expect(opts.setCode).toHaveBeenLastCalledWith(files[1].content)
+  })
+
   it("selects the exact recommended task and language without starting or restoring old code", async () => {
     const opts = buildOpts({
       searchParams: new URLSearchParams(

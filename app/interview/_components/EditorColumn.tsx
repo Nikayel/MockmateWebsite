@@ -181,10 +181,14 @@ export const EditorColumn = memo(function EditorColumn({
     <>
       <ErrorBoundary>
         <LazyCodeMirrorEditor
+          // File identity must also isolate CodeMirror's undo history and pending updates.
+          key={`${selectedScenario?.id ?? "solution"}:${activeWorkspaceFile?.path ?? "solution"}`}
           ref={editorRef}
           height="100%"
           language={editorLanguage}
-          value={code}
+          value={
+            isWorkspaceScenario(selectedScenario) ? (activeWorkspaceFile?.content ?? "") : code
+          }
           onChange={onCodeChange}
           readOnly={
             !isInterviewStarted ||

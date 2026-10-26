@@ -1844,8 +1844,16 @@ function InterviewPageContent() {
 
   const handleEditorChange = useCallback(
     (newCode: string) => {
-      // Enforce code protection if enabled
-      if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
+      // Workspace contracts are checked by running the project, not by requiring
+      // every module to contain the primary file's starter-code declarations.
+      if (isWorkspaceScenario(selectedScenario) && activeWorkspaceFile?.role !== "editable") return
+      if (
+        !isWorkspaceScenario(selectedScenario) &&
+        protectedElements &&
+        starterCode &&
+        isInterviewStarted &&
+        !showFeedback
+      ) {
         const validation = validateCodeProtection(newCode, protectedElements, selectedLanguage)
         if (!validation.valid) {
           toast.error(`Cannot remove required code: ${validation.errors[0]}`)
