@@ -8,6 +8,7 @@ import { recoverLocalCheckpoint } from "@/lib/interview/session-lifecycle/recove
 import type { ChatMessage } from "@/app/interview/_types"
 import type { Scenario } from "@/lib/scenarios"
 import { Button } from "@/components/ui/button"
+import { attemptChunkErrorRecovery } from "@/components/monitoring/chunk-reload"
 
 const scenario = { id: "lifecycle-task", type: "bugfix", title: "Rollup" } as Scenario
 const sessionId = "lifecycle-attempt"
@@ -155,6 +156,11 @@ export function SessionLifecycleFixture() {
         Sparra messages: {partner.length}; Sable messages: {interviewer.length}
       </p>
       <Button onClick={exit}>Save and exit</Button>
+      <Button
+        onClick={() => attemptChunkErrorRecovery("ChunkLoadError: Loading chunk old-build failed.")}
+      >
+        Simulate missing deployment chunk
+      </Button>
       <SessionPauseNotice
         paused={lifecycle.paused}
         warning={lifecycle.warning}

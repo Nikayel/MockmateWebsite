@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 import {
   captureSessionRequest,
   type SessionRequestGuard,
@@ -177,7 +178,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
       const chatHeaders: Record<string, string> = { "Content-Type": "application/json" }
       if (authToken) chatHeaders.Authorization = `Bearer ${authToken}`
-      const response = await fetch("/api/chat", {
+      const response = await sessionFetch("/api/chat", {
         signal: controller.signal,
         method: "POST",
         headers: chatHeaders,

@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 import type { SessionContext } from "@/lib/interview/session-context/schema"
 import { useEffect, useRef } from "react"
 import type { Dispatch, SetStateAction } from "react"
@@ -123,7 +124,7 @@ export function useInterviewProactiveAI(
       try {
         const token = await getCurrentUserToken()
         if (controller.signal.aborted) return
-        const response = await fetch("/api/chat", {
+        const response = await sessionFetch("/api/chat", {
           method: "POST",
           signal: controller.signal,
           headers: {

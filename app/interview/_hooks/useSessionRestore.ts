@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 import { restoreLabAttempt } from "@/lib/bugfix/guided-lab/assessment/restore"
 import type { RestoredSessionInputs } from "@/lib/interview/session-lifecycle/checkpoint"
 import { useEffect, type Dispatch, type SetStateAction } from "react"
@@ -75,7 +76,7 @@ export function useSessionRestore(opts: UseSessionRestoreOptions) {
         let remote: Awaited<ReturnType<typeof getSessionState>> = null
         if (opts.firebaseUser) remote = await getSessionState(sessionId)
         else if (opts.guestId) {
-          const response = await fetch(
+          const response = await sessionFetch(
             `/api/guest-session?sessionId=${encodeURIComponent(sessionId)}&guestId=${encodeURIComponent(opts.guestId)}`
           )
           if (response.status === 404) {

@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 import { createChatMessage } from "@/lib/interview/session-context/conversation"
 import { useRef, useState } from "react"
 import type { Dispatch, SetStateAction } from "react"
@@ -223,7 +224,7 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
         void opts.firebaseUser
           ?.getIdToken()
           .then((token) => {
-            return fetch("/api/session/metrics", {
+            return sessionFetch("/api/session/metrics", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -274,7 +275,7 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
       try {
         const scenarioPattern =
           ("pattern" in scenario ? scenario.pattern : scenario.type) || "unknown"
-        const response = await fetch("/api/guest-session", {
+        const response = await sessionFetch("/api/guest-session", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

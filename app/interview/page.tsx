@@ -1,5 +1,7 @@
 "use client"
 
+import { sessionFetch } from "@/lib/interview/session-fetch"
+
 import { hasSparraPartner } from "@/lib/interview/partner-handoff/contract"
 import type { RestoredSessionInputs } from "@/lib/interview/session-lifecycle/checkpoint"
 
@@ -725,7 +727,7 @@ function InterviewPageContent() {
 
       try {
         const idToken = await firebaseUser.getIdToken()
-        const response = await fetch("/api/roadmap", {
+        const response = await sessionFetch("/api/roadmap", {
           headers: {
             Authorization: `Bearer ${idToken}`,
             "Content-Type": "application/json",
@@ -1183,7 +1185,7 @@ function InterviewPageContent() {
       if (!firebaseUser || !currentSessionId) return true
       try {
         const token = await firebaseUser.getIdToken()
-        const response = await fetch("/api/interview/lifecycle", {
+        const response = await sessionFetch("/api/interview/lifecycle", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({
@@ -1423,7 +1425,7 @@ function InterviewPageContent() {
     onSessionRestored: restoreSessionInputs,
   })
 
-  const { saveNow } = useInterviewAutosave({
+  const { saveNow, localSaveFailed } = useInterviewAutosave({
     isInterviewStarted,
     selectedScenario,
     firebaseUser,
@@ -1456,6 +1458,21 @@ function InterviewPageContent() {
   useEffect(() => {
     if (isSessionPaused && canCheckpoint) void saveNow()
   }, [isSessionPaused, canCheckpoint, saveNow])
+
+  useEffect(() => {
+    const id = "session-device-backup"
+    if (localSaveFailed) {
+      toast.warning("Device backup unavailable", {
+        id,
+        description:
+          "Your browser could not save a recovery copy. Keep this tab open; cloud backup will still be attempted.",
+        duration: Infinity,
+      })
+    } else toast.dismiss(id)
+    return () => {
+      toast.dismiss(id)
+    }
+  }, [localSaveFailed])
 
   const saveAndExit = async () => {
     lifecycle.pauseForExit()
@@ -2098,13 +2115,11 @@ function InterviewPageContent() {
           hintAgent.revealHint(hintId)
           if (selectedScenario) {
             const hint = ragHints.find((entry) => entry.id === hintId)
-            useGuidedLabStore
-              .getState()
-              .observe(selectedScenario.id, {
-                kind: "hint",
-                text: (hint?.hint ?? "A generated hint was revealed.").slice(0, 3000),
-                truncated: (hint?.hint.length ?? 0) > 3000,
-              })
+            useGuidedLabStore.getState().observe(selectedScenario.id, {
+              kind: "hint",
+              text: (hint?.hint ?? "A generated hint was revealed.").slice(0, 3000),
+              truncated: (hint?.hint.length ?? 0) > 3000,
+            })
           }
         },
       },

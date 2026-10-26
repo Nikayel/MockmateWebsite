@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 import type { Dispatch, SetStateAction } from "react"
 import type { User as FirebaseUser } from "firebase/auth"
 import type { User } from "@/lib/types"
@@ -183,7 +184,7 @@ export function useInterviewSessionReset(opts: UseInterviewSessionResetOptions) 
               : hasTests
                 ? opts.testSummary.passRate
                 : 0
-          fetch("/api/rag", {
+          sessionFetch("/api/rag", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

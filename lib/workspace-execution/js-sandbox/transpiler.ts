@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 // Helper to transpile TS client-side (calls transpile API endpoint)
 export async function transpileIfNeeded(code: string, language: string): Promise<string> {
   if (language !== "typescript") {
@@ -5,7 +6,7 @@ export async function transpileIfNeeded(code: string, language: string): Promise
   }
 
   try {
-    const response = await fetch("/api/transpile", {
+    const response = await sessionFetch("/api/transpile", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code }),

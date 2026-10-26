@@ -100,7 +100,7 @@ function scanContract(): Contract {
       if (
         ts.isCallExpression(node) &&
         ts.isIdentifier(node.expression) &&
-        node.expression.text === "fetch" &&
+        ["fetch", "sessionFetch"].includes(node.expression.text) &&
         node.arguments.length >= 1 &&
         ts.isStringLiteral(node.arguments[0])
       ) {

@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 import { useCallback, useState } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import type { User as FirebaseUser } from "firebase/auth"
@@ -89,7 +90,7 @@ export function useInterviewMetrics(
         const token = await firebaseUser?.getIdToken()
         if (!token) return
 
-        await fetch("/api/session/metrics", {
+        await sessionFetch("/api/session/metrics", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -121,7 +122,7 @@ export function useInterviewMetrics(
         const token = await firebaseUser?.getIdToken()
         if (!token) return
 
-        const response = await fetch("/api/spaced-repetition/complete", {
+        const response = await sessionFetch("/api/spaced-repetition/complete", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -161,7 +162,7 @@ export function useInterviewMetrics(
 
       // Send feedback to API (non-blocking)
       try {
-        await fetch("/api/rag", {
+        await sessionFetch("/api/rag", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

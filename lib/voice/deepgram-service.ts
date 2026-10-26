@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 /**
  * Deepgram Voice Service
  *
@@ -190,7 +191,7 @@ export class DeepgramVoiceService {
       throw new Error("Auth token required to fetch a Deepgram access token")
     }
 
-    const response = await fetch("/api/voice/token", {
+    const response = await sessionFetch("/api/voice/token", {
       headers: { Authorization: `Bearer ${authToken}` },
     })
 

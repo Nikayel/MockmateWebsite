@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 /**
  * LLM-Based Code Complexity Analysis
  *
@@ -47,7 +48,7 @@ export async function analyzeComplexityWithLLM(
     if (authToken) headers.Authorization = `Bearer ${authToken}`
     // The analysis prompt is built and owned by /api/analyze-complexity now; send only
     // structured data so the endpoint can't be steered into a general-purpose LLM proxy.
-    const response = await fetch("/api/analyze-complexity", {
+    const response = await sessionFetch("/api/analyze-complexity", {
       method: "POST",
       headers,
       body: JSON.stringify({

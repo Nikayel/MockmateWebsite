@@ -1,11 +1,11 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 /**
  * useDeepgram Hook
  *
  * React hook for real-time speech-to-text transcription using Deepgram
  * Provides easy integration with interview components
  */
-
-"use client"
+;("use client")
 
 import { useState, useCallback, useRef, useEffect } from "react"
 import { DeepgramVoiceService, DeepgramConfig, DEFAULT_DEEPGRAM_MODEL } from "./deepgram-service"
@@ -178,7 +178,7 @@ export function useDeepgram(options: UseDeepgramOptions = {}): UseDeepgramReturn
       try {
         const authToken = await getAuthTokenRef.current?.()
         if (!authToken) return
-        await fetch("/api/usage/voice", {
+        await sessionFetch("/api/usage/voice", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

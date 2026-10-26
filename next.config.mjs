@@ -7,6 +7,14 @@ const withBundleAnalyzer = bundleAnalyzer({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Deployment IDs are public routing metadata, never credentials. Vercel injects
+  // the matching framework deployment ID when Skew Protection is enabled.
+  env: {
+    NEXT_PUBLIC_SESSION_DEPLOYMENT_ID:
+      process.env.VERCEL_SKEW_PROTECTION_ENABLED === '1'
+        ? process.env.VERCEL_DEPLOYMENT_ID || ''
+        : '',
+  },
   // Explicitly disable trailing slashes for consistent URLs
   // This adds automatic 308 redirects from /page/ to /page
   // Prevents "Alternate page with proper canonical tag" in Search Console

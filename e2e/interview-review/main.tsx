@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { createRoot } from "react-dom/client"
+import { Toaster } from "sonner"
 import { ThemeProvider } from "next-themes"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { InterviewSurfaceFrame } from "@/app/interview/_components/InterviewSurfaceFrame"
@@ -148,6 +149,7 @@ createRoot(document.getElementById("root")!).render(
   <ThemeProvider attribute="class" defaultTheme={theme} enableSystem={false}>
     <TooltipProvider>
       <Fixture />
+      <Toaster />
     </TooltipProvider>
   </ThemeProvider>
 )

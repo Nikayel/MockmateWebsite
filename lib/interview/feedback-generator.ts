@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 /**
  * Feedback Generator Service
  *
@@ -191,7 +192,7 @@ export async function generateFeedback({
       const token = await getCurrentUserToken()
       const headers: Record<string, string> = { "Content-Type": "application/json" }
       if (token) headers.Authorization = `Bearer ${token}`
-      const feedbackResponse = await fetch("/api/generate-feedback", {
+      const feedbackResponse = await sessionFetch("/api/generate-feedback", {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -326,7 +327,7 @@ export async function generateSystemDesignFeedback({
       const token = await getCurrentUserToken()
       const headers: Record<string, string> = { "Content-Type": "application/json" }
       if (token) headers.Authorization = `Bearer ${token}`
-      const feedbackResponse = await fetch("/api/generate-feedback", {
+      const feedbackResponse = await sessionFetch("/api/generate-feedback", {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -446,7 +447,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
     const token = await getCurrentUserToken()
     const headers: Record<string, string> = { "Content-Type": "application/json" }
     if (token) headers.Authorization = `Bearer ${token}`
-    const response = await fetch("/api/chat", {
+    const response = await sessionFetch("/api/chat", {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -501,7 +502,7 @@ export async function trackSessionCompletion(
     const token = await firebaseUser?.getIdToken()
     if (!token) return
 
-    await fetch("/api/session/metrics", {
+    await sessionFetch("/api/session/metrics", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

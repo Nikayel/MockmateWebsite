@@ -1,20 +1,8 @@
-/**
- * Stale-deploy chunk recovery.
- *
- * Every production deploy invalidates the previous build's hashed chunk URLs. A tab
- * that loaded before the deploy and lazy-loads a route after it throws a
- * ChunkLoadError: the file it wants no longer exists on the server. Retrying cannot
- * help (the URL is gone for good), and the error page's "Try Again" re-renders with
- * the same stale manifest — the only real fix is a full reload, which fetches the new
- * build's HTML.
- *
- * `attemptChunkErrorRecovery` reloads AT MOST once per latch window
- * (sessionStorage-based) so a genuinely broken build cannot reload-loop: a second
- * chunk failure inside the window falls through to normal error reporting and the
- * error page. Callers therefore use it as a gate — recovered errors are not beaconed
- * to /api/client-error, because deploy churn is expected behavior, not an incident.
- */
+import { toast } from "sonner"
+import { reloadAfterCheckpoint } from "@/lib/interview/session-lifecycle/reload-checkpoint"
+import { reportClientError } from "./report-client-error"
 
+/** A stale tab may need fresh assets. Checkpoint active work before its one recovery reload. */
 const RELOAD_LATCH_KEY = "cs-chunk-reload-at"
 const RELOAD_LATCH_WINDOW_MS = 2 * 60 * 1000
 
@@ -28,7 +16,7 @@ export function isChunkLoadError(message: string | null | undefined): boolean {
 }
 
 /**
- * Returns true when the error was a chunk-load failure AND a reload was triggered —
+ * Returns true when the error was a chunk-load failure AND recovery was scheduled —
  * the caller should stop (skip reporting, skip rendering an error state). Returns
  * false for every other error, and for chunk errors that already got their reload.
  */
@@ -50,6 +38,19 @@ export function attemptChunkErrorRecovery(message: string | null | undefined): b
     return false
   }
 
-  window.location.reload()
+  reloadAfterCheckpoint(
+    () => window.location.reload(),
+    () => {
+      toast.error("Reload paused to protect your work", {
+        description:
+          "We could not save a recovery copy. Keep this tab open and copy your code before refreshing.",
+        duration: Infinity,
+      })
+      reportClientError({
+        message: "Chunk recovery blocked: session checkpoint unavailable",
+        source: "window-error",
+      })
+    }
+  )
   return true
 }

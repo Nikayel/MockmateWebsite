@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 import { toast } from "sonner"
 import type { Dispatch, SetStateAction } from "react"
 import type { User } from "@/lib/types"
@@ -191,7 +192,7 @@ export function useSystemDesignFeedback(
       // Generate feedback using the feedback API
       const feedbackHeaders: Record<string, string> = { "Content-Type": "application/json" }
       if (authToken) feedbackHeaders.Authorization = `Bearer ${authToken}`
-      const feedbackResponse = await fetch("/api/generate-feedback", {
+      const feedbackResponse = await sessionFetch("/api/generate-feedback", {
         method: "POST",
         headers: feedbackHeaders,
         body: JSON.stringify({
@@ -361,7 +362,7 @@ export function useSystemDesignFeedback(
 
           // Store solution for RAG (async, non-blocking)
           if (opts.selectedScenario?.id) {
-            fetch("/api/rag", {
+            sessionFetch("/api/rag", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -385,7 +386,7 @@ export function useSystemDesignFeedback(
       } else if (opts.currentSessionId && opts.isGuestMode && opts.guestId) {
         // Guest user - save completion data via API
         try {
-          await fetch("/api/guest-session", {
+          await sessionFetch("/api/guest-session", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -411,7 +412,7 @@ export function useSystemDesignFeedback(
 
       const chatHeaders: Record<string, string> = { "Content-Type": "application/json" }
       if (authToken) chatHeaders.Authorization = `Bearer ${authToken}`
-      const response = await fetch("/api/chat", {
+      const response = await sessionFetch("/api/chat", {
         method: "POST",
         headers: chatHeaders,
         body: JSON.stringify({

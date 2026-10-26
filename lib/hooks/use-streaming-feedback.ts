@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 import type { LabAssessment, LabEvidence } from "@/lib/bugfix/guided-lab/assessment/schema"
 import type { SessionContext } from "@/lib/interview/session-context/schema"
 /**
@@ -306,7 +307,7 @@ export function useStreamingFeedback() {
         if (!idToken) {
           throw new Error("You must be signed in to save feedback.")
         }
-        const response = await fetch("/api/feedback/persist", {
+        const response = await sessionFetch("/api/feedback/persist", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -453,7 +454,7 @@ export function useStreamingFeedback() {
           })
           return
         }
-        const response = await fetch("/api/feedback/stream", {
+        const response = await sessionFetch("/api/feedback/stream", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

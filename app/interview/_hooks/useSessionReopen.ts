@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 import { restoreLabAttempt } from "@/lib/bugfix/guided-lab/assessment/restore"
 import type { RestoredSessionInputs } from "@/lib/interview/session-lifecycle/checkpoint"
 import {
@@ -160,7 +161,7 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
             let completedAt: string | null = null
             let sessionNotFound = false
             try {
-              const response = await fetch(
+              const response = await sessionFetch(
                 `/api/guest-session?sessionId=${encodeURIComponent(guestSessionId)}&guestId=${encodeURIComponent(guestId)}`
               )
               if (response.ok) {

@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 /**
  * Transfers a completed guest session to the account that was just created
  * from the post-trial signup prompt.
@@ -13,7 +14,7 @@ export async function upgradeGuestSession(params: {
   sessionId: string
   idToken: string
 }): Promise<void> {
-  const response = await fetch("/api/guest-session/migrate", {
+  const response = await sessionFetch("/api/guest-session/migrate", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

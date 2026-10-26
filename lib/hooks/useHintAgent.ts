@@ -1,5 +1,7 @@
 "use client"
 
+import { sessionFetch } from "@/lib/interview/session-fetch"
+
 import { useState, useCallback, useRef, useEffect } from "react"
 import type { GeneratedHint, HintLevel, StruggleMetrics, HintTrigger } from "@/lib/agents/hints"
 import type {
@@ -182,7 +184,7 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
         }
 
         const headers = await buildHeaders()
-        const response = await fetch("/api/agents/hints", {
+        const response = await sessionFetch("/api/agents/hints", {
           method: "POST",
           headers,
           body: JSON.stringify(payload),
@@ -284,7 +286,7 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
       }
 
       const headers = await buildHeaders()
-      const response = await fetch("/api/agents/hints", {
+      const response = await sessionFetch("/api/agents/hints", {
         method: "POST",
         headers,
         body: JSON.stringify(payload),

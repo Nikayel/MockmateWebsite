@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 import { interviewerReactionSchema } from "@/lib/interview/reactions/contract"
 import {
   SPARRA_COMPOSER_ID,
@@ -524,7 +525,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
         }
         const idToken = await firebaseUser.getIdToken()
         if (!isCurrent()) return
-        const response = await fetch("/api/chat", {
+        const response = await sessionFetch("/api/chat", {
           signal: controller.signal,
           method: "POST",
           headers: {
@@ -753,7 +754,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
           const isSystemDesign = selectedScenario?.type === "system-design"
           if (isSystemDesign && isEndingSession && selectedScenario?.id && user) {
             // Store design notes (even if empty - chat-only submission)
-            fetch("/api/rag", {
+            sessionFetch("/api/rag", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({

@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 import { useCallback, useEffect, useRef } from "react"
 import type { Dispatch, SetStateAction } from "react"
 import { toast } from "sonner"
@@ -60,7 +61,7 @@ async function reportFallbackFailure(
   const idToken = await getCurrentUserToken()
   if (!idToken) return
 
-  const response = await fetch("/api/feedback/persist", {
+  const response = await sessionFetch("/api/feedback/persist", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -128,7 +129,7 @@ export function useFeedbackStreaming(
           if (!request.userId) {
             throw new Error("A signed-in user is required to save fallback feedback.")
           }
-          const response = await fetch("/api/feedback/persist", {
+          const response = await sessionFetch("/api/feedback/persist", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

@@ -1,35 +1,11 @@
 /** @vitest-environment jsdom */
 import { act, renderHook } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { useInterviewAutosave, type UseInterviewAutosaveOptions } from "../useInterviewAutosave"
+import { useInterviewAutosave } from "../useInterviewAutosave"
+import { autosaveOptions as options } from "./autosave-fixture"
 
 const save = vi.hoisted(() => vi.fn())
 vi.mock("@/lib/firestore-helpers", () => ({ saveSessionState: save }))
-
-function options(): UseInterviewAutosaveOptions {
-  return {
-    isInterviewStarted: true,
-    selectedScenario: { id: "task" } as never,
-    firebaseUser: { uid: "u" } as never,
-    isGuestMode: false,
-    guestId: null,
-    currentSessionId: "s",
-    code: "edited",
-    chatMessages: [{ type: "user", message: "partner question" }],
-    interviewerMessages: [{ type: "user", message: "my hypothesis" }],
-    selectedLanguage: "python",
-    elapsedTime: 12,
-    testResults: [],
-    testSummary: { total: 0, passed: 0, failed: 0, passRate: 0 },
-    workspaceContext: [],
-    activeWorkspacePath: null,
-    consoleLogs: [],
-    bugfixEvidenceEvents: [],
-    showPostInterviewDiscussion: false,
-    realInterviewMode: false,
-    strictTimeLimit: null,
-  }
-}
 
 beforeEach(() => {
   const stored = new Map<string, string>()

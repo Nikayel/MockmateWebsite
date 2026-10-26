@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 /**
  * Session Manager Service
  *
@@ -107,7 +108,7 @@ export async function startInterviewSession({
       // Initialize session metrics tracking
       const token = await firebaseUser.getIdToken()
       if (token) {
-        fetch("/api/session/metrics", {
+        sessionFetch("/api/session/metrics", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -163,7 +164,7 @@ export async function startInterviewSession({
     try {
       const scenarioPattern =
         ("pattern" in scenario ? scenario.pattern : scenario.type) || "unknown"
-      const response = await fetch("/api/guest-session", {
+      const response = await sessionFetch("/api/guest-session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -265,7 +266,7 @@ export async function autoSaveSession({
 
       // Also save state to Firestore via API (for session recovery)
       if (currentSessionId) {
-        await fetch("/api/guest-session", {
+        await sessionFetch("/api/guest-session", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -352,7 +353,7 @@ export async function restoreSession({
       // Check API for saved session state
       if (sessionId) {
         try {
-          const response = await fetch(
+          const response = await sessionFetch(
             `/api/guest-session?sessionId=${sessionId}&guestId=${guestId}`
           )
           if (response.ok) {

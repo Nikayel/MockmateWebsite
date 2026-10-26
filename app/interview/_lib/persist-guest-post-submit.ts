@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 import type { BugfixEvidenceEvent } from "@/lib/bugfix"
 import type {
   ChatMessage,
@@ -28,7 +29,7 @@ export interface GuestPostSubmitState {
 
 /** Saves the exact post-submit recovery point before guest authentication begins. */
 export async function persistGuestPostSubmitState(state: GuestPostSubmitState): Promise<void> {
-  const response = await fetch("/api/guest-session", {
+  const response = await sessionFetch("/api/guest-session", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

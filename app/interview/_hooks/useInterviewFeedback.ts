@@ -1,3 +1,4 @@
+import { sessionFetch } from "@/lib/interview/session-fetch"
 import { getGuidedAttemptProgress } from "@/lib/stores/guided-lab-store"
 import { buildConversationTimeline } from "@/lib/interview/session-context/conversation"
 import type { SessionContext } from "@/lib/interview/session-context/schema"
@@ -385,7 +386,7 @@ export function useInterviewFeedback(
           const shouldStore = opts.selectedScenario?.id && (opts.code.trim() || isSystemDesign)
 
           if (shouldStore) {
-            fetch("/api/rag", {
+            sessionFetch("/api/rag", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -403,7 +404,7 @@ export function useInterviewFeedback(
             }).catch((err) => console.error("Solution storage error:", err))
           }
 
-          fetch("/api/vectorize-session", {
+          sessionFetch("/api/vectorize-session", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -448,7 +449,7 @@ export function useInterviewFeedback(
         // arrives empty.
         const putCompletion = async (): Promise<Response | null> => {
           try {
-            return await fetch("/api/guest-session", {
+            return await sessionFetch("/api/guest-session", {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
