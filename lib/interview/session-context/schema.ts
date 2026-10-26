@@ -1,3 +1,4 @@
+import { interviewerReactionSchema } from "../reactions/contract"
 import { z } from "zod"
 
 export const conversationEntrySchema = z.object({
@@ -5,6 +6,7 @@ export const conversationEntrySchema = z.object({
   lane: z.enum(["interviewer", "partner"]),
   role: z.enum(["candidate", "interviewer", "ai_partner"]),
   content: z.string().max(10000),
+  reaction: interviewerReactionSchema.optional(),
   timestamp: z.number().finite().nonnegative().optional(),
   sequence: z.number().int().nonnegative().optional(),
 })

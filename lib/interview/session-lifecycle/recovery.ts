@@ -1,3 +1,4 @@
+import { interviewerReactionSchema } from "../reactions/contract"
 import { parseGuidedLabProgress } from "@/lib/bugfix/guided-lab/persistence"
 import { z } from "zod"
 import { EDITOR_LANGUAGES } from "@/lib/interview/languages"
@@ -6,6 +7,7 @@ import type { getSessionState } from "@/lib/firestore-helpers"
 const message = z.object({
   type: z.enum(["ai", "user"]),
   message: z.string(),
+  reaction: interviewerReactionSchema.optional(),
   id: z.string().optional(),
   timestamp: z.number().optional(),
   sequence: z.number().optional(),

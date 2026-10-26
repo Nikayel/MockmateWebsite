@@ -1,3 +1,4 @@
+import { interviewerReactionSchema } from "@/lib/interview/reactions/contract"
 import {
   SPARRA_COMPOSER_ID,
   hasSparraPartner,
@@ -61,6 +62,7 @@ interface ChatUserProfile {
 }
 
 interface ChatApiResponse {
+  reaction?: unknown
   action?: unknown
   reply?: string | null
   provider?: string
@@ -508,6 +510,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             ...prev,
             {
               type: "ai",
+              candidateMessage: userMessage,
               message:
                 "This is where the interviewer comes in, and it needs a free account: one click " +
                 "with Google or GitHub, 8 full AI sessions a month, no card required. Your code " +
@@ -529,6 +532,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             Authorization: `Bearer ${idToken}`,
           },
           body: JSON.stringify({
+            candidateMessage: userMessage,
             message:
               `[CANDIDATE to=${isInterviewer ? "interviewer" : "partner"}; id=${newUserMessage.id}; at=${new Date(newUserMessage.timestamp!).toISOString()}]\n` +
               userMessage +
@@ -645,9 +649,12 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
         }
 
         if (!isCurrent()) return
-        // The model has now seen this code state; diff future sends against it.
-        // Not updated on failure: the retry should still carry the change note.
-        lastSentCodeRef.current.lanes[lane] = codeSnapshot
+        // Local receipts do not show the code to a model; retain its previous
+        // snapshot so the next substantive turn still carries the edit note.
+        // Failed sends likewise retain the note for retry.
+        if (data.provider !== "local" || data.reaction !== "acknowledged") {
+          lastSentCodeRef.current.lanes[lane] = codeSnapshot
+        }
 
         // Check if conversation has ended (AI already said goodbye)
         if (data.conversationEnded) {
@@ -668,6 +675,19 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             }
           )
           // Don't add any message - just prompt to end
+          return
+        }
+
+        if (
+          isInterviewer &&
+          !data.reply &&
+          interviewerReactionSchema.safeParse(data.reaction).success
+        ) {
+          setMessages((previous) =>
+            previous.map((message) =>
+              message.id === newUserMessage.id ? { ...message, reaction: "acknowledged" } : message
+            )
+          )
           return
         }
 

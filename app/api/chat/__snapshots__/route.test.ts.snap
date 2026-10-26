@@ -80,7 +80,7 @@ exports[`/api/chat route > preserves model input for 'dsa'/'interviewer'/session
     "sessionId": undefined,
     "userId": "user-1",
   },
-  "system": "6a236137529897cfafc8d96609d2dca499709034a37ed50912a540ee4b2d5f56",
+  "system": "301da48f867f271657ce6ac4e8fa9f8738dababd4bab2c4ac60450351ccdfac0",
   "turn": "3bff5e4e72a6558f818e9714d41426f189f0431683f66226a1088ca7e383bfbc",
 }
 `;
@@ -97,7 +97,7 @@ exports[`/api/chat route > preserves model input for 'dsa'/'interviewer'/session
     "sessionId": undefined,
     "userId": "user-1",
   },
-  "system": "57d17e189efcffe1f0891cdc72b9d6b6a49f043e85017d99a0d8889b112b7500",
+  "system": "4612e30107c917317c83cfbbaf6084ae6637215392c7b54854c9f3c48729aee1",
   "turn": "b3b79dd9efd0a57d11cf3ebe88ee810ead5a87425e130fd42e80a26486081263",
 }
 `;

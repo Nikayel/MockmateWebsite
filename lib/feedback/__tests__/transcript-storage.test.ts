@@ -67,3 +67,15 @@ describe("prepareTranscriptForStorage", () => {
     )
   })
 })
+
+it("archives only recognized reactions on candidate messages, including shortened text", () => {
+  const stored = prepareTranscriptForStorage([
+    { role: "candidate", content: "x".repeat(5000), reaction: "acknowledged" },
+    { role: "interviewer", content: "hello", reaction: "acknowledged" },
+    { role: "candidate", content: "sure", reaction: "script" },
+  ])
+  expect(stored?.messages[0]).toMatchObject({ reaction: "acknowledged" })
+  expect(stored?.messages[0].content).toHaveLength(4000)
+  expect(stored?.messages[1]).not.toHaveProperty("reaction")
+  expect(stored?.messages[2]).not.toHaveProperty("reaction")
+})

@@ -157,3 +157,15 @@ describe("session saved-work projection", () => {
     expect(work.truncated).toBe(true)
   })
 })
+
+it("preserves acknowledgments in both durable archives and recovery conversations", () => {
+  const archived = sessionConversations(
+    { messages: [{ role: "candidate", content: "sure", reaction: "acknowledged" }] },
+    null
+  )
+  const restored = sessionConversations(null, {
+    interviewer_messages: [{ type: "user", message: "sure", reaction: "acknowledged" }],
+  })
+  expect(archived[0].messages).toEqual(restored[0].messages)
+  expect(archived[0].messages[0].reaction).toBe("acknowledged")
+})

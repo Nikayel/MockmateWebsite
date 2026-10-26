@@ -1,9 +1,10 @@
+import type { TranscriptMessage } from "@/lib/feedback/transcript-storage"
 import { prepareTranscriptForStorage } from "@/lib/feedback/transcript-storage"
 import { count, record, timestamp } from "./fields"
 
 export interface SessionConversation {
   source: "archive" | "interviewer_checkpoint" | "partner_checkpoint"
-  messages: Array<{ role: string; content: string }>
+  messages: TranscriptMessage[]
   originalCount: number
   truncated: boolean
   persistedAt: string | null
@@ -59,6 +60,7 @@ function normalizeMessages(value: unknown, aiRole?: string) {
               : message.type
           : message.role,
         content: aiRole ? message.message : message.content,
+        reaction: message.reaction,
       }
     })
   )

@@ -910,3 +910,58 @@ describe("interviewer native Sparra handoff", () => {
     expect((response as unknown as { data: Record<string, unknown> }).data.action).toBeUndefined()
   })
 })
+
+describe("interviewer acknowledgments", () => {
+  beforeEach(() => vi.clearAllMocks())
+  it.each(["json", "validated-stream"] as const)(
+    "returns a reaction in %s without generating or retrieving a reply",
+    async (responseMode) => {
+      const { generateAIResponse, buildRAGContext } = await setupMocks()
+      const { POST } = await import("./route")
+      const response = await POST(
+        createRequest({
+          message:
+            "[CANDIDATE to=interviewer; id=turn; at=2026-10-26]\nsure, let me inspect the files\n\n[TIME: 3 min elapsed]",
+          candidateMessage: "sure, let me inspect the files",
+          role: "interviewer",
+          responseMode,
+          context: [{ type: "ai", message: "Take a moment to inspect the repo." }],
+        })
+      )
+      expect(response.status).toBe(200)
+      const body =
+        responseMode === "validated-stream"
+          ? await (
+              await import("@/lib/interview/chat/validated-response-stream")
+            ).readValidatedChatStream(response, () => {})
+          : (response as unknown as { data: Record<string, unknown> }).data
+      expect(body).toMatchObject({ reply: "", reaction: "acknowledged", provider: "local" })
+      expect(generateAIResponse).not.toHaveBeenCalled()
+      expect(buildRAGContext).not.toHaveBeenCalled()
+    }
+  )
+})
+
+it("lets Sable choose a native reaction for other wording in the existing model turn", async () => {
+  vi.clearAllMocks()
+  const { generateAIResponse } = await setupMocks()
+  vi.mocked(generateAIResponse).mockResolvedValueOnce({
+    text: "",
+    provider: "openai-none",
+    latencyMs: 12,
+    toolCalls: [{ name: "acknowledge_message", args: {} }],
+  })
+  const { POST } = await import("./route")
+  const response = await POST(
+    createRequest({
+      message: "Leave this with me while I investigate independently",
+      role: "interviewer",
+      context: [{ type: "ai", message: "Inspect the files before making the change." }],
+    })
+  )
+  expect((response as unknown as { data: Record<string, unknown> }).data).toMatchObject({
+    reply: "",
+    reaction: "acknowledged",
+  })
+  expect(generateAIResponse).toHaveBeenCalledOnce()
+})

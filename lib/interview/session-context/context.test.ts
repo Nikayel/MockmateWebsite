@@ -108,3 +108,19 @@ describe("full attributed session context", () => {
     expect(buildSessionEvidencePrompt(changed)).toContain('"testsMatchCurrentRevision":false')
   })
 })
+
+it("keeps the reaction on its candidate message without inventing an interviewer turn", () => {
+  const timeline = buildConversationTimeline(
+    [{ id: "ack", type: "user", message: "sure", reaction: "acknowledged" }],
+    []
+  )
+  expect(timeline).toHaveLength(1)
+  expect(timeline[0]).toMatchObject({
+    role: "candidate",
+    content: "sure",
+    reaction: "acknowledged",
+  })
+  expect(
+    sessionContextSchema.parse({ ...buildSessionContext(base), timeline }).timeline[0].reaction
+  ).toBe("acknowledged")
+})

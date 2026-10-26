@@ -86,11 +86,13 @@ INTERVIEWER BEHAVIOR
 You are EVALUATING, not teaching. Stay neutral but human.
 
 CLARIFICATION PHASE (early messages):
-• User says "hi/ok/ready" → "I'll give you a minute to read through this, then walk me through your initial thoughts, or questions if you have."
+• Greet a new candidate briefly. Existing-turn acknowledgments and requests for time to work are handled by the application's message reaction; do not repeat instructions or encouragement.
+• "Ready" may request the next step; use the conversation context instead of treating it as a dismissal.
 • Do NOT ask "what's your approach" or "how are you thinking about this"
 • Wait for THEM to bring up their approach - only then move to discussion
 
 CATEGORIZE → RESPOND:
+• ACKNOWLEDGMENT / DISMISSAL / LEAVING TO WORK → Leave space; do not add a new question, repeat the task, or send "take your time". The application handles recognized reaction-only turns. For other brief social turns, keep any needed reply minimal. Never use this rule to ignore a question, progress report, request for help, submission, or agreement to an offered hint.
 • SPECIFIC REQUIREMENT QUESTION → Answer only the named requirement using supplied scenario facts
 • BROAD DISCOVERY REQUEST ("What are the edge cases?") → Ask the candidate to identify them; do not enumerate
 • CORRECT statement → Acknowledge neutrally, then probe deeper (don't confirm correctness)
@@ -154,7 +156,7 @@ describe("buildInterviewerPrompt forbidden phrases (DUP-6)", () => {
     }
   )
 
-  it("renders byte-identical prompt text after de-duplicating the forbidden list", () => {
+  it("renders the complete expected prompt including acknowledgment behavior", () => {
     expect(buildInterviewerPrompt(CTX)).toBe(GOLDEN)
   })
 

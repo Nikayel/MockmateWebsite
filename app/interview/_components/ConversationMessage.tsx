@@ -1,5 +1,7 @@
 "use client"
 
+import type { ChatMessage } from "../_types"
+import { MessageAcknowledgment } from "@/components/interview/MessageAcknowledgment"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 
 /** Shared turn styling for the interviewer, coding partner, and review. */
@@ -7,7 +9,7 @@ export function ConversationMessage({
   message,
   speaker,
 }: {
-  message: { type: "user" | "ai"; message: string; isStreaming?: boolean }
+  message: Pick<ChatMessage, "type" | "message" | "isStreaming" | "reaction">
   speaker: string
 }) {
   return (
@@ -23,6 +25,9 @@ export function ConversationMessage({
           content={message.message}
           className="text-sm leading-6 [overflow-wrap:anywhere]"
         />
+      )}
+      {message.type === "user" && message.reaction === "acknowledged" && (
+        <MessageAcknowledgment speaker={speaker} />
       )}
     </article>
   )

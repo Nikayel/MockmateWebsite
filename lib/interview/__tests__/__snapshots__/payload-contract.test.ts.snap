@@ -27,6 +27,7 @@ exports[`interview payload contract (Slice 0 oracle) > captures every API reques
   "fetch POST /api/chat": [
     [
       "...spread",
+      "candidateMessage",
       "consoleLogs",
       "context",
       "currentCode",

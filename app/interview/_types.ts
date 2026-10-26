@@ -1,3 +1,4 @@
+import type { InterviewerReaction } from "@/lib/interview/reactions/contract"
 import type { WorkspaceScenarioFile } from "@/lib/scenarios/types"
 
 export { SUPPORTED_LANGUAGES, EDITOR_LANGUAGES } from "@/lib/interview/languages"
@@ -19,6 +20,7 @@ export type ChatMessage = {
   message: string
   /** A validated interviewer reply that is still being revealed to the candidate. */
   isStreaming?: boolean
+  reaction?: InterviewerReaction
   sequence?: number
   timestamp?: number
   phase?: "post_interview"

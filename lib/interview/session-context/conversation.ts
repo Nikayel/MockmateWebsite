@@ -1,3 +1,4 @@
+import type { InterviewerReaction } from "../reactions/contract"
 import type { ConversationEntry } from "./schema"
 
 interface Message {
@@ -7,6 +8,7 @@ interface Message {
   timestamp?: number
   sequence?: number
   isStreaming?: boolean
+  reaction?: InterviewerReaction
 }
 let sequence = 0
 export function createChatMessage(type: "user" | "ai", message: string): Message {
@@ -37,6 +39,9 @@ export function buildConversationTimeline(
                 ? "ai_partner"
                 : "interviewer",
           content: message.message,
+          ...(lane === "interviewer" && message.type === "user" && message.reaction
+            ? { reaction: message.reaction }
+            : {}),
           ...(message.timestamp !== undefined ? { timestamp: message.timestamp } : {}),
           ...(message.sequence !== undefined ? { sequence: message.sequence } : {}),
         })
@@ -52,6 +57,6 @@ export function buildConversationTimeline(
 export function timelineProviderHistory(timeline: ConversationEntry[]) {
   return timeline.map((entry) => ({
     role: entry.role === "candidate" ? ("user" as const) : ("model" as const),
-    content: `[${entry.role}; to=${entry.lane}; id=${entry.id}; at=${entry.timestamp === undefined ? "unknown (legacy order unavailable)" : new Date(entry.timestamp).toISOString()}]\n${entry.content}`,
+    content: `[${entry.role}; to=${entry.lane}; id=${entry.id}${entry.reaction ? "; receipt=interviewer_acknowledged" : ""}; at=${entry.timestamp === undefined ? "unknown (legacy order unavailable)" : new Date(entry.timestamp).toISOString()}]\n${entry.content}`,
   }))
 }

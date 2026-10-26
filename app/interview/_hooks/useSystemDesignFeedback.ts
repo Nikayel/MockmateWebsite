@@ -177,11 +177,13 @@ export function useSystemDesignFeedback(
         ...opts.interviewerMessages.map((m) => ({
           role: m.type === "user" ? "candidate" : "interviewer",
           content: m.message,
+          ...(m.type === "user" && m.reaction ? { reaction: m.reaction } : {}),
           timestamp: m.timestamp,
         })),
         ...opts.chatMessages.map((m) => ({
           role: m.type === "user" ? "candidate" : "ai_partner",
           content: m.message,
+          ...(m.type === "user" && m.reaction ? { reaction: m.reaction } : {}),
           timestamp: m.timestamp,
         })),
       ].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))

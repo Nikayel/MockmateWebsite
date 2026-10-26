@@ -1,3 +1,4 @@
+import { MessageAcknowledgment } from "@/components/interview/MessageAcknowledgment"
 import type { SessionConversation } from "@/lib/admin/session-review/conversation"
 import { conversationRoleLabel } from "@/lib/admin/session-review/conversation"
 import { absoluteTime } from "@/lib/admin/session-display"
@@ -40,6 +41,7 @@ export function Conversation({ conversations }: { conversations: SessionConversa
                 <div className="text-sm leading-relaxed [overflow-wrap:anywhere] break-words whitespace-pre-wrap text-gray-200">
                   {message.content}
                 </div>
+                {message.reaction === "acknowledged" && <MessageAcknowledgment />}
               </li>
             ))}
           </ol>

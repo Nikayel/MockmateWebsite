@@ -1,3 +1,4 @@
+import { shouldAcknowledgeWithReaction } from "../reactions/policy"
 import { buildChatRequestContext, type ChatRequestData } from "./request-context"
 import { checkChatTurnEligibility } from "./turn-eligibility"
 import { resolveChatInterviewState } from "./interview-state"
@@ -31,6 +32,14 @@ export async function processChatMessage(
   const early = await checkChatTurnEligibility(requestContext, userId, validatedData.ownerId)
   if (early) return { kind: "early", ...early }
 
+  if (shouldAcknowledgeWithReaction(requestContext)) {
+    signal?.throwIfAborted()
+    return {
+      kind: "reply",
+      response: { reply: "", reaction: "acknowledged", provider: "local" },
+    }
+  }
+
   // Prepared before generation, started afterward, and never awaited on the response path.
   const extractionJob = prepareConversationExtraction(requestContext, userId)
   const interviewState = resolveChatInterviewState(requestContext)
@@ -63,6 +72,7 @@ export async function processChatMessage(
       provider: aiResponse.provider,
       latencyMs: aiResponse.latencyMs,
       ...(aiResponse.action ? { action: aiResponse.action } : {}),
+      ...(aiResponse.reaction ? { reaction: aiResponse.reaction } : {}),
       _debug: {
         phase: currentPhase,
         messageCount: requestContext.messageCount,

@@ -279,6 +279,7 @@ interface RawTranscriptMessage {
   message?: string
   content?: string
   lane?: string
+  reaction?: "acknowledged"
   timestamp?: number
   id?: string
 }
@@ -308,6 +309,7 @@ function boundTranscript(raw: unknown): { messages: RawTranscriptMessage[]; trun
   return {
     messages: kept.map((entry: RawTranscriptMessage) => ({
       lane: entry?.lane,
+      ...(entry?.reaction === "acknowledged" ? { reaction: entry.reaction } : {}),
       timestamp: typeof entry?.timestamp === "number" ? entry.timestamp : undefined,
       id: entry?.id,
       type: entry?.type,

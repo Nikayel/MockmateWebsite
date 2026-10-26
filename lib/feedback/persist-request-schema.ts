@@ -1,3 +1,4 @@
+import { interviewerReactionSchema } from "@/lib/interview/reactions/contract"
 import { labAssessmentSchema } from "@/lib/bugfix/guided-lab/assessment/schema"
 import { z } from "zod"
 import { clampScore } from "@/lib/constants"
@@ -80,7 +81,15 @@ export const persistRequestSchema = z
       .nullish(),
 
     conversationTranscript: z
-      .array(z.object({ role: z.string(), content: z.string() }).catch(null as never))
+      .array(
+        z
+          .object({
+            role: z.string(),
+            content: z.string(),
+            reaction: interviewerReactionSchema.optional(),
+          })
+          .catch(null as never)
+      )
       .nullish(),
     efficiencyMetrics: z
       .object({

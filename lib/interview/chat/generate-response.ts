@@ -1,4 +1,9 @@
 import {
+  getInterviewerReactionTools,
+  executeInterviewerReaction,
+  INTERVIEWER_REACTION_GUIDANCE,
+} from "../reactions/tool"
+import {
   executePartnerHandoff,
   getPartnerHandoffTools,
   PARTNER_HANDOFF_GUIDANCE,
@@ -47,10 +52,15 @@ export async function generateValidatedChatResponse(input: ChatGenerationContext
 
   // Use AI provider abstraction with fallback
   // Pass userId/sessionId for proper cost tracking
-  const tools = getPartnerHandoffTools(input.request)
+  const handoffTools = getPartnerHandoffTools(input.request)
+  const reactionTools = getInterviewerReactionTools(input.request)
+  const availableTools = [...(handoffTools ?? []), ...reactionTools]
+  const tools = availableTools.length ? availableTools : undefined
   const generate = async () => {
     const aiResponse = await generateAIResponse(
-      systemPrompt + (tools ? PARTNER_HANDOFF_GUIDANCE : ""),
+      systemPrompt +
+        (handoffTools ? PARTNER_HANDOFF_GUIDANCE : "") +
+        (reactionTools.length ? INTERVIEWER_REACTION_GUIDANCE : ""),
       fullUserMessage,
       history,
       {
@@ -66,15 +76,17 @@ export async function generateValidatedChatResponse(input: ChatGenerationContext
     )
     if (tools) signal?.throwIfAborted()
     const action = await executePartnerHandoff(aiResponse.toolCalls, input.request)
-    if (action) return { ...aiResponse, text: PARTNER_HANDOFF_REPLY, action }
+    if (action) return { ...aiResponse, text: PARTNER_HANDOFF_REPLY, action, reaction: undefined }
+    const reaction = await executeInterviewerReaction(aiResponse.toolCalls, input.request)
+    if (reaction) return { ...aiResponse, text: "", reaction, action: undefined }
     if (!aiResponse.text.trim())
       throw new Error("The interviewer returned no valid reply or handoff")
-    return { ...aiResponse, action: undefined }
+    return { ...aiResponse, action: undefined, reaction: undefined }
   }
-  const aiResponse = tools
+  const aiResponse = handoffTools
     ? await tracePartnerHandoff(generate, { sessionId, phase: currentPhase })
     : await generate()
-  if (aiResponse.action) return aiResponse
+  if (aiResponse.action || aiResponse.reaction) return aiResponse
 
   observeChatResponse(aiResponse.text, input.request)
   await validateChatResponse(aiResponse, input)

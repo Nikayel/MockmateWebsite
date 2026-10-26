@@ -14,7 +14,10 @@
  * hard-fails at 1MB: recency always wins when anything must go.
  */
 
+import type { InterviewerReaction } from "@/lib/interview/reactions/contract"
+
 export interface TranscriptMessage {
+  reaction?: InterviewerReaction
   role: string
   content: string
 }
@@ -30,14 +33,20 @@ export const TRANSCRIPT_MAX_CONTENT_CHARS = 4000
 export const TRANSCRIPT_MAX_TOTAL_BYTES = 700_000
 
 export function prepareTranscriptForStorage(
-  raw: Array<{ role?: unknown; content?: unknown }> | null | undefined
+  raw: Array<{ role?: unknown; content?: unknown; reaction?: unknown }> | null | undefined
 ): StoredTranscript | null {
   if (!Array.isArray(raw) || raw.length === 0) return null
 
   const valid: TranscriptMessage[] = []
   for (const entry of raw) {
     if (!entry || typeof entry.role !== "string" || typeof entry.content !== "string") continue
-    valid.push({ role: entry.role, content: entry.content })
+    valid.push({
+      role: entry.role,
+      content: entry.content,
+      ...(["user", "candidate"].includes(entry.role) && entry.reaction === "acknowledged"
+        ? { reaction: "acknowledged" as const }
+        : {}),
+    })
   }
   if (valid.length === 0) return null
 
@@ -53,7 +62,7 @@ export function prepareTranscriptForStorage(
   messages = messages.map((m) => {
     if (m.content.length <= TRANSCRIPT_MAX_CONTENT_CHARS) return m
     truncated = true
-    return { role: m.role, content: m.content.slice(0, TRANSCRIPT_MAX_CONTENT_CHARS) }
+    return { ...m, content: m.content.slice(0, TRANSCRIPT_MAX_CONTENT_CHARS) }
   })
 
   // Byte budget: shed oldest messages until the serialized payload fits.

@@ -332,3 +332,13 @@ describe("validateFeedbackFailureReport", () => {
     ).toBe(false)
   })
 })
+
+it("preserves the reaction through the feedback persistence boundary", () => {
+  const result = validatePersistRequestBody(
+    validBody({
+      conversationTranscript: [{ role: "candidate", content: "sure", reaction: "acknowledged" }],
+    })
+  )
+  expect(result.success).toBe(true)
+  if (result.success) expect(result.data.conversationTranscript?.[0].reaction).toBe("acknowledged")
+})

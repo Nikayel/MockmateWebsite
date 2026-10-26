@@ -51,3 +51,11 @@ describe("local/cloud reconciliation", () => {
     expect(recoverLocalCheckpoint(null, "key", "attempt")).toBeNull()
   })
 })
+
+it("preserves acknowledgments when restoring a saved attempt", () => {
+  const interviewerMessages = [{ type: "user", message: "sure", reaction: "acknowledged" }]
+  stored({ ...local, interviewerMessages })
+  expect(recoverLocalCheckpoint(null, "key", "attempt")?.interviewerMessages).toEqual(
+    interviewerMessages
+  )
+})
