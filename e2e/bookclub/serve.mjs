@@ -11,7 +11,10 @@ const server = await createServer({
   configFile: false,
   root: fixtureRoot,
   publicDir: resolve(repoRoot, "public"),
-  define: { "process.env.PISTON_API_URL": JSON.stringify("") },
+  define: {
+    "process.env.PISTON_API_URL": JSON.stringify(""),
+    "process.env.NEXT_PUBLIC_SESSION_DEPLOYMENT_ID": JSON.stringify("dpl_bookclub_fixture"),
+  },
   esbuild: { jsx: "automatic" },
   css: { postcss: resolve(repoRoot, "postcss.config.mjs") },
   resolve: {

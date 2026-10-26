@@ -106,6 +106,12 @@ test("explains unlocks, runs real Python repairs, resumes, and re-verifies edits
   request,
 }) => {
   const errors: string[] = []
+  const workerPins: Array<string | null> = []
+  page.context().on("request", (request) => {
+    const url = new URL(request.url())
+    if (url.pathname === "/workers/python-sandbox-worker.js")
+      workerPins.push(url.searchParams.get("dpl"))
+  })
   page.on("pageerror", (error) => errors.push(error.message))
   await page.goto(lab)
   const rail = page.getByRole("region", { name: "Guided debugging lab", exact: true })
@@ -120,6 +126,7 @@ test("explains unlocks, runs real Python repairs, resumes, and re-verifies edits
     .click()
   await next.click()
   await run(page)
+  expect(workerPins).toContain("dpl_bookclub_fixture")
   await page
     .getByRole("textbox", { name: "Explain your diagnosis" })
     .fill(

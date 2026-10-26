@@ -41,7 +41,10 @@ const server = await createServer({
   configFile: false,
   root: fixtureRoot,
   esbuild: { jsx: "automatic" },
-  define: { "process.env.PISTON_API_URL": JSON.stringify("") },
+  define: {
+    "process.env.PISTON_API_URL": JSON.stringify(""),
+    "process.env.NEXT_PUBLIC_SESSION_DEPLOYMENT_ID": JSON.stringify(""),
+  },
   css: { postcss: resolve(repoRoot, "postcss.config.mjs") },
   resolve: {
     dedupe: ["react", "react-dom"],
