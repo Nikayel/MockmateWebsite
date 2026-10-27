@@ -1,4 +1,5 @@
 import { parseGuidedLabProgress } from "@/lib/bugfix/guided-lab/persistence"
+import { serializeCheckpoint } from "@/lib/interview/session-lifecycle/checkpoint"
 /**
  * Guest Session API
  *
@@ -341,32 +342,14 @@ export async function PUT(request: NextRequest) {
 
     // Session state update (for recovery)
     if (sessionState) {
-      updateData.session_state = {
-        code: sessionState.code,
-        language: sessionState.language,
-        elapsed_time: sessionState.elapsedTime,
-        chat_messages: sessionState.chatMessages,
-        interviewer_messages: sessionState.interviewerMessages,
-        test_results: sessionState.testResults?.slice(-10),
-        test_summary: sessionState.testSummary,
-        workspace_context: sessionState.workspaceContext,
-        active_workspace_path: sessionState.activeWorkspacePath,
-        console_logs: sessionState.consoleLogs,
-        bugfix_evidence_events: sessionState.bugfixEvidenceEvents,
-        guided_lab_progress: parseGuidedLabProgress(sessionState.guidedLabProgress),
-        bugfix_hypothesis: sessionState.bugfixHypothesis,
-        bugfix_root_cause: sessionState.bugfixRootCause,
-        bugfix_prevention: sessionState.bugfixPrevention,
-        is_post_interview_discussion: sessionState.isPostInterviewDiscussion,
-        real_interview_mode: sessionState.realInterviewMode,
-        strict_time_limit: sessionState.strictTimeLimit,
-        test_run_revision: sessionState.testRunRevision,
-        strict_deadline_at: sessionState.strictDeadlineAt,
-        paused: sessionState.paused,
-        interviewer_input: sessionState.interviewerInput,
-        chat_input: sessionState.chatInput,
-        saved_at: new Date().toISOString(),
-      }
+      updateData.session_state = serializeCheckpoint(
+        {
+          ...sessionState,
+          selectedLanguage: sessionState.language,
+          guidedLabProgress: parseGuidedLabProgress(sessionState.guidedLabProgress),
+        },
+        sessionState.testResults?.slice(-10)
+      )
     }
 
     // Completion data

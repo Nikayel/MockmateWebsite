@@ -26,7 +26,7 @@ export interface SessionCheckpoint {
   workspaceContext?: Array<Record<string, unknown>>
   activeWorkspacePath?: string | null
   consoleLogs?: Array<Record<string, unknown>>
-  guidedLabProgress?: GuidedLabProgress
+  guidedLabProgress?: GuidedLabProgress | null
   bugfixEvidenceEvents?: unknown[]
   bugfixHypothesis?: string
   bugfixRootCause?: string
@@ -42,8 +42,22 @@ export interface SessionCheckpoint {
   ownerId?: string
 }
 
+// The guest API accepts bounded legacy JSON entries; authenticated writers retain
+// the stricter SessionCheckpoint contract. Both use the same storage field map.
+type CheckpointSerializationInput = Partial<
+  Omit<
+    SessionCheckpoint,
+    "chatMessages" | "interviewerMessages" | "workspaceContext" | "consoleLogs"
+  >
+> & {
+  chatMessages?: unknown[]
+  interviewerMessages?: unknown[]
+  workspaceContext?: unknown[]
+  consoleLogs?: unknown[]
+}
+
 /** Session snapshots are plain JSON. Omit undefined recursively before Firestore sees them. */
-export function serializeCheckpoint(state: SessionCheckpoint, testResults: unknown[]) {
+export function serializeCheckpoint(state: CheckpointSerializationInput, testResults?: unknown[]) {
   return JSON.parse(
     JSON.stringify({
       code: state.code,

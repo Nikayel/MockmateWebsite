@@ -50,6 +50,52 @@ function put(body: unknown) {
 type MockResponse = { status: number; data: Record<string, unknown> }
 
 describe("PUT /api/guest-session validation (API-3)", () => {
+  it("preserves a guest workspace, messages and deadline while bounding test history", async () => {
+    const { PUT } = await importRoute()
+    const state = {
+      code: "repair",
+      language: "python",
+      elapsedTime: 42,
+      interviewerMessages: [{ type: "user", message: "sure", reaction: "acknowledged" }],
+      workspaceContext: [{ path: "main.py", content: "repair", role: "editable" }],
+      strictTimeLimit: 600,
+      strictDeadlineAt: 1700000600000,
+      testResults: Array.from({ length: 12 }, (_, index) => ({ passed: true, index })),
+    }
+    const response = await PUT(
+      put({ sessionId: SESSION_ID, guestId: VALID_GUEST_ID, sessionState: state })
+    )
+    expect(response.status).toBe(200)
+    const written = docUpdate.mock.calls[0][0]
+    expect(written).toStrictEqual(JSON.parse(JSON.stringify(written)))
+    expect(written.session_state).toMatchObject({
+      interviewer_messages: state.interviewerMessages,
+      workspace_context: state.workspaceContext,
+      strict_deadline_at: state.strictDeadlineAt,
+      test_results: state.testResults.slice(-10),
+    })
+  })
+  it("saves a partial guest checkpoint without undefined Firestore fields", async () => {
+    const { PUT } = await importRoute()
+    const res = await PUT(
+      put({
+        sessionId: SESSION_ID,
+        guestId: VALID_GUEST_ID,
+        sessionState: { code: "latest repair", language: "python", elapsedTime: 14 },
+      })
+    )
+    expect(res.status).toBe(200)
+    const written = docUpdate.mock.calls[0][0]
+    // The Admin SDK rejects these fields even though permissive mocks accept them.
+    expect(written).toStrictEqual(JSON.parse(JSON.stringify(written)))
+    expect(written.session_state).toMatchObject({
+      code: "latest repair",
+      language: "python",
+      elapsed_time: 14,
+    })
+    expect(written.session_state).not.toHaveProperty("bugfix_hypothesis")
+    expect(written.session_state).not.toHaveProperty("strict_deadline_at")
+  })
   afterEach(() => {
     vi.restoreAllMocks()
   })

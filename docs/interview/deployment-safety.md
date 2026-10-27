@@ -31,6 +31,11 @@ Recovery reuses the original attempt ID and strict deadline. Terminal cloud stat
 wins over local recovery; existing ownership and completed-attempt checks remain.
 No new Firestore index, migration, storage service or automatic AI retry is required.
 
+Guest and authenticated writes share `serializeCheckpoint`. Optional guest fields
+are omitted recursively before reaching the Admin SDK: writing `undefined` for an
+absent hypothesis or deadline rejects the entire backup. The guest route retains
+its request validation, ownership checks, completion guards and ten-result limit.
+
 ## Version routing and the Vercel plan requirement
 
 `lib/interview/session-fetch.ts` preserves fetch semantics and adds
