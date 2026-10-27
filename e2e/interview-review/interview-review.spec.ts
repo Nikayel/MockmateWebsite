@@ -40,9 +40,11 @@ test("submit → bounded debrief → full feedback → dashboard uses the existi
     page.getByText("New reply: verify the state after both cleanup passes.")
   ).toBeVisible()
   await page.getByRole("button", { name: "View feedback" }).click()
-  await expect(page.getByRole("heading", { name: "Interview feedback" })).toBeVisible()
-  await expect(page.locator("header").getByText("73/100")).toBeVisible()
-  await page.locator("summary", { hasText: "Scores & rubric" }).click()
+  await expect(
+    page.getByRole("heading", { name: "Cache cleanup: reconcile the overnight report" })
+  ).toBeVisible()
+  await expect(page.getByLabel("73 out of 100", { exact: true })).toBeVisible()
+  await page.locator("summary", { hasText: "Score breakdown" }).click()
   const content = page.getByRole("region", { name: "Interview feedback content" })
   expect(await content.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
     true
@@ -95,11 +97,14 @@ test("review fits desktop, mobile and landscape in both themes", async ({ page }
         path: testInfo.outputPath(`feedback-${theme}-${viewport.width}.png`),
       })
       await expectViewportFit(page)
-      const scores = page.locator("summary", { hasText: "Scores & rubric" })
+      const scores = page.locator("summary", { hasText: "Score breakdown" })
       await scores.focus()
       await page.keyboard.press("Enter")
       await expect(scores.locator("..")).toHaveAttribute("open", "")
       await expectViewportFit(page)
+      await page.screenshot({
+        path: testInfo.outputPath(`feedback-expanded-${theme}-${viewport.width}.png`),
+      })
     }
   }
 })
@@ -119,6 +124,47 @@ test("larger text keeps mobile report actions and the last detail reachable", as
   await expect(page.getByText("Graded on debugging process & fix quality")).toBeInViewport()
   await expect(page.getByRole("button", { name: "Done", exact: true })).toBeInViewport()
   await expectViewportFit(page)
+})
+
+test("digest feedback separates the interview result from tests on both feedback surfaces", async ({
+  page,
+}, testInfo) => {
+  const errors: string[] = []
+  page.on("pageerror", (error) => errors.push(error.message))
+  for (const width of [375, 1440]) {
+    await page.setViewportSize({ width, height: 900 })
+    for (const theme of ["light", "dark"]) {
+      for (const surface of ["interview", "saved"]) {
+        await page.goto(`/?view=feedback&example=digest&surface=${surface}&theme=${theme}`)
+        await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+          "Add Notification Digest Scheduling"
+        )
+        await expect(page.getByLabel("50 out of 100", { exact: true })).toHaveCount(1)
+        await expect(page.getByText("Grade D", { exact: true })).toBeVisible()
+        await expect(page.getByText("4/4 passed", { exact: true })).toBeVisible()
+        await expect(page.getByText("2 min", { exact: true })).toHaveCount(1)
+        const summary = page.getByText(/^All 4 tests passed, and the response wrapper/)
+        await expect(summary).toHaveCount(1)
+        await page.screenshot({
+          path: testInfo.outputPath(`digest-${surface}-${theme}-${width}.png`),
+        })
+        const disclosure = page.locator("summary", { hasText: "Score breakdown" })
+        await disclosure.focus()
+        await page.keyboard.press("Enter")
+        await expect(page.getByText("Technical score: 80/100", { exact: true })).toBeVisible()
+        await expect(summary).toHaveCount(1)
+        await expect(page.getByLabel("50 out of 100", { exact: true })).toHaveCount(1)
+        await page.screenshot({
+          path: testInfo.outputPath(`digest-expanded-${surface}-${theme}-${width}.png`),
+        })
+        if (surface === "interview") await expectViewportFit(page)
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+          true
+        )
+      }
+    }
+  }
+  expect(errors).toEqual([])
 })
 
 test("incoming replies preserve the reader's position until they choose Latest reply", async ({

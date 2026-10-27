@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { Fragment, useState } from "react"
 import { createRoot } from "react-dom/client"
 import { Toaster } from "sonner"
 import { ThemeProvider } from "next-themes"
@@ -17,6 +17,9 @@ import "@/app/globals.css"
 
 const params = new URLSearchParams(window.location.search)
 const theme = params.get("theme") === "light" ? "light" : "dark"
+const isDigest = params.get("example") === "digest"
+const digestSummary =
+  "All 4 tests passed, and the response wrapper is clean, but you didn’t explain the scheduling approach or its complexity, leaving key reasoning hard to assess."
 localStorage.setItem("theme", theme)
 document.documentElement.classList.toggle("dark", theme === "dark")
 const longText =
@@ -37,6 +40,7 @@ function Fixture() {
   const [showCode, setShowCode] = useState(true)
   const [input, setInput] = useState("")
   const [messages, setMessages] = useState(initialMessages)
+  const Surface = params.get("surface") === "saved" ? Fragment : InterviewSurfaceFrame
   return (
     <main className="bg-background text-foreground">
       {view === "email-consent" ? (
@@ -56,23 +60,29 @@ function Fixture() {
       ) : view === "done" ? (
         <h1>Dashboard return</h1>
       ) : (
-        <InterviewSurfaceFrame>
+        <Surface>
           {view === "workspace" ? (
             <WorkspaceFixture onSubmit={() => setView("review")} />
           ) : view === "feedback" ? (
             <PracticeFeedback
-              contained
-              feedback={longText}
+              contained={params.get("surface") !== "saved"}
+              feedback={isDigest ? digestSummary : longText}
               structuredFeedback={{
-                tldr: longText,
-                whatWorked: [
-                  "Reproduced the failure before editing.",
-                  "Checked the boundary at the exact expiry timestamp.",
-                ],
-                fixNext: Array.from({ length: 9 }, (_, index) => `${index + 1}. ${longText}`),
-                actionPlan: ["Re-run the regression cases and explain the retained state."],
+                tldr: isDigest ? digestSummary : longText,
+                whatWorked: isDigest
+                  ? ["All four scheduling tests passed.", "Kept the response wrapper clean."]
+                  : [
+                      "Reproduced the failure before editing.",
+                      "Checked the boundary at the exact expiry timestamp.",
+                    ],
+                fixNext: isDigest
+                  ? ["Explain how digest jobs are scheduled and how the approach scales."]
+                  : Array.from({ length: 9 }, (_, index) => `${index + 1}. ${longText}`),
+                actionPlan: isDigest
+                  ? ["Walk through one digest schedule and explain its time and space complexity."]
+                  : ["Re-run the regression cases and explain the retained state."],
               }}
-              performanceScore={73}
+              performanceScore={isDigest ? 50 : 73}
               technicalScore={80}
               scoreBreakdown={{
                 understandingScore: 80,
@@ -80,11 +90,17 @@ function Fixture() {
                 codeQualityScore: 75,
                 communicationScore: 65,
               }}
-              testsPassed={8}
-              testsTotal={12}
-              elapsedTime={960}
-              problemType="bugfix"
-              problemTitle="Cache cleanup: reconcile the overnight report"
+              testsPassed={isDigest ? 4 : 8}
+              testsTotal={isDigest ? 4 : 12}
+              elapsedTime={isDigest ? 95 : 960}
+              problemType={isDigest ? "feature" : "bugfix"}
+              problemTitle={
+                isDigest
+                  ? "Add Notification Digest Scheduling"
+                  : "Cache cleanup: reconcile the overnight report"
+              }
+              difficulty="hard"
+              sessionDate={params.get("surface") === "saved" ? "October 1, 2026" : undefined}
               code={code}
               language="python"
               onClose={() => setView("done")}
@@ -126,7 +142,7 @@ function Fixture() {
               onClose={() => setView("done")}
             />
           )}
-        </InterviewSurfaceFrame>
+        </Surface>
       )}
       {view === "review" && (
         <button

@@ -1,36 +1,36 @@
 import { Button } from "@/components/ui/button"
+import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
+import {
+  clampPracticeMinutesFromSeconds,
+  MAX_SESSION_PRACTICE_MINUTES,
+} from "@/lib/session-duration"
 
 interface ReviewSummaryProps {
-  score: number
-  grade: string
-  problemTitle?: string
-  testsPassed: number
-  testsTotal: number
+  difficulty?: string
+  sessionDate?: string
   elapsedTime: number
   onClose?: () => void
 }
 
 export function ReviewSummary({
-  score,
-  grade,
-  problemTitle,
-  testsPassed,
-  testsTotal,
+  difficulty,
+  sessionDate,
   elapsedTime,
 }: Omit<ReviewSummaryProps, "onClose">) {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-      <span className="text-foreground font-medium tabular-nums">
-        {Math.round(score)}/100 <span className="text-muted-foreground font-normal">· {grade}</span>
-      </span>
-      {problemTitle && <span className="max-w-prose break-words">{problemTitle}</span>}
-      <span className="text-muted-foreground text-xs tabular-nums">
-        {testsTotal > 0 && (
-          <>
-            {testsPassed}/{testsTotal} tests ·{" "}
-          </>
-        )}
-        {elapsedTime < 60 ? `${elapsedTime}s` : `${Math.floor(elapsedTime / 60)} min`}
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+      {difficulty && (
+        <span
+          className={`rounded-md px-2 py-0.5 text-xs font-medium capitalize ${difficultyColorClass(difficulty, "badgeOnLight")}`}
+        >
+          {difficulty}
+        </span>
+      )}
+      {sessionDate && <span>{sessionDate}</span>}
+      <span className="tabular-nums" title="Elapsed session time, including pauses">
+        {elapsedTime < 60
+          ? `${Math.max(0, Math.round(elapsedTime))}s`
+          : `${clampPracticeMinutesFromSeconds(elapsedTime)}${elapsedTime / 60 > MAX_SESSION_PRACTICE_MINUTES ? "+" : ""} min`}
       </span>
     </div>
   )

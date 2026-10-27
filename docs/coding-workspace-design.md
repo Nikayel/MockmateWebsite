@@ -45,6 +45,14 @@ LIVE indicators, persistent online/equalizer decoration, and submit-button glow 
 
 The particular neutral/clay palette is a product design choice. These sources support the hierarchy and accessibility constraints; they do not prove a particular hue looks prestigious or lowers anxiety. The redesign has not yet been measured in a user study.
 
+## Interview feedback
+
+Completed interview feedback uses one scenario heading and one metadata row for difficulty, date (on saved sessions), and duration. `PracticeFeedback` owns this header on the saved-session page, which prevents the previous duplicate title, percentage score, and conflicting rounded/floored durations. Duration uses the existing practice-time rounding and ceiling.
+
+`ScoreDisplay` presents a single labeled interview score out of 100 beside the written summary. Test results are labeled separately so passing every test is not mistaken for a perfect interview assessment. System-design reports omit synthetic test counts. A native **Score breakdown** disclosure contains the existing category weights/rubrics, a separately labeled technical result, and PDF export; opening it does not repeat the headline summary. The headline score no longer switches between two metrics. The lower written feedback sections and scoring calculations are unchanged.
+
+This applies [NN/g's visual hierarchy guidance](https://www.nngroup.com/articles/principles-visual-design/), [proximity principle](https://www.nngroup.com/articles/gestalt-proximity/), and [eye-tracking findings on descriptive headings](https://www.nngroup.com/articles/layer-cake-pattern-scanning/). They support the information hierarchy; the specific layout remains a design choice that has not been tested in a user study.
+
 ## Verification
 
 `playwright.interview-review.config.ts` renders the real workspace/review components and CodeMirror. Local fixture callbacks simulate chat replies, reset operations, and runner output without accounts or paid AI calls.

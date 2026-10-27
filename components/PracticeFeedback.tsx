@@ -4,7 +4,6 @@ import { GuidedLabReview } from "./practice/GuidedLabReview"
 import type { LabAssessment } from "@/lib/bugfix/guided-lab/assessment/schema"
 import type { ReactNode } from "react"
 import { parseFeedback } from "@/lib/feedback/parsers"
-import { getLetterGrade } from "@/lib/constants"
 import { ScoreDisplay } from "@/components/practice/ScoreDisplay"
 import { FeedbackSections } from "@/components/practice/FeedbackSections"
 import type { ChatMessage } from "@/lib/types"
@@ -55,6 +54,7 @@ interface PracticeFeedbackProps {
   problemType?: string
   difficulty?: string
   problemTitle?: string
+  sessionDate?: string
   code?: string
   language?: string
   chatMessages?: ChatMessage[]
@@ -102,7 +102,9 @@ export default function PracticeFeedback({
   sessionId,
   feedbackSurface = "interview",
   problemType,
+  difficulty,
   problemTitle,
+  sessionDate,
   code,
   language = "javascript",
   chatMessages,
@@ -235,48 +237,33 @@ export default function PracticeFeedback({
         ? normalizeScore(sections.scores.overall)
         : 0
 
-  const grade = getLetterGrade(overallScore)
-
   return (
     <ReviewFrame
       title="Interview feedback"
+      heading={problemTitle}
+      className="max-w-5xl"
       contained={contained}
       summary={
         <ReviewSummary
-          score={overallScore}
-          grade={grade}
-          problemTitle={problemTitle}
-          testsPassed={testsPassed}
-          testsTotal={testsTotal}
+          difficulty={difficulty}
+          sessionDate={sessionDate}
           elapsedTime={elapsedTime}
         />
       }
       actions={<ReviewClose onClose={onClose} />}
     >
       <div className="mx-auto max-w-5xl space-y-4 p-4 sm:p-6">
-        {sections.tldr && (
-          <p className="text-foreground max-w-prose text-sm leading-6">{sections.tldr}</p>
-        )}
-        <details className="border-border/60 rounded-xl border">
-          <summary className="text-muted-foreground focus-visible:ring-ring min-h-11 cursor-pointer rounded-xl px-4 py-3 text-sm font-medium focus-visible:ring-2">
-            Scores &amp; rubric
-          </summary>
-          <div className="px-3 pb-3">
-            <ScoreDisplay
-              sections={sections}
-              overallScore={overallScore}
-              technicalScore={technicalScore}
-              testsPassed={testsPassed}
-              testsTotal={testsTotal}
-              elapsedTime={elapsedTime}
-              problemType={problemType}
-              onExport={onExport}
-              problemTitle={problemTitle}
-              grade={grade}
-              scores={scores}
-            />
-          </div>
-        </details>
+        <ScoreDisplay
+          sections={sections}
+          overallScore={overallScore}
+          technicalScore={technicalScore}
+          testsPassed={testsPassed}
+          testsTotal={testsTotal}
+          problemType={problemType}
+          onExport={onExport}
+          problemTitle={problemTitle}
+          scores={scores}
+        />
 
         {afterScore}
 

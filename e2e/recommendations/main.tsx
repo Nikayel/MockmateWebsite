@@ -49,7 +49,6 @@ createRoot(document.getElementById("root")!).render(
                 }}
                 testsPassed={3}
                 testsTotal={3}
-                elapsedTime={900}
                 problemType="dsa"
                 problemTitle="Two Sum"
               />

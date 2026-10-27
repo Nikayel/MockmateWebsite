@@ -11,14 +11,7 @@ describe("ReviewFrame", () => {
       <ReviewFrame
         title="Interview feedback"
         summary={
-          <ReviewSummary
-            score={73}
-            grade="C"
-            testsPassed={8}
-            testsTotal={12}
-            elapsedTime={960}
-            problemTitle="Cache cleanup"
-          />
+          <ReviewSummary elapsedTime={960} difficulty="hard" sessionDate="October 1, 2026" />
         }
         actions={<ReviewClose onClose={onClose} />}
       >
@@ -32,7 +25,8 @@ describe("ReviewFrame", () => {
       false
     )
     expect(content.contains(screen.getByRole("button", { name: "Done" }))).toBe(false)
-    expect(screen.getByText("8/12 tests · 16 min")).toBeTruthy()
+    expect(screen.getByText("16 min")).toBeTruthy()
+    expect(screen.getByText("October 1, 2026")).toBeTruthy()
     fireEvent.click(screen.getByRole("button", { name: "Done" }))
     expect(onClose).toHaveBeenCalledOnce()
   })
@@ -48,9 +42,14 @@ describe("ReviewFrame", () => {
     expect(content.className).not.toContain("overflow-y-auto")
   })
 
-  it("does not invent a test result for interviews without executable tests", () => {
-    render(<ReviewSummary score={73} grade="C" testsPassed={0} testsTotal={0} elapsedTime={45} />)
+  it("shows short durations without inventing a test result", () => {
+    render(<ReviewSummary elapsedTime={45} />)
     expect(screen.queryByText(/tests/)).toBeNull()
     expect(screen.getByText("45s")).toBeTruthy()
+  })
+
+  it("rounds duration consistently with saved session history", () => {
+    render(<ReviewSummary elapsedTime={95} />)
+    expect(screen.getByText("2 min")).toBeTruthy()
   })
 })

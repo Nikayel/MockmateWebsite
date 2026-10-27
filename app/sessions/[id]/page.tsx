@@ -208,6 +208,10 @@ export default function SessionDetailPage() {
     )
   }
 
+  const hasFeedback = Boolean(
+    session.feedback && session.completed_at && (feedbackStatus === "complete" || !feedbackStatus)
+  )
+
   return (
     <main className="bg-background min-h-screen">
       <Header />
@@ -227,68 +231,71 @@ export default function SessionDetailPage() {
               </Button>
             </Link>
 
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="mb-2 flex items-center gap-2">
-                  <h1 className="text-foreground text-xl font-semibold">{session.topic}</h1>
-                  <span
-                    className={`rounded px-2 py-0.5 text-[10px] tracking-wider uppercase ${difficultyColorClass(session.difficulty, "badgeOnLight")}`}
-                  >
-                    {session.difficulty}
-                  </span>
-                </div>
-                <div className="text-muted-foreground flex items-center gap-4 text-xs">
-                  <span className="flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5" />
-                    {new Date(session.started_at).toLocaleDateString("en-US", {
-                      month: "long",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </span>
-                  {session.completed_at && (
-                    <span className="flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5" />
-                      {clampPracticeMinutes(session.started_at, session.completed_at)}
-                      {isTruncatedDuration(session.started_at, session.completed_at) ? "+" : ""} min
+            {(!hasFeedback || session.is_guided_lab) && (
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="mb-2 flex items-center gap-2">
+                    <h1 className="text-foreground text-xl font-semibold">{session.topic}</h1>
+                    <span
+                      className={`rounded px-2 py-0.5 text-[10px] tracking-wider uppercase ${difficultyColorClass(session.difficulty, "badgeOnLight")}`}
+                    >
+                      {session.difficulty}
                     </span>
-                  )}
+                  </div>
+                  <div className="text-muted-foreground flex items-center gap-4 text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5" />
+                      {new Date(session.started_at).toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </span>
+                    {session.completed_at && (
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5" />
+                        {clampPracticeMinutes(session.started_at, session.completed_at)}
+                        {isTruncatedDuration(session.started_at, session.completed_at)
+                          ? "+"
+                          : ""}{" "}
+                        min
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {session.performance_score && (
-                <div className="text-right">
-                  <div
-                    className={`text-3xl font-light ${
-                      session.performance_score >= 80
-                        ? "text-emerald-400"
-                        : session.performance_score >= 60
-                          ? "text-amber-400"
-                          : "text-red-400"
-                    }`}
-                  >
-                    {Math.round(session.performance_score)}%
+                {session.performance_score && (
+                  <div className="text-right">
+                    <div
+                      className={`text-3xl font-light ${
+                        session.performance_score >= 80
+                          ? "text-emerald-400"
+                          : session.performance_score >= 60
+                            ? "text-amber-400"
+                            : "text-red-400"
+                      }`}
+                    >
+                      {Math.round(session.performance_score)}%
+                    </div>
+                    <div className="text-muted-foreground text-[10px] tracking-wider uppercase">
+                      {session.is_guided_lab ? "Workspace checks" : "Score"}
+                    </div>
                   </div>
-                  <div className="text-muted-foreground text-[10px] tracking-wider uppercase">
-                    {session.is_guided_lab ? "Workspace checks" : "Score"}
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Feedback Section */}
           {/* Handle completed sessions - show feedback if available */}
           {/* Note: Legacy sessions may not have feedback_status, treat completed_at + feedback as complete */}
-          {session.feedback &&
-          session.completed_at &&
-          (feedbackStatus === "complete" || !feedbackStatus) ? (
+          {hasFeedback ? (
             <PracticeFeedback
               isGuidedLab={session.is_guided_lab}
               guidedLabAssessment={session.guided_lab_assessment}
               sessionId={session.id}
               feedbackSurface="saved_session"
-              feedback={session.feedback}
+              feedback={session.feedback ?? ""}
               performanceScore={session.performance_score || 0}
               technicalScore={session.technical_score ?? session.mastery_score}
               scoreBreakdown={session.score_breakdown}
@@ -310,7 +317,7 @@ export default function SessionDetailPage() {
               spaceComplexity={session.space_complexity}
               efficiencyScore={session.efficiency_score}
               elapsedTime={Math.round(
-                (new Date(session.completed_at).getTime() -
+                (new Date(session.completed_at ?? session.started_at).getTime() -
                   new Date(session.started_at).getTime()) /
                   1000
               )}
@@ -318,6 +325,11 @@ export default function SessionDetailPage() {
               problemType={session.type}
               difficulty={session.difficulty}
               problemTitle={session.topic}
+              sessionDate={new Date(session.started_at).toLocaleDateString("en-US", {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
               code={session.final_code || session.session_state?.code}
               language={session.language || session.session_state?.language || "javascript"}
               chatMessages={session.session_state?.chat_messages}

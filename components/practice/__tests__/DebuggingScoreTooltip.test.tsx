@@ -26,11 +26,11 @@ function renderScores(problemType = "bugfix") {
       overallScore={70}
       testsPassed={2}
       testsTotal={3}
-      elapsedTime={300}
       problemType={problemType}
       scores={{ understanding: 60, problemSolving: 70, codeQuality: 80, communication: 65 }}
     />
   )
+  fireEvent.click(screen.getByText("Score breakdown", { selector: "summary" }))
 }
 
 describe("debugging score explanations", () => {
