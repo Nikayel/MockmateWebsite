@@ -13,7 +13,7 @@ import { test, expect } from "@playwright/test"
  *   2. A way to sign a real test user into that project from Playwright. Nothing in this repo does
  *      this yet -- e2e/guest-trial-journey.spec.ts's own header says so explicitly ("needs a
  *      seeded Firebase emulator user... TODO: cover it once an auth emulator exists in CI").
- *   3. `SPRINT_LABS_ENABLED` forced on (default OFF -- see docs/sprint-labs/EXECUTION-STATE.md's
+ *   3. `SPRINT_LABS_ENABLED` forced on (default OFF -- see docs/sprint-labs/DECISIONS.md's
  *      ship-behind-a-flag decision). Set via `FEATURE_FLAG_SPRINT_LABS_ENABLED=true` (env sits
  *      under a Firestore override in lib/feature-flags.ts's resolution order, so this is the
  *      correct break-glass lever for a throwaway dev server, not a Firestore doc edit).

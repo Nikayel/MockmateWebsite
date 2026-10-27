@@ -61,10 +61,53 @@ function buildOptions() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  fetchMock.mockReset()
   vi.stubGlobal("fetch", fetchMock)
 })
 
 describe("usePostInterviewDiscussion", () => {
+  it("sends the stable scenario ID and edited solution during a workspace debrief", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ reply: "Compare the fixes?" }),
+    })
+    const { options } = buildOptions()
+    const solution =
+      "def merge_threads(existing_threads, incoming_threads): return existing_threads"
+    const { result } = renderHook(() =>
+      usePostInterviewDiscussion({
+        ...options,
+        selectedScenario: {
+          id: "bugfix-comment-thread-merge",
+          type: "bugfix",
+          title: "Editor Comments",
+          executionMode: "workspace",
+          workspace: { primaryFilePath: "src/comment_threads.py" },
+        },
+        code: "# README is currently open",
+        chatWorkspaceContext: [
+          { path: "src/comment_threads.py", role: "editable", content: solution },
+        ],
+      } as never)
+    )
+    await result.current.triggerPostInterviewDiscussion([], {
+      passed: 7,
+      total: 7,
+      failed: 0,
+      passRate: 100,
+    })
+    const request = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(request).toMatchObject({
+      scenarioId: "bugfix-comment-thread-merge",
+      currentCode: solution,
+      hasSubmitted: true,
+    })
+    const { analyzeComplexityWithLLM } = await import("@/lib/interview")
+    expect(analyzeComplexityWithLLM).toHaveBeenCalledWith(
+      expect.objectContaining({ code: solution })
+    )
+  })
+
   it("tags a successful kickoff so resume logic can recognize it", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,

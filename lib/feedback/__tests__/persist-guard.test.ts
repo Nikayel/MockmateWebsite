@@ -25,6 +25,10 @@ describe("resolvePersistAction", () => {
     )
   })
 
+  it("leaves a frozen score queued for its real narrative", () => {
+    expect(resolvePersistAction({ status: "queued", scoreFrozen: true }, "fallback")).toBe("skip")
+    expect(resolvePersistAction({ status: "queued", scoreFrozen: true }, "server")).toBe("persist")
+  })
   it("never lets fallback overwrite anything already complete", () => {
     expect(resolvePersistAction({ status: "complete", source: "fallback" }, "fallback")).toBe(
       "skip"

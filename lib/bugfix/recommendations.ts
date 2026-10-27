@@ -33,12 +33,9 @@ export function buildBugfixReadinessProfile(params: {
   const strengths = new Set<BugfixSkillCategory>()
 
   if (score.reproductionDiscipline < 70) weaknesses.add("observability")
-  if (score.codebaseNavigation < 70) weaknesses.add("frontend-state")
   if (score.verificationDiscipline < 70) weaknesses.add("data-validation")
-  if (score.aiCollaborationQuality < 70) weaknesses.add("ai-collaboration")
 
   if (score.reproductionDiscipline >= 85) strengths.add("observability")
-  if (score.minimalFixQuality >= 85) strengths.add("mutation-reference")
   if (score.verificationDiscipline >= 85) strengths.add("data-validation")
   if (score.aiCollaborationQuality >= 85) strengths.add("ai-collaboration")
 

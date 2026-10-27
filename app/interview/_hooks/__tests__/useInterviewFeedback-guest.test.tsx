@@ -125,6 +125,34 @@ afterEach(() => {
 })
 
 describe("proceedToFinalFeedback for a guest", () => {
+  it("stages the edited workspace solution when the candidate is viewing documentation", async () => {
+    const solution =
+      "def merge_threads(existing_threads, incoming_threads): return existing_threads"
+    const opts = buildOpts({
+      selectedScenario: {
+        id: "bugfix-comment-thread-merge",
+        title: "Editor Comments",
+        type: "bugfix",
+        difficulty: "medium",
+        executionMode: "workspace",
+        workspace: { primaryFilePath: "src/comment_threads.py" },
+      },
+      code: "# Comment Thread Sync documentation",
+      workspaceContext: [{ path: "src/comment_threads.py", role: "editable", content: solution }],
+      activeWorkspacePath: "README.md",
+    })
+    const { result } = renderHook(() => useInterviewFeedback(opts as never))
+    await act(async () => {
+      await result.current.proceedToFinalFeedback()
+    })
+    expect(opts.lastFeedbackRequestRef.current).toEqual(
+      expect.objectContaining({
+        code: solution,
+        scenarioId: "bugfix-comment-thread-merge",
+      })
+    )
+  })
+
   it("withholds the score from the UI and never starts the AI stream", async () => {
     const opts = buildOpts()
     const { result } = renderHook(() => useInterviewFeedback(opts as never))

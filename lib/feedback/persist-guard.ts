@@ -17,12 +17,14 @@ export type PersistSource = "stream" | "fallback" | "server" | "backfill"
 export interface ExistingFeedbackState {
   status?: string | null
   source?: string | null
+  scoreFrozen?: boolean
 }
 
 export function resolvePersistAction(
   existing: ExistingFeedbackState,
   incomingSource: PersistSource
 ): "persist" | "skip" {
+  if (existing.scoreFrozen && incomingSource === "fallback") return "skip"
   if (existing.status !== "complete") return "persist"
   const existingIsFallback = existing.source === "fallback"
   if (existingIsFallback && incomingSource !== "fallback") return "persist"

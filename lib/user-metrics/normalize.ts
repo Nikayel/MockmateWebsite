@@ -1,3 +1,4 @@
+import { isScoredCompletedSession } from "@/lib/interview/completion-status"
 import { clampPracticeMinutes } from "@/lib/session-duration"
 import { calculateTechnicalScoreFromBreakdown } from "@/lib/constants"
 import type { MetricSession } from "./types"
@@ -27,7 +28,7 @@ export function normalizeMetricSession(
   const doc = record(raw)
   const completedMs = typeof doc.completed_at === "string" ? Date.parse(doc.completed_at) : NaN
   if (!Number.isFinite(completedMs) || completedMs > now) return null
-  if (doc.feedback_status != null && doc.feedback_status !== "complete") return null
+  if (!isScoredCompletedSession(doc)) return null
   const scenarioId = text(doc.scenario_id, id)
   const guided =
     doc.is_guided_lab === true ||
@@ -90,6 +91,7 @@ export function normalizeMetricSession(
       doc.completed_at as string
     ),
     kind: guided ? "guided_lab" : "interview",
+    measurementVersion: typeof doc.measurement_version === "number" ? doc.measurement_version : 1,
     performanceScore: performance,
     technicalScore: guided ? null : technical,
     debuggingScore: score(record(doc.bugfix_score_breakdown).overall) ?? performance,

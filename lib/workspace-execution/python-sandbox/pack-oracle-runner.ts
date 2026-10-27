@@ -18,6 +18,7 @@ import type { StdoutDiffResult } from "@/lib/bugfix/packs/stdout-oracle"
 import { diffStdout } from "@/lib/bugfix/packs/stdout-oracle"
 import { overlayWorkspaceFiles } from "../files"
 import { runPythonInWorker } from "./worker-runner"
+import type { ExecutionFailureKind } from "../test-outcomes"
 
 const PACK_STDOUT_MARKER = "__PACK_STDOUT__:"
 const PACK_ORACLE_ENTRYPOINT = "__pack_oracle__.py"
@@ -33,6 +34,7 @@ export interface PackOracleRunResult {
   match: boolean
   /** Runtime/crash error message, or null. */
   error: string | null
+  failureKind?: ExecutionFailureKind
   consoleLogs: Array<{
     type: "log" | "error" | "warn" | "info"
     message: string
@@ -143,6 +145,7 @@ export async function executePackOracleClientSide(
         diff: null,
         match: false,
         error: runResult.error || "Execution failed",
+        failureKind: runResult.failureKind,
         consoleLogs,
       }
     }

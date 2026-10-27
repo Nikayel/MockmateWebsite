@@ -2,7 +2,7 @@
  * The one real-`git`-process boundary for `lab validate --dynamic` (PLAN.md Task 7). Every other
  * module under `dynamic/` composes these primitives; none of them shells out to `git` directly.
  *
- * Per docs/sprint-labs/AGENT-CONTEXT.md §4 launch blocker 6 and EXECUTION-STATE.md's deviation D5,
+ * Per docs/sprint-labs/AGENT-CONTEXT.md §4 launch blocker 6 and DECISIONS.md's workspace boundary,
  * a Sprint Labs workspace is provisioned by **`git init` + file copy, never a clone** (a workbook's
  * `repo/` seed is plain files, not a committed git repo — D5 confirms this even for the real
  * Meridian seed, and `workbooks/_fixture-workbook` has no `repo/` at all). This module mirrors that

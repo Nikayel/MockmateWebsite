@@ -23,7 +23,7 @@ mirrors `docs/python-curriculum/` so the two courses read the same way.
 | [`AGENT-1-engineer.md`](./AGENT-1-engineer.md) | **Ship-the-spec prompt** — a copy-paste runbook for the engineering agent that builds the sql.js runner + wiring + routes + two proof lessons from `SPEC.md`. |
 | [`AGENT-2-curriculum-developer.md`](./AGENT-2-curriculum-developer.md) | **Curriculum-author prompt** — a `/loop` runbook that authors all 46 lessons from `CONTENT.md` into `SqlLesson` objects, one per iteration, verified green. Run after AGENT 1. |
 
-Related: [`../python-curriculum/CURRICULUM-GAP-ANALYSIS.md`](../python-curriculum/CURRICULUM-GAP-ANALYSIS.md)
+Related: [Python curriculum guide](../python-curriculum/README.md)
 — the audit of what the **Python** course is missing (produced in the same pass).
 
 ## The four levels (same Read → Apply → Practice spine at increasing depth)

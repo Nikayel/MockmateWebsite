@@ -1,15 +1,11 @@
 import { describe, expect, it } from "vitest"
-import {
-  isScoredCompletedSession,
-  summarizeSessionFunnelCounts,
-} from "../firestore-helpers"
+import { isScoredCompletedSession, summarizeSessionFunnelCounts } from "../firestore-helpers"
 
 /**
  * WCSR (weekly completed-scored-rounds) counts only rounds that were completed
  * AND scored. This matters because markSessionEvaluating() stamps completed_at
- * the moment evaluation STARTS, so pending/processing/failed rounds carry a
- * completed_at with no score. Counting completed_at alone (the old behavior)
- * inflated every "completed" metric with unscored and failed rounds.
+ * the moment evaluation STARTS. A frozen score counts even while its separate
+ * written report is queued or has failed; an unfrozen in-progress score does not.
  */
 describe("isScoredCompletedSession", () => {
   it("counts a completed round whose feedback finished", () => {
@@ -31,7 +27,7 @@ describe("isScoredCompletedSession", () => {
     ).toBe(false)
   })
 
-  it("excludes a round whose feedback generation failed", () => {
+  it("excludes a failed round without a frozen score", () => {
     expect(
       isScoredCompletedSession({
         completed_at: "2026-07-10T00:00:00.000Z",
@@ -39,6 +35,28 @@ describe("isScoredCompletedSession", () => {
         performance_score: 40,
       })
     ).toBe(false)
+  })
+
+  it("counts a frozen score while written feedback is still queued", () => {
+    expect(
+      isScoredCompletedSession({
+        completed_at: "2026-07-10T00:00:00.000Z",
+        feedback_status: "queued",
+        feedback_score_frozen: true,
+        performance_score: 76,
+      })
+    ).toBe(true)
+  })
+
+  it("keeps a frozen score counted if automatic feedback retries fail", () => {
+    expect(
+      isScoredCompletedSession({
+        completed_at: "2026-07-10T00:00:00.000Z",
+        feedback_status: "failed",
+        feedback_score_frozen: true,
+        performance_score: 76,
+      })
+    ).toBe(true)
   })
 
   it("excludes a round that never completed", () => {
@@ -104,7 +122,11 @@ describe("summarizeSessionFunnelCounts", () => {
 
   it("treats a session with no is_guest flag as registered", () => {
     const counts = summarizeSessionFunnelCounts([
-      { completed_at: "2026-07-10T00:00:00.000Z", feedback_status: "complete", performance_score: 70 },
+      {
+        completed_at: "2026-07-10T00:00:00.000Z",
+        feedback_status: "complete",
+        performance_score: 70,
+      },
     ])
     expect(counts.registered).toBe(1)
     expect(counts.guest).toBe(0)

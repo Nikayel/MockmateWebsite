@@ -7,7 +7,7 @@
  * L4 Data Engineering (workspace/assertion grading), L5 Advanced & Company-Specific SQL for DE
  * Interviews (see docs/sql-curriculum/expand-sql-de.md).
  * Cloud & Data Platforms section: L6 Cloud & Data Engineering Foundations (see
- * docs/sql-curriculum/cloud/PLAN.md), L7 Warehouses, Lakehouse & Dimensional Modeling.
+ * docs/sql-curriculum/cloud/research-4-distributed-pipelines.md), L7 Warehouses, Lakehouse & Dimensional Modeling.
  * Pipelines & Reliability section: L8 Batch Pipelines & Orchestration, L9 Streaming & Change Data
  * Capture.
  * Compute & Operations section: L10 Distributed Compute & Data Operations.

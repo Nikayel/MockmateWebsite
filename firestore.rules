@@ -70,7 +70,7 @@ service cloud.firestore {
      * What it does NOT buy: a user can still claim 100 on a session they failed.
      * Closing that needs the scores to stop travelling through the client at all,
      * which is the Edge-to-Node consolidation tracked in
-     * docs/EDGE-TO-NODE-CONSOLIDATION.md.
+     * docs/plans/technical-chores.md.
      */
     function hasSaneSessionScore() {
       return !('performance_score' in request.resource.data)
@@ -654,6 +654,12 @@ service cloud.firestore {
     }
 
     match /algorithm_research_aggregate/{docId} {
+      allow read, write: if false;
+    }
+
+    // Feedback jobs contain private prompt text and sealed grading context.
+    // The Admin SDK worker is the only reader/writer.
+    match /feedback_jobs/{jobId} {
       allow read, write: if false;
     }
 

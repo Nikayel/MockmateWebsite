@@ -1,0 +1,148 @@
+{
+  "version": "0.1.1",
+  "sourceCommit": "1fe5a9ae66f40ae7d299d4497ef87d7e1da8e2f1",
+  "language": "python",
+  "purpose": "Evidence-grounded hint evaluation; correctness QA is a prerequisite, not a hint-quality score.",
+  "tasks": [
+    {
+      "id": "dsa-two-sum",
+      "track": "dsa",
+      "source": "lib/scenarios/dsa/arrays-hashing/dsa-two-sum.ts",
+      "group": "arrays-hashing",
+      "reason": "Distinct indices, duplicate values, negative values, and order-independent answers."
+    },
+    {
+      "id": "dsa-valid-palindrome",
+      "track": "dsa",
+      "source": "lib/scenarios/dsa/two-pointers/dsa-valid-palindrome.ts",
+      "group": "two-pointers",
+      "reason": "Normalization, digits, punctuation, and both pointer boundaries."
+    },
+    {
+      "id": "dsa-valid-parentheses",
+      "track": "dsa",
+      "source": "lib/scenarios/dsa/stack/dsa-valid-parentheses.ts",
+      "group": "stack",
+      "reason": "Type, nesting, prefix validity, and leftover openers."
+    },
+    {
+      "id": "dsa-longest-substring-without-repeating",
+      "track": "dsa",
+      "source": "lib/scenarios/dsa/sliding-window.ts",
+      "group": "sliding-window",
+      "reason": "Contiguity and a nondecreasing left boundary; several superficially plausible wrong approaches."
+    },
+    {
+      "id": "dsa-binary-search",
+      "track": "dsa",
+      "source": "lib/scenarios/dsa/binary-search/dsa-binary-search.ts",
+      "group": "binary-search",
+      "reason": "Inclusive bounds, missing targets, singleton and endpoint cases."
+    },
+    {
+      "id": "dsa-house-robber",
+      "track": "dsa",
+      "source": "lib/scenarios/dsa/dynamic-programming/dsa-house-robber.ts",
+      "group": "dynamic-programming",
+      "reason": "Greedy and alternating-parity counterexamples already appear in the catalog."
+    },
+    {
+      "id": "dsa-course-schedule",
+      "track": "dsa",
+      "source": "lib/scenarios/dsa/graphs/dsa-course-schedule.ts",
+      "group": "graphs",
+      "reason": "Disconnected cycles and shared dependencies distinguish several graph misconceptions."
+    },
+    {
+      "id": "dsa-subsets",
+      "track": "dsa",
+      "source": "lib/scenarios/dsa/backtracking.ts",
+      "group": "backtracking",
+      "reason": "Empty subset, list aliasing, duplicates, and genuinely unordered valid outputs."
+    },
+    {
+      "id": "dsa-merge-intervals",
+      "track": "dsa",
+      "source": "lib/scenarios/dsa/intervals.ts",
+      "group": "intervals",
+      "reason": "Explicit touching-endpoint contract, sorting, containment, and zero-width intervals."
+    },
+    {
+      "id": "dsa-last-stone-weight",
+      "track": "dsa",
+      "source": "lib/scenarios/dsa/heap.ts",
+      "group": "heap",
+      "reason": "Unambiguous heap task with duplicate weights and complete cancellation."
+    },
+    {
+      "id": "stripe-webhook-idempotency",
+      "track": "bugfix",
+      "source": "packs/stripe-webhook-idempotency",
+      "group": "wrong-dedup-key",
+      "reason": "Event identity versus matching attributes; preserves true redeliveries."
+    },
+    {
+      "id": "palantir-entity-resolution-merge",
+      "track": "bugfix",
+      "source": "packs/palantir-entity-resolution-merge",
+      "group": "wrong-dedup-key",
+      "reason": "Namespaced identity, case normalization, and distinct-link counting."
+    },
+    {
+      "id": "datadog-metric-window-rollup",
+      "track": "bugfix",
+      "source": "packs/datadog-metric-window-rollup",
+      "group": "off-by-one-window",
+      "reason": "Half-open time windows, replay deduplication, and empty intermediate windows."
+    },
+    {
+      "id": "generic-session-window-count",
+      "track": "bugfix",
+      "source": "packs/generic-session-window-count",
+      "group": "off-by-one-window",
+      "reason": "The opposite boundary convention: an exactly-threshold gap remains one session."
+    },
+    {
+      "id": "generic-log-error-rollup",
+      "track": "bugfix",
+      "source": "packs/generic-log-error-rollup",
+      "group": "accumulator-wrong-scope",
+      "reason": "Per-service counts and intentionally first-seen output order."
+    },
+    {
+      "id": "datadog-monitor-empty-series",
+      "track": "bugfix",
+      "source": "packs/datadog-monitor-empty-series",
+      "group": "silent-boundary",
+      "reason": "Missing samples differ from zero-valued samples; threshold equality matters."
+    },
+    {
+      "id": "generic-cache-eviction-mutation",
+      "track": "bugfix",
+      "source": "packs/generic-cache-eviction-mutation",
+      "group": "mutation-during-iteration",
+      "reason": "Consecutive expired entries, refresh semantics, and expiry equality."
+    },
+    {
+      "id": "stripe-payout-batch-mutation",
+      "track": "bugfix",
+      "source": "packs/stripe-payout-batch-mutation",
+      "group": "mutation-during-iteration",
+      "reason": "Adjacent redeliveries skip legitimate payouts; filter and batch behavior must survive."
+    },
+    {
+      "id": "palantir-pipeline-order-dependence",
+      "track": "bugfix",
+      "source": "packs/palantir-pipeline-order-dependence",
+      "group": "order-dependence",
+      "reason": "Partial commit batches leak across pipelines; exact and partial batches are both needed."
+    },
+    {
+      "id": "palantir-foundry-usage-rollup",
+      "track": "bugfix",
+      "source": "packs/palantir-foundry-usage-rollup",
+      "group": "double-count",
+      "reason": "Cross-replica deduplication while preserving distinct same-account usage."
+    }
+  ]
+}

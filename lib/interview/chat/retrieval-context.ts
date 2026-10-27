@@ -22,7 +22,7 @@ export async function buildChatRetrievalContext(
   const isSystemDesign = scenarioType === "system-design"
   let systemPrompt = ""
   // Derive scenarioId from title for complexity lookup (e.g., "Two Sum" -> "dsa-two-sum")
-  const scenarioId = sessionContext?.task.id ?? buildScenarioId(scenarioTitle)
+  const scenarioId = sessionContext?.task.id ?? request.scenarioId ?? buildScenarioId(scenarioTitle)
 
   // This retrieval path indexes DSA patterns/complexity, not incident or design
   // contracts. Non-DSA rounds are grounded in their public task and workspace.

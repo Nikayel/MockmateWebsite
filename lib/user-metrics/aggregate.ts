@@ -30,6 +30,21 @@ function groups(
   )
 }
 
+function dailyScores(sessions: MetricSession[], now: number): MetricsSnapshot["daily"] {
+  const daily = new Map<string, number[]>()
+  const oldestDay = new Date(now - 90 * 86400000).toISOString().slice(0, 10)
+  for (const session of sessions) {
+    const day = session.completedAt.slice(0, 10)
+    if (day < oldestDay) continue
+    const values = daily.get(day) ?? []
+    values.push(session.performanceScore)
+    daily.set(day, values)
+  }
+  return [...daily]
+    .map(([date, scores]) => ({ date, score: average(scores)!, sessions: scores.length }))
+    .sort((a, b) => a.date.localeCompare(b.date))
+}
+
 /** One contribution per persisted session ID, regardless of completion retries. */
 export function aggregateMetricSessions(input: MetricSession[], now = Date.now()): MetricsSnapshot {
   const unique = [...new Map(input.map((session) => [session.id, session])).values()].sort(
@@ -38,17 +53,11 @@ export function aggregateMetricSessions(input: MetricSession[], now = Date.now()
   const interviews = unique.filter((s) => s.kind === "interview")
   const labs = unique.filter((s) => s.kind === "guided_lab")
   const bugs = interviews.filter((s) => s.type === "bugfix")
-  const recent = interviews.slice(0, 5)
-  const daily = new Map<string, number[]>()
-  const oldestDay = new Date(now - 90 * 86400000).toISOString().slice(0, 10)
-  for (const session of interviews) {
-    const day = session.completedAt.slice(0, 10)
-    if (day >= oldestDay) {
-      const values = daily.get(day) ?? []
-      values.push(session.performanceScore)
-      daily.set(day, values)
-    }
-  }
+  // Compare scores only under the latest scoring rules; retain historical totals.
+  const comparable = interviews.filter(
+    (s) => s.measurementVersion === interviews[0]?.measurementVersion
+  )
+  const recent = comparable.slice(0, 5)
   const breakdown = {
     codeQuality: average(interviews.map((s) => s.scoreBreakdown?.codeQuality ?? null)),
     problemSolving: average(interviews.map((s) => s.scoreBreakdown?.problemSolving ?? null)),
@@ -72,11 +81,10 @@ export function aggregateMetricSessions(input: MetricSession[], now = Date.now()
     },
     patternStats: groups(interviews, "pattern"),
     difficultyStats: groups(interviews, "difficulty"),
-    daily: [...daily]
-      .map(([date, scores]) => ({ date, score: average(scores)!, sessions: scores.length }))
-      .sort((a, b) => a.date.localeCompare(b.date)),
+    daily: dailyScores(interviews, now),
+    trendDaily: dailyScores(comparable, now),
     weeklyAverage: average(
-      interviews
+      comparable
         .filter((s) => Date.parse(s.completedAt) >= now - 7 * 86400000)
         .map((s) => s.performanceScore)
     ),
@@ -85,7 +93,12 @@ export function aggregateMetricSessions(input: MetricSession[], now = Date.now()
     recentAverageCount: recent.length,
     scoreBreakdown: Object.values(breakdown).every((v) => v === null) ? null : breakdown,
     bugfix: {
-      readiness: average(bugs.slice(0, 5).map((s) => s.debuggingScore)),
+      readiness: average(
+        bugs
+          .filter((s) => s.measurementVersion === bugs[0]?.measurementVersion)
+          .slice(0, 5)
+          .map((s) => s.debuggingScore)
+      ),
       sessions: bugs.length,
       latest: bugs[0] ?? null,
     },

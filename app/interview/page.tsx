@@ -198,6 +198,7 @@ function InterviewPageContent() {
   } | null>(null)
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false) // Track AI feedback generation
   const [isGeneratingDiscussion, setIsGeneratingDiscussion] = useState(false)
+  const [systemDesignFeedbackQueued, setSystemDesignFeedbackQueued] = useState(false)
 
   // Streaming feedback hook - Edge function with no timeout
   const streamingFeedback = useStreamingFeedback()
@@ -278,6 +279,10 @@ function InterviewPageContent() {
   // Declared before the voice/hint hooks below, which stamp it onto their
   // usage reports for per-session cost attribution.
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setSystemDesignFeedbackQueued(false)
+  }, [currentSessionId])
 
   const interviewerVoice = useVoiceInput({
     autoSendEnabled: true,
@@ -1122,6 +1127,9 @@ function InterviewPageContent() {
   } = useInterviewMetrics({
     firebaseUser,
     selectedScenarioId: selectedScenario?.id,
+    scenarioType: selectedScenario?.type,
+    difficulty: selectedScenario?.difficulty,
+    elapsedTimeSeconds: elapsedTime,
     userId: user?.id,
     guestId,
     currentSessionId,
@@ -1711,6 +1719,7 @@ function InterviewPageContent() {
     realInterviewMode,
     currentSessionId,
     setIsGeneratingDiscussion,
+    setFeedbackQueued: setSystemDesignFeedbackQueued,
     setStructuredFeedback,
     setTechnicalScore,
     setScoreBreakdown,
@@ -2046,8 +2055,16 @@ function InterviewPageContent() {
 
   const handleEditorChange = useCallback(
     (newCode: string) => {
-      // Enforce code protection if enabled
-      if (protectedElements && starterCode && isInterviewStarted && !showFeedback) {
+      // Workspace contracts are checked by running the project, not by requiring
+      // every module to contain the primary file's starter-code declarations.
+      if (isWorkspaceScenario(selectedScenario) && activeWorkspaceFile?.role !== "editable") return
+      if (
+        !isWorkspaceScenario(selectedScenario) &&
+        protectedElements &&
+        starterCode &&
+        isInterviewStarted &&
+        !showFeedback
+      ) {
         const validation = validateCodeProtection(newCode, protectedElements, selectedLanguage)
         if (!validation.valid) {
           toast.error(`Cannot remove required code: ${validation.errors[0]}`)
@@ -2188,6 +2205,7 @@ function InterviewPageContent() {
     (streamingFeedback.state.isConnected && !streamingFeedback.state.isPersisted) ||
     (streamingFeedback.state.phase !== "idle" &&
       streamingFeedback.state.phase !== "complete" &&
+      streamingFeedback.state.phase !== "queued" &&
       streamingFeedback.state.phase !== "error")
 
   // Progress lives here, above InterviewFeedbackView, so that re-rendering or
@@ -2442,6 +2460,7 @@ function InterviewPageContent() {
               guidedLabAssessment={streamingFeedback.state.feedback?.guidedLabAssessment}
               showPostInterviewDiscussion={showPostInterviewDiscussion}
               isFeedbackLoading={isFeedbackLoading}
+              feedbackQueued={streamingFeedback.state.feedbackQueued || systemDesignFeedbackQueued}
               isFromRoadmap={isFromRoadmap}
               activeRoadmap={activeRoadmap}
               onGoToDashboard={() => router.push("/dashboard")}

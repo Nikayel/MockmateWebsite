@@ -3,7 +3,7 @@
  *
  * React hook for managing notifications in the UI.
  * Provides:
- * - Real-time notification fetching
+ * - Initial and on-demand notification fetching
  * - Read/unread state management
  * - Preference updates
  * - Notification actions
@@ -16,8 +16,6 @@ import type { NotificationType } from "@/lib/rag/knowledge-base/notification-kno
 import { logger } from "@/lib/logger"
 
 export interface UseNotificationsOptions {
-  /** Polling interval in ms (0 to disable) */
-  pollInterval?: number
   /** Initial fetch on mount */
   fetchOnMount?: boolean
 }
@@ -52,7 +50,7 @@ export interface UseNotificationsReturn {
 }
 
 export function useNotifications(options: UseNotificationsOptions = {}): UseNotificationsReturn {
-  const { pollInterval = 60000, fetchOnMount = true } = options
+  const { fetchOnMount = true } = options
   const { firebaseUser, initialized } = useAuth()
 
   const [notifications, setNotifications] = useState<InAppNotification[]>([])
@@ -60,8 +58,6 @@ export function useNotifications(options: UseNotificationsOptions = {}): UseNoti
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const pollRef = useRef<NodeJS.Timeout | null>(null)
 
   // Helper to get auth headers
   const getAuthHeaders = useCallback(async (): Promise<HeadersInit | null> => {
@@ -327,32 +323,6 @@ export function useNotifications(options: UseNotificationsOptions = {}): UseNoti
       fetchPreferences()
     }
   }, [fetchOnMount, initialized, firebaseUser, refresh, fetchPreferences])
-
-  // Polling - only active when pollInterval > 0 and user is authenticated
-  useEffect(() => {
-    // Clear any existing interval
-    if (pollRef.current) {
-      clearInterval(pollRef.current)
-      pollRef.current = null
-    }
-
-    // Only start polling if interval is positive and user is authenticated.
-    // Hidden tabs skip the fetch: the bell is in the header on every page, so
-    // without this every backgrounded tab kept billing a Firestore-backed
-    // request per minute indefinitely.
-    if (pollInterval > 0 && firebaseUser) {
-      pollRef.current = setInterval(() => {
-        if (!document.hidden) refresh()
-      }, pollInterval)
-    }
-
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current)
-        pollRef.current = null
-      }
-    }
-  }, [pollInterval, firebaseUser, refresh])
 
   return {
     notifications,

@@ -211,6 +211,24 @@ describe("/api/spaced-repetition/complete", () => {
     expect(mocks.updateProblemMastery).not.toHaveBeenCalled()
   })
 
+  it("leaves the review schedule unchanged when no result was assessed", async () => {
+    const { POST } = await import("./route")
+    const response = (await POST(
+      createRequest({
+        ...validPayload,
+        mastery_score: undefined,
+        test_cases_passed: 0,
+        test_cases_total: 0,
+      })
+    )) as unknown as StubResponse
+    expect(response.status).toBe(200)
+    expect(response.data?.skipped).toBe(true)
+    expect(mocks.quickMasteryScore).not.toHaveBeenCalled()
+    expect(mocks.calculateNextReview).not.toHaveBeenCalled()
+    expect(mocks.initializeProblemMasteryFromSession).not.toHaveBeenCalled()
+    expect(mocks.updateProblemMastery).not.toHaveBeenCalled()
+  })
+
   it("still succeeds on the repeat-review path for an existing problem", async () => {
     mocks.getAllUserProblems.mockResolvedValue([existingMastery])
     const { POST } = await import("./route")

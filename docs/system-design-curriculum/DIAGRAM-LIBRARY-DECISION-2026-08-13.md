@@ -178,7 +178,7 @@ Partition by file, one agent per `level*.ts`, never `git add -A`. Convert only w
 
 **Also fix, unrelated but adjacent:** `docs/csdiagram-authoring.md` describes `ladder` as "messages crossing between participants over time: a handshake, a consensus round", which is a sequence diagram. The schema is ascending-magnitude bands on a log scale. The doc is wrong and will mislead an authoring agent.
 
-**Re-measure before building anything new:** COUNCIL-AUDIT-2026-08-13.md §5.5 proposes a `state-machine` type. Phase 3's `feedback` + `reveal:"all"` + optional-badge changes may take it below its own three-lesson threshold. Sequence it after, then decide.
+**Re-measure before building anything new:** The historical council proposed a `state-machine` type. Phase 3's `feedback` + `reveal:"all"` + optional-badge changes may take it below its own three-lesson threshold. Sequence it after, then decide.
 
 ---
 
@@ -191,24 +191,3 @@ Partition by file, one agent per `level*.ts`, never `git add -A`. Convert only w
 **Effect on the 1,459 assertions: they should all keep passing, and this is better news than expected.** I read the suite and ran it (1,459 tests, green, 2.9 s). It asserts four things: every fence parses, every fence renders through the real markdown pipeline, no raw spec JSON leaks as text, and the same markdown renders **byte-identical HTML twice**. It does **not** assert on coordinates, node positions, or specific rendered label text. So the Phase 1 and 2 renderer changes do not touch it, provided rendering stays deterministic, which it does because layout stays a pure function of the spec. Phase 3 is additive with defaults, so all 22 existing topology specs parse unchanged.
 
 The one real risk is the determinism assertion: any change that introduces run-to-run variation, an unseeded value or a time read, fails 1,459 tests at once. That is the suite working as designed, and it is precisely the property that adopting an external renderer would have put at risk.
-
----
-
-## Appendix: verification log
-
-Verified by me against the repo and the network on 2026-08-13:
-
-- `topology-layout.ts` is 43 lines; relaxation runs `spec.nodes.length` passes; `e.kind !== "replication"` at line 19.
-- Cyclic 6-node spec produces 32 columns / 5,666px, with `etl` (col 31) past `train` (col 27). Reproduced by re-implementing the shipped function exactly.
-- `TopologyDiagram.tsx`: `NODE_W = 116`; `node.label.length > 18 ? node.label.slice(0, 17) + "…"`; `<svg aria-hidden="true" focusable="false">`; edges drawn as straight `<line>`; `visible` accumulates stages `0..player.index`; both nodes and edges filtered by it.
-- `useStepPlayer` initialises `useState(0)`, so SSR renders stage 0 only. Contract comments confirm never-autoplay, reduced-motion, keyboard control.
-- `DiagramFrame` supplies `<figure>`, `aria-label={groupLabel}`, `<figcaption>`.
-- 22 authored topology specs across 18 files.
-- `content-integrity.test.ts`: 1,459 tests, passing, 2.93 s; asserts parse + render + no-JSON-leak + byte-identical determinism.
-- `ANIMATED_DIAGRAM_TYPES = new Set(["topology","ladder"])` at `coverage.ts:53`, one call site at `:181`.
-- `lib/markdown/components.tsx:49` `<pre>` uses literal `border-gray-700/50 bg-gray-900/80 text-gray-200`, no `dark:`, no token. `preprocessAsciiArt` wraps loose ASCII into these same fences.
-- 55 ASCII architecture fences in SD curriculum; widest line 126 chars; 24 fences contain a line over 80 chars.
-- npm registry: mermaid 11.16.1 MIT; elkjs 0.12.0 EPL-2.0 OR GPL-3.0-or-later; @dagrejs/dagre 3.1.1 MIT; @xyflow/react 12.11.3 MIT; @viz-js/viz 3.29.0 MIT.
-- Mermaid gzip: entry 11,025 B; entry + 9 static chunks 124,375 B; UMD 971,552 B (raw 3,566,058 B).
-
-Taken from the surveys and **not** independently re-verified by me: all esbuild bundle measurements for elkjs / dagre / React Flow / d3-dag / reaflow / react-archer / react-xarrows; the D2 and Graphviz execution results; ELK and dagre layout-quality counts on the 22-spec corpus; the DOWN-flow width measurements; the ~21.3 KB figure for the existing system; the React Flow `role="application"` and attribution findings; the meta-analysis effect sizes.

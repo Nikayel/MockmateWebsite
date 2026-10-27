@@ -33,6 +33,8 @@ export interface SealedLegacyScenario {
   bugDescription?: string
   groundTruth?: string
   rootCauseRubric?: string[]
+  /** Post-session guidance only; never part of the root-cause scoring rubric. */
+  fixTradeoffs?: string
 }
 
 const SEALED_LEGACY_LOADERS: Record<string, () => Promise<{ sealed: SealedLegacyScenario }>> = {
@@ -90,9 +92,7 @@ export async function loadSealedLegacyReferenceFiles(
  * reference solution that the client module no longer carries. Scoring behavior is
  * preserved because the values are the exact ones that used to live on the client.
  */
-export async function hydrateSealedLegacyBugfix(
-  scenario: BugFixScenario
-): Promise<BugFixScenario> {
+export async function hydrateSealedLegacyBugfix(scenario: BugFixScenario): Promise<BugFixScenario> {
   const sealed = await loadSealedLegacyBugfix(scenario.id)
   if (!sealed) return scenario
   return {

@@ -69,7 +69,13 @@ describe("next practice against the real catalog", () => {
         scenario_id: current.id,
         difficulty: current.difficulty,
         language: "javascript",
-        bugfix_evidence_summary: { rootCauseExplained: false },
+        bugfix_evidence_summary: {
+          rootCauseAssessment: {
+            status: "observed",
+            score: 30,
+            evidence: "Maybe the order is wrong.",
+          },
+        },
       },
       [
         current,

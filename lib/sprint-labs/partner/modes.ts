@@ -1,6 +1,6 @@
 /**
  * Sable partner — mode resolver (docs/sprint-labs/AGENT-CONTEXT.md §6,
- * EXECUTION-STATE.md owner decision 4, PLAN.md Task 14).
+ * DECISIONS.md partner boundary, PLAN.md Task 14).
  *
  * Enforced as CAPABILITY, never as prompt-side conscience: `PartnerMode` is a
  * typed union where the illegal combination has no representable slot -- the

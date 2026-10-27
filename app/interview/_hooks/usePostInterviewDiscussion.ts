@@ -15,6 +15,8 @@ import {
   type LLMComplexityResult,
 } from "@/lib/interview"
 import type { Scenario } from "@/lib/scenarios"
+import { getWorkspacePrimaryCode } from "@/lib/workspace-execution/files"
+import { isWorkspaceScenario } from "@/lib/workspace-execution/validators"
 import type { ConversationTracker } from "@/lib/interview/interview-phases"
 import type { InterviewTargetCompany } from "@/lib/stores"
 import type {
@@ -23,6 +25,7 @@ import type {
   EfficiencyMetrics,
   TestResult,
   TestSummary,
+  WorkspaceContextFile,
 } from "../_types"
 
 export interface UsePostInterviewDiscussionOptions extends SessionRequestGuard {
@@ -44,7 +47,7 @@ export interface UsePostInterviewDiscussionOptions extends SessionRequestGuard {
   conversationTracker: ConversationTracker
   recentNudgeTopics: string[]
   targetCompany: InterviewTargetCompany
-  chatWorkspaceContext: unknown
+  chatWorkspaceContext: WorkspaceContextFile[]
 
   // Page state setters
   setIsGeneratingDiscussion: Dispatch<SetStateAction<boolean>>
@@ -101,7 +104,11 @@ export function usePostInterviewDiscussion(
         return false
       }
 
-      const optimalComplexity = (opts.selectedScenario as any)?.optimalComplexity
+      const optimalComplexity =
+        opts.selectedScenario.type === "dsa" ? opts.selectedScenario.optimalComplexity : undefined
+      const solutionCode = isWorkspaceScenario(opts.selectedScenario)
+        ? getWorkspacePrimaryCode(opts.selectedScenario, opts.chatWorkspaceContext)
+        : opts.code
 
       // Firebase ID token for authenticated API calls (null for guests)
       const authToken = await getCurrentUserToken()
@@ -111,7 +118,7 @@ export function usePostInterviewDiscussion(
       let llmComplexity: LLMComplexityResult | null = null
       try {
         llmComplexity = await analyzeComplexityWithLLM({
-          code: opts.code,
+          code: solutionCode,
           language: opts.selectedLanguage,
           problemTitle: opts.selectedScenario.title,
           problemDescription: opts.selectedScenario.description,
@@ -125,7 +132,7 @@ export function usePostInterviewDiscussion(
 
       if (!isCurrent()) return false
       // Build metrics: prefer LLM results, fall back to regex for missing values
-      const regexMetrics = analyzeCodeEfficiency(opts.code, optimalComplexity)
+      const regexMetrics = analyzeCodeEfficiency(solutionCode, optimalComplexity)
 
       // Use LLM complexity if available and confident, otherwise use regex
       let finalTimeComplexity = regexMetrics.estimatedTimeComplexity
@@ -206,8 +213,9 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
               }
             : { skill_level: opts.experienceLevel },
           workspaceContext: opts.chatWorkspaceContext,
-          currentCode: opts.code,
+          currentCode: solutionCode,
           scenarioTitle: opts.selectedScenario?.title,
+          scenarioId: opts.selectedScenario?.id,
           scenarioType: opts.selectedScenario?.type,
           scenarioCompany: opts.targetCompany,
           isProactive: false,

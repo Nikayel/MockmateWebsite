@@ -137,13 +137,19 @@ describe("calculateSystemDesignScores", () => {
     expect(result.overall).toBe(expected)
   })
 
-  it("fewer than 3 messages caps communication at 40 even with a high AI score", () => {
+  it("does not penalize a substantive explanation for using fewer messages", () => {
     const result = calculateSystemDesignScores(
       preScreen({ candidateMessageCount: 2 }),
       validation({ communicationScore: 90, questionsAsked: 0, questionsAnswered: 0 }),
       FILLED_DESIGN_NOTES
     )
-    expect(result.communication).toBe(40)
+    expect(result.communication).toBe(90)
+    const verbose = calculateSystemDesignScores(
+      preScreen({ candidateMessageCount: 20 }),
+      validation({ communicationScore: 90, questionsAsked: 0, questionsAnswered: 0 }),
+      FILLED_DESIGN_NOTES
+    )
+    expect(result).toEqual(verbose)
   })
 
   it("incoherent session drops every subscore to its penalty floor", () => {
@@ -197,9 +203,9 @@ describe("calculateSystemDesignScores", () => {
     expect(result).toEqual({
       understanding: 40,
       problemSolving: 15,
-      codeQuality: 60,
+      codeQuality: 15,
       communication: 35,
-      overall: 35,
+      overall: 26,
     })
   })
 })

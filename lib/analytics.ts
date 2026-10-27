@@ -167,11 +167,11 @@ export function trackSessionStart(params: {
 export function trackSessionComplete(params: {
   sessionId: string
   scenarioId: string
-  scenarioType: string
-  difficulty: string
+  scenarioType?: string
+  difficulty?: string
   language: string
   performanceScore?: number
-  durationMinutes: number
+  durationMinutes?: number
 }) {
   trackEvent("session_complete", params)
 }

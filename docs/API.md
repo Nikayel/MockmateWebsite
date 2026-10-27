@@ -5,7 +5,7 @@ Complete API documentation for the CodeSparring platform. All endpoints are serv
 ## Base URL
 
 ```
-Production: https://codesparring.com/api
+Production: https://www.codesparring.dev/api
 Development: http://localhost:3000/api
 ```
 
@@ -32,6 +32,7 @@ const token = await auth.currentUser?.getIdToken()
 | Category | Endpoints | Auth Required |
 |----------|-----------|---------------|
 | [Interview](#interview-apis) | `/chat`, `/execute`, `/generate-feedback` | Yes |
+| [Post-feedback recommendations](RECOMMENDATION-ENGINE.md) | `GET /recommendations/next-practice?sessionId=...` | Yes (session owner; all tiers) |
 | [User](#user-apis) | `/user/profile`, `/user/metrics` | Yes |
 | [Spaced Repetition](#spaced-repetition-apis) | `/spaced-repetition/*` | Yes |
 | [Payments](#payment-apis) | `/create-checkout`, `/customer-portal` | Yes |

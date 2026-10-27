@@ -23,7 +23,8 @@ import type {
   TestSummary,
   WorkspaceContextFile,
 } from "../_types"
-import { HARNESS_ERROR_NOTICE, isHarnessError } from "@/lib/workspace-execution/harness-errors"
+import { HARNESS_ERROR_NOTICE } from "@/lib/workspace-execution/harness-errors"
+import { isScoreableTest } from "@/lib/workspace-execution/test-outcomes"
 import {
   announceRunFailure,
   applyExecutionApiError,
@@ -199,7 +200,13 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
         if (selectedScenario.type === "bugfix") {
           recordBugfixEvidence({
             type: "test_run",
-            testSummary: data.summary,
+            testSummary: {
+              ...data.summary,
+              total: data.summary.effectiveTotal ?? data.summary.total,
+            },
+            ...(data.results[0]?.sourceRevision
+              ? { metadata: { sourceRevision: data.results[0].sourceRevision } }
+              : {}),
           })
           if (data.summary.failed > 0) {
             recordBugfixEvidence({
@@ -209,7 +216,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
           }
         }
 
-        syncHintAgentWithTestOutcome(data.summary, data.results)
+        if (!data.summary.serviceErrors) syncHintAgentWithTestOutcome(data.summary, data.results)
 
         setConsoleLogs(data.consoleLogs ?? [])
 
@@ -220,13 +227,16 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
         // below used to sit entirely behind `allFailed`, so a scenario mixing assert.equal
         // (which worked) with assert.deepEqual (which did not) produced a partial pass rate,
         // skipped classification altogether, and was scored against the candidate.
-        const harnessError = errorResults.find((r: TestResult) => isHarnessError(r.error))?.error
+        const platformFailure = errorResults.find((result: TestResult) => !isScoreableTest(result))
 
-        if (harnessError || (allFailed && errorResults.length > 0)) {
-          // Prefer the harness fault over errorResults[0]: a run mixing one genuine failure
+        if (platformFailure || (allFailed && errorResults.length > 0)) {
+          // Prefer the platform fault over errorResults[0]: a run mixing one genuine failure
           // with several of ours was being blamed entirely on the candidate.
-          const firstError = harnessError ?? errorResults[0].error
-          const cause = classifyFailedRun(firstError)
+          const firstError = platformFailure?.error ?? errorResults[0].error
+          const cause = classifyFailedRun(
+            firstError,
+            platformFailure?.failureKind ?? errorResults[0].failureKind
+          )
 
           if (cause === "service-down") {
             toast.error("Code execution unavailable", {
@@ -370,7 +380,13 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
         if (selectedScenario.type === "bugfix") {
           recordBugfixEvidence({
             type: "test_run",
-            testSummary: data.summary,
+            testSummary: {
+              ...data.summary,
+              total: data.summary.effectiveTotal ?? data.summary.total,
+            },
+            ...(data.results[0]?.sourceRevision
+              ? { metadata: { sourceRevision: data.results[0].sourceRevision } }
+              : {}),
           })
           if (data.summary.failed > 0) {
             recordBugfixEvidence({
@@ -378,7 +394,11 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
               testSummary: data.summary,
             })
           }
-          if (data.summary.failed === 0) {
+          if (
+            data.summary.failed === 0 &&
+            (data.summary.effectiveTotal ?? data.summary.total) > 0 &&
+            !data.summary.serviceErrors
+          ) {
             recordBugfixEvidence({
               type: "hidden_result_received",
               testSummary: data.summary,
@@ -386,7 +406,7 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
           }
         }
 
-        syncHintAgentWithTestOutcome(data.summary, data.results)
+        if (!data.summary.serviceErrors) syncHintAgentWithTestOutcome(data.summary, data.results)
 
         setConsoleLogs(data.consoleLogs ?? [])
 
@@ -397,13 +417,16 @@ export function useCodeExecution(opts: UseCodeExecutionOptions): UseCodeExecutio
         // below used to sit entirely behind `allFailed`, so a scenario mixing assert.equal
         // (which worked) with assert.deepEqual (which did not) produced a partial pass rate,
         // skipped classification altogether, and was scored against the candidate.
-        const harnessError = errorResults.find((r: TestResult) => isHarnessError(r.error))?.error
+        const platformFailure = errorResults.find((result: TestResult) => !isScoreableTest(result))
 
-        if (harnessError || (allFailed && errorResults.length > 0)) {
-          // Prefer the harness fault over errorResults[0]: a run mixing one genuine failure
+        if (platformFailure || (allFailed && errorResults.length > 0)) {
+          // Prefer the platform fault over errorResults[0]: a run mixing one genuine failure
           // with several of ours was being blamed entirely on the candidate.
-          const firstError = harnessError ?? errorResults[0].error
-          const cause = classifyFailedRun(firstError)
+          const firstError = platformFailure?.error ?? errorResults[0].error
+          const cause = classifyFailedRun(
+            firstError,
+            platformFailure?.failureKind ?? errorResults[0].failureKind
+          )
 
           if (cause === "service-down") {
             playSound("fail")

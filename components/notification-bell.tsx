@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Bell, ExternalLink, RefreshCw } from "lucide-react"
 import { useNotifications } from "@/lib/hooks/useNotifications"
-import { useAuth } from "@/lib/auth-context"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 
@@ -18,15 +17,8 @@ export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false)
   const [hoveredNotificationId, setHoveredNotificationId] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const { firebaseUser } = useAuth()
-
   const { notifications, unreadCount, loading, error, refresh, markRead, markAllRead } =
-    useNotifications({
-      // Poll every 60 seconds when authenticated
-      pollInterval: firebaseUser ? 60000 : 0,
-      // Fetch immediately when user is authenticated
-      fetchOnMount: true,
-    })
+    useNotifications()
 
   // Handle bell click
   const handleBellClick = useCallback(() => {

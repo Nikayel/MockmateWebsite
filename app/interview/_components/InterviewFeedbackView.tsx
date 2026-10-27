@@ -72,6 +72,7 @@ interface InterviewFeedbackViewProps {
   scoringRingTweenMs: FeedbackLoadingStateProps["ringTweenMs"]
   scoringRingEase: FeedbackLoadingStateProps["ringEase"]
   // PracticeFeedback
+  feedbackQueued?: boolean
   feedback: PracticeFeedbackProps["feedback"]
   performanceScore: PracticeFeedbackProps["performanceScore"]
   technicalScore: PracticeFeedbackProps["technicalScore"]
@@ -141,6 +142,7 @@ export function InterviewFeedbackView({
   scoringRingTweenMs,
   scoringRingEase,
   feedback,
+  feedbackQueued = false,
   performanceScore,
   technicalScore,
   scoreBreakdown,
@@ -211,6 +213,7 @@ export function InterviewFeedbackView({
           isGuidedLab={isGuidedLab}
           guidedLabAssessment={guidedLabAssessment}
           feedback={feedback}
+          feedbackPending={feedbackQueued}
           sessionId={sessionId}
           performanceScore={performanceScore}
           technicalScore={technicalScore}
@@ -233,7 +236,19 @@ export function InterviewFeedbackView({
           onClose={onGoToDashboard}
           clarifyingQuestionsAssessment={clarifyingQuestionsAssessment}
           afterScore={
-            showProfilePersonalization && userId ? (
+            feedbackQueued ? (
+              <div className="border-primary/20 bg-primary/5 rounded-xl border p-4" role="status">
+                <p className="font-medium">
+                  Your score is ready. Written feedback is taking longer.
+                </p>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  We’ll retry it in the background. Check Sessions for the finished report.
+                </p>
+                <Button variant="outline" size="sm" className="mt-3" onClick={onGoToDashboard}>
+                  Go to dashboard
+                </Button>
+              </div>
+            ) : showProfilePersonalization && userId && !feedbackQueued ? (
               <ProfilePersonalizationPrompt
                 userId={userId}
                 source="feedback"

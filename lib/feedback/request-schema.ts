@@ -1,4 +1,5 @@
 import { z } from "zod"
+import type { ExecutionTestObservation } from "@/lib/workspace-execution/test-outcomes"
 
 export const MAX_FEEDBACK_CODE_LENGTH = 100000
 export const MAX_FEEDBACK_TRANSCRIPT_LENGTH = 200000
@@ -67,7 +68,7 @@ export interface FeedbackTranscriptMessage {
   content: string
 }
 
-export interface FeedbackTestResult {
+export interface FeedbackTestResult extends ExecutionTestObservation {
   description?: string
   passed?: boolean
   expected?: unknown

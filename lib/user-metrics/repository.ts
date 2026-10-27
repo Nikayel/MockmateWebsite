@@ -4,7 +4,7 @@ import { aggregateMetricSessions } from "./aggregate"
 import type { MetricsSnapshot, MetricSession } from "./types"
 import type { QueryDocumentSnapshot } from "firebase-admin/firestore"
 
-const SCHEMA_VERSION = 1
+const SCHEMA_VERSION = 2
 const CACHE_MS = 60_000
 const PAGE_SIZE = 250
 
@@ -31,6 +31,8 @@ async function readFinalSessions(userId: string, now: number): Promise<MetricSes
         "started_at",
         "completed_at",
         "feedback_status",
+        "feedback_score_frozen",
+        "measurement_version",
         "performance_score",
         "technical_score",
         "mastery_score",

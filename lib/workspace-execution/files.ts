@@ -27,9 +27,9 @@ export function getVisibleWorkspaceFiles(scenario: WorkspaceScenario): Workspace
   return scenario.workspace.files.filter((file) => !file.hidden)
 }
 
-export function getWorkspacePrimaryCode(scenario: WorkspaceScenario): string {
-  return (
-    scenario.workspace.files.find((file) => file.path === scenario.workspace.primaryFilePath)
-      ?.content ?? ""
-  )
+export function getWorkspacePrimaryCode(
+  scenario: WorkspaceScenario,
+  files: ReadonlyArray<Pick<WorkspaceScenarioFile, "path" | "content">> = scenario.workspace.files
+): string {
+  return files.find((file) => file.path === scenario.workspace.primaryFilePath)?.content ?? ""
 }

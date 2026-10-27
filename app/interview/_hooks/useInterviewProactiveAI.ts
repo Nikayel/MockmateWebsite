@@ -1,11 +1,13 @@
 import { sessionFetch } from "@/lib/interview/session-fetch"
 import type { SessionContext } from "@/lib/interview/session-context/schema"
 import { useEffect, useRef } from "react"
+import { getWorkspacePrimaryCode } from "@/lib/workspace-execution/files"
+import { isWorkspaceScenario } from "@/lib/workspace-execution/validators"
 import type { Dispatch, SetStateAction } from "react"
 import { getCurrentUserToken } from "@/lib/firebase-lazy"
 import { extractTopicsFromMessage } from "@/lib/interview"
 import type { Scenario } from "@/lib/scenarios"
-import type { ChatMessage } from "../_types"
+import type { ChatMessage, WorkspaceContextFile } from "../_types"
 import { shouldTriggerSilenceNudge } from "./proactive-silence"
 import { getProactiveBlockReason } from "@/lib/interview/conversation-pacing"
 
@@ -34,7 +36,7 @@ export interface UseInterviewProactiveAIOptions {
   interviewerInput: string
   elapsedTime: number
   code: string
-  chatWorkspaceContext: unknown
+  chatWorkspaceContext: WorkspaceContextFile[]
   selectedScenario: Scenario | null
   targetCompany: string | null
   recentNudgeTopics: string[]
@@ -141,7 +143,11 @@ export function useInterviewProactiveAI(
             sessionId: opts.currentSessionId,
             ownerId: opts.ownerId,
             workspaceContext: opts.chatWorkspaceContext,
-            currentCode: opts.code,
+            currentCode:
+              opts.selectedScenario && isWorkspaceScenario(opts.selectedScenario)
+                ? getWorkspacePrimaryCode(opts.selectedScenario, opts.chatWorkspaceContext)
+                : opts.code,
+            scenarioId: opts.selectedScenario?.id,
             scenarioTitle: opts.selectedScenario?.title,
             scenarioType: opts.selectedScenario?.type,
             scenarioCompany: opts.targetCompany,

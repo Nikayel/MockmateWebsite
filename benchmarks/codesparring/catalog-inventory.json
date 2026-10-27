@@ -1,0 +1,2452 @@
+[
+  {
+    "id": "dsa-two-sum",
+    "title": "Two Sum",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-contains-duplicate",
+    "title": "Contains Duplicate",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-product-array-except-self",
+    "title": "Product of Array Except Self",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 7,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-group-anagrams",
+    "title": "Group Anagrams",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 6,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-longest-consecutive-sequence",
+    "title": "Longest Consecutive Sequence",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-first-missing-positive",
+    "title": "First Missing Positive",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 7,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-valid-anagram",
+    "title": "Valid Anagram",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 6,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-top-k-frequent-elements",
+    "title": "Top K Frequent Elements",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-encode-decode-strings",
+    "title": "Encode and Decode Strings",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-subarray-sum-equals-k",
+    "title": "Subarray Sum Equals K",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-find-all-duplicates",
+    "title": "Find All Duplicates in an Array",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-next-permutation",
+    "title": "Next Permutation",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 6,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-majority-element",
+    "title": "Majority Element",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-rotate-array",
+    "title": "Rotate Array",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-3sum",
+    "title": "3Sum",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-trapping-rain-water-two-pointers",
+    "title": "Trapping Rain Water",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 8,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-container-with-most-water",
+    "title": "Container With Most Water",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 6,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-longest-palindromic-substring",
+    "title": "Longest Palindromic Substring",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-remove-duplicates-sorted-array",
+    "title": "Remove Duplicates from Sorted Array",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-move-zeroes",
+    "title": "Move Zeroes",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-valid-palindrome",
+    "title": "Valid Palindrome",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-sort-colors",
+    "title": "Sort Colors",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-reverse-string",
+    "title": "Reverse String",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-partition-labels",
+    "title": "Partition Labels",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-two-sum-ii-sorted",
+    "title": "Two Sum II - Input Array Is Sorted",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-4sum",
+    "title": "4Sum",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-squares-sorted-array",
+    "title": "Squares of a Sorted Array",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-boats-save-people",
+    "title": "Boats to Save People",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-merge-sorted-array",
+    "title": "Merge Sorted Array",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-even-odd-index-sum-difference",
+    "title": "Difference Between Sums at Even and Odd Indices",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-student-highest-average",
+    "title": "Student with Highest Average Score",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-valid-parentheses",
+    "title": "Valid Parentheses",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 10,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-min-stack",
+    "title": "Min Stack",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-daily-temperatures",
+    "title": "Daily Temperatures",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 6,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-largest-rectangle-histogram",
+    "title": "Largest Rectangle in Histogram",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 7,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-evaluate-reverse-polish",
+    "title": "Evaluate Reverse Polish Notation",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-decode-string",
+    "title": "Decode String",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-asteroid-collision",
+    "title": "Asteroid Collision",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-simplify-path",
+    "title": "Simplify Path",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-basic-calculator",
+    "title": "Basic Calculator",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-remove-duplicates-string",
+    "title": "Remove All Adjacent Duplicates In String II",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-longest-valid-parentheses",
+    "title": "Longest Valid Parentheses",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 6,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-car-fleet",
+    "title": "Car Fleet",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-trapping-rain-water",
+    "title": "Trapping Rain Water",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-next-greater-element-i",
+    "title": "Next Greater Element I",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-next-greater-element-ii",
+    "title": "Next Greater Element II",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-online-stock-span",
+    "title": "Online Stock Span",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-132-pattern",
+    "title": "132 Pattern",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-max-frequency-stack",
+    "title": "Maximum Frequency Stack",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-best-time-to-buy-sell-stock",
+    "title": "Best Time to Buy and Sell Stock",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-longest-substring-without-repeating",
+    "title": "Longest Substring Without Repeating Characters",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-sliding-window-maximum",
+    "title": "Sliding Window Maximum",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-minimum-window-substring",
+    "title": "Minimum Window Substring",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-longest-repeating-character-replacement",
+    "title": "Longest Repeating Character Replacement",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-permutation-in-string",
+    "title": "Permutation in String",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-max-consecutive-ones-iii",
+    "title": "Max Consecutive Ones III",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-reverse-linked-list",
+    "title": "Reverse Linked List",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 6,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-linked-list-cycle",
+    "title": "Linked List Cycle",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 6,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-lru-cache",
+    "title": "LRU Cache",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 7,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-merge-two-sorted-lists",
+    "title": "Merge Two Sorted Lists",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-copy-list-random-pointer",
+    "title": "Copy List with Random Pointer",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-reorder-list",
+    "title": "Reorder List",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-remove-nth-from-end",
+    "title": "Remove Nth Node From End of List",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-add-two-numbers",
+    "title": "Add Two Numbers",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-linked-list-cycle-ii",
+    "title": "Linked List Cycle II",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-intersection-two-linked-lists",
+    "title": "Intersection of Two Linked Lists",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-remove-duplicates-sorted-list",
+    "title": "Remove Duplicates from Sorted List",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-palindrome-linked-list",
+    "title": "Palindrome Linked List",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-middle-linked-list",
+    "title": "Middle of the Linked List",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-reverse-nodes-k-group",
+    "title": "Reverse Nodes in k-Group",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-sort-list",
+    "title": "Sort List",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-swap-nodes-pairs",
+    "title": "Swap Nodes in Pairs",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-invert-binary-tree",
+    "title": "Invert Binary Tree",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-same-tree",
+    "title": "Same Tree",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-maximum-depth-binary-tree",
+    "title": "Maximum Depth of Binary Tree",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-symmetric-tree",
+    "title": "Symmetric Tree",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-subtree-of-another-tree",
+    "title": "Subtree of Another Tree",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-balanced-binary-tree",
+    "title": "Balanced Binary Tree",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-binary-tree-right-side-view",
+    "title": "Binary Tree Right Side View",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-count-good-nodes",
+    "title": "Count Good Nodes in Binary Tree",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-construct-binary-tree-preorder-inorder",
+    "title": "Construct Binary Tree from Preorder and Inorder Traversal",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-binary-tree-inorder",
+    "title": "Binary Tree Inorder Traversal",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-serialize-deserialize-tree",
+    "title": "Serialize and Deserialize Binary Tree",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-binary-tree-max-path-sum",
+    "title": "Binary Tree Maximum Path Sum",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-lowest-common-ancestor-binary-tree",
+    "title": "Lowest Common Ancestor of a Binary Tree",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-binary-tree-level-order",
+    "title": "Binary Tree Level Order Traversal",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-diameter-of-binary-tree",
+    "title": "Diameter of Binary Tree",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-path-sum",
+    "title": "Path Sum",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-path-sum-ii",
+    "title": "Path Sum II",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-flatten-binary-tree",
+    "title": "Flatten Binary Tree to Linked List",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-sum-root-to-leaf",
+    "title": "Sum Root to Leaf Numbers",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-populating-next-right",
+    "title": "Populating Next Right Pointers in Each Node",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-validate-bst",
+    "title": "Validate Binary Search Tree",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-binary-tree-zigzag",
+    "title": "Binary Tree Zigzag Level Order Traversal",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-all-nodes-distance-k",
+    "title": "All Nodes Distance K in Binary Tree",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-vertical-order-traversal",
+    "title": "Vertical Order Traversal of a Binary Tree",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-recover-bst",
+    "title": "Recover Binary Search Tree",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-number-of-islands",
+    "title": "Number of Islands",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-course-schedule",
+    "title": "Course Schedule",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 8,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-clone-graph",
+    "title": "Clone Graph",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-word-ladder",
+    "title": "Word Ladder",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-pacific-atlantic-water-flow",
+    "title": "Pacific Atlantic Water Flow",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-rotting-oranges",
+    "title": "Rotting Oranges",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-graph-valid-tree",
+    "title": "Graph Valid Tree",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-course-schedule-ii",
+    "title": "Course Schedule II",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 6,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-alien-dictionary",
+    "title": "Alien Dictionary",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-all-paths-source-target",
+    "title": "All Paths From Source to Target",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-surrounded-regions",
+    "title": "Surrounded Regions",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-number-connected-components",
+    "title": "Number of Connected Components in an Undirected Graph",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-redundant-connection",
+    "title": "Redundant Connection",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-network-delay-time",
+    "title": "Network Delay Time",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-cheapest-flights-k-stops",
+    "title": "Cheapest Flights Within K Stops",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-min-cost-connect-points",
+    "title": "Min Cost to Connect All Points",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-accounts-merge",
+    "title": "Accounts Merge",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-swim-in-rising-water",
+    "title": "Swim in Rising Water",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-walls-and-gates",
+    "title": "Walls and Gates",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-shortest-path-binary-matrix",
+    "title": "Shortest Path in Binary Matrix",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-open-the-lock",
+    "title": "Open the Lock",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-evaluate-division",
+    "title": "Evaluate Division",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-is-graph-bipartite",
+    "title": "Is Graph Bipartite?",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-find-path-exists",
+    "title": "Find if Path Exists in Graph",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-keys-and-rooms",
+    "title": "Keys and Rooms",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-snakes-and-ladders",
+    "title": "Snakes and Ladders",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-find-town-judge",
+    "title": "Find the Town Judge",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-maximum-subarray",
+    "title": "Maximum Subarray",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-climbing-stairs",
+    "title": "Climbing Stairs",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-longest-increasing-subsequence",
+    "title": "Longest Increasing Subsequence",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-word-break",
+    "title": "Word Break",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 6,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-house-robber",
+    "title": "House Robber",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 7,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-unique-paths",
+    "title": "Unique Paths",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-edit-distance",
+    "title": "Edit Distance",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-coin-change",
+    "title": "Coin Change",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-longest-common-subsequence",
+    "title": "Longest Common Subsequence",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 6,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-01-knapsack",
+    "title": "0/1 Knapsack Problem",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-partition-equal-subset-sum",
+    "title": "Partition Equal Subset Sum",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 7,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-regular-expression-matching",
+    "title": "Regular Expression Matching",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-house-robber-ii",
+    "title": "House Robber II",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-decode-ways",
+    "title": "Decode Ways",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 7,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-maximum-product-subarray",
+    "title": "Maximum Product Subarray",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 6,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-target-sum",
+    "title": "Target Sum",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-minimum-path-sum",
+    "title": "Minimum Path Sum",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-palindromic-substrings",
+    "title": "Palindromic Substrings",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-longest-palindromic-subsequence",
+    "title": "Longest Palindromic Subsequence",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-best-time-buy-sell-stock-ii",
+    "title": "Best Time to Buy and Sell Stock II",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-best-time-buy-sell-stock-cooldown",
+    "title": "Best Time to Buy and Sell Stock with Cooldown",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-triangle",
+    "title": "Triangle",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-maximal-square",
+    "title": "Maximal Square",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-min-cost-climbing-stairs",
+    "title": "Min Cost Climbing Stairs",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-kth-largest-element",
+    "title": "Kth Largest Element in an Array",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-merge-k-sorted-lists",
+    "title": "Merge K Sorted Lists",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-find-median-data-stream",
+    "title": "Find Median from Data Stream",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-task-scheduler",
+    "title": "Task Scheduler",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-k-closest-points-origin",
+    "title": "K Closest Points to Origin",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-reorganize-string",
+    "title": "Reorganize String",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-rearrange-string-k-distance",
+    "title": "Rearrange String k Distance Apart",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-last-stone-weight",
+    "title": "Last Stone Weight",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-top-k-frequent-words",
+    "title": "Top K Frequent Words",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-binary-search",
+    "title": "Binary Search",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 9,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-search-rotated-sorted-array",
+    "title": "Search in Rotated Sorted Array",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 8,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-find-first-last-position",
+    "title": "Find First and Last Position of Element in Sorted Array",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-find-minimum-rotated-sorted-array",
+    "title": "Find Minimum in Rotated Sorted Array",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-search-2d-matrix",
+    "title": "Search a 2D Matrix",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-koko-eating-bananas",
+    "title": "Koko Eating Bananas",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-median-two-sorted-arrays",
+    "title": "Median of Two Sorted Arrays",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-first-bad-version",
+    "title": "First Bad Version",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-search-insert-position",
+    "title": "Search Insert Position",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-time-based-key-value-store",
+    "title": "Time Based Key-Value Store",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-capacity-ship-packages",
+    "title": "Capacity To Ship Packages Within D Days",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-word-search",
+    "title": "Word Search",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-combination-sum",
+    "title": "Combination Sum",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-permutations",
+    "title": "Permutations",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-subsets",
+    "title": "Subsets",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-n-queens",
+    "title": "N-Queens",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-letter-combinations-phone",
+    "title": "Letter Combinations of a Phone Number",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-palindrome-partitioning",
+    "title": "Palindrome Partitioning",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-generate-parentheses",
+    "title": "Generate Parentheses",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-merge-intervals",
+    "title": "Merge Intervals",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-insert-interval",
+    "title": "Insert Interval",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-non-overlapping-intervals-intervals",
+    "title": "Non-overlapping Intervals",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-meeting-rooms-ii",
+    "title": "Meeting Rooms II",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-meeting-rooms",
+    "title": "Meeting Rooms",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-rotate-image",
+    "title": "Rotate Image",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-string-to-integer-atoi",
+    "title": "String to Integer (atoi)",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-spiral-matrix",
+    "title": "Spiral Matrix",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-set-matrix-zeroes",
+    "title": "Set Matrix Zeroes",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-pow-x-n",
+    "title": "Pow(x, n)",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-plus-one",
+    "title": "Plus One",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-happy-number",
+    "title": "Happy Number",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-roman-to-integer",
+    "title": "Roman to Integer",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-valid-binary-search-tree",
+    "title": "Validate Binary Search Tree",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-lowest-common-ancestor-bst",
+    "title": "Lowest Common Ancestor of BST",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-kth-smallest-bst",
+    "title": "Kth Smallest Element in BST",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-delete-node-bst",
+    "title": "Delete Node in a BST",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-convert-sorted-array-bst",
+    "title": "Convert Sorted Array to Binary Search Tree",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-two-sum-bst",
+    "title": "Two Sum IV - Input is a BST",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-bst-iterator",
+    "title": "Binary Search Tree Iterator",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-range-sum-bst",
+    "title": "Range Sum of BST",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 2,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-serialize-deserialize-bst",
+    "title": "Serialize and Deserialize BST",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-closest-bst-value",
+    "title": "Closest Binary Search Tree Value",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-inorder-successor-bst",
+    "title": "Inorder Successor in BST",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-implement-trie",
+    "title": "Implement Trie (Prefix Tree)",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-word-search-ii",
+    "title": "Word Search II",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-design-autocomplete",
+    "title": "Design Search Autocomplete System",
+    "track": "dsa",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-word-break-trie",
+    "title": "Word Break",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-replace-words",
+    "title": "Replace Words",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-add-search-word",
+    "title": "Design Add and Search Words Data Structure",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-single-number",
+    "title": "Single Number",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-number-of-1-bits",
+    "title": "Number of 1 Bits",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-counting-bits",
+    "title": "Counting Bits",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-reverse-bits",
+    "title": "Reverse Bits",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-missing-number",
+    "title": "Missing Number",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-sum-of-two-integers",
+    "title": "Sum of Two Integers",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-jump-game",
+    "title": "Jump Game",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-jump-game-ii",
+    "title": "Jump Game II",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-gas-station",
+    "title": "Gas Station",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-task-scheduler-greedy",
+    "title": "Task Scheduler",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-partition-labels-greedy",
+    "title": "Partition Labels",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-hand-of-straights",
+    "title": "Hand of Straights",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-valid-parenthesis-string",
+    "title": "Valid Parenthesis String",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 5,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-merge-triplets",
+    "title": "Merge Triplets to Form Target Triplet",
+    "track": "dsa",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 3,
+    "editableSourceLines": null
+  },
+  {
+    "id": "dsa-maximum-units-on-truck",
+    "title": "Maximum Units on a Truck",
+    "track": "dsa",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 4,
+    "editableSourceLines": null
+  },
+  {
+    "id": "bugfix-search-race",
+    "title": "Support Console: Reservation Lookup Shows the Wrong Guest",
+    "track": "bugfix",
+    "difficulty": "medium",
+    "selected": false,
+    "python": false,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 25
+  },
+  {
+    "id": "bugfix-billing-webhook-idempotency",
+    "title": "Billing: Duplicate Credits and Surprise Downgrades After Replays",
+    "track": "bugfix",
+    "difficulty": "hard",
+    "selected": false,
+    "python": false,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 24
+  },
+  {
+    "id": "bugfix-api-rate-limiter-workspace",
+    "title": "Rate Limiter: Bursts Slip Past the Plan Limit",
+    "track": "bugfix",
+    "difficulty": "hard",
+    "selected": false,
+    "python": false,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 29
+  },
+  {
+    "id": "bugfix-comment-thread-merge",
+    "title": "Editor Comments: Sidebar Over-Counts Unresolved Threads",
+    "track": "bugfix",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 14
+  },
+  {
+    "id": "bugfix-event-aggregation-retries",
+    "title": "Analytics: One Account's Event Counts Are Inflated",
+    "track": "bugfix",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 11
+  },
+  {
+    "id": "bugfix-feature-pipeline-nan-workspace",
+    "title": "Feature Pipeline: A Migrated Cohort Scores Wrong",
+    "track": "bugfix",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 16
+  },
+  {
+    "id": "bugfix-temperature-alert-regression",
+    "title": "Ops Panel Undercounts Cold-Streak Recovery Windows",
+    "track": "bugfix",
+    "difficulty": "medium",
+    "selected": false,
+    "python": false,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 32
+  },
+  {
+    "id": "bugfix-onboarding",
+    "title": "Warm-up: the adjustment matcher pairs money that's already settled",
+    "track": "bugfix",
+    "difficulty": "easy",
+    "selected": false,
+    "python": false,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 26
+  },
+  {
+    "id": "bugfix-bookclub-reading-streak-workspace",
+    "title": "BookClub Reading Streak & History",
+    "track": "bugfix",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 57
+  },
+  {
+    "id": "bugfix-foundry-usage-rollup",
+    "title": "Compute-Usage Rollup Overbills a Replayed Build",
+    "track": "bugfix",
+    "difficulty": "medium",
+    "selected": false,
+    "python": false,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 35
+  },
+  {
+    "id": "datadog-alert-dedup-order",
+    "title": "Alert-incident rollup hides a monitor's second page in an interleaved feed",
+    "track": "bugfix",
+    "difficulty": "hard",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 120
+  },
+  {
+    "id": "datadog-endpoint-latency-peak",
+    "title": "Peak latency report overstates one endpoint",
+    "track": "bugfix",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 63
+  },
+  {
+    "id": "datadog-metric-window-rollup",
+    "title": "Metric window rollup pages on-call for a minute that never spiked",
+    "track": "bugfix",
+    "difficulty": "medium",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 117
+  },
+  {
+    "id": "datadog-monitor-empty-series",
+    "title": "Monitor board reads OK for a series whose exporter went silent",
+    "track": "bugfix",
+    "difficulty": "easy",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 80
+  },
+  {
+    "id": "generic-cache-eviction-mutation",
+    "title": "Cache eviction report over-reports one namespace's live entries",
+    "track": "bugfix",
+    "difficulty": "medium",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 107
+  },
+  {
+    "id": "generic-log-error-rollup",
+    "title": "Reliability rollup over-reports one service's ERROR count",
+    "track": "bugfix",
+    "difficulty": "easy",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 76
+  },
+  {
+    "id": "generic-session-window-count",
+    "title": "Session rollup over-counts one user's visits",
+    "track": "bugfix",
+    "difficulty": "hard",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 119
+  },
+  {
+    "id": "palantir-entity-resolution-merge",
+    "title": "Entity resolution merges two tenants' entities into one link count",
+    "track": "bugfix",
+    "difficulty": "medium",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 111
+  },
+  {
+    "id": "palantir-foundry-usage-rollup",
+    "title": "Foundry usage rollup bills one account too much",
+    "track": "bugfix",
+    "difficulty": "medium",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 66
+  },
+  {
+    "id": "palantir-ontology-link-rollup",
+    "title": "Ontology link report undercounts one object type",
+    "track": "bugfix",
+    "difficulty": "easy",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 53
+  },
+  {
+    "id": "palantir-pipeline-order-dependence",
+    "title": "Foundry pipeline report over-counts one transform's materialized records",
+    "track": "bugfix",
+    "difficulty": "hard",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 119
+  },
+  {
+    "id": "stripe-ledger-double-post",
+    "title": "Overlapping settlement batches over-credit one account's balance",
+    "track": "bugfix",
+    "difficulty": "medium",
+    "selected": false,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 107
+  },
+  {
+    "id": "stripe-payout-batch-mutation",
+    "title": "Nightly payout run under-schedules one merchant's settlement",
+    "track": "bugfix",
+    "difficulty": "hard",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 117
+  },
+  {
+    "id": "stripe-webhook-idempotency",
+    "title": "Webhook replay under-credits one merchant's balance",
+    "track": "bugfix",
+    "difficulty": "easy",
+    "selected": true,
+    "python": true,
+    "shippedCaseCount": 1,
+    "editableSourceLines": 76
+  }
+]

@@ -37,6 +37,7 @@ export async function executeJsClientSide(
           expected: testCase.expected,
           actual: null,
           passed: false,
+          failureKind: runResult.failureKind,
           error: runResult.error || "Execution failed",
         })
         continue

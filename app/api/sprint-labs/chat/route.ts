@@ -1,6 +1,6 @@
 /**
  * /api/sprint-labs/chat — the Sable in-workspace partner (chat-only v0).
- * docs/sprint-labs/AGENT-CONTEXT.md §3/§6, EXECUTION-STATE.md owner decision
+ * docs/sprint-labs/AGENT-CONTEXT.md §3/§6, DECISIONS.md owner decision
  * 4, INTEGRATION.md §4, PLAN.md Task 14.
  *
  * Thin: flag -> metered preamble -> validate -> tier gate -> resolve the

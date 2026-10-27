@@ -98,12 +98,15 @@ export function calculateSystemDesignScores(
   }
 
   let codeQuality = 25
-  if (aiValidation.isCoherent && preScreen.hasContent) {
-    const messageCount = preScreen.candidateMessageCount || 0
-    if (messageCount >= 10) codeQuality = Math.min(90, codeQuality + 45)
-    else if (messageCount >= 5) codeQuality = Math.min(80, codeQuality + 35)
-    else if (messageCount >= 3) codeQuality = Math.min(70, codeQuality + 25)
-    else codeQuality = Math.min(55, codeQuality + 15)
+  if (aiValidation.isCoherent && aiValidation.responsesRelevant && preScreen.hasContent) {
+    // Assess the content of the design discussion rather than its message count.
+    if (aiValidation.approachExplained) {
+      codeQuality += { none: 0, poor: 5, basic: 10, good: 20, excellent: 30 }[
+        aiValidation.approachQuality
+      ]
+    }
+    if (aiValidation.alternativesDiscussed) codeQuality += 15
+    if (aiValidation.edgeCasesConsidered) codeQuality += 10
   } else {
     codeQuality = Math.max(15, codeQuality - 15)
   }
@@ -119,14 +122,14 @@ export function calculateSystemDesignScores(
   // The bonus must not undo the relevance cap above: answering every question
   // with off-topic content is not communication credit. The Node DSA scorer
   // already nests its equivalent bonus inside the relevant-and-coherent branch.
-  if (aiValidation.isCoherent && aiValidation.responsesRelevant && aiValidation.questionsAsked > 0) {
+  if (
+    aiValidation.isCoherent &&
+    aiValidation.responsesRelevant &&
+    aiValidation.questionsAsked > 0
+  ) {
     const answerRate = aiValidation.questionsAnswered / aiValidation.questionsAsked
     if (answerRate >= 0.8) communication = Math.min(95, communication + 10)
     else if (answerRate >= 0.5) communication = Math.min(90, communication + 5)
-  }
-
-  if (preScreen.candidateMessageCount < 3) {
-    communication = Math.min(40, communication)
   }
 
   // NOTE: this function does not apply the communication-evidence gate itself.

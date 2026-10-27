@@ -21,3 +21,6 @@ extension/
 
 # Documentation
 *.md
+
+# Benchmark snapshots are generated and fingerprinted byte-for-byte.
+benchmarks/codesparring/**/*.json

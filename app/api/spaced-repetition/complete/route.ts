@@ -141,6 +141,16 @@ export async function POST(request: NextRequest) {
     )
     const difficulty = scenario.difficulty as Difficulty
 
+    // An unavailable test run is not a failed recall. Explicit design assessments
+    // still use providedMasteryScore; coding runs need judged tests.
+    if (providedMasteryScore == null && test_cases_total === 0) {
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        reason: "No assessed result; review schedule unchanged.",
+      })
+    }
+
     // Calculate mastery score for spaced repetition
     // This is separate from performance_score - it focuses on code correctness, not communication
     const masteryScore =

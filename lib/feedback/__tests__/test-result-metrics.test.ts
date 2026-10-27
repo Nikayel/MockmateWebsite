@@ -40,15 +40,37 @@ describe("calculateFeedbackTestMetrics", () => {
     ])
 
     expect(metrics.testsPassed).toBe(1)
-    expect(metrics.testsTotal).toBe(2)
-    expect(metrics.serviceErrorCount).toBe(4)
-    expect(metrics.validTests.map((test) => test.description)).toEqual(["passes", "fails"])
+    expect(metrics.testsTotal).toBe(3)
+    expect(metrics.serviceErrorCount).toBe(3)
+    expect(metrics.validTests.map((test) => test.description)).toEqual([
+      "passes",
+      "fails",
+      "timeout",
+    ])
     expect(metrics.serviceErrorTests.map((test) => test.description)).toEqual([
       "busy",
-      "timeout",
       "unavailable",
       "null actual",
     ])
+  })
+
+  it("counts candidate timeouts and exceptions returning null as failures", () => {
+    const metrics = calculateFeedbackTestMetrics([
+      { passed: true },
+      { passed: false, error: "Code execution timed out. Try checking for infinite loops." },
+      { passed: false, error: "TypeError: invalid input", actual: "null" },
+    ])
+    expect(metrics.testsTotal).toBe(3)
+    expect(metrics.testsPassed).toBe(1)
+    expect(metrics.serviceErrorCount).toBe(0)
+  })
+
+  it("honors explicit platform failures even when their message mentions a timeout", () => {
+    const metrics = calculateFeedbackTestMetrics([
+      { passed: false, error: "Initialization timed out", failureKind: "service" },
+    ])
+    expect(metrics.testsTotal).toBe(0)
+    expect(metrics.serviceErrorCount).toBe(1)
   })
 
   it("treats missing test results as zero tests", () => {

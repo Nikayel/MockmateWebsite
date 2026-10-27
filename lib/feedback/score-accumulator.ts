@@ -356,9 +356,6 @@ export function calculateSystemDesignScores(signals: {
     requirements += 40
     signalsUsed.push("requirements")
   }
-  if (signals.candidateMessageCount >= 5) {
-    requirements += 20
-  }
 
   // Architecture (Problem-Solving equivalent)
   if (signals.hasDesignNotes && signals.designNotesLength > 200) {
@@ -387,7 +384,6 @@ export function calculateSystemDesignScores(signals: {
     signals.questionsAsked > 0 ? signals.questionsAnswered / signals.questionsAsked : 0
   communication += answerRate * 30
   if (signals.approachExplained) communication += 20
-  if (signals.candidateMessageCount >= 10) communication += 20
 
   // Overall for system design uses the canonical system-design weights so the
   // instant score matches the final AI-validated score. requirements maps to
@@ -408,7 +404,7 @@ export function calculateSystemDesignScores(signals: {
     silentSolution: false,
     incompleteSolution: signals.candidateMessageCount < 3 && !signals.hasDesignNotes,
     aiCopyingDetected: false,
-    confidence: signals.candidateMessageCount >= 5 ? "high" : "medium",
+    confidence: "low", // Keyword/interaction signals are provisional, regardless of volume.
     signalsUsed,
   }
 }

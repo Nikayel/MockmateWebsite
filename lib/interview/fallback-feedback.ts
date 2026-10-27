@@ -24,6 +24,7 @@ export interface FallbackFeedbackRequest {
   testsTotal?: number
   bugfixEvidenceEvents?: BugfixEvidenceEvent[]
   bugfixExpectedTouchedFiles?: string[]
+  bugfixFinalSourceRevision?: string
 }
 
 export interface FallbackScoreBreakdown {
@@ -53,6 +54,7 @@ export function computeFallbackScores(request: FallbackFeedbackRequest): Fallbac
     const evidenceSummary = summarizeBugfixEvidence({
       events: request.bugfixEvidenceEvents || [],
       expectedTouchedFiles: request.bugfixExpectedTouchedFiles || [],
+      finalSourceRevision: request.bugfixFinalSourceRevision,
     })
     // Pass the difficulty through (the stream path does): calculateBugfixEvidenceScore scales
     // codebaseNavigation's target by it, so dropping it scored every fallback bugfix as medium.

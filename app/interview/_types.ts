@@ -27,6 +27,8 @@ export type ChatMessage = {
 }
 
 export type TestResult = {
+  sourceRevision?: string
+  failureKind?: import("@/lib/workspace-execution/test-outcomes").ExecutionFailureKind
   description: string
   passed: boolean
   input: unknown

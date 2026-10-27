@@ -1,5 +1,6 @@
 import type { InterviewSession } from "@/lib/types"
 import type { NextPracticeRecommendation } from "./next-practice-types"
+import { needsRootCausePractice } from "@/lib/bugfix/reasoning-assessment"
 
 type PracticeFocus = Pick<NextPracticeRecommendation, "focus" | "focusSource" | "feedbackNote">
 
@@ -12,7 +13,7 @@ export function getNextPracticeFocus(session: InterviewSession): PracticeFocus {
       focusSource: "bugfix-evidence",
     }
   }
-  if (session.type === "bugfix" && evidence?.rootCauseExplained === false) {
+  if (session.type === "bugfix" && needsRootCausePractice(evidence)) {
     return {
       focus: "Explain the root cause and why your change fixes it, then verify with tests.",
       focusSource: "bugfix-evidence",

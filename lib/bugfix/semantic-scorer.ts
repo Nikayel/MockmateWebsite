@@ -9,6 +9,7 @@ export const BugfixSemanticScoreSchema = z.object({
   preventionQuality: z.number().int().min(0).max(100),
   communicationScore: z.number().int().min(0).max(100),
   scoringRationale: z.string().max(500).optional(),
+  rootCauseEvidence: z.string().trim().min(1).max(500).nullable().optional(),
 })
 
 export type BugfixSemanticScores = z.infer<typeof BugfixSemanticScoreSchema>
@@ -193,6 +194,7 @@ Return ONLY this JSON:
   "rootCauseAccuracy": 0-100,
   "preventionQuality": 0-100,
   "communicationScore": 0-100,
+  "rootCauseEvidence": "exact quote from a CANDIDATE turn supporting the root cause assessment, or null if none was stated",
   "scoringRationale": "one sentence explaining the rootCauseAccuracy score"
 }`.trim()
 }

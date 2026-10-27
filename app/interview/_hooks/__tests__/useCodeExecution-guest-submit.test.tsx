@@ -17,11 +17,13 @@ import { renderHook, act } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const executeScenario = vi.fn()
+const classifyFailedRun = vi.fn((_error: unknown, _failureKind?: unknown) => "user-code")
 vi.mock("../code-execution-helpers", () => ({
   executeScenario: (...args: unknown[]) => executeScenario(...args),
   applyExecutionApiError: vi.fn(),
   announceRunFailure: vi.fn(),
-  classifyFailedRun: () => "user-code",
+  classifyFailedRun: (error: unknown, failureKind?: unknown) =>
+    classifyFailedRun(error, failureKind),
 }))
 
 vi.mock("@/lib/firestore-helpers", () => ({
@@ -104,6 +106,37 @@ beforeEach(() => {
 })
 
 describe("submitCode handoff for a guest", () => {
+  it("does not treat partial platform failures as a successful completed run", async () => {
+    classifyFailedRun.mockReturnValueOnce("service-down")
+    executeScenario.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        results: [
+          { passed: true },
+          { passed: false, error: "Runtime startup timed out", failureKind: "service" },
+        ],
+        summary: {
+          passed: 1,
+          total: 2,
+          failed: 0,
+          passRate: 100,
+          effectiveTotal: 1,
+          serviceErrors: 1,
+        },
+        consoleLogs: [],
+      },
+    })
+    const opts = buildOpts()
+    const { result } = renderHook(() => useCodeExecution(opts as never))
+    await act(async () => {
+      await result.current.submitCode()
+    })
+    expect(classifyFailedRun).toHaveBeenCalledWith("Runtime startup timed out", "service")
+    expect(opts.syncHintAgentWithTestOutcome).not.toHaveBeenCalled()
+    expect(opts.setShowPostInterviewDiscussion).not.toHaveBeenCalled()
+    expect(persistGuestPostSubmitState).not.toHaveBeenCalled()
+  })
+
   it("saves the recovery point before entering the account-gated post-submit phase", async () => {
     const opts = buildOpts()
     const { result } = renderHook(() => useCodeExecution(opts as never))

@@ -1,6 +1,7 @@
 import { sessionAssetUrl } from "@/lib/interview/session-fetch"
 // Function to execute wrapped code string in Web Worker with a 5s timeout
 import { WORKER_START_FAILURE_MESSAGE } from "../harness-errors"
+import type { ExecutionFailureKind } from "../test-outcomes"
 
 export type WorkerRunResult = {
   success: boolean
@@ -9,6 +10,7 @@ export type WorkerRunResult = {
   error?: string
   // Set by the worker (or by a spawn/onerror failure here) when the worker could not START, as
   // opposed to the learner's code failing. Only this kind of failure is retried.
+  failureKind?: ExecutionFailureKind
   workerStartFailed?: boolean
 }
 
@@ -26,6 +28,7 @@ function runInWorkerOnce(
         logs: [],
         error: `Failed to spawn Web Worker: ${err}`,
         workerStartFailed: true,
+        failureKind: "service",
       })
       return
     }
@@ -36,6 +39,7 @@ function runInWorkerOnce(
         success: false,
         logs: [],
         error: "Code execution timed out. Try checking for infinite loops.",
+        failureKind: "candidate-timeout",
       })
     }, timeoutMs)
 
@@ -53,6 +57,7 @@ function runInWorkerOnce(
         logs: [],
         error: err.message || "Unknown worker error",
         workerStartFailed: true,
+        failureKind: "service",
       })
     }
 
@@ -65,7 +70,12 @@ export async function runInWorker(
   timeoutMs = 5000
 ): Promise<WorkerRunResult> {
   if (typeof window === "undefined") {
-    return { success: false, logs: [], error: "Execution environment is not browser" }
+    return {
+      success: false,
+      logs: [],
+      error: "Execution environment is not browser",
+      failureKind: "service",
+    }
   }
 
   const first = await runInWorkerOnce(workerData, timeoutMs)
@@ -80,5 +90,5 @@ export async function runInWorker(
     return second
   }
 
-  return { success: false, logs: [], error: WORKER_START_FAILURE_MESSAGE }
+  return { success: false, logs: [], error: WORKER_START_FAILURE_MESSAGE, failureKind: "service" }
 }

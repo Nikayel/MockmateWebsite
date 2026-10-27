@@ -15,10 +15,20 @@ describe("practice observations", () => {
     expect(
       practiceObservations(
         session({
-          bugfix_evidence_summary: { reproducedBeforeEditing: false, rootCauseExplained: false },
+          bugfix_evidence_summary: {
+            reproducedBeforeEditing: false,
+            rootCauseAssessment: { status: "observed", score: 40, evidence: "The order is wrong." },
+          },
         }),
         session({
-          bugfix_evidence_summary: { reproducedBeforeEditing: true, rootCauseExplained: true },
+          bugfix_evidence_summary: {
+            reproducedBeforeEditing: true,
+            rootCauseAssessment: {
+              status: "observed",
+              score: 90,
+              evidence: "Removing the entry shifts the next index.",
+            },
+          },
         })
       )
     ).toHaveLength(2)
@@ -36,6 +46,14 @@ describe("practice observations", () => {
       practiceObservations(
         session({ score_breakdown: { understandingScore: 40 } }),
         session({ type: "dsa", score_breakdown: { understandingScore: 80 } })
+      )
+    ).toEqual([])
+  })
+  it("does not call a scoring-version change learner progress", () => {
+    expect(
+      practiceObservations(
+        session({ score_breakdown: { communicationScore: 40 } }),
+        session({ measurement_version: 2, score_breakdown: { communicationScore: 80 } })
       )
     ).toEqual([])
   })

@@ -176,6 +176,16 @@ describe("interview payload contract (Slice 0 oracle)", () => {
     expect(contract).toMatchSnapshot()
   })
 
+  it("includes the stable scenario ID in workspace-aware chat entry points", () => {
+    const workspaceRequests = scanContract()["fetch POST /api/chat"].filter((fields) =>
+      fields.includes("sessionContext")
+    )
+    expect(workspaceRequests).toHaveLength(3)
+    for (const fields of workspaceRequests) {
+      expect(fields).toContain("scenarioId")
+    }
+  })
+
   it("persists guided assessment and scoped progress through each recovery boundary", () => {
     // Intentional feature change: assessment replaces the old quiz-summary payload;
     // phase evidence must also survive authenticated, guest and local autosave.

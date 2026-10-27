@@ -1,7 +1,7 @@
 /**
  * Research-participation consent (Admin SDK, server-only).
  *
- * WHY THIS EXISTS: the platform describes itself, in `docs/learner-model/RESEARCH-MEMO.md`,
+ * WHY THIS EXISTS: the platform describes itself, in `docs/learner-model/STUDY-HARNESS.md`,
  * as hosting a between-subjects field study, and it now logs item-level learning data.
  * There was no consent surface anywhere in the app. That is the gap this closes.
  *

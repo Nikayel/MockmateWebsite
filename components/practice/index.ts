@@ -1,7 +1,7 @@
 export { StreakBanner } from "./StreakBanner"
 export { DueForReview, type DueItem, type Priority, type MasteryLevel } from "./DueForReview"
 export { PatternMastery } from "./PatternMastery"
-export { SmartRecommendations } from "./SmartRecommendations"
+export { NextPracticeCard } from "./NextPracticeCard"
 export { ReviewCard } from "./ReviewCard"
 export { ReviewSections } from "./ReviewSections"
 export { ReviewCalendar } from "./ReviewCalendar"

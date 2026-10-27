@@ -15,6 +15,16 @@ CodeSparring is an AI-powered coding interview practice platform built in the `M
 - Prefer clear, boring, maintainable code over clever code.
 - Run focused checks after meaningful changes.
 
+## Complexity Review & Learning
+
+Apply this to every feature, fix, and refactor, including AI-generated code. Treat each change as a short teaching opportunity for the owner to learn engineering judgment and catch AI drift.
+
+- **Start with the simplest adequate change.** Read the existing flow and look for reusable code before adding files, dependencies, state, or abstractions. New layers must solve a current, concrete problem; hypothetical future reuse is insufficient.
+- **Review the finished diff for complexity.** Check for unnecessary files, one-use wrappers, indirection, duplicated rules, redundant state/effects, speculative configuration, and tests that only mirror implementation. Simplify within scope before reporting completion. File-size targets guide cohesion; do not fragment a simple solution merely to meet a line count.
+- **Verify generated code independently.** Trace inputs, state, side effects, and failures against the actual requirement. Passing tests or a model's confident explanation alone do not establish correctness. Preserve necessary validation, authorization, recovery, and domain boundaries when simplifying.
+- **Pinpoint drift with evidence.** Name the file/function, the unnecessary mechanism, and the simpler alternative. Fix it when in scope; briefly flag relevant work outside scope without expanding the task. Do not invent findings or claim an audit beyond what you inspected.
+- **Teach briefly in the final summary.** Alongside the outcome and verification, give 1–3 short points tied to actual files/functions: the decision and why, a simpler alternative considered or applied, and a useful signal the owner can use to spot similar drift. Scale to the change; skip generic lectures and repeated code. Add inline code comments only for non-obvious constraints or rationale, not tutorial narration.
+
 ## Engineering Principles
 
 ### Maintainability & Code Cleanliness
@@ -104,6 +114,7 @@ CodeSparring is an AI-powered coding interview practice platform built in the `M
 
 - The code supports a real user journey.
 - Files and functions remain cohesive.
+- The diff has been reviewed for unnecessary complexity, and the key engineering lesson is explained briefly.
 - Duplicate business logic is avoided.
 - Names are specific and consistent.
 - Inputs are validated at trust boundaries.

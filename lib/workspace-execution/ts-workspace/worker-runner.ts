@@ -18,6 +18,7 @@ import { sessionAssetUrl } from "@/lib/interview/session-fetch"
  */
 
 import { WORKER_START_FAILURE_MESSAGE } from "../harness-errors"
+import type { ExecutionFailureKind } from "../test-outcomes"
 
 export interface TsWorkerFile {
   path: string
@@ -34,6 +35,7 @@ export interface TsWorkerRunResult {
   success: boolean
   logs: Array<{ type: "log" | "error" | "warn" | "info"; message: string; timestamp: number }>
   error?: string
+  failureKind?: ExecutionFailureKind
   transpileTimingsMs?: Record<string, number>
 }
 
@@ -140,6 +142,7 @@ function getTsWorker(): Worker {
             success: false,
             logs: pendingRun ? pendingRun.logs : [],
             error: buildExecTimeoutMessage(execTimeoutMs),
+            failureKind: "candidate-timeout",
           })
           resetTsWorker()
         }, execTimeoutMs)
@@ -188,7 +191,7 @@ function retryOrGiveUp(
     attemptTsRun(workerData, execTimeoutMs, transpileTimeoutMs, resolve, attempt + 1)
     return
   }
-  resolve({ success: false, logs: [], error: WORKER_START_FAILURE_MESSAGE })
+  resolve({ success: false, logs: [], error: WORKER_START_FAILURE_MESSAGE, failureKind: "service" })
 }
 
 /**
@@ -220,6 +223,7 @@ export function runTsInWorker(
       success: false,
       logs: [],
       error: "Execution environment is not browser",
+      failureKind: "service",
     })
   }
 
@@ -268,6 +272,7 @@ function attemptTsRun(
       success: false,
       logs: pendingRun ? pendingRun.logs : [],
       error: TRANSPILE_TIMEOUT_MESSAGE,
+      failureKind: "service",
     })
     resetTsWorker()
   }, transpileTimeoutMs)

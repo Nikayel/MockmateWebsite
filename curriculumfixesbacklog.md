@@ -1,7 +1,7 @@
 # Curriculum Fixes Backlog
 
 The standing work queue for the Learn curriculum, sibling to `seofixesbacklog.md`. Sourced from the
-46-agent council audit (`docs/system-design-curriculum/COUNCIL-AUDIT-2026-08-13.md`) and from the
+46-agent council audit (`historical SD council audit (removed; recoverable in Git)`) and from the
 independent checker pass that read every file after it was edited.
 
 **These tickets are written to be executed by AI agents, so they are deliberately long.** Each one
@@ -419,7 +419,7 @@ unbroken. No new widget family added under this ticket.
 
 ### CUR-09 — Re-scope or delete SD-W5
 
-**SHIPPED 2026-08-14** as `docs/SD-CLOSURE-AUDIT-2026-08-14.md`. Twelve read-only agents, one per
+**SHIPPED 2026-08-14** as `historical SD closure audit (removed; recoverable in Git)`. Twelve read-only agents, one per
 level file, 208 lessons: **97 gaps, 56 blocking and 41 friction** (the doc first said 83/50/33; that
 was the pre-re-audit total, left stale when L3's row moved from 0/0 to 6/8), each with the exact clause from the
 model answer that needs the missing fact. No finding is expressed as a word count.
@@ -434,7 +434,7 @@ Repair is deliberately NOT in this ticket, per the separate-diagnosis-from-repai
 
 **Second pass, same day, added a defect class the first pass did not look for.** Re-running the audit
 found **44 exercises whose model answer grades a requirement the prompt never states**, written up in
-`docs/SD-UNSTATED-REQUIREMENTS-2026-08-14.md`. Closure asks whether the learner was given the facts;
+`historical unstated-requirements audit (removed; recoverable in Git)`. Closure asks whether the learner was given the facts;
 this asks whether they were given the question, and the two fail independently. One of the 44 is not a
 scope gap but a **direct contradiction**: `sd-l6-sync-vs-async` (apply, `level6.ts:3523`) instructs the
 learner to make inventory async and then grades them for not keeping it synchronous.
@@ -503,7 +503,7 @@ both races side by side instead of quietly rewording either the model answer or 
 **Effort:** 3 agent-days, one agent per level file. **Depends on:** CUR-09, which is the written list
 this runs against.
 
-**Evidence.** `docs/SD-CLOSURE-AUDIT-2026-08-14.md`: 97 gaps across 208 lessons, 56 of them blocking.
+**Evidence.** `historical SD closure audit (removed; recoverable in Git)`: 97 gaps across 208 lessons, 56 of them blocking.
 A blocking gap means a learner who read the teach carefully still cannot produce a clause the model
 answer treats as known, because the concept is absent from the lesson. That is the same defect class
 as the 2026-08-12 finding where definitions had migrated into opt-in hints and six graded exercises

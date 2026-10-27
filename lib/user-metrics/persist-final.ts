@@ -15,12 +15,21 @@ export async function persistFinalSession(
       throw new Error("Session ownership changed")
     if (
       resolvePersistAction(
-        { status: current.get("feedback_status"), source: current.get("feedback_source") },
+        {
+          status: current.get("feedback_status"),
+          source: current.get("feedback_source"),
+          scoreFrozen: current.get("feedback_score_frozen") === true,
+        },
         (update.feedback_source ?? "stream") as PersistSource
       ) === "skip"
     )
       return false
-    transaction.update(session, update)
+    const fields = { ...update }
+    if (current.get("feedback_score_frozen") === true) {
+      delete fields.performance_score
+      delete fields.score_breakdown
+    }
+    transaction.update(session, fields)
     transaction.set(
       adminDb.collection("user_stats").doc(userId),
       {

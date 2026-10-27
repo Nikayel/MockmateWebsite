@@ -8,9 +8,9 @@
  *
  * Technical Score is now unified with Mastery Score for simplicity.
  * Both measure objective coding ability without communication:
- * - Correctness (60%): test pass rate
- * - Time Efficiency (25%): how quickly solved relative to expected time
- * - Independence (15%): minimal hint usage
+ * - Correctness (80%): judged test pass rate
+ * - Estimated time: diagnostic only, excluded from version 2 scoring
+ * - Recorded hint use (20%): a practice signal, not proof of independent transfer
  */
 
 /**

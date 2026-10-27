@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { calculateMasteryScore, type MasteryScoreInput } from "../mastery-score"
+import { calculateMasteryScore, quickMasteryScore, type MasteryScoreInput } from "../mastery-score"
 
 /**
  * Communication-time discount regression (session 2Iz2oYpGQxs6UNo6s7Hd).
@@ -20,6 +20,38 @@ const SESSION: MasteryScoreInput = {
 }
 
 describe("mastery time analysis communication discount", () => {
+  it("does not let estimated timing or conversation volume change mastery", () => {
+    const fast = calculateMasteryScore({ ...SESSION, timeSpentMinutes: 1 })
+    const idle = calculateMasteryScore({
+      ...SESSION,
+      timeSpentMinutes: 90,
+      interviewerMessagesCount: 50,
+    })
+    expect(fast.masteryScore).toBe(idle.masteryScore)
+    expect(idle.metadata.timeUsedForScore).toBe(false)
+  })
+  it("uses the same rules for scheduling fallbacks and ignores assumed hint availability", () => {
+    const input = { ...SESSION, hintsUsed: 2 }
+    expect(calculateMasteryScore({ ...input, hintsTotal: 2 }).masteryScore).toBe(
+      calculateMasteryScore({ ...input, hintsTotal: 50 }).masteryScore
+    )
+    expect(quickMasteryScore({ ...input, performanceScore: 90 })).toBe(
+      calculateMasteryScore(input).masteryScore
+    )
+    expect(
+      quickMasteryScore({ ...input, performanceScore: 90, testCasesPassed: 0, testCasesTotal: 0 })
+    ).toBe(0)
+  })
+
+  it("does not erase hint dependence with a perfect-correctness floor", () => {
+    const independent = calculateMasteryScore(SESSION)
+    const assisted = calculateMasteryScore({ ...SESSION, hintsUsed: 5 })
+    expect(assisted.masteryScore).toBeLessThan(independent.masteryScore)
+    expect(assisted.components.independenceScore).toBeLessThan(50)
+    expect(
+      calculateMasteryScore({ ...SESSION, testCasesPassed: 0, testCasesTotal: 0 }).masteryScore
+    ).toBe(0)
+  })
   it("charges the full wall clock when no message counts are provided", () => {
     const result = calculateMasteryScore(SESSION)
     expect(result.timeAnalysis.estimatedCommunicationMinutes).toBe(0)

@@ -1,5 +1,5 @@
 /**
- * Mode-resolver matrix (docs/sprint-labs/AGENT-CONTEXT.md §6, EXECUTION-STATE.md
+ * Mode-resolver matrix (docs/sprint-labs/AGENT-CONTEXT.md §6, DECISIONS.md
  * owner decision 4). `resolvePartnerMode` is pure: no Firestore, no sealed
  * content import (that lives in resolve-mode.server.ts, kept separate so this
  * file — and its types — stay safe to import from a "use client" component).

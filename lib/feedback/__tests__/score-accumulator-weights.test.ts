@@ -43,7 +43,12 @@ const baseSignals: ScoreSignals = {
 }
 
 function weightedOverall(
-  scores: { understanding: number; problemSolving: number; codeQuality: number; communication: number },
+  scores: {
+    understanding: number
+    problemSolving: number
+    codeQuality: number
+    communication: number
+  },
   weights: {
     UNDERSTANDING: number
     PROBLEM_SOLVING: number
@@ -102,7 +107,7 @@ describe("score accumulator uses canonical scoring weights (DUP-1)", () => {
     })
     // requirements -> understanding, architecture -> problemSolving,
     // scalability -> codeQuality (see the mapping in calculateSystemDesignScores).
-    expect(result.understanding).toBe(90)
+    expect(result.understanding).toBe(70)
     expect(result.problemSolving).toBe(100)
     expect(result.codeQuality).toBe(90)
     expect(result.communication).toBe(65)

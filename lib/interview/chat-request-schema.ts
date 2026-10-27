@@ -39,6 +39,7 @@ export const chatRequestSchema = z
     currentCode: z.string().max(100000).optional(),
     isProactive: z.boolean().optional(),
     scenarioTitle: z.string().optional(),
+    scenarioId: z.string().max(200).optional(),
     scenarioType: z.string().optional(),
     scenarioPattern: z.string().optional(),
     scenarioCompany: z.string().nullish(),

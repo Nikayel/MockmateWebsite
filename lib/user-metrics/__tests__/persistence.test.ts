@@ -185,6 +185,39 @@ describe("canonical metrics persistence", () => {
     ).toBe(false)
     expect(h.rows.get("interview_sessions/final")?.performance_score).toBe(81)
   })
+  it("keeps a frozen score when written feedback arrives with different scores", async () => {
+    session("frozen", {
+      feedback_status: "queued",
+      feedback_score_frozen: true,
+      performance_score: 76,
+      score_breakdown: { understandingScore: 70 },
+    })
+    expect((await loadUserMetrics("u1")).overview.averageScore).toBe(76)
+    expect(
+      await persistFinalSession("frozen", "u1", {
+        feedback_status: "complete",
+        feedback_source: "server",
+        performance_score: 99,
+        score_breakdown: { understandingScore: 99 },
+      })
+    ).toBe(true)
+    expect(h.rows.get("interview_sessions/frozen")).toMatchObject({
+      performance_score: 76,
+      score_breakdown: { understandingScore: 70 },
+    })
+    expect((await loadUserMetrics("u1")).overview.averageScore).toBe(76)
+  })
+  it("does not let fallback complete a session with a queued frozen score", async () => {
+    session("frozen", { feedback_status: "queued", feedback_score_frozen: true })
+    expect(
+      await persistFinalSession("frozen", "u1", {
+        feedback_status: "complete",
+        feedback_source: "fallback",
+        performance_score: 0,
+      })
+    ).toBe(false)
+    expect(h.rows.get("interview_sessions/frozen")?.feedback_status).toBe("queued")
+  })
   it("does not cache an obsolete revision when feedback arrives during rebuild", async () => {
     session("race")
     h.duringRead = () => {

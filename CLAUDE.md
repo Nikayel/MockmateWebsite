@@ -14,6 +14,7 @@ CodeSparring is an AI-powered coding interview practice platform built in the `M
 - Do not revert unrelated user changes.
 - Prefer clear, boring, maintainable code over clever code.
 - Run focused checks after meaningful changes.
+- Follow [Complexity Review & Learning in AGENTS.md](AGENTS.md#complexity-review--learning) for every coding task: review generated code, simplify unnecessary complexity, and include concise teaching tied to the actual change.
 - Crons are scheduled externally on cron-job.org, never in `vercel.json`. CEO said do not
   touch this: a `crons` block on the Vercel Hobby plan rejects every production deploy.
   See `app/api/cron/README.md`.

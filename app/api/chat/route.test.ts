@@ -319,6 +319,34 @@ describe("/api/chat route", () => {
     expect(history?.[1].content).toContain("My hypothesis")
   })
 
+  it.each(["interviewer", "partner"] as const)(
+    "gives the %s the scenario trade-off focus and verification evidence without answers",
+    async (role) => {
+      const { generateAIResponse, buildRAGContext } = await setupMocks()
+      const { POST } = await import("./route")
+      const response = await POST(
+        createRequest({
+          role,
+          message: "My fix passes. How should I compare the approaches?",
+          scenarioId: "bugfix-comment-thread-merge",
+          scenarioTitle: "Editor Comments: Sidebar Over-Counts Unresolved Threads",
+          scenarioType: "bugfix",
+          currentCode: "def merge_threads(existing_threads, incoming_threads): pass",
+          testResults: [{ description: "merge keeps order", passed: true }],
+        })
+      )
+      expect(response.status).toBe(200)
+      const [systemPrompt, userPrompt] = vi.mocked(generateAIResponse).mock.calls[0]
+      expect(systemPrompt).toContain("DEBUGGING FIX TRADE-OFF FOCUS")
+      expect(systemPrompt).toContain("10,000 existing threads")
+      expect(systemPrompt).toContain("merge keeps order - PASSED")
+      expect(systemPrompt).not.toContain("index_by_id")
+      expect(systemPrompt).not.toContain("existing_index >= 0")
+      expect(userPrompt).toContain("def merge_threads")
+      expect(buildRAGContext).not.toHaveBeenCalled()
+    }
+  )
+
   it("returns 400 for invalid request bodies", async () => {
     const { enforceChatRateLimit } = await setupMocks()
     const { POST } = await import("./route")

@@ -128,12 +128,11 @@ export const SCORING = {
    * Focuses purely on objective code metrics.
    */
   TECHNICAL_WEIGHTS: {
-    /** Correctness: Test pass rate */
-    CORRECTNESS: 0.6,
-    /** Time Efficiency: Solve speed relative to expected time */
-    TIME_EFFICIENCY: 0.25,
-    /** Independence: Minimal hint usage */
-    INDEPENDENCE: 0.15,
+    /** Version 2: observed correctness; estimated time is diagnostic only. */
+    CORRECTNESS: 0.8,
+    TIME_EFFICIENCY: 0,
+    /** Recorded hint use; independent transfer requires reassessment. */
+    INDEPENDENCE: 0.2,
   },
 
   /**

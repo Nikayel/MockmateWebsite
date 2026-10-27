@@ -2,7 +2,7 @@
 
 Distilled from `SPRINT-PLAN.md` ("Fixes to apply before authoring" + §9),
 `WORKBOOK-SPEC.md` §5–§6, `AGENT-CONTEXT.md`, and the owner decisions in
-`EXECUTION-STATE.md`. When this doc and a spec disagree, the spec wins and the
+`DECISIONS.md`. When this doc and a spec disagree, the spec wins and the
 disagreement gets reported, not silently resolved. `lab validate` enforces the
 rules marked **[validate]**.
 

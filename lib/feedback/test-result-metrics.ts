@@ -1,6 +1,26 @@
-import { isHarnessError } from "@/lib/workspace-execution/harness-errors"
+import {
+  isScoreableTest,
+  type ExecutionTestObservation,
+} from "@/lib/workspace-execution/test-outcomes"
+import { z } from "zod"
 
-export interface FeedbackTestResult {
+export const feedbackTestResultsSchema = z
+  .array(
+    z
+      .object({
+        sourceRevision: z.string().max(128).optional(),
+        passed: z.boolean(),
+        description: z.string().max(2000).optional(),
+        error: z.string().max(20000).nullable().optional(),
+        failureKind: z.enum(["candidate", "candidate-timeout", "service", "harness"]).optional(),
+        expected: z.unknown().optional(),
+        actual: z.unknown().optional(),
+      })
+      .passthrough()
+  )
+  .max(500)
+
+export interface FeedbackTestResult extends ExecutionTestObservation {
   description?: string
   passed?: boolean
   expected?: unknown
@@ -46,24 +66,12 @@ export interface FeedbackTestMetrics {
  * at 2/5. That number reaches every score floor, the feedback prompt, and, through
  * calculateMasteryScore, the spaced-repetition schedule, where it cost 36 points of mastery.
  */
-function isUnscoreableTest(test: FeedbackTestResult): boolean {
-  const error = test.error || ""
-
-  return (
-    error.includes("service is busy") ||
-    error.includes("timed out") ||
-    error.includes("Service unavailable") ||
-    isHarnessError(test.error) ||
-    (Boolean(test.error) && test.actual === "null")
-  )
-}
-
 export function calculateFeedbackTestMetrics(
   testResults: FeedbackTestResult[] | undefined
 ): FeedbackTestMetrics {
   const tests = Array.isArray(testResults) ? testResults : []
-  const serviceErrorTests = tests.filter(isUnscoreableTest)
-  const validTests = tests.filter((test) => !isUnscoreableTest(test))
+  const serviceErrorTests = tests.filter((test) => !isScoreableTest(test))
+  const validTests = tests.filter(isScoreableTest)
 
   return {
     validTests,

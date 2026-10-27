@@ -12,7 +12,7 @@ exports[`/api/chat route > preserves model input for 'bugfix'/'interviewer'/sess
     "sessionId": undefined,
     "userId": "user-1",
   },
-  "system": "05d518dea84d6c9b4edada85ef524e3c16af7d53485403de846c3cb6e78d3321",
+  "system": "ede042bc2f2095bff46da9d7b5d094b73f0e63ae3cc586badc70d640f3207219",
   "turn": "3bff5e4e72a6558f818e9714d41426f189f0431683f66226a1088ca7e383bfbc",
 }
 `;
@@ -29,7 +29,7 @@ exports[`/api/chat route > preserves model input for 'bugfix'/'interviewer'/sess
     "sessionId": undefined,
     "userId": "user-1",
   },
-  "system": "f99171d292181f01e68433b6fc85e1040cdc72ef1675bf5fd9b982d8ab23e157",
+  "system": "3b77ac70745b547b71e6d9496a646b32c721c7d9dac96e58854839509f1045a1",
   "turn": "ba44095cb7340acc9220d93fd8828d6c53f4360b53cf7604e48dbc6c39f31880",
 }
 `;
@@ -46,7 +46,7 @@ exports[`/api/chat route > preserves model input for 'bugfix'/'partner'/session=
     "sessionId": undefined,
     "userId": "user-1",
   },
-  "system": "148954ed512351e59ce0d7ff7881c0596dd4f674d28d2ec878efe5cd1c4edb84",
+  "system": "9cb6b7dceee42b91c630a2d4ce42548b821ec3e7b574e092e873e5833b7174cc",
   "turn": "3bff5e4e72a6558f818e9714d41426f189f0431683f66226a1088ca7e383bfbc",
 }
 `;
@@ -63,7 +63,7 @@ exports[`/api/chat route > preserves model input for 'bugfix'/'partner'/session=
     "sessionId": undefined,
     "userId": "user-1",
   },
-  "system": "3ea373dcfaf94ee7b0d05d9ddd1f4597e9c554483565b2a7c66d33a05e571b1f",
+  "system": "d60b322ba83fd0aa464038173944bd55fe46fefdc8b9eb257afba77d139309cc",
   "turn": "124a76fdaead091583864b9102ccfc1c773088343c83baa189c4b6d07bf33a97",
 }
 `;

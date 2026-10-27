@@ -191,17 +191,18 @@ export const EditorColumn = memo(function EditorColumn({
       <ErrorBoundary>
         <MarkdownFileView
           fileName={activeWorkspaceFile?.path ?? ""}
-          content={code}
+          content={activeWorkspaceFile?.content ?? code}
           preview={
             onDocumentPreviewChange ? documentPreviewPath === activeWorkspaceFile?.path : undefined
           }
           onPreviewChange={onDocumentPreviewChange}
         >
           <LazyCodeMirrorEditor
+            key={activeWorkspaceFile?.path ?? selectedScenario?.id ?? "editor"}
             ref={editorRef}
             height="100%"
             language={editorLanguage}
-            value={code}
+            value={activeWorkspaceFile?.content ?? code}
             onChange={onCodeChange}
             readOnly={
               !isInterviewStarted ||

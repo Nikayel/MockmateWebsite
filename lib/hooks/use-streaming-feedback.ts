@@ -154,6 +154,8 @@ export interface StreamingFeedbackState {
   isConnected: boolean
   isComplete: boolean
   isPersisted: boolean // True after results are saved to Firestore
+  isScoreSaved: boolean
+  feedbackQueued: boolean
 
   // Current phase
   phase:
@@ -162,6 +164,7 @@ export interface StreamingFeedbackState {
     | "analyzing"
     | "generating"
     | "persisting"
+    | "queued"
     | "complete"
     | "error"
   phaseMessage: string
@@ -201,6 +204,7 @@ export interface StreamingFeedbackRequest {
   language: string
   testsPassed: number
   testsTotal: number
+  testResults?: import("@/lib/feedback/test-result-metrics").FeedbackTestResult[]
   scenarioType?: string
   scenarioTitle?: string
   scenarioId?: string
@@ -216,6 +220,7 @@ export interface StreamingFeedbackRequest {
   guidedLabEvidence?: LabEvidence
   bugfixEvidenceEvents?: unknown[]
   bugfixExpectedTouchedFiles?: string[]
+  bugfixFinalSourceRevision?: string
   bugfixHypothesis?: string
   bugfixRootCause?: string
   bugfixPrevention?: string
@@ -231,6 +236,8 @@ export function useStreamingFeedback() {
     isConnected: false,
     isComplete: false,
     isPersisted: false,
+    isScoreSaved: false,
+    feedbackQueued: false,
     phase: "idle",
     phaseMessage: "",
     instantScores: null,
@@ -245,6 +252,7 @@ export function useStreamingFeedback() {
 
   const abortControllerRef = useRef<AbortController | null>(null)
   const requestRef = useRef<StreamingFeedbackRequest | null>(null)
+  const scoreSavedRef = useRef(false)
 
   /**
    * Segment timings for the scoring wait.
@@ -399,6 +407,7 @@ export function useStreamingFeedback() {
 
       // Store request for persist call
       requestRef.current = request
+      scoreSavedRef.current = false
 
       marksRef.current = { start: Date.now(), phases: {} }
       waitReportedRef.current = false
@@ -408,6 +417,8 @@ export function useStreamingFeedback() {
         isConnected: true,
         isComplete: false,
         isPersisted: false,
+        isScoreSaved: false,
+        feedbackQueued: false,
         phase: "calculating_scores",
         phaseMessage: "Starting...",
         instantScores: null,
@@ -426,6 +437,7 @@ export function useStreamingFeedback() {
       // Variables to capture final state for persist
       let finalScores: StreamingScores | null = null
       let finalFeedback: StreamingFeedback | null = null
+      let generationQueued = false
 
       /** End the run on a named refusal instead of the generic failure. */
       const failWithRefusal = (refusal: FeedbackRefusal) => {
@@ -491,6 +503,9 @@ export function useStreamingFeedback() {
 
             if (event === "refined_scores") {
               finalScores = data as StreamingScores
+            } else if (event === "score_saved") {
+              finalScores = data as StreamingScores
+              scoreSavedRef.current = true
             } else if (event === "scores" && !finalScores) {
               finalScores = data as StreamingScores
             } else if (event === "feedback") {
@@ -499,6 +514,7 @@ export function useStreamingFeedback() {
                 finalScores = (data as StreamingFeedback).scores
               }
             }
+            if (event === "queued") generationQueued = true
 
             handleEvent(event, data)
           } catch {
@@ -525,7 +541,7 @@ export function useStreamingFeedback() {
         // After streaming completes, persist to Firestore
         if (finalScores && finalFeedback && requestRef.current) {
           await persistFeedback(requestRef.current, finalScores, finalFeedback)
-        } else {
+        } else if (!generationQueued) {
           // Streaming completed but missing data
           setState((prev) => ({
             ...prev,
@@ -542,6 +558,20 @@ export function useStreamingFeedback() {
         }
 
         logger.error("[StreamingFeedback] Stream failed:", { error })
+        if (scoreSavedRef.current) {
+          setState((prev) => ({
+            ...prev,
+            isConnected: false,
+            isComplete: true,
+            isPersisted: true,
+            isScoreSaved: true,
+            feedbackQueued: true,
+            phase: "queued",
+            phaseMessage: "Your score is ready. Written feedback is taking longer.",
+            error: null,
+          }))
+          return
+        }
         setState((prev) => ({
           ...prev,
           isConnected: false,
@@ -595,6 +625,30 @@ export function useStreamingFeedback() {
           }))
           break
 
+        case "score_saved":
+          setState((prev) => ({
+            ...prev,
+            isPersisted: true,
+            isScoreSaved: true,
+            refinedScores: data as StreamingScores,
+          }))
+          break
+
+        case "queued":
+          setState((prev) => ({
+            ...prev,
+            isConnected: false,
+            isComplete: true,
+            isPersisted: prev.isScoreSaved || prev.isPersisted,
+            feedbackQueued: true,
+            phase: "queued",
+            phaseMessage:
+              (data as { message?: string }).message ??
+              "Your score is ready. Written feedback is taking longer.",
+            error: null,
+          }))
+          break
+
         case "feedback":
           setState((prev) => ({
             ...prev,
@@ -645,10 +699,13 @@ export function useStreamingFeedback() {
   const reset = useCallback(() => {
     cancel()
     requestRef.current = null
+    scoreSavedRef.current = false
     setState({
       isConnected: false,
       isComplete: false,
       isPersisted: false,
+      isScoreSaved: false,
+      feedbackQueued: false,
       phase: "idle",
       phaseMessage: "",
       instantScores: null,

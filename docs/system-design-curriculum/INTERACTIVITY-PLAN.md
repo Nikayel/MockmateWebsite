@@ -3,7 +3,7 @@
 > Produced by the sd-interactivity-council workflow on 2026-07-23 (6 per-level auditors over all 12 levels,
 > 3 perspective judges: learning science / staff engineering / product-pitch, 1 synthesizer; 10 agents, all clean).
 > This plan is BINDING for the /loop retrofit iterations. Per-lesson audit data: `interactivity-audit.json`.
-> Judge rationale: `INTERACTIVITY-COUNCIL-VERDICTS.md`.
+> Keep the design constraints below; historical council reports are not completion evidence.
 
 ## Interaction model
 

@@ -21,6 +21,8 @@ import {
 import { executeWorkspaceScenarioTsClientSide } from "./ts-workspace"
 import { ORACLE_VISIBLE_PATH } from "@/lib/bugfix/packs/scenario"
 import { isPackScenario, isWorkspaceScenario, type PackScenario } from "./validators"
+import { classifyExecutionFailure, summarizeExecutionTests } from "./test-outcomes"
+import { executionSourceRevision } from "./source-revision"
 
 // NOTE on the Sprint Labs PGlite ("pg-sandbox") suite engine: it is deliberately NOT wired into
 // executeScenarioInBrowser below. Sprint Labs tickets are typed via lib/sprint-labs/types.ts
@@ -115,6 +117,7 @@ function formatPackResult(
         expected: undefined,
         actual: undefined,
         error: result.ran ? null : result.error,
+        failureKind: result.failureKind,
       },
     ],
     consoleLogs: result.consoleLogs,
@@ -152,12 +155,13 @@ function formatWorkspaceResult(result: WorkspaceExecutionResult): BrowserExecuti
       expected: undefined,
       actual: undefined,
       error: item.error,
+      failureKind: item.failureKind,
       isHidden: item.isHidden,
     })),
   } as BrowserExecutionResult
 }
 
-export async function executeScenarioInBrowser(options: {
+async function executeScenarioInBrowserRaw(options: {
   code: string
   scenario: Scenario
   language: string
@@ -226,4 +230,25 @@ export async function executeScenarioInBrowser(options: {
           options.scenario as unknown as SqlSingleFileScenario
         )
       : executeJsClientSide(fullCode, language, testCases, options.scenario.id)
+}
+
+/** Normalize every browser engine before results reach UI, evidence, or feedback. */
+export async function executeScenarioInBrowser(
+  options: Parameters<typeof executeScenarioInBrowserRaw>[0]
+): Promise<BrowserExecutionResult | null> {
+  const sourceRevision = await executionSourceRevision(
+    options.code,
+    options.workspaceFiles?.map((file) => ({ ...file, role: "editable" }))
+  )
+  const result = await executeScenarioInBrowserRaw(options)
+  if (!result) return null
+  return {
+    ...result,
+    results: result.results.map((test) => ({
+      ...test,
+      sourceRevision,
+      ...(test.passed ? {} : { failureKind: classifyExecutionFailure(test) ?? "candidate" }),
+    })),
+    summary: summarizeExecutionTests(result.results),
+  } as BrowserExecutionResult
 }

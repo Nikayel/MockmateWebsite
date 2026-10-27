@@ -4,6 +4,7 @@ import { getScenarioLanguages } from "@/lib/scenarios/languages"
 import { EDITOR_LANGUAGES } from "@/lib/interview/languages"
 import { formatPatternLabel } from "@/lib/pattern-labels"
 import { getNextPracticeFocus } from "./next-practice-focus"
+import { needsRootCausePractice } from "@/lib/bugfix/reasoning-assessment"
 import type { NextPracticeRecommendation } from "./next-practice-types"
 
 const DIFFICULTY = { easy: 0, medium: 1, hard: 2 } as const
@@ -21,7 +22,7 @@ function evidenceSkillMatch(session: InterviewSession, candidate: Scenario): num
   const skill =
     evidence?.reproducedBeforeEditing === false
       ? "reproduc"
-      : evidence?.rootCauseExplained === false
+      : needsRootCausePractice(evidence)
         ? "root cause"
         : undefined
   return skill && candidate.debuggingSkills?.some((value) => value.toLowerCase().includes(skill))

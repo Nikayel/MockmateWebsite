@@ -124,6 +124,60 @@ describe("/api/feedback/stream cost bounds", () => {
     vi.unstubAllEnvs()
   })
 
+  it("uses sealed fix trade-offs only for the matching debugging scenario", async () => {
+    const { POST } = await import("./route")
+    for (const scenarioId of ["bugfix-comment-thread-merge", "bugfix-search-race"]) {
+      await drain(
+        await POST(
+          makeRequest({
+            scenarioType: "bugfix",
+            scenarioId,
+            code: "def merge_threads(existing_threads, incoming_threads): pass",
+            bugfixFixTradeoffs: "CLIENT-INVENTED-GRADING-RULE",
+          })
+        )
+      )
+      const prompt = mocks.generateFeedbackResponseEdge.mock.calls.at(-1)![1] as string
+      expect(prompt).not.toContain("CLIENT-INVENTED-GRADING-RULE")
+      if (scenarioId === "bugfix-comment-thread-merge") {
+        expect(prompt).toContain("FIX TRADE-OFF REVIEW")
+        expect(prompt).toContain("O(n + m)")
+        expect(prompt).toContain("O(m * (n + m))")
+        expect(prompt).toContain("do not change pre-calculated scores")
+        expect(prompt).toContain("def merge_threads")
+      } else {
+        expect(prompt).not.toContain("FIX TRADE-OFF REVIEW")
+      }
+    }
+  })
+
+  it.each([2000, 31_000])(
+    "reviews bounded implementation code beyond the old prefix (%i chars)",
+    async (size) => {
+      const { POST } = await import("./route")
+      const code =
+        "# padding\n".repeat(Math.ceil(size / 10)) + "\nreturn merged # final implementation"
+      await drain(
+        await POST(
+          makeRequest({
+            scenarioType: "bugfix",
+            scenarioId: "bugfix-comment-thread-merge",
+            code,
+          })
+        )
+      )
+      const prompt = mocks.generateFeedbackResponseEdge.mock.calls[0][1] as string
+      if (size < 30_000) {
+        expect(prompt).toContain("return merged # final implementation")
+        expect(prompt).not.toContain("[CODE TRUNCATED")
+      } else {
+        expect(prompt).not.toContain("return merged # final implementation")
+        expect(prompt).toContain("[CODE TRUNCATED")
+        expect(prompt).toContain("efficiency is unverified")
+      }
+    }
+  )
+
   describe("authentication", () => {
     it("keeps Sparra attribution and sends original/current workspace evidence to grading", async () => {
       const sessionContext = buildSessionContext({
@@ -162,6 +216,50 @@ describe("/api/feedback/stream cost bounds", () => {
       const response = await POST(makeRequest())
 
       expect(response.status).toBe(401)
+      expect(mocks.generateFeedbackResponseEdge).not.toHaveBeenCalled()
+    })
+  })
+
+  describe("test evidence", () => {
+    it("scores judged rows consistently rather than trusting contradictory aggregate counts", async () => {
+      const { POST } = await import("./route")
+      const base = {
+        code: "function solve(values) { return values.filter(value => value > 0) }",
+        language: "javascript",
+        scenarioTitle: "Filter values",
+      }
+      const fromRows = await drain(
+        await POST(
+          makeRequest({
+            ...base,
+            testsPassed: 1,
+            testsTotal: 1,
+            testResults: [
+              { passed: true },
+              {
+                passed: false,
+                error: "Code execution timed out",
+                failureKind: "candidate-timeout",
+              },
+              { passed: false, error: "Runtime startup timed out", failureKind: "service" },
+            ],
+          })
+        )
+      )
+      const fromCounts = await drain(
+        await POST(makeRequest({ ...base, testsPassed: 1, testsTotal: 2 }))
+      )
+      expect(readSseEvent(fromRows, "refined_scores")).toEqual(
+        readSseEvent(fromCounts, "refined_scores")
+      )
+    })
+
+    it("rejects malformed test evidence before generating feedback", async () => {
+      const { POST } = await import("./route")
+      const stream = await drain(await POST(makeRequest({ testResults: [null] })))
+      expect(readSseEvent<{ message: string }>(stream, "error").message).toBe(
+        "Invalid test results"
+      )
       expect(mocks.generateFeedbackResponseEdge).not.toHaveBeenCalled()
     })
   })

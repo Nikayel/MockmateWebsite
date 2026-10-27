@@ -13,6 +13,8 @@ import {
 import { createChatMessage } from "@/lib/interview/session-context/conversation"
 import type { SessionContext } from "@/lib/interview/session-context/schema"
 import { useEffect, useRef } from "react"
+import { getWorkspacePrimaryCode } from "@/lib/workspace-execution/files"
+import { isWorkspaceScenario } from "@/lib/workspace-execution/validators"
 import type { Dispatch, SetStateAction } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -40,7 +42,7 @@ import {
 } from "@/lib/interview/chat/validated-response-stream"
 import type { Scenario } from "@/lib/scenarios"
 import type { BugfixEvidenceEvent } from "@/lib/bugfix"
-import type { ChatMessage } from "../_types"
+import type { ChatMessage, WorkspaceContextFile } from "../_types"
 
 /**
  * Fixed id shared by both "session complete" toasts so they never stack (a
@@ -86,7 +88,7 @@ export interface UseInterviewChatOptions extends SessionRequestGuard {
   interviewerVoice: VoiceController
   selectedScenario: Scenario | null
   code: string
-  chatWorkspaceContext: unknown
+  chatWorkspaceContext: WorkspaceContextFile[]
   recentNudgeTopics: string[]
   userAnsweredTopics: string[]
   testResults: unknown[]
@@ -562,8 +564,12 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
                 }
               : { skill_level: experienceLevel },
             workspaceContext: chatWorkspaceContext,
-            currentCode: code,
+            currentCode:
+              selectedScenario && isWorkspaceScenario(selectedScenario)
+                ? getWorkspacePrimaryCode(selectedScenario, chatWorkspaceContext)
+                : code,
             scenarioTitle: selectedScenario?.title,
+            scenarioId: selectedScenario?.id,
             scenarioType: selectedScenario?.type,
             guidedLab: getGuidedChatState(selectedScenario?.id),
             scenarioCompany: targetCompany, // Target company for RAG context
@@ -576,8 +582,8 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             // Pass topics the user has already answered to prevent re-asking
             userAnsweredTopics: isInterviewer ? userAnsweredTopics : undefined,
             // Pass test results and console logs for interviewer awareness
-            testResults: isInterviewer ? testResults : undefined,
-            consoleLogs: isInterviewer ? consoleLogs : undefined,
+            testResults,
+            consoleLogs,
             // Phase-aware interview tracking (only for interviewer)
             ...(isInterviewer ? getInterviewerChatParams() : {}),
           }),

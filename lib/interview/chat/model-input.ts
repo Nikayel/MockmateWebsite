@@ -1,3 +1,4 @@
+import { buildBugfixTradeoffContext } from "@/lib/bugfix/fix-tradeoffs"
 import { buildInterviewerPrompt } from "@/lib/interview/interviewer-prompts"
 import {
   buildSessionBaselinePrompt,
@@ -39,9 +40,15 @@ export async function buildChatModelInput(
       ? buildInterviewerPrompt(interviewerContext, "turn")
       : ""
   const retrievalContext = await buildChatRetrievalContext(request, userId)
-  const systemPrompt = sessionContext
-    ? stableSystemPrompt + buildSessionBaselinePrompt(sessionContext)
-    : stableSystemPrompt + retrievalContext
+  const tradeoffContext = buildBugfixTradeoffContext(
+    request.scenarioType,
+    sessionContext?.task.id ?? request.scenarioId,
+    role === "interviewer" ? "interviewer" : "partner"
+  )
+  const systemPrompt =
+    (sessionContext
+      ? stableSystemPrompt + buildSessionBaselinePrompt(sessionContext)
+      : stableSystemPrompt + retrievalContext) + (tradeoffContext ? `\n${tradeoffContext}` : "")
   const history = sessionContext
     ? timelineProviderHistory(sessionContext.timeline)
     : buildProviderHistory(context)

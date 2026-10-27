@@ -1,0 +1,73 @@
+"""Independent feeds exposing root defects, tempting partial fixes, and regressions."""
+EDGE_FEEDS = {
+    "stripe-webhook-idempotency": [
+        "a,charge,new_shop,40,2026-03-01T01:00:00Z\nb,charge,new_shop,40,2026-03-01T01:01:00Z\na,charge,new_shop,40,2026-03-01T01:00:04Z\n",
+        "a,charge,zulu,10,2026-03-01T01:00:00Z\nb,refund,zulu,4,2026-03-01T01:01:00Z\nc,charge,alpha,0,2026-03-01T01:02:00Z\n",
+        "# no events\n",
+        "broken,row\na,charge,x,NaN,2026-03-01T01:00:00Z\nb,charge,x,8,2026-03-01T01:01:00Z\n",
+        "a,refund,x,5,2026-03-01T01:00:00Z\nb,refund,x,5,2026-03-01T01:01:00Z\n",
+    ],
+    "palantir-entity-resolution-merge": [
+        "commercial,Atlas,a\ngov,atlas,b\ncommercial, ATLAS ,c\ncommercial,Atlas,a\n",
+        "gov,zeta,a\ngov,beta,b\ncommercial,beta,c\n",
+        "commercial,one,a\ncommercial,two,b\n",
+        "unknown,one,a\ncommercial,,b\ngov,valid,c\ntruncated\n",
+        "# no records\n",
+    ],
+    "datadog-metric-window-rollup": [
+        "2026-05-01T12:00:00Z,web.5xx,a,2\n2026-05-01T12:01:00Z,web.5xx,b,3\n",
+        "2026-05-01T12:00:59Z,web.5xx,a,1\n2026-05-01T12:02:01Z,web.5xx,b,4\n",
+        "2026-05-01T12:00:00Z,web.5xx,a,2\n2026-05-01T12:00:00Z,web.5xx,a,2\n",
+        "invalid,web.5xx,a,1\n2026-05-01T12:00:00Z,other,b,9\ntruncated\n",
+        "# empty\n",
+    ],
+    "generic-session-window-count": [
+        "2026-05-01T12:00:00Z,u,a,web\n2026-05-01T12:30:00Z,u,b,web\n2026-05-01T13:00:00Z,u,c,web\n",
+        "2026-05-01T12:00:00Z,u,a,web\n2026-05-01T12:30:01Z,u,b,web\n",
+        "2026-05-01T12:30:00Z,u,b,web\n2026-05-01T12:00:00Z,u,a,mobile\n2026-05-01T12:00:00Z,u,a,mobile\n",
+        "2026-05-01T12:00:00Z,z,a,web\n2026-05-01T12:30:00Z,x,b,web\n",
+        "invalid,u,a,web\ntruncated\n",
+    ],
+    "generic-log-error-rollup": [
+        "t zulu ERROR first\nt alpha INFO second\nt beta ERROR third\n",
+        "t zulu INFO all fine\nt alpha ERROR failure with spaces\nt alpha ERROR another failure\n",
+        "t x WARN warning\nt x ERROR failure\nt x ERROR failure\n",
+        "malformed\nt valid INFO message\n",
+        "# no logs\n",
+    ],
+    "datadog-monitor-empty-series": [
+        "monitor,silent,1,0\nmonitor,zero,1,0\nsample,zero,a,2026-05-01T12:00:00Z,0\n",
+        "monitor,equal,5,2\nsample,equal,a,2026-05-01T12:00:00Z,5\n",
+        "monitor,x,2,1\nsample,x,a,2026-05-01T12:05:00Z,9\nsample,x,b,2026-05-01T11:59:59Z,9\n",
+        "monitor,x,5,2\nsample,x,a,2026-05-01T12:00:00Z,2\nsample,x,a,2026-05-01T12:00:00Z,2\nsample,x,b,2026-05-01T12:04:59Z,10\n",
+        "monitor,x,NaN,0\nmonitor,y,3,1\nsample,y,truncated\n# comment\n",
+    ],
+    "generic-cache-eviction-mutation": [
+        "x,a,1699999999\nx,b,1700000000\nx,c,1700000001\n",
+        "x,a,1699999999\nx,a,1700000001\ny,a,1700000000\n",
+        "x,a,1700000001\nx,a,1699999999\n",
+        " feed ,a,1700000001,pinned\nfeed,b,1700000000,pinned\n",
+        "truncated\nx,a,NaN\n# no valid entries\n",
+    ],
+    "stripe-payout-batch-mutation": [
+        "a,x,usd,10,pending\na,x,usd,10,pending\nb,x,usd,20,pending\n",
+        "a,x,eur,10,pending\nb,x,gbp,10,pending\nc,y,usd,0,pending\n",
+        "a,x,cad,99,pending\nb,x,usd,11,hold\nc,x,usd,12,pending\n",
+        "a,x,usd,1,pending\nb,x,usd,2,pending\nc,x,usd,3,pending\nd,x,usd,4,pending\n",
+        "broken\na,x,usd,NaN,pending\n# no valid payouts\n",
+    ],
+    "palantir-pipeline-order-dependence": [
+        "normalize,a,1,2026-05-01T12:00:00Z\nenrich,b,2,2026-05-01T12:01:00Z\n",
+        "normalize,a,1,t\nnormalize,b,1,t\nnormalize,c,1,t\nenrich,d,1,t\n",
+        "normalize,a,1,t\nnormalize,a,1,t\nnormalize,b,0,t\nenrich,c,NaN,t\npublish,d,2,t\n",
+        "geocode,a,-1,t\npublish,b,0,t\n",
+        "# no records\ntruncated\n",
+    ],
+    "palantir-foundry-usage-rollup": [
+        "primary,ACME,a,5\nbackup,acme,a,5\nbackup,acme,b,7\n",
+        "backup,new,b,8\nbackup,new,b,8\n",
+        "primary,Acme,a,0\nprimary,ACME,b,5\nprimary,acme,c,5\n",
+        "other,x,a,99\nprimary,x,b,NaN\ntruncated\nbackup,x,c,3\n",
+        "# no usage\n",
+    ],
+}

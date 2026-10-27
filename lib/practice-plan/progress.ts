@@ -9,7 +9,12 @@ export function practiceObservations(before: InterviewSession, after: InterviewS
     const current = after.bugfix_evidence_summary
     if (previous?.reproducedBeforeEditing === false && current?.reproducedBeforeEditing === true)
       observations.push("This time, you reproduced the failure before editing the code.")
-    if (previous?.rootCauseExplained === false && current?.rootCauseExplained === true)
+    if (
+      previous?.rootCauseAssessment?.status === "observed" &&
+      current?.rootCauseAssessment?.status === "observed" &&
+      (previous.rootCauseAssessment.score ?? 100) < 70 &&
+      (current.rootCauseAssessment.score ?? 0) >= 70
+    )
       observations.push("This time, your session recorded an explanation of the root cause.")
   }
   const labels = {
@@ -18,6 +23,8 @@ export function practiceObservations(before: InterviewSession, after: InterviewS
     codeQualityScore: "Code quality",
     communicationScore: "Communication",
   } as const
+  // A scoring-rule change is not a change in the learner's ability.
+  if (before.measurement_version !== after.measurement_version) return observations
   const valid = (value: unknown): value is number =>
     typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100
   const weakest = (Object.keys(labels) as (keyof typeof labels)[])

@@ -125,7 +125,16 @@ export interface InterviewSession {
   technical_score?: number // Code-focused score (= mastery score, excludes communication)
   mastery_score?: number // Same as technical_score, for backwards compatibility
   feedback?: string
-  feedback_status?: "pending" | "processing" | "complete" | "failed" // Track feedback generation state
+  feedback_status?: "pending" | "processing" | "queued" | "complete" | "failed" // Track feedback generation state
+  feedback_score_frozen?: boolean
+  feedback_score_snapshot?: {
+    understanding: number
+    problemSolving: number
+    codeQuality: number
+    communication: number
+    overall: number
+  }
+  feedback_manual_retry_count?: number
   structured_feedback?: {
     tldr?: string
     whatWorked?: string[]
@@ -150,6 +159,10 @@ export interface InterviewSession {
     communicationScore?: number
   }
   bugfix_evidence_summary?: {
+    evidenceVersion?: 2
+    finalSourceVerified?: boolean
+    rootCauseAssessment?: import("./bugfix/types").BugfixEvidenceSummary["rootCauseAssessment"]
+    firstAIHelp?: import("./bugfix/types").BugfixEvidenceSummary["firstAIHelp"]
     reproducedBeforeEditing?: boolean
     inspectedFiles?: string[]
     inspectedTestOrDocs?: string[]
@@ -163,6 +176,7 @@ export interface InterviewSession {
     aiShortcutCount?: number
     aiPartnerUseCount?: number
   }
+  measurement_version?: number
   bugfix_score_breakdown?: {
     overall?: number
     reproductionDiscipline?: number

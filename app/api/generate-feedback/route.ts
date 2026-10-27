@@ -66,6 +66,53 @@ import {
 } from "@/lib/feedback/input-summary"
 import { buildFeedbackSystemInstruction } from "@/lib/feedback/system-instructions"
 
+interface FeedbackScoreSnapshot {
+  understanding: number
+  problemSolving: number
+  codeQuality: number
+  communication: number
+  overall: number
+}
+
+async function postFeedbackPersistAction(
+  request: NextRequest,
+  payload: Record<string, unknown>
+): Promise<Response | null> {
+  const authorization = request.headers.get("authorization")
+  if (!authorization) return null
+
+  const configuredOrigin = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "")
+  const origin =
+    configuredOrigin || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
+  let persistUrl: string
+  try {
+    persistUrl = origin
+      ? `${origin}/api/feedback/persist`
+      : new URL("/api/feedback/persist", request.url).toString()
+  } catch {
+    return null
+  }
+
+  const isInternalAction =
+    payload.outcome === "score_ready" || payload.outcome === "generation_failed"
+  try {
+    return await fetch(persistUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: authorization,
+        ...(isInternalAction && process.env.CRON_SECRET
+          ? { "x-feedback-internal-secret": process.env.CRON_SECRET }
+          : {}),
+      },
+      body: JSON.stringify(payload),
+    })
+  } catch (error) {
+    logger.error("[Feedback API] Server-side persist request failed", { error })
+    return null
+  }
+}
+
 export async function POST(request: NextRequest) {
   // Authenticate and charge this submitted action once; provider calls meter their own work.
   const metered = await enforceMeteredAiRequest(request, {
@@ -77,6 +124,15 @@ export async function POST(request: NextRequest) {
   const { userId: rateLimitUserId } = metered
 
   const startTime = Date.now()
+  let queuedScoreSnapshot: {
+    sessionId: string
+    userId: string
+    scores: FeedbackScoreSnapshot
+    scenarioType: string
+    scenarioTitle: string
+    scenarioId?: string
+  } | null = null
+  let feedbackNarrativePersisted = false
 
   try {
     const validation = validateFeedbackRequestBody(await request.json())
@@ -977,6 +1033,47 @@ CRITICAL INSTRUCTIONS:
       promptLength: prompt.length,
     })
 
+    const feedbackScoreSnapshot: FeedbackScoreSnapshot = {
+      understanding: finalScores.understanding,
+      problemSolving: finalScores.problemSolving,
+      codeQuality: finalScores.codeQuality,
+      communication: finalScores.communication,
+      overall: finalScores.overall,
+    }
+    if (sessionId) {
+      const scoreReadyResponse = await postFeedbackPersistAction(request, {
+        outcome: "score_ready",
+        sessionId,
+        userId,
+        scores: feedbackScoreSnapshot,
+        systemPrompt: enhancedSystemInstruction,
+        userPrompt: prompt,
+        scenarioType: scenarioType || "dsa",
+        scenarioTitle: scenarioTitle || "Unknown",
+        scenarioId,
+        silentNotes: silentNotes ?? [],
+      })
+      if (scoreReadyResponse && !scoreReadyResponse.ok) {
+        logger.error("[Feedback API] Score-ready persist was rejected", {
+          sessionId,
+          status: scoreReadyResponse.status,
+        })
+      }
+      const scoreReadyResult = scoreReadyResponse?.ok
+        ? ((await scoreReadyResponse.json().catch(() => null)) as { scoreSaved?: unknown } | null)
+        : null
+      if (scoreReadyResult?.scoreSaved === true) {
+        queuedScoreSnapshot = {
+          sessionId,
+          userId,
+          scores: feedbackScoreSnapshot,
+          scenarioType: scenarioType || "dsa",
+          scenarioTitle: scenarioTitle || "Unknown",
+          scenarioId,
+        }
+      }
+    }
+
     const aiResponse = await generateFeedbackResponse(
       enhancedSystemInstruction,
       prompt,
@@ -1255,6 +1352,44 @@ CRITICAL INSTRUCTIONS:
       })
     }
 
+    // Complete the saved score job server-side as well as returning feedback
+    // to the browser. This closes the lease if the client leaves before its
+    // session update, and the persist route preserves the frozen score.
+    if (queuedScoreSnapshot) {
+      const persisted = await postFeedbackPersistAction(request, {
+        sessionId: queuedScoreSnapshot.sessionId,
+        userId: queuedScoreSnapshot.userId,
+        scores: queuedScoreSnapshot.scores,
+        feedback: {
+          raw: finalFeedback,
+          tldr: structuredFeedback.tldr,
+          whatWorked: structuredFeedback.whatWorked,
+          fixNext: structuredFeedback.fixNext,
+          actionPlan: structuredFeedback.actionPlan,
+        },
+        silentNotes: silentNotes ?? [],
+        testsPassed,
+        testsTotal,
+        timeSpentMinutes: timeSpent ? Math.round(timeSpent / 60) : 0,
+        hintsUsed: hintsUsedActual,
+        difficulty,
+        scenarioType: queuedScoreSnapshot.scenarioType,
+        scenarioTitle: queuedScoreSnapshot.scenarioTitle,
+        scenarioId: queuedScoreSnapshot.scenarioId,
+        conversationTranscript,
+        efficiencyMetrics,
+        source: "server",
+      })
+      if (!persisted?.ok) {
+        logger.error("[Feedback API] Completed feedback persist failed", {
+          sessionId: queuedScoreSnapshot.sessionId,
+          status: persisted?.status,
+        })
+      } else {
+        feedbackNarrativePersisted = true
+      }
+    }
+
     return NextResponse.json({
       feedback: finalFeedback,
       performanceScore: scores.overall,
@@ -1321,6 +1456,21 @@ CRITICAL INSTRUCTIONS:
     })
   } catch (error) {
     logger.error("Feedback generation error", { error, endpoint: "/api/generate-feedback" })
+    if (queuedScoreSnapshot && !feedbackNarrativePersisted) {
+      await postFeedbackPersistAction(request, {
+        outcome: "generation_failed",
+        sessionId: queuedScoreSnapshot.sessionId,
+        userId: queuedScoreSnapshot.userId,
+        errorMessage:
+          error instanceof Error ? error.message.slice(0, 500) : "Feedback generation failed",
+      })
+      return NextResponse.json({
+        feedback: "",
+        feedbackPending: true,
+        performanceScore: queuedScoreSnapshot.scores.overall,
+        scores: queuedScoreSnapshot.scores,
+      })
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to generate feedback" },
       { status: 500 }

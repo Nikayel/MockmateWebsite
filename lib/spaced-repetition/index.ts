@@ -111,15 +111,6 @@ export {
   type LearningStatsContext,
 } from "./mastery-calculator"
 
-// RAG Integration
-export {
-  getSmartRecommendations,
-  getPatternRecommendations,
-  getNextPracticeRecommendation,
-  type SmartRecommendation,
-  type RecommendationType,
-} from "./rag-integration"
-
 // Research Tracker (A/B Testing Analytics)
 export {
   recordReviewEvent,

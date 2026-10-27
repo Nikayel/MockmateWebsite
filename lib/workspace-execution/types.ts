@@ -4,6 +4,7 @@ import type {
   WorkspaceScenarioFile,
   WorkspaceScenarioLanguage,
 } from "@/lib/scenarios/types"
+import type { ExecutionTestObservation } from "./test-outcomes"
 
 export type { WorkspaceScenarioConfig, WorkspaceScenarioFile, WorkspaceScenarioLanguage }
 
@@ -17,7 +18,7 @@ export interface PistonWorkspaceFile {
   content: string
 }
 
-export interface WorkspaceTestResult {
+export interface WorkspaceTestResult extends ExecutionTestObservation {
   suite: string
   name: string
   passed: boolean
@@ -54,7 +55,7 @@ export type WorkspaceScenario = Scenario & {
   workspace: WorkspaceScenarioConfig
 }
 
-export interface DsaTestResult {
+export interface DsaTestResult extends ExecutionTestObservation {
   description: string
   passed: boolean
   input: any

@@ -36,6 +36,9 @@ export interface UseInterviewMetricsOptions {
   firebaseUser: FirebaseUser | null
   // read-only cross-cutting deps for submitHintFeedback's /api/rag body
   selectedScenarioId: string | undefined
+  scenarioType?: string
+  difficulty?: string
+  elapsedTimeSeconds?: number
   userId: string | undefined
   guestId: string | null
   currentSessionId: string | null
@@ -75,15 +78,17 @@ export function useInterviewMetrics(
     async (params: TrackSessionCompletionParams) => {
       // GA4 session_complete: /api/admin/analytics queries this exact event name.
       // Fired before the token guard so an auth hiccup cannot drop the count.
-      // Scenario type/difficulty/duration are not plumbed into this hook and the
-      // admin dashboard aggregates by event name, so unknowns are acceptable here.
+      // Unknown values stay absent; zero is a real duration, not a missing value.
       trackSessionComplete({
         sessionId: params.sessionId,
         scenarioId: selectedScenarioId || "unknown",
-        scenarioType: "unknown",
-        difficulty: "unknown",
+        ...(options.scenarioType ? { scenarioType: options.scenarioType } : {}),
+        ...(options.difficulty ? { difficulty: options.difficulty } : {}),
         language: params.language,
-        durationMinutes: 0,
+        ...(typeof options.elapsedTimeSeconds === "number" &&
+        Number.isFinite(options.elapsedTimeSeconds)
+          ? { durationMinutes: options.elapsedTimeSeconds / 60 }
+          : {}),
       })
 
       try {
@@ -113,7 +118,13 @@ export function useInterviewMetrics(
         console.error("[Session Metrics] Failed to track completion:", error)
       }
     },
-    [firebaseUser, selectedScenarioId]
+    [
+      firebaseUser,
+      selectedScenarioId,
+      options.scenarioType,
+      options.difficulty,
+      options.elapsedTimeSeconds,
+    ]
   )
 
   const updateSpacedRepetition = useCallback(

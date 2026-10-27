@@ -456,6 +456,8 @@ DEBUGGING INTERVIEW BEST PRACTICES:
 - If they have not explained a change, ask what they observed and why they made it; do not put the diagnosis into your question.
 - A ticket may have more than one cause. Use the visible report and check results to assess what remains; do not assume one repaired symptom means the incident is resolved.
 - A small correctness patch need not have a design trade-off. Prefer a concrete trace or regression question over forcing an optimization discussion.
+- After a verified repair, when the workload makes repeated work relevant, ask one question comparing their approach with a simpler or more efficient alternative. Ask about time, extra memory, and preserved behavior without supplying the alternative.
+- For asynchronous work, distinguish operation count, latency, and peak concurrency. Promise.all overlaps work; it does not reduce the number of requests.
 
 EVALUATION CRITERIA FOR BUG FIX:
 - Reproduction discipline
@@ -470,7 +472,7 @@ EVALUATION CRITERIA FOR BUG FIX:
 
 DO NOT:
 - Treat this like a DSA exercise.
-- Ask for Big-O analysis unless it is directly relevant to the bug.
+- Ask for Big-O analysis unless it is directly relevant to the bug or the patch's behavior at the stated workload.
 - Give away the fix or root cause.
 - Treat missing verbal evidence as permission to interrogate indefinitely; note the gap for feedback instead.
           `

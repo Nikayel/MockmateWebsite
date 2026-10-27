@@ -40,20 +40,18 @@ createRoot(document.getElementById("root")!).render(
               <ScoreDisplay
                 sections={sections}
                 overallScore={70}
-                performanceScore={70}
                 technicalScore={75}
-                scoreBreakdown={{
-                  understandingScore: 70,
-                  problemSolvingScore: 75,
-                  codeQualityScore: 80,
-                  communicationScore: 45,
+                scores={{
+                  understanding: 70,
+                  problemSolving: 75,
+                  codeQuality: 80,
+                  communication: 45,
                 }}
                 testsPassed={3}
                 testsTotal={3}
                 elapsedTime={900}
                 problemType="dsa"
                 problemTitle="Two Sum"
-                feedback={report}
               />
               <FeedbackSections
                 sections={sections}

@@ -1,7 +1,7 @@
 /**
  * Sprint Labs — client-side io-case executor (docs/sprint-labs/PLAN.md Task "runtime B").
  *
- * This is the client half of WORKBOOK-SPEC.md §5's IO-case design (EXECUTION-STATE.md's standing
+ * This is the client half of WORKBOOK-SPEC.md §5's IO-case design (DECISIONS.md's standing
  * note, restated because every line of this file exists to honor it): the server issues an
  * io-case's `input` (never `expected`); the CLIENT runs the learner's CURRENT workspace code
  * against that input and posts the RAW output; the SERVER (`lib/sprint-labs/grading/
@@ -25,7 +25,7 @@
  * synthesized test asserts NOTHING — it exists purely to call the learner's exported function and
  * report the raw return value back out through a console.log marker, the same "protocol line in
  * stdout" idiom `executeWorkspaceScenarioTsClientSide` / `run-visible-tests.ts` /
- * `python-sandbox/pack-oracle-runner.ts`'s `decodePackStdout` all already use (EXECUTION-STATE.md:
+ * `python-sandbox/pack-oracle-runner.ts`'s `decodePackStdout` all already use (DECISIONS.md:
  * "last marker, stdout-typed only"). Own marker prefix (`__SPRINT_LAB_IO_CASE_OUTPUT__:`), because
  * the existing `__WORKSPACE_TEST_RESULTS__:` marker is a pass/fail-per-test-name protocol; this one
  * carries an arbitrary JSON-safe VALUE per case instead.

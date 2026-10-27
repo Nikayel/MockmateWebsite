@@ -1,11 +1,13 @@
 import { sessionAssetUrl } from "@/lib/interview/session-fetch"
 import type { DsaExecutionResult } from "../types"
+import type { ExecutionFailureKind } from "../test-outcomes"
 
 interface PythonWorkerRunResult {
   success: boolean
   result?: unknown
   logs: DsaExecutionResult["consoleLogs"]
   error?: string
+  failureKind?: ExecutionFailureKind
 }
 
 interface PythonWorkerData {
@@ -17,6 +19,7 @@ interface PythonWorkerData {
 }
 
 interface PendingPythonRun {
+  executionStarted: boolean
   resolve: (value: PythonWorkerRunResult) => void
   timeoutId: ReturnType<typeof setTimeout>
   execTimeoutMs: number
@@ -70,12 +73,18 @@ function getPythonWorker(): Worker {
       // Swap the generous boot timeout for the tight execution timeout so that
       // a runaway loop is still caught quickly, without penalizing cold starts.
       if (data.type === "exec-start") {
+        pendingRun.executionStarted = true
         clearTimeout(pendingRun.timeoutId)
         pendingRun.timeoutId = setTimeout(() => {
           // Resolve BEFORE tearing down: resetPythonWorker() nulls pendingRun,
           // and resolveActive() no-ops on a null pendingRun. Reversing the order
           // would leave the run promise pending forever.
-          resolveActive({ success: false, logs: [], error: EXEC_TIMEOUT_MESSAGE })
+          resolveActive({
+            success: false,
+            logs: [],
+            error: EXEC_TIMEOUT_MESSAGE,
+            failureKind: "candidate-timeout",
+          })
           resetPythonWorker()
         }, pendingRun.execTimeoutMs)
         return
@@ -97,6 +106,13 @@ function getPythonWorker(): Worker {
         result: data.result,
         logs: [...statusLogs, ...(data.logs || [])],
         error: data.error,
+        ...(!data.success
+          ? {
+              failureKind: pendingRun.executionStarted
+                ? ("candidate" as const)
+                : ("service" as const),
+            }
+          : {}),
       }
       resolveActive(payload)
     }
@@ -112,6 +128,7 @@ function getPythonWorker(): Worker {
         success: false,
         logs: statusLogs,
         error: error.message || "Unknown Python worker error",
+        failureKind: "service",
       })
       resetPythonWorker()
     }
@@ -138,6 +155,7 @@ export function runPythonInWorker(
       success: false,
       logs: [],
       error: "Execution environment is not browser",
+      failureKind: "service",
     })
   }
 
@@ -167,6 +185,7 @@ function startPythonRun(
         success: false,
         logs: [],
         error: error instanceof Error ? error.message : "Failed to spawn Python Web Worker",
+        failureKind: "service",
       })
       return
     }
@@ -175,11 +194,16 @@ function startPythonRun(
     // as the worker reports it is about to run code (`exec-start`).
     const timeoutId = setTimeout(() => {
       // Resolve BEFORE resetPythonWorker() nulls pendingRun, or the promise hangs.
-      resolveActive({ success: false, logs: [], error: BOOT_TIMEOUT_MESSAGE })
+      resolveActive({
+        success: false,
+        logs: [],
+        error: BOOT_TIMEOUT_MESSAGE,
+        failureKind: "service",
+      })
       resetPythonWorker()
     }, bootTimeoutMs)
 
-    pendingRun = { resolve, timeoutId, execTimeoutMs, logs: [] }
+    pendingRun = { resolve, timeoutId, execTimeoutMs, logs: [], executionStarted: false }
     worker.postMessage(typeof workerData === "string" ? { code: workerData } : workerData)
   })
 }

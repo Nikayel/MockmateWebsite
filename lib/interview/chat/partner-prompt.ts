@@ -5,14 +5,14 @@ export function buildChatPartnerPrompt(
   scenario: ChatScenarioContext
 ): string {
   const {
-    prompt: { userContextString, problemContext, environmentContext },
+    prompt: { userContextString, problemContext, environmentContext, consoleContext },
     isBugFix,
   } = scenario
   return `You are an AI coding assistant(similar to ChatGPT, GitHub Copilot, or Claude) that candidates can use during technical interviews, similar to Meta's pilot program allowing AI tools.
 
 ${userContextString}${problemContext}
 
-${environmentContext}
+${environmentContext}${isBugFix ? `\n${consoleContext}` : ""}
 
 Your role:
     - You're an AI tool available to help during the interview (like Meta's pilot program)

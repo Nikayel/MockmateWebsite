@@ -25,7 +25,7 @@ import {
  * (Fluid Compute runs Node in the same regions at the same price). The
  * remaining reason this is separate is inertia plus the Firebase-Admin split
  * (Edge cannot use it, hence /api/feedback/persist). See
- * docs/EDGE-TO-NODE-CONSOLIDATION.md for the migration assessment.
+ * docs/plans/technical-chores.md for the migration assessment.
  *
  * Flow:
  * 1. Receive session data
@@ -47,6 +47,11 @@ import {
 // Direct imports to avoid pulling in Node.js dependencies via barrel exports
 import { sanitizeTestCount, sanitizeEfficiencyScore } from "@/lib/feedback/request-schema"
 import { preScreenConversation } from "@/lib/feedback/pre-screening"
+import {
+  calculateFeedbackTestMetrics,
+  feedbackTestResultsSchema,
+} from "@/lib/feedback/test-result-metrics"
+import { applyRootCauseAssessment } from "@/lib/bugfix/reasoning-assessment"
 import { analyzeCodeCompleteness } from "@/lib/feedback/completeness-analysis"
 import { parseFeedbackSections, buildSilentNotesContext } from "@/lib/feedback/parsers"
 import { completeFeedbackSections } from "@/lib/feedback/structured-feedback-schema"
@@ -267,7 +272,7 @@ const MAX_TRANSCRIPT_MESSAGES = 400
  */
 const MAX_MESSAGE_CHARS = 4_000
 
-/** ~30k characters. The prompt only ever shows the first 1,500. */
+/** ~30k characters. Trade-off reviews need the implementation, not a short prefix. */
 const MAX_CODE_CHARS = 30_000
 
 /** AI partner turns feed the copy-detection overlap scan, which is O(code x messages). */
@@ -458,18 +463,26 @@ export async function POST(request: NextRequest) {
       return null
     }
   }
-  const persistServerSide = async (payload: Record<string, unknown>) => {
+  const persistServerSide = async (payload: Record<string, unknown>): Promise<boolean> => {
     const persistUrl = resolvePersistUrl()
     if (!persistUrl) {
       logger.error("[Streaming Feedback] Cannot resolve persist URL; server-side persist skipped", {
         sessionId: payload.sessionId,
       })
-      return
+      return false
     }
     try {
+      const isInternalAction =
+        payload.outcome === "score_ready" || payload.outcome === "generation_failed"
       const response = await fetch(persistUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: forwardedAuth },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: forwardedAuth,
+          ...(isInternalAction && process.env.CRON_SECRET
+            ? { "x-feedback-internal-secret": process.env.CRON_SECRET }
+            : {}),
+        },
         body: JSON.stringify(payload),
       })
       if (!response.ok) {
@@ -478,11 +491,17 @@ export async function POST(request: NextRequest) {
           sessionId: payload.sessionId,
         })
       }
+      if (payload.outcome === "score_ready" && response.ok) {
+        const result = (await response.json().catch(() => null)) as { scoreSaved?: unknown } | null
+        return result?.scoreSaved === true
+      }
+      return response.ok
     } catch (error) {
       logger.error("[Streaming Feedback] Server-side persist failed", {
         sessionId: payload.sessionId,
         error,
       })
+      return false
     }
   }
 
@@ -494,6 +513,7 @@ export async function POST(request: NextRequest) {
   // Set once the body names a real Firestore session owned by the caller; the
   // catch uses it to mark that session "failed" instead of leaving "processing".
   let persistTarget: { sessionId: string; userId: string } | null = null
+  let scoreSnapshotSaved = false
 
   const processRequest = async () => {
     startHeartbeat()
@@ -604,8 +624,20 @@ export async function POST(request: NextRequest) {
       // Untrusted numeric inputs: a non-numeric count would make passRate NaN
       // (which survives clamping into the scores event), and testsPassed >
       // testsTotal would make it >100% and trip every perfect-pass floor.
-      const testsTotal = sanitizeTestCount(rawTestsTotal)
-      const testsPassed = Math.min(sanitizeTestCount(rawTestsPassed), testsTotal)
+      const parsedTests =
+        body.testResults === undefined
+          ? undefined
+          : feedbackTestResultsSchema.safeParse(body.testResults)
+      if (parsedTests && !parsedTests.success) {
+        await sendEvent("error", { message: "Invalid test results" })
+        return
+      }
+      const judged = parsedTests?.success
+        ? calculateFeedbackTestMetrics(parsedTests.data)
+        : undefined
+      const testsTotal = judged?.testsTotal ?? sanitizeTestCount(rawTestsTotal)
+      const testsPassed =
+        judged?.testsPassed ?? Math.min(sanitizeTestCount(rawTestsPassed), testsTotal)
 
       // Bound the free-text inputs ONCE, here, before anything reads them. Every
       // reader below (message counts, pre-screening, the five AI payloads) uses
@@ -613,10 +645,7 @@ export async function POST(request: NextRequest) {
       // survives into a priced call.
       const { messages: conversationTranscript, truncated: transcriptTruncated } =
         boundTranscript(rawConversationTranscript)
-      const code =
-        typeof rawCode === "string" && rawCode.length > MAX_CODE_CHARS
-          ? rawCode.slice(0, MAX_CODE_CHARS)
-          : rawCode
+      const code = typeof rawCode === "string" ? rawCode.slice(0, MAX_CODE_CHARS) : ""
       const partnerMessages = Array.isArray(rawPartnerMessages)
         ? rawPartnerMessages.slice(0, MAX_PARTNER_MESSAGES)
         : rawPartnerMessages
@@ -703,21 +732,22 @@ export async function POST(request: NextRequest) {
       await sendEvent("phase", { phase: "analyzing", message: "Analyzing your interview..." })
 
       const passRate = testsTotal > 0 ? (testsPassed / testsTotal) * 100 : 0
-      // preScreenConversation declares { role, content } but has always been
-      // handed the raw body shape, which for some clients carries `type` /
-      // `message` instead. Bounding the transcript gave the value a real type
-      // and surfaced the mismatch; normalising it here would change what
-      // pre-screening counts, and pre-screening feeds the scores users see.
-      // Preserved exactly as-is — worth fixing, but not inside a cost change.
-      const preScreen = preScreenConversation(
-        conversationTranscript as unknown as Array<{ role: string; content: string }>
-      )
+      // Both legacy type/message and current role/content clients must provide
+      // the same candidate evidence to pre-screening and the semantic scorer.
+      const normalizedTranscript = conversationTranscript.map((message) => ({
+        role:
+          message.type === "user" || message.role === "user" || message.role === "candidate"
+            ? "user"
+            : "interviewer",
+        content: message.message || message.content || "",
+      }))
+      const preScreen = preScreenConversation(normalizedTranscript)
       const aiCodeOverlap = analyzeAICodeOverlap(code, partnerMessages)
       const hasBlindCopying =
         scenarioType !== "bugfix" &&
         aiCodeOverlap.hasHighOverlap &&
         !aiCodeOverlap.modificationsMade
-      const bugfixEvidenceSummary: BugfixEvidenceSummary | null =
+      let bugfixEvidenceSummary: BugfixEvidenceSummary | null =
         !guidedConfig && scenarioType === "bugfix" && Array.isArray(bugfixEvidenceEvents)
           ? summarizeBugfixEvidence({
               events: bugfixEvidenceEvents as BugfixEvidenceEvent[],
@@ -731,6 +761,10 @@ export async function POST(request: NextRequest) {
               expectedTouchedFiles: Array.isArray(bugfixExpectedTouchedFiles)
                 ? bugfixExpectedTouchedFiles
                 : [],
+              finalSourceRevision:
+                typeof body.bugfixFinalSourceRevision === "string"
+                  ? body.bugfixFinalSourceRevision
+                  : undefined,
             })
           : null
       const bugfixScoreBreakdownPreSemantic: BugfixScoreBreakdown | null = bugfixEvidenceSummary
@@ -778,6 +812,7 @@ export async function POST(request: NextRequest) {
       // no longer posts it). Packs keep their prior behavior: the prompt still uses the
       // client-sent generic pack rubric, not the sealed debrief rubric.
       let sealedLegacyRubric: string[] | null = null
+      let sealedFixTradeoffs: string | undefined
       if (scenarioType === "bugfix" && typeof scenarioId === "string" && scenarioId) {
         try {
           const sealed = await loadSealedPack(scenarioId)
@@ -793,6 +828,7 @@ export async function POST(request: NextRequest) {
           } else {
             const legacy = await loadSealedLegacyBugfix(scenarioId)
             if (legacy) {
+              sealedFixTradeoffs = legacy.fixTradeoffs
               sealedLegacyRubric =
                 legacy.rootCauseRubric && legacy.rootCauseRubric.length > 0
                   ? legacy.rootCauseRubric
@@ -1027,10 +1063,26 @@ export async function POST(request: NextRequest) {
       // PHASE 3: Calculate Final Scores
       // ========================================
       // Note: extractedEvidence is already merged into aiValidation above
+      if (bugfixEvidenceSummary) {
+        bugfixEvidenceSummary = applyRootCauseAssessment(
+          bugfixEvidenceSummary,
+          bugfixSemanticScores,
+          transcriptMessages
+            .filter((message) => message.role === "user")
+            .map((message) => message.content)
+        )
+      }
       const bugfixScoreBreakdown: BugfixScoreBreakdown | null = bugfixEvidenceSummary
         ? calculateBugfixEvidenceScore(bugfixEvidenceSummary, {
             difficulty: scenarioDifficulty || "medium",
-            semanticOverrides: bugfixSemanticScores,
+            semanticOverrides: {
+              ...bugfixSemanticScores,
+              // A quote we could not verify must not become a confident judgment.
+              rootCauseAccuracy:
+                hasCandidateTurn && bugfixEvidenceSummary.rootCauseAssessment?.status !== "observed"
+                  ? 50
+                  : bugfixSemanticScores.rootCauseAccuracy,
+            },
             // This breakdown REPLACES the capped scorer output below, so the
             // integrity signals have to be applied here too or bugfix sessions
             // escape them entirely.
@@ -1120,6 +1172,7 @@ export async function POST(request: NextRequest) {
           bugfixRootCauseRubric:
             sealedLegacyRubric ??
             (Array.isArray(bugfixRootCauseRubric) ? bugfixRootCauseRubric : []),
+          bugfixFixTradeoffs: sealedFixTradeoffs,
           silentNotes: finalSilentNotes,
           code,
           language,
@@ -1127,6 +1180,52 @@ export async function POST(request: NextRequest) {
           testsPassed,
           testsTotal,
         })
+
+      const bugfixPostSessionReport =
+        bugfixEvidenceSummary && bugfixScoreBreakdown
+          ? buildBugfixPostSessionReport({
+              evidence: bugfixEvidenceSummary,
+              score: bugfixScoreBreakdown,
+              rootCauseText: typeof bugfixRootCause === "string" ? bugfixRootCause : undefined,
+              preventionText: typeof bugfixPrevention === "string" ? bugfixPrevention : undefined,
+            })
+          : undefined
+
+      // Save the finalized score and exact narrative prompts before attempting
+      // the inline generation. The worker can reclaim the lease if this stream
+      // process disappears, or retry immediately when generation throws.
+      if (persistTarget && !guidedConfig) {
+        scoreSnapshotSaved = await persistServerSide({
+          outcome: "score_ready",
+          sessionId: persistTarget.sessionId,
+          userId: persistTarget.userId,
+          scores: {
+            understanding: finalScores.understanding,
+            problemSolving: finalScores.problemSolving,
+            codeQuality: finalScores.codeQuality,
+            communication: finalScores.communication,
+            overall: finalScores.overall,
+          },
+          systemPrompt: systemInstruction,
+          userPrompt: prompt,
+          scenarioType: scenarioType || "dsa",
+          scenarioTitle: scenarioTitle || "Unknown",
+          scenarioId,
+          silentNotes: finalSilentNotes,
+          bugfixEvidenceSummary: bugfixEvidenceSummary ?? null,
+          bugfixScoreBreakdown: bugfixScoreBreakdown ?? null,
+          bugfixPostSessionReport: bugfixPostSessionReport ?? null,
+        })
+        if (scoreSnapshotSaved) {
+          await sendEvent("score_saved", {
+            understanding: finalScores.understanding,
+            problemSolving: finalScores.problemSolving,
+            codeQuality: finalScores.codeQuality,
+            communication: finalScores.communication,
+            overall: finalScores.overall,
+          })
+        }
+      }
 
       const aiResponse: import("@/lib/ai-providers-edge").EdgeAIResponse = guidedLabAssessment
         ? {
@@ -1188,16 +1287,6 @@ export async function POST(request: NextRequest) {
       // The client sets "complete" itself once the results are genuinely
       // renderable (lib/hooks/use-streaming-feedback.ts), which is the only moment
       // that word is true.
-
-      const bugfixPostSessionReport =
-        bugfixEvidenceSummary && bugfixScoreBreakdown
-          ? buildBugfixPostSessionReport({
-              evidence: bugfixEvidenceSummary,
-              score: bugfixScoreBreakdown,
-              rootCauseText: typeof bugfixRootCause === "string" ? bugfixRootCause : undefined,
-              preventionText: typeof bugfixPrevention === "string" ? bugfixPrevention : undefined,
-            })
-          : undefined
 
       const finalScoresPayload = {
         understanding: finalScores.understanding,
@@ -1269,13 +1358,25 @@ export async function POST(request: NextRequest) {
         scenarioType: loggedScenarioType,
         error,
       })
-      await sendEvent("error", {
-        message: error instanceof Error ? error.message : "Failed to generate feedback",
-      })
-      // Land the session in a terminal state. Without this, a generation error
-      // after the client disconnected left feedback_status "processing"
-      // forever, with no retry UI and nothing for the reaper to have to catch.
-      if (persistTarget) {
+      if (scoreSnapshotSaved && persistTarget) {
+        await persistServerSide({
+          outcome: "generation_failed",
+          sessionId: persistTarget.sessionId,
+          userId: persistTarget.userId,
+          errorMessage:
+            error instanceof Error ? error.message.slice(0, 500) : "Feedback generation failed",
+        })
+        await sendEvent("queued", {
+          message: "Your score is ready. Written feedback is taking longer than expected.",
+        })
+      } else {
+        await sendEvent("error", {
+          message: error instanceof Error ? error.message : "Failed to generate feedback",
+        })
+      }
+      // If there is no score-ready job to recover from, keep the old terminal
+      // failure path. A saved score remains queued and is retried by the worker.
+      if (persistTarget && !scoreSnapshotSaved) {
         await persistServerSide({
           outcome: "failed",
           sessionId: persistTarget.sessionId,
@@ -1378,6 +1479,7 @@ function buildPrompt(data: {
   bugfixRootCause?: unknown
   bugfixPrevention?: unknown
   bugfixRootCauseRubric?: string[]
+  bugfixFixTradeoffs?: string
   silentNotes: unknown[]
   code: string
   language: string
@@ -1398,6 +1500,7 @@ function buildPrompt(data: {
     bugfixRootCause,
     bugfixPrevention,
     bugfixRootCauseRubric,
+    bugfixFixTradeoffs,
     silentNotes,
     code,
     language,
@@ -1455,12 +1558,14 @@ COMMUNICATION:
 
 ${evidenceSummary ? `EVIDENCE FROM CONVERSATION:\n${evidenceSummary}\n` : ""}
 ${bugfixEvidenceContext}
+${scenarioType === "bugfix" && bugfixFixTradeoffs ? `FIX TRADE-OFF REVIEW (server-supplied; assess the submitted code):\n${bugfixFixTradeoffs}\n` : ""}
 ${silentNotesContext}
 
 CODE (${language || "javascript"}):
 \`\`\`
-${code?.slice(0, 1500) || "[No code]"}
+${code?.slice(0, bugfixFixTradeoffs ? MAX_CODE_CHARS : 1500) || "[No code]"}
 \`\`\`
+${bugfixFixTradeoffs && code.length >= MAX_CODE_CHARS ? "[CODE TRUNCATED at the input limit; efficiency is unverified. Do not assume unseen code is correct or efficient.]" : ""}
 
 ${
   efficiencyMetrics

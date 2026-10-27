@@ -10,10 +10,10 @@
  *    synthesis.
  *  - **Hidden tests** (`tests/hidden/*.yaml`) are authored as DATA, not files: `kind: "probe"` is a
  *    raw assertion-statement `body` string with no import of its own (docs/sprint-labs/
- *    EXECUTION-STATE.md's own grading design has the CLIENT execute a probe body against whatever
+ *    DECISIONS.md's own grading design has the CLIENT execute a probe body against whatever
  *    is already in scope in the learner's live workspace -- there is no established, product-wide
  *    "what identifiers does a probe body see" convention anywhere yet, confirmed by exhaustive
- *    search of EXECUTION-STATE.md/INTEGRATION.md's grading-architecture sections, both of which
+ *    search of DECISIONS.md/INTEGRATION.md's grading-architecture sections, both of which
  *    describe probe execution only at the "client runs it" level of detail). This module supplies
  *    the one this task needs for CI replay, documented here since it is new design surface, not a
  *    quote from any spec: a synthesized hidden test file imports, VERBATIM, every named-import line
@@ -25,7 +25,7 @@
  *    convention (`assert(cond, message)`).
  *
  * `kind: "io-case"` hidden tests are bridged ONLY when authored with an explicit `entryPoint`
- * (`{module, export}` -- PLAN.md Task 7 review round 1, Critical 2). EXECUTION-STATE.md's
+ * (`{module, export}` -- PLAN.md Task 7 review round 1, Critical 2). DECISIONS.md's
  * deviation D1 ("no server-side execution yet") is about the LIVE product, where the client runs
  * the learner's code and the server only ever compares, never executes (`lib/sprint-labs/grading/
  * gate-runner.ts`). This CI replay gate is a different context: it ALREADY executes probe hidden

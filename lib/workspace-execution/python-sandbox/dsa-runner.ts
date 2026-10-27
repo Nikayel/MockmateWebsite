@@ -37,6 +37,7 @@ export async function executePythonClientSide(
           expected: testCase.expected,
           actual: null,
           passed: false,
+          failureKind: runResult.failureKind,
           error: runResult.error
             ? sanitizePythonTraceback(runResult.error, userCodeLineCount)
             : "Execution failed",

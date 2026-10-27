@@ -487,7 +487,11 @@ export function useSessionReopen(opts: UseSessionReopenOptions) {
           }
 
           // If there's saved code, use it; otherwise use starter code
-          if (hasExistingProgress && savedState?.code !== undefined) {
+          if (
+            !isWorkspaceScenario(scenario) &&
+            hasExistingProgress &&
+            savedState?.code !== undefined
+          ) {
             opts.setCode(savedState.code)
             if (savedState.language) {
               opts.setSelectedLanguage(savedState.language as any)

@@ -4,12 +4,12 @@ import {
   serializeCheckpoint,
   type SessionCheckpoint,
 } from "./interview/session-lifecycle/checkpoint"
-import { isScoredCompletedSession } from "./interview/completion-status"
 /**
  * Firestore helper functions for creating and managing user data
  */
 
 import { db } from "./firebase"
+import { isScoredCompletedSession } from "./interview/completion-status"
 import {
   doc,
   setDoc,
@@ -56,6 +56,8 @@ export function sanitizeTestResultsForFirestore(testResults: Array<any>): Array<
     expected: stringifyTestValue(t.expected),
     actual: stringifyTestValue(t.actual),
     error: t.error ?? null,
+    ...(typeof t.sourceRevision === "string" && { sourceRevision: t.sourceRevision }),
+    ...(t.failureKind && { failureKind: t.failureKind }),
   }))
 }
 
@@ -427,7 +429,7 @@ export async function createInterviewSession(
  * - 'complete': Feedback generation finished, scores are final
  * - 'failed': Feedback generation failed (user can retry)
  */
-export type FeedbackStatus = "pending" | "processing" | "complete" | "failed"
+export type FeedbackStatus = "pending" | "processing" | "queued" | "complete" | "failed"
 
 export { isScoredCompletedSession }
 
@@ -437,6 +439,7 @@ export interface SessionFunnelInput {
   completed_at?: unknown
   feedback_status?: unknown
   performance_score?: unknown
+  feedback_score_frozen?: unknown
 }
 
 /** Guest/registered + scored-completion partition of a set of interview_sessions. */
@@ -501,6 +504,7 @@ export interface ActivationSessionInput {
   completed_at?: unknown
   feedback_status?: unknown
   performance_score?: unknown
+  feedback_score_frozen?: unknown
 }
 
 /** Signup-cohort activation: first scored round within the activation window of signup. */

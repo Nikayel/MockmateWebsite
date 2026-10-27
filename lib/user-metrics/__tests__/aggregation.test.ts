@@ -41,6 +41,15 @@ describe("canonical session normalization", () => {
     for (const completed_at of [undefined, "bad", "2027-01-01T00:00:00Z"])
       expect(normalizeMetricSession("bad", { ...base, completed_at }, now)).toBeNull()
   })
+  it.each(["queued", "failed"])(
+    "includes a frozen score with %s written feedback",
+    (feedback_status) => {
+      expect(
+        session("frozen", { feedback_status, feedback_score_frozen: true }).performanceScore
+      ).toBe(81)
+      expect(normalizeMetricSession("provisional", { ...base, feedback_status }, now)).toBeNull()
+    }
+  )
   it("supports legacy finalized sessions without a feedback status", () => {
     expect(session("legacy", { feedback_status: undefined }).performanceScore).toBe(81)
   })
@@ -114,6 +123,22 @@ describe("one consistent aggregation", () => {
     expect(result.overview.averageTechnicalScore).toBe(0)
     expect(result.scoreBreakdown?.codeQuality).toBe(0)
     expect(result.scoreBreakdown?.communication).toBeNull()
+  })
+  it("keeps history but compares only the latest measurement version", () => {
+    const result = aggregateMetricSessions(
+      [
+        session("new", { measurement_version: 2, performance_score: 60 }),
+        session("old", { performance_score: 100, completed_at: "2026-10-24T11:00:00Z" }),
+      ],
+      now
+    )
+    expect(result.overview.totalSessions).toBe(2)
+    expect(result.overview.averageScore).toBe(80)
+    expect(result.recentAverage).toBe(60)
+    expect(result.weeklyAverage).toBe(60)
+    expect(result.bugfix.readiness).toBe(60)
+    expect(result.daily).toHaveLength(2)
+    expect(result.trendDaily).toHaveLength(1)
   })
   it("distinguishes no scored interviews from a zero average", () => {
     const result = aggregateMetricSessions([], now)

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Progress } from "@/components/ui/progress"
-import { getLetterGrade, GRADE_COLOR_CLASS } from "@/lib/constants"
+import { getLetterGrade, GRADE_COLOR_CLASS, SCORING } from "@/lib/constants"
 import {
   Lightbulb,
   Zap,
@@ -14,42 +14,30 @@ import {
   Bug,
   Wrench,
   Clock,
-  CheckCircle,
-  AlertTriangle,
   Download,
   Info,
-  X,
   ArrowLeft,
 } from "lucide-react"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { calculateTechnicalScoreFromBreakdown } from "@/lib/constants"
 import type { FeedbackSection } from "@/lib/feedback/parsers"
+import { BUGFIX_SCORE_CATEGORIES, bugfixCategoryOverallWeight } from "@/lib/bugfix/score-dimensions"
+import { DebuggingScoreTooltip } from "./DebuggingScoreTooltip"
 
 interface ScoreDisplayProps {
   sections: FeedbackSection
   overallScore: number
-  performanceScore: number
   technicalScore?: number // Pre-calculated technical score from backend
-  scoreBreakdown?: {
-    understandingScore?: number
-    problemSolvingScore?: number
-    codeQualityScore?: number
-    communicationScore?: number
-  }
   testsPassed: number
   testsTotal: number
   elapsedTime: number
   problemType?: string
-  feedback: string
-  timeComplexity?: string
-  spaceComplexity?: string
-  efficiencyScore?: number
   onExport?: () => void
   onClose?: () => void
   problemTitle?: string
   grade?: string
-  scores?: {
+  scores: {
     understanding: number
     problemSolving: number
     codeQuality: number
@@ -65,125 +53,18 @@ function formatTime(seconds: number) {
 export function ScoreDisplay({
   sections,
   overallScore,
-  performanceScore,
   technicalScore: technicalScoreProp,
-  scoreBreakdown,
   testsPassed,
   testsTotal,
   elapsedTime,
   problemType,
-  feedback,
-  timeComplexity,
-  spaceComplexity,
-  efficiencyScore,
   onExport,
   onClose,
   problemTitle,
   grade: gradeProp,
-  scores: scoresProp,
+  scores,
 }: ScoreDisplayProps) {
   const [showTechnicalOnly, setShowTechnicalOnly] = useState(false)
-  const feedbackLower = feedback.toLowerCase()
-
-  // Derived metrics based on problem type
-  const testPassRate = testsTotal > 0 ? (testsPassed / testsTotal) * 100 : 0
-  const solutionWorks = testPassRate >= 50
-  const complexityAccurate = (efficiencyScore || 0) >= 70 && solutionWorks
-
-  const edgeCasesDiscussed =
-    /edge cases considered:\s*yes/i.test(feedback) ||
-    /discussed.*edge case/i.test(feedback) ||
-    /mentioned.*edge case/i.test(feedback) ||
-    feedbackLower.includes("edge case") ||
-    feedbackLower.includes("corner case")
-
-  const hasRequirements =
-    feedbackLower.includes("requirement") ||
-    feedbackLower.includes("clarif") ||
-    feedbackLower.includes("scope")
-  const hasScalability =
-    feedbackLower.includes("scal") ||
-    feedbackLower.includes("performance") ||
-    feedbackLower.includes("load") ||
-    feedbackLower.includes("capacity")
-  const hasBugIdentified =
-    feedbackLower.includes("bug") ||
-    feedbackLower.includes("issue") ||
-    feedbackLower.includes("problem") ||
-    feedbackLower.includes("error")
-  const hasRootCause =
-    feedbackLower.includes("root cause") ||
-    feedbackLower.includes("because") ||
-    feedbackLower.includes("reason") ||
-    feedbackLower.includes("why")
-
-  const normalizeScore = (score: number | undefined): number => {
-    if (score === undefined || score === null || isNaN(score)) return 0
-    // Normalize: if score is <= 10, assume it's on a 0-10 scale and multiply by 10
-    // Otherwise, assume it's already on a 0-100 scale
-    return Math.min(100, score <= 10 ? score * 10 : score)
-  }
-
-  // Priority for category scores:
-  // 1. scoreBreakdown from backend (most authoritative)
-  // 2. Parsed scores from feedback text
-  // 3. Fallback to performanceScore for all categories
-  const hasBackendScores =
-    scoreBreakdown &&
-    (scoreBreakdown.understandingScore !== undefined ||
-      scoreBreakdown.problemSolvingScore !== undefined ||
-      scoreBreakdown.codeQualityScore !== undefined ||
-      scoreBreakdown.communicationScore !== undefined)
-
-  const hasParsedScores =
-    sections.scores.understanding > 0 ||
-    sections.scores.problemSolving > 0 ||
-    sections.scores.codeQuality > 0 ||
-    sections.scores.communication > 0
-
-  let scores: {
-    understanding: number
-    problemSolving: number
-    codeQuality: number
-    communication: number
-  }
-
-  if (hasBackendScores) {
-    // Use backend scores (most authoritative)
-    // These should already be in 0-100 format from the API
-    scores = {
-      understanding: normalizeScore(scoreBreakdown!.understandingScore),
-      problemSolving: normalizeScore(scoreBreakdown!.problemSolvingScore),
-      codeQuality: normalizeScore(scoreBreakdown!.codeQualityScore),
-      communication: normalizeScore(scoreBreakdown!.communicationScore),
-    }
-  } else if (hasParsedScores) {
-    // Use parsed scores from feedback text
-    // These might be in different formats, so normalize them
-    scores = {
-      understanding: normalizeScore(sections.scores.understanding || 0),
-      problemSolving: normalizeScore(sections.scores.problemSolving || 0),
-      codeQuality: normalizeScore(sections.scores.codeQuality || 0),
-      communication: normalizeScore(sections.scores.communication || 0),
-    }
-  } else if (performanceScore > 0) {
-    // Fallback: use performanceScore for all categories
-    const baseScore = normalizeScore(performanceScore)
-    scores = {
-      understanding: baseScore,
-      problemSolving: baseScore,
-      codeQuality: baseScore,
-      communication: baseScore,
-    }
-  } else {
-    scores = {
-      understanding: 0,
-      problemSolving: 0,
-      codeQuality: 0,
-      communication: 0,
-    }
-  }
-
   // Use stored technical score if available, otherwise derive it from the
   // breakdown using the canonical weights in lib/constants.
   const technicalScore =
@@ -206,28 +87,28 @@ export function ScoreDisplay({
           {
             name: "Requirements",
             score: scores.understanding,
-            weight: "20%",
+            weight: `${SCORING.SYSTEM_DESIGN_WEIGHTS.UNDERSTANDING * 100}%`,
             icon: Search,
             colorClass: "text-sky-400",
           },
           {
             name: "Architecture",
             score: scores.problemSolving,
-            weight: "30%",
+            weight: `${SCORING.SYSTEM_DESIGN_WEIGHTS.PROBLEM_SOLVING * 100}%`,
             icon: Layers,
             colorClass: "text-emerald-400",
           },
           {
             name: "Scalability",
             score: scores.codeQuality,
-            weight: "20%",
+            weight: `${SCORING.SYSTEM_DESIGN_WEIGHTS.CODE_QUALITY * 100}%`,
             icon: Scale,
             colorClass: "text-violet-400",
           },
           {
             name: "Communication",
             score: scores.communication,
-            weight: "30%",
+            weight: `${SCORING.SYSTEM_DESIGN_WEIGHTS.COMMUNICATION * 100}%`,
             icon: MessageSquare,
             colorClass: "text-amber-400",
           },
@@ -235,30 +116,34 @@ export function ScoreDisplay({
       : problemType === "bugfix"
         ? [
             {
-              name: "Investigation",
+              category: "understanding" as const,
+              name: BUGFIX_SCORE_CATEGORIES.understanding.label,
               score: scores.understanding,
-              weight: "35%",
+              weight: `${bugfixCategoryOverallWeight("understanding")}%`,
               icon: Search,
               colorClass: "text-sky-400",
             },
             {
-              name: "Root Cause",
+              category: "problemSolving" as const,
+              name: BUGFIX_SCORE_CATEGORIES.problemSolving.label,
               score: scores.problemSolving,
-              weight: "25%",
+              weight: `${bugfixCategoryOverallWeight("problemSolving")}%`,
               icon: Bug,
               colorClass: "text-emerald-400",
             },
             {
-              name: "Fix Quality",
+              category: "codeQuality" as const,
+              name: BUGFIX_SCORE_CATEGORIES.codeQuality.label,
               score: scores.codeQuality,
-              weight: "20%",
+              weight: `${bugfixCategoryOverallWeight("codeQuality")}%`,
               icon: Wrench,
               colorClass: "text-violet-400",
             },
             {
-              name: "Communication",
+              category: "communication" as const,
+              name: BUGFIX_SCORE_CATEGORIES.communication.label,
               score: scores.communication,
-              weight: "20%",
+              weight: `${bugfixCategoryOverallWeight("communication")}%`,
               icon: MessageSquare,
               colorClass: "text-amber-400",
             },
@@ -267,28 +152,28 @@ export function ScoreDisplay({
             {
               name: "Understanding",
               score: scores.understanding,
-              weight: "25%",
+              weight: `${SCORING.PERFORMANCE_WEIGHTS.UNDERSTANDING * 100}%`,
               icon: Lightbulb,
               colorClass: "text-sky-400",
             },
             {
               name: "Problem-Solving",
               score: scores.problemSolving,
-              weight: "25%",
+              weight: `${SCORING.PERFORMANCE_WEIGHTS.PROBLEM_SOLVING * 100}%`,
               icon: Zap,
               colorClass: "text-emerald-400",
             },
             {
               name: "Code Quality",
               score: scores.codeQuality,
-              weight: "30%",
+              weight: `${SCORING.PERFORMANCE_WEIGHTS.CODE_QUALITY * 100}%`,
               icon: Code,
               colorClass: "text-violet-400",
             },
             {
               name: "Communication",
               score: scores.communication,
-              weight: "20%",
+              weight: `${SCORING.PERFORMANCE_WEIGHTS.COMMUNICATION * 100}%`,
               icon: MessageSquare,
               colorClass: "text-amber-400",
             },
@@ -325,13 +210,7 @@ export function ScoreDisplay({
 
         doc.setFontSize(11)
         doc.setFont("helvetica", "normal")
-        const exportScores = scoresProp || scores
-        const criteria = [
-          { name: "Understanding", score: exportScores.understanding, weight: "25%" },
-          { name: "Problem-Solving", score: exportScores.problemSolving, weight: "25%" },
-          { name: "Code Quality", score: exportScores.codeQuality, weight: "30%" },
-          { name: "Communication", score: exportScores.communication, weight: "20%" },
-        ]
+        const criteria = scoreItems
         criteria.forEach((c) => {
           doc.text(`${c.name} (${c.weight}): ${c.score}%`, margin + 5, y)
           y += 6
@@ -353,13 +232,13 @@ export function ScoreDisplay({
       </div>
 
       {/* Compact Header with Grade */}
-      <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
+      <div className="border-border/50 bg-card/50 overflow-hidden rounded-2xl border">
         {/* Close Button - Apple-style prominent placement */}
         {onClose && (
-          <div className="flex items-center justify-end border-b border-border/50 px-5 py-3">
+          <div className="border-border/50 flex items-center justify-end border-b px-5 py-3">
             <button
               onClick={onClose}
-              className="flex h-10 items-center gap-2 rounded-full bg-muted px-4 text-sm font-medium text-muted-foreground shadow-sm transition-all duration-200 hover:bg-muted hover:text-foreground active:scale-[0.98]"
+              className="bg-muted text-muted-foreground hover:bg-muted hover:text-foreground flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium shadow-sm transition-all duration-200 active:scale-[0.98]"
             >
               <ArrowLeft className="h-4 w-4" />
               Close
@@ -417,62 +296,32 @@ export function ScoreDisplay({
                   </TooltipTrigger>
                   <TooltipContent
                     side="right"
-                    className="max-w-xs border border-border bg-muted text-foreground"
+                    className="border-border bg-muted text-foreground max-w-xs border"
                   >
                     {showTechnicalOnly ? (
                       <div className="space-y-2 p-1">
-                        <p className="font-semibold text-violet-400">Technical Score Breakdown</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          Excludes communication - pure coding ability:
-                        </p>
-                        <ul className="space-y-1 text-[11px] text-muted-foreground">
-                          <li>
-                            <span className="font-medium text-violet-400">60%</span> Code Quality —
-                            test pass rate, efficiency, complexity
-                          </li>
-                          <li>
-                            <span className="font-medium text-violet-400">25%</span> Problem Solving
-                            — approach, debugging, optimization attempts
-                          </li>
-                          <li>
-                            <span className="font-medium text-violet-400">15%</span> Understanding —
-                            code explanation, complexity analysis
-                          </li>
-                        </ul>
-                        <p className="border-t border-border pt-1 text-[10px] text-muted-foreground">
-                          Technical can differ from Overall because it heavily weights Code Quality
-                          (60%) while Overall includes Communication (20%) and weights Code Quality
-                          at only 30%.
+                        <p className="font-semibold">Technical score</p>
+                        <p className="text-xs leading-relaxed">
+                          {technicalScoreProp === undefined
+                            ? "Estimated from saved categories: 60% code quality, 25% problem solving, and 15% understanding."
+                            : "Uses your saved technical result. Current scoring combines 80% judged test correctness with 20% recorded hint use. Elapsed time does not affect it; historical sessions retain their original rules."}
                         </p>
                       </div>
                     ) : (
                       <div className="space-y-2 p-1">
-                        <p className="font-semibold text-foreground">Overall Score Breakdown</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          Full interview performance including soft skills:
-                        </p>
-                        <ul className="space-y-1 text-[11px] text-muted-foreground">
-                          <li>
-                            <span className="font-medium text-foreground">30%</span> Code Quality —
-                            test pass rate, efficiency, complexity
-                          </li>
-                          <li>
-                            <span className="font-medium text-foreground">25%</span> Problem Solving —
-                            approach, debugging, optimization attempts
-                          </li>
-                          <li>
-                            <span className="font-medium text-foreground">25%</span> Understanding —
-                            code explanation, complexity analysis
-                          </li>
-                          <li>
-                            <span className="font-medium text-foreground">20%</span> Communication —
-                            thought process, answering questions
-                          </li>
+                        <p className="font-semibold">Overall score</p>
+                        <ul className="space-y-1 text-xs">
+                          {scoreItems.map((entry) => (
+                            <li key={entry.name}>
+                              {entry.name}: {entry.weight}
+                            </li>
+                          ))}
                         </ul>
-                        <p className="border-t border-border pt-1 text-[10px] text-muted-foreground">
-                          Click to see Technical score which excludes communication and focuses on
-                          pure coding ability.
-                        </p>
+                        {problemType === "bugfix" && (
+                          <p className="text-xs">
+                            Hover or focus each card for its subcategories and individual weights.
+                          </p>
+                        )}
                       </div>
                     )}
                   </TooltipContent>
@@ -482,7 +331,7 @@ export function ScoreDisplay({
 
             {/* TL;DR */}
             <div className="min-w-0 flex-1">
-              <p className="text-sm leading-relaxed text-muted-foreground">
+              <p className="text-muted-foreground text-sm leading-relaxed">
                 {sections.tldr ||
                   (problemType === "system-design"
                     ? overallScore < 25
@@ -496,76 +345,26 @@ export function ScoreDisplay({
               </p>
 
               {/* Quick stats */}
-              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
+              <div className="text-muted-foreground mt-3 flex flex-wrap items-center gap-3 text-xs">
+                <span
+                  className="flex items-center gap-1"
+                  title="Elapsed session time, including pauses"
+                >
                   <Clock className="h-3 w-3" />
                   {formatTime(elapsedTime)}
                 </span>
                 <button
                   onClick={handleExport}
-                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors"
                   title="Export feedback as PDF"
                 >
                   <Download className="h-3 w-3" />
                   Export
                 </button>
-                {problemType === "system-design" ? (
-                  <>
-                    <span className="flex items-center gap-1">
-                      {hasRequirements ? (
-                        <CheckCircle className="h-3 w-3 text-emerald-500" />
-                      ) : (
-                        <AlertTriangle className="h-3 w-3 text-muted-foreground" />
-                      )}
-                      Requirements
-                    </span>
-                    <span className="flex items-center gap-1">
-                      {hasScalability ? (
-                        <CheckCircle className="h-3 w-3 text-emerald-500" />
-                      ) : (
-                        <AlertTriangle className="h-3 w-3 text-muted-foreground" />
-                      )}
-                      Scalability
-                    </span>
-                  </>
-                ) : problemType === "bugfix" ? (
-                  <>
-                    <span className="flex items-center gap-1">
-                      {hasBugIdentified ? (
-                        <CheckCircle className="h-3 w-3 text-emerald-500" />
-                      ) : (
-                        <AlertTriangle className="h-3 w-3 text-muted-foreground" />
-                      )}
-                      Bug Found
-                    </span>
-                    <span className="flex items-center gap-1">
-                      {hasRootCause ? (
-                        <CheckCircle className="h-3 w-3 text-emerald-500" />
-                      ) : (
-                        <AlertTriangle className="h-3 w-3 text-muted-foreground" />
-                      )}
-                      Root Cause
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="flex items-center gap-1">
-                      {complexityAccurate ? (
-                        <CheckCircle className="h-3 w-3 text-emerald-500" />
-                      ) : (
-                        <AlertTriangle className="h-3 w-3 text-muted-foreground" />
-                      )}
-                      Complexity
-                    </span>
-                    <span className="flex items-center gap-1">
-                      {edgeCasesDiscussed ? (
-                        <CheckCircle className="h-3 w-3 text-emerald-500" />
-                      ) : (
-                        <AlertTriangle className="h-3 w-3 text-muted-foreground" />
-                      )}
-                      Edge Cases
-                    </span>
-                  </>
+                {testsTotal > 0 && (
+                  <span>
+                    {testsPassed}/{testsTotal} tests passed
+                  </span>
                 )}
               </div>
             </div>
@@ -575,19 +374,47 @@ export function ScoreDisplay({
 
       {/* Score Breakdown - Horizontal compact cards */}
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        {scoreItems.map((item) => (
-          <div key={item.name} className="rounded-xl border border-border/50 bg-card/50 p-3">
-            <div className="mb-2 flex items-center gap-1.5">
-              <item.icon className={cn("h-3.5 w-3.5", item.colorClass)} />
-              <span className="text-[11px] text-muted-foreground">{item.name}</span>
-              <span className="ml-auto text-[10px] text-muted-foreground">{item.weight}</span>
+        {scoreItems.map((item) => {
+          const isDebugging = problemType === "bugfix" && "category" in item
+          const card = (
+            <div
+              key={item.name}
+              role={isDebugging ? "group" : undefined}
+              tabIndex={isDebugging ? 0 : undefined}
+              aria-label={isDebugging ? `${item.name} score details` : undefined}
+              className={cn(
+                "border-border/50 bg-card/50 rounded-xl border p-3",
+                isDebugging &&
+                  "focus-visible:ring-ring cursor-help focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+              )}
+            >
+              <div className="mb-2 flex items-center gap-1.5">
+                <item.icon className={cn("h-3.5 w-3.5", item.colorClass)} />
+                <span className="text-muted-foreground text-[11px]">{item.name}</span>
+                {isDebugging && (
+                  <Info className="text-muted-foreground h-3 w-3 shrink-0" aria-hidden="true" />
+                )}
+                <span
+                  className="text-muted-foreground ml-auto text-[10px]"
+                  aria-label={isDebugging ? `${item.weight} combined overall weight` : undefined}
+                >
+                  {item.weight}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-foreground text-lg font-semibold">{item.score}%</span>
+                <Progress value={item.score} className="bg-muted h-1 flex-1" />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-semibold text-foreground">{item.score}%</span>
-              <Progress value={item.score} className="h-1 flex-1 bg-muted" />
-            </div>
-          </div>
-        ))}
+          )
+          return isDebugging ? (
+            <DebuggingScoreTooltip key={item.name} category={item.category}>
+              {card}
+            </DebuggingScoreTooltip>
+          ) : (
+            card
+          )
+        })}
       </div>
     </div>
   )

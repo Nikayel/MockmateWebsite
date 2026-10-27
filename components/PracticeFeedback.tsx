@@ -81,6 +81,8 @@ interface PracticeFeedbackProps {
   } | null
   /** A high-priority next action rendered after the score and before detail. */
   afterScore?: ReactNode
+  /** Keep the score visible while the written report is being retried. */
+  feedbackPending?: boolean
 }
 
 export default function PracticeFeedback({
@@ -95,9 +97,6 @@ export default function PracticeFeedback({
   structuredFeedback,
   testsPassed,
   testsTotal,
-  timeComplexity,
-  spaceComplexity,
-  efficiencyScore,
   elapsedTime = 0,
   userId,
   sessionId,
@@ -114,10 +113,11 @@ export default function PracticeFeedback({
   alternativeApproaches,
   clarifyingQuestionsAssessment,
   afterScore,
+  feedbackPending = false,
 }: PracticeFeedbackProps) {
   useFeedbackViewAnalytics({
     sessionId,
-    feedbackReady: Boolean(feedback.trim()),
+    feedbackReady: !feedbackPending && Boolean(feedback.trim()),
     surface: feedbackSurface,
     problemType,
     language,
@@ -156,10 +156,10 @@ export default function PracticeFeedback({
   }
 
   const normalizeScore = (score: number | undefined): number => {
-    if (score === undefined || score === null || isNaN(score)) return 0
-    // Normalize: if score is <= 10, assume it's on a 0-10 scale and multiply by 10
-    // Otherwise, assume it's already on a 0-100 scale
-    return Math.min(100, score <= 10 ? score * 10 : score)
+    // API scores and parseFeedback output both use the canonical 0–100 scale.
+    // The parser handles explicit /10 denominators at the text boundary.
+    if (score === undefined || !Number.isFinite(score)) return 0
+    return Math.min(100, Math.max(0, score))
   }
 
   // Priority for scores:
@@ -265,17 +265,11 @@ export default function PracticeFeedback({
             <ScoreDisplay
               sections={sections}
               overallScore={overallScore}
-              performanceScore={performanceScore}
               technicalScore={technicalScore}
-              scoreBreakdown={scoreBreakdown}
               testsPassed={testsPassed}
               testsTotal={testsTotal}
               elapsedTime={elapsedTime}
               problemType={problemType}
-              feedback={feedback}
-              timeComplexity={timeComplexity}
-              spaceComplexity={spaceComplexity}
-              efficiencyScore={efficiencyScore}
               onExport={onExport}
               problemTitle={problemTitle}
               grade={grade}
@@ -286,20 +280,22 @@ export default function PracticeFeedback({
 
         {afterScore}
 
-        <FeedbackSections
-          sections={sections}
-          code={code}
-          language={language}
-          problemType={problemType}
-          userId={userId}
-          sessionId={sessionId}
-          constitutionalAICritique={constitutionalAICritique}
-          chatMessages={chatMessages}
-          interviewerMessages={interviewerMessages}
-          complexityAnalysis={complexityAnalysis}
-          alternativeApproaches={alternativeApproaches}
-          clarifyingQuestionsAssessment={clarifyingQuestionsAssessment}
-        />
+        {!feedbackPending && (
+          <FeedbackSections
+            sections={sections}
+            code={code}
+            language={language}
+            problemType={problemType}
+            userId={userId}
+            sessionId={sessionId}
+            constitutionalAICritique={constitutionalAICritique}
+            chatMessages={chatMessages}
+            interviewerMessages={interviewerMessages}
+            complexityAnalysis={complexityAnalysis}
+            alternativeApproaches={alternativeApproaches}
+            clarifyingQuestionsAssessment={clarifyingQuestionsAssessment}
+          />
+        )}
       </div>
     </ReviewFrame>
   )

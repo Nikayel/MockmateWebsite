@@ -1,18 +1,9 @@
 import type { BugfixEvidenceSummary, BugfixScoreBreakdown } from "./types"
-
-const DEFAULT_WEIGHTS = {
-  reproductionDiscipline: 0.1,
-  codebaseNavigation: 0.1,
-  evidenceGathering: 0.1,
-  hypothesisQuality: 0.1,
-  minimalFixQuality: 0.12,
-  verificationDiscipline: 0.12,
-  overEditControl: 0.08,
-  rootCauseUnderstanding: 0.1,
-  regressionPrevention: 0.08,
-  aiCollaborationQuality: 0.05,
-  communication: 0.05,
-} satisfies Record<keyof Omit<BugfixScoreBreakdown, "overall">, number>
+import {
+  BUGFIX_SCORE_CATEGORIES,
+  BUGFIX_SCORE_DIMENSIONS,
+  type BugfixScoreCategory,
+} from "./score-dimensions"
 
 /**
  * Score for a language dimension that only the semantic scorer can judge, when it did
@@ -58,23 +49,13 @@ export interface BugfixCategoryScores {
 export function mapBugfixBreakdownToCategoryScores(
   score: BugfixScoreBreakdown
 ): BugfixCategoryScores {
+  const categoryScore = (category: BugfixScoreCategory) =>
+    averageScores(BUGFIX_SCORE_CATEGORIES[category].dimensions.map((dimension) => score[dimension]))
   return {
-    understanding: averageScores([
-      score.reproductionDiscipline,
-      score.codebaseNavigation,
-      score.evidenceGathering,
-    ]),
-    problemSolving: averageScores([
-      score.hypothesisQuality,
-      score.rootCauseUnderstanding,
-      score.regressionPrevention,
-    ]),
-    codeQuality: averageScores([
-      score.verificationDiscipline,
-      score.minimalFixQuality,
-      score.overEditControl,
-    ]),
-    communication: averageScores([score.communication, score.aiCollaborationQuality]),
+    understanding: categoryScore("understanding"),
+    problemSolving: categoryScore("problemSolving"),
+    codeQuality: categoryScore("codeQuality"),
+    communication: categoryScore("communication"),
   }
 }
 
@@ -130,16 +111,21 @@ export function calculateBugfixEvidenceScore(
   const touchedExpected = evidence.editedFiles.filter((path) =>
     evidence.expectedTouchedFiles.includes(path)
   ).length
-  const difficulty = options.difficulty || "medium"
   const overrides = options.semanticOverrides ?? {}
 
   const breakdown: Omit<BugfixScoreBreakdown, "overall"> = {
     reproductionDiscipline: evidence.reproducedBeforeEditing ? 100 : 35,
-    codebaseNavigation: ratioScore(evidence.inspectedFiles.length, difficulty === "easy" ? 2 : 4),
-    evidenceGathering: ratioScore(
-      evidence.inspectedTestOrDocs.length + evidence.visibleTestsRun,
-      2
-    ),
+    // Opening more tabs is not stronger navigation. Only the relevant file set
+    // can establish coverage; scenarios without one remain unassessed/neutral.
+    codebaseNavigation:
+      expectedTouched > 0
+        ? ratioScore(
+            evidence.inspectedFiles.filter((path) => evidence.expectedTouchedFiles.includes(path))
+              .length,
+            expectedTouched
+          )
+        : 50,
+    evidenceGathering: evidence.reproducedBeforeEditing ? 100 : 50,
     hypothesisQuality: overrides.hypothesisQuality ?? UNJUDGED_LANGUAGE_SCORE,
     minimalFixQuality:
       expectedTouched === 0
@@ -147,23 +133,26 @@ export function calculateBugfixEvidenceScore(
         : clampScore(
             ratioScore(touchedExpected, expectedTouched) - evidence.overEditedFiles.length * 25
           ),
-    verificationDiscipline: clampScore(
-      evidence.finalPassRate * 0.7 + evidence.visibleTestsRun * 15
-    ),
+    // Repeating the same test must not improve the score.
+    verificationDiscipline:
+      evidence.finalSourceVerified === false
+        ? 35
+        : evidence.visibleTestsRun > 0
+          ? clampScore(evidence.finalPassRate)
+          : 50,
     overEditControl: clampScore(100 - evidence.overEditedFiles.length * 35),
     rootCauseUnderstanding: overrides.rootCauseAccuracy ?? UNJUDGED_LANGUAGE_SCORE,
     regressionPrevention: overrides.preventionQuality ?? UNJUDGED_LANGUAGE_SCORE,
-    aiCollaborationQuality: clampScore(
-      70 + evidence.aiPartnerUseCount * 10 - evidence.aiShortcutCount * 35
-    ),
+    // A request does not establish what help was delivered or understood.
+    aiCollaborationQuality: 50,
     communication: capCommunicationForIntegrity(
       overrides.communicationScore ?? 50,
       options.integrity
     ),
   }
 
-  const overall = Object.entries(DEFAULT_WEIGHTS).reduce((sum, [key, weight]) => {
-    return sum + breakdown[key as keyof typeof breakdown] * weight
+  const overall = Object.entries(BUGFIX_SCORE_DIMENSIONS).reduce((sum, [key, dimension]) => {
+    return sum + breakdown[key as keyof typeof breakdown] * dimension.weight
   }, 0)
 
   return {

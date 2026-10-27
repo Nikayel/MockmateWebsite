@@ -1,4 +1,5 @@
 import type { BugFixScenario } from "../../types"
+import { COMMENT_THREAD_MERGE_WORKLOAD } from "@/lib/bugfix/fix-tradeoffs"
 
 const starter = `def merge_threads(existing_threads, incoming_threads):
     merged = list(existing_threads)
@@ -146,7 +147,10 @@ export const bugfixCommentThreadMergeScenario: BugFixScenario = {
 **Incident Report**
 On some documents the unresolved badge sits one higher than the open comments a reviewer can see, and the first comment renders twice in the margin. It follows a sync that updates the top comment; updates to later comments merge cleanly. A reviewer held a document open believing an unresolved comment remained when it did not.
 
-Read the codebase files, run the tests, and make the smallest fix in the merge function without changing its public signature.`,
+Read the codebase files, run the tests, and make the smallest fix in the merge function without changing its public signature.
+
+**Workload**
+${COMMENT_THREAD_MERGE_WORKLOAD} After verifying correctness, explain how your patch scales with both counts and whether a simpler repair would preserve that behavior.`,
   buggyCode: { python: starter },
   codebaseFiles: {
     python: [
@@ -216,6 +220,10 @@ Read the codebase files, run the tests, and make the smallest fix in the merge f
         content: `# Comment Thread Sync
 
 The editor syncs comment threads from the server into local state. A sidebar badge shows the number of unresolved threads (threads whose status is not "resolved") so reviewers know when a document still needs attention.
+
+## Workload
+
+${COMMENT_THREAD_MERGE_WORKLOAD} After fixing the incident, be ready to compare the work and extra memory your approach needs as both counts grow. Preserve the merge contract when considering alternatives.
 
 ## Merge contract
 

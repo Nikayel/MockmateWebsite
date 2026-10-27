@@ -10,6 +10,7 @@ export interface MetricSession {
   completedAt: string
   durationMinutes: number
   kind: "interview" | "guided_lab"
+  measurementVersion: number
   performanceScore: number
   technicalScore: number | null
   debuggingScore: number
@@ -40,6 +41,7 @@ export interface MetricsSnapshot {
   patternStats: Record<string, ScoreGroup>
   difficultyStats: Record<string, ScoreGroup>
   daily: Array<{ date: string; score: number; sessions: number }>
+  trendDaily: MetricsSnapshot["daily"]
   weeklyAverage: number | null
   recentSessions: MetricSession[]
   recentAverage: number | null

@@ -22,7 +22,7 @@
  * accuracy, and that is a far better failure than a broken feedback response.
  *
  * This does NOT move the route off Edge. See
- * docs/EDGE-TO-NODE-CONSOLIDATION.md for that separate, deferred decision.
+ * docs/plans/technical-chores.md for that separate, deferred decision.
  */
 
 import { estimateTokensFromText } from "./token-estimate"

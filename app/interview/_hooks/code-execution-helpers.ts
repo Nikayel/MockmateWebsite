@@ -2,9 +2,12 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react"
 import { toast } from "sonner"
 // Used only by the deprecated `/api/execute` fallback below (kept commented for reference):
 // import { getCurrentUserToken } from "@/lib/firebase-lazy"
-import { isExecutionServiceError } from "@/lib/piston"
 import { executeScenarioInBrowser } from "@/lib/workspace-execution"
-import { HARNESS_ERROR_NOTICE, isHarnessError } from "@/lib/workspace-execution/harness-errors"
+import { HARNESS_ERROR_NOTICE } from "@/lib/workspace-execution/harness-errors"
+import {
+  classifyExecutionFailure,
+  type ExecutionTestObservation,
+} from "@/lib/workspace-execution/test-outcomes"
 import type { Scenario } from "@/lib/scenarios"
 import { isWorkspaceScenario } from "../_utils/workspace"
 import type {
@@ -126,9 +129,13 @@ const SYNTAX_ERROR_MARKERS = [
  * Order matters. `service-down` and `harness` both have to be settled before anything is
  * blamed on the candidate.
  */
-export function classifyFailedRun(firstError: string | null | undefined): FailedRunCause {
-  if (isExecutionServiceError(firstError)) return "service-down"
-  if (isHarnessError(firstError)) return "harness"
+export function classifyFailedRun(
+  firstError: string | null | undefined,
+  failureKind?: ExecutionTestObservation["failureKind"]
+): FailedRunCause {
+  const kind = classifyExecutionFailure({ error: firstError, failureKind })
+  if (kind === "service") return "service-down"
+  if (kind === "harness") return "harness"
   if (firstError && SYNTAX_ERROR_MARKERS.some((marker) => firstError.includes(marker))) {
     return "syntax"
   }

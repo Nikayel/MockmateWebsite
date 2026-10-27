@@ -32,6 +32,7 @@ export async function executeWorkspaceScenarioPythonClientSide(
             suite: "workspace",
             name: "Workspace test runner",
             passed: false,
+            failureKind: runResult.failureKind,
             error: runResult.error || "Execution failed",
           },
         ],

@@ -11,7 +11,7 @@ export interface OptimalComplexity {
 }
 
 export interface AnalysisOptions {
-  /** Test pass rate (0-100). If 100%, we're more confident the solution is optimal */
+  /** Retained for callers; passing tests does not establish complexity. */
   testPassRate?: number
   /** The DSA pattern type (e.g., "two-pointers", "sliding-window") for pattern-aware estimation */
   pattern?: string
@@ -25,33 +25,8 @@ export interface CodeEfficiencyMetrics {
   optimalTimeComplexity: string
   optimalSpaceComplexity: string
   efficiencyScore: number
-}
-
-/**
- * Detect obvious brute force patterns relative to the optimal complexity.
- *
- * CONSERVATIVE APPROACH: Only flag clear brute force patterns.
- * For complex patterns (bucket sort, amortized analysis), defer to LLM analysis.
- *
- * Returns true ONLY if there's clear evidence of suboptimal approach.
- */
-function detectBruteForcePattern(code: string, optimalTime?: string): boolean {
-  // Only detect triple-nested loops as definite brute force
-  // This is conservative - we'd rather under-flag than over-flag
-  const tripleNestedFor =
-    (code.match(/\bfor\b[^}]*\{[^}]*\bfor\b[^}]*\{[^}]*\bfor\b/gi) || []).length > 0 ||
-    (code.match(/\bfor\b[^:]*:[^\n]*\n\s+for\b[^:]*:[^\n]*\n\s+for\b/gi) || []).length > 0
-
-  // For O(n²) optimal: 3 nested for loops is brute force (like brute force 3Sum)
-  if (optimalTime === "O(n²)" && tripleNestedFor) {
-    return true
-  }
-
-  // For other cases, defer to LLM analysis - regex can't reliably detect:
-  // - Bucket sort (nested loops that are O(n) amortized)
-  // - Sequential vs nested loops
-  // - Early termination patterns
-  return false
+  analysisSource: "heuristic"
+  confidence: "low"
 }
 
 /**
@@ -60,18 +35,18 @@ function detectBruteForcePattern(code: string, optimalTime?: string): boolean {
  * SYSTEMATIC APPROACH:
  * 1. Use pattern recognition for common DSA patterns (two-pointers, sliding-window, etc.)
  * 2. Detect and exclude "helper" loops (duplicate-skipping, pointer advancement)
- * 3. If all tests pass and no brute force detected, trust the optimal complexity
- * 4. Only penalize when there's clear evidence of suboptimal approach
+ * 3. Keep correctness separate from estimated complexity
+ * 4. Keep heuristic estimates neutral in numeric scoring
  *
  * @param code - The source code to analyze
  * @param optimalComplexity - Optional optimal complexity from the scenario
- * @param options - Additional options like test pass rate for smarter estimation
+ * @param _options - Legacy caller options; correctness does not establish optimality
  * @returns Efficiency metrics including estimated and optimal complexity
  */
 export function analyzeCodeEfficiency(
   code: string,
   optimalComplexity?: OptimalComplexity,
-  options?: AnalysisOptions
+  _options?: AnalysisOptions
 ): CodeEfficiencyMetrics {
   // Calculate lines of code (excluding empty lines and comments)
   const lines = code.split("\n")
@@ -193,48 +168,8 @@ export function analyzeCodeEfficiency(
   const optimalTimeComplexity = optimalComplexity?.time || "N/A"
   const optimalSpaceComplexity = optimalComplexity?.space || "N/A"
 
-  // SYSTEMATIC APPROACH: If all tests pass and no clear brute force, trust optimal complexity
-  // This handles edge cases where pattern recognition might miss something
-  // Rationale: If the solution works correctly for all test cases, and doesn't use an obviously
-  // suboptimal approach (like 3 nested for loops for a 2-pointer problem), it's likely optimal
-  const testPassRate = options?.testPassRate ?? 0
-  const isBruteForce = detectBruteForcePattern(code, optimalTimeComplexity)
-
-  if (testPassRate === 100 && optimalTimeComplexity !== "N/A" && !isBruteForce) {
-    // All tests pass and no brute force detected - trust the optimal complexity
-    // This is the systematic fallback when pattern recognition might be imperfect
-    estimatedTimeComplexity = optimalTimeComplexity
-    // For space, only trust optimal if we didn't detect extra data structures
-    // (some problems allow O(n) space for the output itself)
-  }
-
-  // Calculate efficiency score (0-100)
-  let efficiencyScore = 100
-
-  // Deduct points for suboptimal time complexity
-  if (optimalTimeComplexity !== "N/A" && estimatedTimeComplexity !== optimalTimeComplexity) {
-    efficiencyScore -= 20
-  }
-
-  // Deduct points for suboptimal space complexity
-  if (optimalSpaceComplexity !== "N/A" && estimatedSpaceComplexity !== optimalSpaceComplexity) {
-    efficiencyScore -= 10
-  }
-
-  // Deduct points for excessive complexity
-  if (complexityLevel === "High") {
-    efficiencyScore -= 15
-  } else if (complexityLevel === "Medium") {
-    efficiencyScore -= 5
-  }
-
-  // Deduct points for excessive lines of code
-  if (linesOfCode > 30) {
-    efficiencyScore -= 10
-  } else if (linesOfCode > 20) {
-    efficiencyScore -= 5
-  }
-
+  // Regex estimates cannot establish optimality, cleanliness, or efficiency.
+  // Keep descriptive estimates, but use a neutral score until verified analysis exists.
   return {
     linesOfCode,
     complexity: complexityLevel,
@@ -242,6 +177,8 @@ export function analyzeCodeEfficiency(
     estimatedSpaceComplexity,
     optimalTimeComplexity,
     optimalSpaceComplexity,
-    efficiencyScore: Math.max(0, efficiencyScore),
+    efficiencyScore: 50,
+    analysisSource: "heuristic",
+    confidence: "low",
   }
 }

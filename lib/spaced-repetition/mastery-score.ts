@@ -7,7 +7,7 @@
  *
  * Key Philosophy:
  * - Interview Score = "Would you pass this interview?" (includes communication)
- * - Mastery Score = "Do you KNOW this pattern/concept?" (code correctness only)
+ * - Mastery Score = an observed practice signal for scheduling, not a readiness verdict.
  *
  * The spaced repetition algorithm should use mastery score because:
  * 1. SR is about COGNITIVE RETENTION of specific skills
@@ -15,14 +15,13 @@
  * 3. Someone who solves correctly but quietly should NOT review more
  * 4. Someone who communicates well but fails should review MORE
  *
- * Factors considered:
- * - Correctness (test pass rate) - 60%
- * - Time efficiency (adjusted for communication overhead) - 25%
- * - Hint dependency - 15%
+ * Version 2 renormalizes correctness and recorded hint use (80% / 20%).
+ * Estimated time remains diagnostic and does not affect the score. Independent
+ * transfer still requires a separate, unfamiliar assessment.
  */
 
 import type { InteractionMetrics } from "../scoring"
-import { SCORING, calculateTechnicalScoreFromBreakdown } from "../constants"
+import { calculateTechnicalScore, calculateTechnicalScoreFromBreakdown } from "../constants"
 
 // =============================================================================
 // TYPES
@@ -56,9 +55,9 @@ export interface MasteryScoreResult {
 
   // Component breakdown for debugging/analytics
   components: {
-    correctnessScore: number // 0-100, weighted 60%
-    timeEfficiencyScore: number // 0-100, weighted 25%
-    independenceScore: number // 0-100, weighted 15%
+    correctnessScore: number // 0-100, weighted 80%
+    timeEfficiencyScore: number // Diagnostic estimate only; excluded in v2
+    independenceScore: number // 0-100, weighted 20%
   }
 
   // Time analysis
@@ -72,19 +71,12 @@ export interface MasteryScoreResult {
 
   // Metadata
   metadata: {
-    algorithm: "v1"
+    algorithm: "v2"
     calculatedAt: string
+    timeUsedForScore: false
+    sufficientTestEvidence: boolean
+    independenceBasis: "recorded-hints"
   }
-}
-
-// =============================================================================
-// CONFIGURATION - Weights imported from constants.ts (single source of truth)
-// =============================================================================
-
-const WEIGHTS = {
-  correctness: SCORING.TECHNICAL_WEIGHTS.CORRECTNESS, // 60% - Did the code work?
-  timeEfficiency: SCORING.TECHNICAL_WEIGHTS.TIME_EFFICIENCY, // 25% - How quickly?
-  independence: SCORING.TECHNICAL_WEIGHTS.INDEPENDENCE, // 15% - Hint dependency
 }
 
 // Expected solve times by difficulty (minutes)
@@ -121,35 +113,27 @@ export function calculateMasteryScore(input: MasteryScoreInput): MasteryScoreRes
   // Pure test pass rate, with slight difficulty adjustment
   const correctnessScore = calculateCorrectnessScore(input)
 
-  // 2. TIME EFFICIENCY SCORE (25%)
+  // 2. TIME EFFICIENCY ESTIMATE (diagnostic only)
   // How quickly they solved it, adjusted for communication overhead
   const timeAnalysis = analyzeTime(input)
   const timeEfficiencyScore = calculateTimeEfficiencyScore(timeAnalysis, input)
 
-  // 3. INDEPENDENCE SCORE (15%)
+  // 3. RECORDED HINT USE (20%)
   // Did they solve it without hints?
   const independenceScore = calculateIndependenceScore(input)
 
   // Weighted final score
-  let masteryScore = Math.round(
-    correctnessScore * WEIGHTS.correctness +
-      timeEfficiencyScore * WEIGHTS.timeEfficiency +
-      independenceScore * WEIGHTS.independence
-  )
-
-  // CRITICAL FLOOR: 100% test pass rate guarantees minimum mastery
-  // You solved the problem correctly - that's the most important signal
-  const passRate = input.testCasesTotal > 0 ? input.testCasesPassed / input.testCasesTotal : 0
-  if (passRate === 1) {
-    // Perfect correctness = minimum 75 mastery (you KNOW this pattern)
-    masteryScore = Math.max(75, masteryScore)
-  } else if (passRate >= 0.8) {
-    // 80%+ correct = minimum 60 mastery
-    masteryScore = Math.max(60, masteryScore)
-  } else if (passRate >= 0.5) {
-    // 50%+ correct = minimum 40 mastery
-    masteryScore = Math.max(40, masteryScore)
-  }
+  // Wall-clock minus estimated conversation time is not measured coding speed.
+  // Keep that estimate for diagnostics, but renormalize the observed components.
+  // Correctness floors must not erase the assistance penalty.
+  const masteryScore =
+    input.testCasesTotal > 0
+      ? calculateTechnicalScore({
+          correctness: correctnessScore,
+          timeEfficiency: timeEfficiencyScore,
+          independence: independenceScore,
+        })
+      : 0
 
   return {
     masteryScore: Math.max(0, Math.min(100, masteryScore)),
@@ -160,8 +144,11 @@ export function calculateMasteryScore(input: MasteryScoreInput): MasteryScoreRes
     },
     timeAnalysis,
     metadata: {
-      algorithm: "v1",
+      algorithm: "v2",
       calculatedAt: now,
+      timeUsedForScore: false,
+      sufficientTestEvidence: input.testCasesTotal > 0,
+      independenceBasis: "recorded-hints",
     },
   }
 }
@@ -176,8 +163,7 @@ export function calculateMasteryScore(input: MasteryScoreInput): MasteryScoreRes
  */
 function calculateCorrectnessScore(input: MasteryScoreInput): number {
   if (input.testCasesTotal === 0) {
-    // No tests - use efficiency as proxy (shouldn't happen often)
-    return input.codeEfficiencyScore || 50
+    return 0 // No judged tests cannot establish correctness.
   }
 
   const passRate = input.testCasesPassed / input.testCasesTotal
@@ -294,24 +280,11 @@ function calculateTimeEfficiencyScore(
  * - Second hint: Moderate penalty (needed more guidance)
  * - Third+ hints: Significant penalty (struggled to understand)
  *
- * The ratio also matters: 1/5 hints is better than 1/2 hints
+ * Available-hint counts vary across paths; only recorded usage affects this signal.
  */
 function calculateIndependenceScore(input: MasteryScoreInput): number {
-  if (input.hintsTotal === 0) {
-    // No hints available - assume independent
-    return 100
-  }
-
-  if (input.hintsUsed === 0) {
-    return 100 // Perfect independence
-  }
-
-  const hintRatio = input.hintsUsed / input.hintsTotal
-
-  // Used all hints - significant penalty but not catastrophic
-  if (hintRatio >= 1) {
-    return 25
-  }
+  if (!Number.isFinite(input.hintsUsed) || input.hintsUsed < 0) return 50
+  if (input.hintsUsed === 0) return 100 // No in-product hints recorded.
 
   // Progressive penalty system:
   // First hint: -10 points (could be minor clarification)
@@ -325,13 +298,6 @@ function calculateIndependenceScore(input: MasteryScoreInput): number {
   if (hintsUsed >= 3) score -= 20 // Third hint
   if (hintsUsed >= 4) score -= 20 // Fourth hint
   if (hintsUsed >= 5) score -= 15 // Fifth+ hints (diminishing penalty)
-
-  // Ratio bonus: using fewer of available hints shows restraint
-  // e.g., using 1 of 5 available hints is better than 1 of 2
-  const ratioBonus = (1 - hintRatio) * 10
-
-  // Apply ratio bonus but don't exceed 95 (you still used a hint)
-  score = Math.min(95, score + ratioBonus)
 
   return Math.max(20, Math.round(score))
 }
@@ -383,92 +349,14 @@ export function quickMasteryScore(params: {
   hintsUsed: number
   problemDifficulty: "easy" | "medium" | "hard"
 }): number {
-  const {
-    performanceScore,
-    testCasesPassed,
-    testCasesTotal,
-    timeSpentMinutes,
-    hintsUsed,
-    problemDifficulty,
-  } = params
-
-  // If we have test case data, calculate properly using the full algorithm
-  if (testCasesTotal > 0) {
-    const result = calculateMasteryScore({
-      testCasesPassed,
-      testCasesTotal,
-      timeSpentMinutes,
-      hintsUsed,
-      hintsTotal: 3, // Default assumption
-      problemDifficulty,
-    })
-    return result.masteryScore
-  }
-
-  // Fallback when no test data: derive mastery from performance score
-  // IMPORTANT: Properly extract technical portion by removing communication component
-
-  // Interview score breakdown (from SCORING.PERFORMANCE_WEIGHTS in lib/constants.ts):
-  // - Understanding: 25% (technical)
-  // - Problem-Solving: 25% (technical)
-  // - Code Quality: 20% (technical)
-  // - Communication: 30% (NON-technical - exclude this for mastery)
-  //
-  // Formula: performance = 0.25*U + 0.25*PS + 0.20*CQ + 0.30*C
-  // Technical components = 0.25*U + 0.25*PS + 0.20*CQ (70% of total weight)
-  //
-  // To extract technical score, we:
-  // 1. Assume communication was average (50/100 = 0.50 normalized)
-  // 2. Communication contributes: 0.30 * 50 = 15 points to performance score
-  // 3. Technical contribution: performanceScore - 15
-  // 4. Rescale from 70-point scale to 100-point scale: (technical / 0.70)
-
-  const assumedCommunicationScore = 50 // Average communication performance
-  const communicationContribution = 0.3 * assumedCommunicationScore // 15 points
-  const technicalPoints = performanceScore - communicationContribution
-
-  // Rescale from 70-point max to 100-point scale
-  const baseScore = technicalPoints / 0.7
-
-  // Apply hint penalty - heavier for spaced repetition
-  // Each hint indicates they needed help understanding the pattern
-  const hintPenalty = Math.min(35, hintsUsed * 12) // More aggressive than before
-
-  // Time penalty - if they took way too long, they may not have mastered it
-  const expectedTime = EXPECTED_TIME[problemDifficulty]
-  const timeRatio = timeSpentMinutes > 0 ? timeSpentMinutes / expectedTime : 1
-
-  // Progressive time penalty
-  let timePenalty = 0
-  if (timeRatio > 2.0) {
-    timePenalty = Math.min(25, (timeRatio - 2.0) * 12) // Took more than 2x expected
-  } else if (timeRatio > 1.5) {
-    timePenalty = Math.min(10, (timeRatio - 1.5) * 10) // Took 1.5-2x expected
-  }
-
-  // Time bonus for fast solvers (indicates strong pattern recognition)
-  let timeBonus = 0
-  if (timeRatio < 0.6 && performanceScore >= 70) {
-    timeBonus = 5 // Solved quickly AND correctly
-  }
-
-  // Calculate final mastery score
-  let masteryScore = baseScore - hintPenalty - timePenalty + timeBonus
-
-  // CRITICAL FLOOR: 100% test pass rate guarantees minimum mastery
-  // (matches the full algorithm's floor logic)
-  if (testCasesPassed === testCasesTotal && testCasesTotal > 0) {
-    masteryScore = Math.max(75, masteryScore)
-  } else if (testCasesTotal > 0) {
-    const passRate = testCasesPassed / testCasesTotal
-    if (passRate >= 0.8) {
-      masteryScore = Math.max(60, masteryScore)
-    } else if (passRate >= 0.5) {
-      masteryScore = Math.max(40, masteryScore)
-    }
-  }
-
-  return Math.max(0, Math.min(100, Math.round(masteryScore)))
+  return calculateMasteryScore({
+    testCasesPassed: params.testCasesPassed,
+    testCasesTotal: params.testCasesTotal,
+    timeSpentMinutes: params.timeSpentMinutes,
+    hintsUsed: params.hintsUsed,
+    hintsTotal: 0, // Compatibility only; version 2 scores recorded usage, not catalog size.
+    problemDifficulty: params.problemDifficulty,
+  }).masteryScore
 }
 
 // =============================================================================

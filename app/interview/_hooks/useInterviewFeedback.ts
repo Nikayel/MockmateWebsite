@@ -3,7 +3,10 @@ import { getGuidedAttemptProgress } from "@/lib/stores/guided-lab-store"
 import { buildConversationTimeline } from "@/lib/interview/session-context/conversation"
 import type { SessionContext } from "@/lib/interview/session-context/schema"
 import { useRef } from "react"
-import { isHarnessError } from "@/lib/workspace-execution/harness-errors"
+import { executionSourceRevision } from "@/lib/workspace-execution/source-revision"
+import { getWorkspacePrimaryCode } from "@/lib/workspace-execution/files"
+import { isWorkspaceScenario } from "@/lib/workspace-execution/validators"
+import { calculateFeedbackTestMetrics } from "@/lib/feedback/test-result-metrics"
 import type { Dispatch, SetStateAction } from "react"
 import { toast } from "sonner"
 import type { User } from "@/lib/types"
@@ -205,25 +208,28 @@ export function useInterviewFeedback(
       // not a function", a candidate who had fixed the real bug went to the mastery
       // calculation as 2/5, which is 52 mastery instead of 88. That number is the
       // spaced-repetition input, so our bug rescheduled their review as a failure.
-      const scoreableTests = opts.testResults.filter((test) => !isHarnessError(test.error))
-      const harnessBrokeCount = opts.testResults.length - scoreableTests.length
-      const scoreablePassed = scoreableTests.filter((test) => test.passed).length
-      const scoreableTotal = scoreableTests.length
-      const testSummary =
-        harnessBrokeCount > 0
-          ? {
-              ...opts.testSummary,
-              passed: scoreablePassed,
-              total: scoreableTotal,
-              failed: scoreableTotal - scoreablePassed,
-              passRate: scoreableTotal > 0 ? (scoreablePassed / scoreableTotal) * 100 : 0,
-            }
-          : opts.testSummary
+      const finalSourceRevision = await executionSourceRevision(opts.code, opts.workspaceContext)
+      const currentTests = opts.testResults.filter(
+        (test) =>
+          !finalSourceRevision ||
+          !test.sourceRevision ||
+          test.sourceRevision === finalSourceRevision
+      )
+      const judged = calculateFeedbackTestMetrics(currentTests)
+      const testSummary = {
+        passed: judged.testsPassed,
+        total: judged.testsTotal,
+        failed: judged.testsTotal - judged.testsPassed,
+        passRate: judged.testsTotal ? (judged.testsPassed / judged.testsTotal) * 100 : 0,
+      }
 
       const feedbackText = `Completed ${opts.selectedScenario?.title} with ${testSummary.passed}/${testSummary.total} tests passing`
+      const solutionCode = isWorkspaceScenario(opts.selectedScenario)
+        ? getWorkspacePrimaryCode(opts.selectedScenario, opts.workspaceContext)
+        : opts.code
       let calculatedPerformanceScore = testSummary.passRate
       const efficiencyData = analyzeCodeEfficiency(
-        opts.code,
+        solutionCode,
         opts.selectedScenario.type === "dsa" ? opts.selectedScenario.optimalComplexity : undefined
       )
 
@@ -269,10 +275,11 @@ export function useInterviewFeedback(
             // Null for guests: the sign-in handler stamps the freshly created
             // uid onto the staged request after the session migrates.
             userId: opts.user?.id ?? null,
-            code: opts.code,
+            code: solutionCode,
             language: opts.selectedLanguage,
             testsPassed: testSummary.passed,
             testsTotal: testSummary.total,
+            testResults: currentTests,
             scenarioType: opts.selectedScenario?.type,
             scenarioTitle: opts.selectedScenario?.title,
             scenarioId: opts.selectedScenario?.id,
@@ -295,6 +302,7 @@ export function useInterviewFeedback(
             )?.evidence,
             bugfixEvidenceEvents: bugfixEvidencePayload,
             bugfixExpectedTouchedFiles,
+            bugfixFinalSourceRevision: finalSourceRevision,
             // The root-cause rubric and ground truth are NOT posted from the client:
             // they are answer content and now live only in the sealed legacy registry.
             // The feedback stream route sources them server-side for scoring.
@@ -342,7 +350,7 @@ export function useInterviewFeedback(
         try {
           // Save basic session data - feedback and scores will be updated by /api/feedback/persist
           await updateInterviewSession(opts.currentSessionId, undefined, undefined, {
-            code: opts.code,
+            code: solutionCode,
             language: opts.selectedLanguage,
             testResults: opts.testResults,
             timeComplexity: efficiencyData?.estimatedTimeComplexity,
@@ -354,7 +362,7 @@ export function useInterviewFeedback(
           opts
             .trackSessionCompletion({
               sessionId: opts.currentSessionId,
-              finalCode: opts.code,
+              finalCode: solutionCode,
               language: opts.selectedLanguage,
               testsPassed: testSummary.passed,
               testsTotal: testSummary.total,
@@ -383,7 +391,7 @@ export function useInterviewFeedback(
           }
 
           const isSystemDesign = opts.selectedScenario?.type === "system-design"
-          const shouldStore = opts.selectedScenario?.id && (opts.code.trim() || isSystemDesign)
+          const shouldStore = opts.selectedScenario?.id && (solutionCode.trim() || isSystemDesign)
 
           if (shouldStore) {
             sessionFetch("/api/rag", {
@@ -395,7 +403,7 @@ export function useInterviewFeedback(
                 problemId: opts.selectedScenario.id,
                 problemTitle: opts.selectedScenario.title,
                 solutionCode:
-                  opts.code || (isSystemDesign ? "// Design discussion completed via chat" : ""),
+                  solutionCode || (isSystemDesign ? "// Design discussion completed via chat" : ""),
                 language: opts.selectedLanguage,
                 passed: isSystemDesign ? true : testSummary.passed === testSummary.total,
                 score: calculatedPerformanceScore,
@@ -413,7 +421,7 @@ export function useInterviewFeedback(
               scenarioId: opts.selectedScenario?.id,
               scenarioTitle: opts.selectedScenario?.title,
               language: opts.selectedLanguage,
-              code: opts.code,
+              code: solutionCode,
               testResults: opts.testResults,
               timeSpent: opts.elapsedTime,
               aiCollaborationMetrics,

@@ -26,7 +26,7 @@ export const SERVER_EXECUTION_ETA = "next month"
  * One canonical sentence for the catalog card, the workbook overview, and
  * the Sable partner's system context, so the AI partner, the coder, and the
  * interviewer never say something different from what the UI shows.
- * EXECUTION-STATE.md owner decision 3. Never hand-write this sentence
+ * DECISIONS.md execution boundary. Never hand-write this sentence
  * again; import it.
  */
 export const SERVER_EXECUTION_MESSAGE = `Server-side isolated grading and additional languages land ${SERVER_EXECUTION_ETA}.`

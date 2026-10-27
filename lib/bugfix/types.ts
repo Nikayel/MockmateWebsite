@@ -62,6 +62,21 @@ export interface BugfixEvidenceEvent {
 }
 
 export interface BugfixEvidenceSummary {
+  evidenceVersion?: 2
+  finalSourceVerified?: boolean
+  /** Request timing is observable; it does not prove the AI supplied a useful answer. */
+  firstAIHelp?: {
+    requestedAt: number
+    elapsedMs?: number
+    beforeFirstEdit?: boolean
+    beforeFirstFailure?: boolean
+    beforeFirstSuccess?: boolean
+  }
+  rootCauseAssessment?: {
+    status: "observed" | "not-observed" | "unavailable"
+    score?: number
+    evidence?: string
+  }
   reproducedBeforeEditing: boolean
   inspectedFiles: string[]
   inspectedTestOrDocs: string[]

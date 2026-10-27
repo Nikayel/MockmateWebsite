@@ -2,7 +2,7 @@ import type { MetricsSnapshot } from "./types"
 
 export function metricTrends(snapshot: MetricsSnapshot, days: number, now = Date.now()) {
   const firstDay = new Date(now - (days - 1) * 86400000).toISOString().slice(0, 10)
-  const daily = snapshot.daily.filter((day) => day.date >= firstDay)
+  const daily = snapshot.trendDaily.filter((day) => day.date >= firstDay)
   let trend: "improving" | "stable" | "declining" = "stable"
   if (daily.length >= 4) {
     const midpoint = Math.floor(daily.length / 2)

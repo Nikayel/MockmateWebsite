@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { NextRequest } from "next/server"
 import { buildLabAssessment } from "@/lib/bugfix/guided-lab/assessment/report"
 import { bookclubGuidedLab } from "@/lib/scenarios/real-world/bugfix/bookclub/milestones"
@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   update: vi.fn(),
   set: vi.fn(),
+  create: vi.fn(),
 }))
 vi.mock("@/lib/auth-helpers", () => ({ verifyAuth: mocks.verifyAuth }))
 vi.mock("@/lib/firebase-admin", () => ({
@@ -17,6 +18,7 @@ vi.mock("@/lib/firebase-admin", () => ({
         get: mocks.get,
         update: (_ref: unknown, payload: unknown) => mocks.update(payload),
         set: mocks.set,
+        create: mocks.create,
       }),
     collection: () => ({
       doc: () => ({
@@ -58,9 +60,9 @@ function body(overrides: Record<string, unknown> = {}) {
     ...overrides,
   }
 }
-async function post(payload: Record<string, unknown>) {
+async function post(payload: Record<string, unknown>, headers = new Headers()) {
   const { POST } = await import("./route")
-  return POST({ json: async () => payload } as NextRequest)
+  return POST({ json: async () => payload, headers } as NextRequest)
 }
 beforeEach(() => {
   vi.clearAllMocks()
@@ -71,6 +73,8 @@ beforeEach(() => {
   })
   mocks.update.mockResolvedValue(undefined)
 })
+afterEach(() => vi.unstubAllEnvs())
+
 describe("guided practice persistence", () => {
   it("persists phase feedback while excluding interview categories and speed/hint penalties", async () => {
     const response = await post(body())
@@ -108,5 +112,51 @@ describe("guided practice persistence", () => {
     mocks.get.mockResolvedValueOnce({ exists: true, get: () => "another-user" })
     expect((await post(body())).status).toBe(403)
     expect(mocks.update).not.toHaveBeenCalled()
+  })
+})
+
+describe("durable score snapshots", () => {
+  const scoreReady = () => ({
+    outcome: "score_ready",
+    sessionId: "attempt",
+    userId: "user-1",
+    scores: body().scores,
+    systemPrompt: "Feedback policy",
+    userPrompt: "Session evidence",
+    scenarioType: "dsa",
+    scenarioTitle: "Two Sum",
+  })
+  it("requires internal authentication before accepting grading prompts", async () => {
+    vi.stubEnv("CRON_SECRET", "internal-test")
+    expect((await post(scoreReady())).status).toBe(401)
+    expect(mocks.update).not.toHaveBeenCalled()
+  })
+  it("freezes the score and invalidates metrics in the same transaction", async () => {
+    vi.stubEnv("CRON_SECRET", "internal-test")
+    mocks.get
+      .mockResolvedValueOnce({
+        exists: true,
+        get: (key: string) => (key === "user_id" ? "user-1" : undefined),
+      })
+      .mockResolvedValueOnce({ exists: false })
+    const response = await post(
+      scoreReady(),
+      new Headers({ "x-feedback-internal-secret": "internal-test" })
+    )
+    expect(response.status).toBe(200)
+    expect(mocks.update.mock.calls[0][0]).toMatchObject({
+      feedback_score_frozen: true,
+      measurement_version: 2,
+      performance_score: 99,
+    })
+    expect(mocks.set).toHaveBeenCalledWith(
+      expect.anything(),
+      { metrics_revision: expect.anything() },
+      { merge: true }
+    )
+    expect(mocks.create).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: "inline", attempt_count: 0 })
+    )
   })
 })

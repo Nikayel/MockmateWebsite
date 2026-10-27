@@ -72,6 +72,14 @@ describe("sanitizeTestResultsForFirestore", () => {
     expectFirestoreSafe(sanitizeTestResultsForFirestore([{ description: "x", passed: true }]))
   })
 
+  it("preserves source correlation and failure classification across autosave", () => {
+    const rows = sanitizeTestResultsForFirestore([
+      { description: "cache", passed: false, sourceRevision: "abc123", failureKind: "service" },
+    ])
+    expectFirestoreSafe(rows)
+    expect(rows[0]).toMatchObject({ sourceRevision: "abc123", failureKind: "service" })
+  })
+
   it("handles an empty result set", () => {
     expect(sanitizeTestResultsForFirestore([])).toEqual([])
   })

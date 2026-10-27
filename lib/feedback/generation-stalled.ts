@@ -2,11 +2,10 @@
  * When is a session's feedback generation considered stalled?
  *
  * "pending" and "processing" are transit states that normally resolve within
- * a minute of completion. They only persist when the pipeline was orphaned
- * (historically: the browser tab owned persistence and was closed mid-stream).
- * A completed session still in a transit state past this threshold will never
- * finish on its own, so the UI should offer retry instead of a spinner, and
- * the reaper cron flips it to "failed".
+ * a minute of completion. They only persist when evaluation was orphaned.
+ * "queued" is deliberately excluded: its frozen score is already visible and
+ * the feedback worker owns the retry schedule. A completed session still in a
+ * scoring transit state past this threshold is shown as failed and reaped.
  */
 
 export const FEEDBACK_STALL_THRESHOLD_MS = 5 * 60_000
