@@ -724,7 +724,6 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
               if (isCurrent())
                 document.getElementById(SPARRA_COMPOSER_ID)?.focus({ preventScroll: true })
             })
-            toast.info("Sparra is open. Review your question and send it when you’re ready.")
           }
 
           // Track topics from interviewer messages to avoid repetitive questions

@@ -41,7 +41,11 @@ export function Conversation({ conversations }: { conversations: SessionConversa
                 <div className="text-sm leading-relaxed [overflow-wrap:anywhere] break-words whitespace-pre-wrap text-gray-200">
                   {message.content}
                 </div>
-                {message.reaction === "acknowledged" && <MessageAcknowledgment />}
+                {message.reaction === "acknowledged" && (
+                  <div className="mt-2">
+                    <MessageAcknowledgment />
+                  </div>
+                )}
               </li>
             ))}
           </ol>

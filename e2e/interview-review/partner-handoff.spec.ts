@@ -39,6 +39,7 @@ for (const viewport of [
     const draft = page.getByRole("textbox", { name: "Message Sparra" })
     await expect(draft).toBeFocused()
     await expect(draft).toHaveValue(question)
+    await expect(page.locator("[data-sonner-toast]")).toHaveCount(0)
     expect(requests).toHaveLength(1)
     expect(requests[0].partnerAvailable).toBe(true)
     await expect(page.getByRole("log", { name: "Sparra messages" })).not.toContainText(question)

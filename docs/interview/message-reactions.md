@@ -29,6 +29,10 @@ its ID and existing attempt-generation guard. It creates no interviewer turn,
 phase-tracker update, or AI-message scoring event. Normal candidate tracking remains. A local receipt preserves the last model-seen
 code snapshot so the next substantive turn still reports intervening edits.
 A shared accessible badge renders the receipt in chat and admin inspection.
+Chat places the badge below the message bubble, within the same turn. It uses a
+native color thumbs-up emoji and an opaque, theme-aware surface so it remains
+distinct from the candidate's bubble in light and dark mode. The badge is a
+non-interactive image labeled with the acknowledging speaker.
 
 Reaction metadata survives local/cloud recovery, attributed timelines, bounded
 feedback transcripts, and archive persistence. Legacy messages need no migration.

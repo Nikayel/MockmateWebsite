@@ -15,6 +15,7 @@ mobile, including when the problem rail is collapsed or focus mode was enabled.
 The candidate’s question becomes an unsent draft if Sparra has no existing draft.
 The input receives keyboard focus. Nothing is automatically sent, and existing
 partner history and drafts are preserved. Escape returns to the Problem tab.
+The tab change and focused draft provide confirmation; opening Sparra adds no toast.
 
 ## Implementation
 

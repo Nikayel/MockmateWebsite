@@ -1,5 +1,3 @@
-import { ThumbsUp } from "lucide-react"
-
 /** A receipt attached to the candidate's message, not a correctness signal. */
 export function MessageAcknowledgment({ speaker = "Interviewer" }: { speaker?: string }) {
   const label = `${speaker} acknowledged`
@@ -8,9 +6,16 @@ export function MessageAcknowledgment({ speaker = "Interviewer" }: { speaker?: s
       role="img"
       aria-label={label}
       title={label}
-      className="border-border bg-muted/40 text-muted-foreground mt-2 inline-flex rounded-full border px-2 py-1"
+      className="border-border bg-card inline-flex shrink-0 items-center justify-center rounded-full border px-2 py-1 align-middle text-lg leading-none"
     >
-      <ThumbsUp className="h-3 w-3" aria-hidden="true" />
+      <span
+        aria-hidden="true"
+        style={{
+          fontFamily: '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif',
+        }}
+      >
+        👍
+      </span>
     </span>
   )
 }
