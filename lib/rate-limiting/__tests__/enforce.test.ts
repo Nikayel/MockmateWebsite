@@ -37,6 +37,32 @@ describe("rate-limit enforcement", () => {
     await expect(enforceRateLimitPolicy("chatFree", "user:one")).resolves.toBeNull()
   })
 
+  it("checks both feedback windows against the authenticated user", async () => {
+    const limiter = limiterResult({
+      success: true,
+      limit: 5,
+      remaining: 4,
+      reset: Date.now() + 60_000,
+    })
+    getUpstashRateLimiter.mockReturnValue(limiter)
+    const { enforceFeedbackStreamRateLimit } = await import("../enforce")
+    await expect(enforceFeedbackStreamRateLimit("one")).resolves.toBeNull()
+    expect(getUpstashRateLimiter.mock.calls).toEqual([
+      ["feedbackStreamBurst"],
+      ["feedbackStreamSustained"],
+    ])
+    expect(limiter.limit.mock.calls).toEqual([["user:one"], ["user:one"]])
+  })
+
+  it("stops at a blocked feedback burst instead of charging the sustained window", async () => {
+    getUpstashRateLimiter.mockReturnValue(
+      limiterResult({ success: false, limit: 2, remaining: 0, reset: Date.now() + 60_000 })
+    )
+    const { enforceFeedbackStreamRateLimit } = await import("../enforce")
+    expect((await enforceFeedbackStreamRateLimit("one"))?.status).toBe(429)
+    expect(getUpstashRateLimiter.mock.calls).toEqual([["feedbackStreamBurst"]])
+  })
+
   it("returns a consistent 429 response", async () => {
     getUpstashRateLimiter.mockReturnValue(
       limiterResult({ success: false, limit: 20, remaining: 0, reset: Date.now() + 30_000 })

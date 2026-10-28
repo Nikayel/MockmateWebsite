@@ -105,6 +105,9 @@ export interface ProfileQuota {
 }
 
 export interface ChatMessage {
+  id?: string
+  generationId?: string
+  feedbackAvailable?: boolean
   type: "user" | "ai"
   message: string
   timestamp?: number
@@ -121,6 +124,7 @@ export interface InterviewSession {
   type?: string // scenario type: 'dsa', 'bugfix', etc.
   pattern?: string // DSA pattern: 'arrays-hashing', 'two-pointers', etc.
   scenario_id?: string // scenario ID for reopening sessions
+  recommendation_decision_id?: string // Pointer only; server-owned start receipt proves attribution
   performance_score?: number
   technical_score?: number // Code-focused score (= mastery score, excludes communication)
   mastery_score?: number // Same as technical_score, for backwards compatibility

@@ -1,3 +1,4 @@
+import { registerHintResponses } from "@/lib/ai-response-feedback/hints"
 import { NextRequest, NextResponse } from "next/server"
 import {
   generateHints,
@@ -70,11 +71,11 @@ export async function POST(request: NextRequest) {
     switch (body.action) {
       case "generate": {
         const params: GenerateHintsPayload = { ...body, userId: authenticatedUserId }
-        return handleGenerateHints(params)
+        return handleGenerateHints(params, crypto.randomUUID())
       }
       case "get-next": {
         const params: GetNextHintPayload = { ...body, userId: authenticatedUserId }
-        return handleGetNextHint(params)
+        return handleGetNextHint(params, crypto.randomUUID())
       }
       default:
         return NextResponse.json(
@@ -158,7 +159,7 @@ function buildHintRequest(
 /**
  * Generate personalized hints
  */
-async function handleGenerateHints(params: GenerateHintsPayload) {
+async function handleGenerateHints(params: GenerateHintsPayload, generationId: string) {
   const {
     userId,
     problemId,
@@ -197,6 +198,7 @@ async function handleGenerateHints(params: GenerateHintsPayload) {
 
   // Build request with sanitized inputs
   const request: HintGenerationRequest = {
+    generationId,
     ...buildHintRequest(
       {
         ...params,
@@ -261,7 +263,12 @@ async function handleGenerateHints(params: GenerateHintsPayload) {
     ).catch((err) => logger.error("[Hints API] Failed to store hints in RAG:", { error: err }))
 
     return NextResponse.json({
-      hints: uniqueHints,
+      hints: await registerHintResponses(uniqueHints, {
+        generationId,
+        userId,
+        sessionId: params.sessionId,
+        scenarioId: problemId,
+      }),
       struggleLevel: response.struggleLevel,
       recommendedRevealLevel: response.recommendedRevealLevel,
       personalizationApplied: response.personalizationApplied,
@@ -320,7 +327,7 @@ async function storeHintsInRAG(
 /**
  * Get the next unrevealed hint
  */
-async function handleGetNextHint(params: GetNextHintPayload) {
+async function handleGetNextHint(params: GetNextHintPayload, generationId: string) {
   const {
     userId,
     problemId,
@@ -367,7 +374,14 @@ async function handleGetNextHint(params: GetNextHintPayload) {
           )
 
           return NextResponse.json({
-            hint,
+            hint: (
+              await registerHintResponses([hint], {
+                generationId,
+                userId,
+                sessionId: params.sessionId,
+                scenarioId: problemId,
+              })
+            )[0],
             message: "Retrieved similar hint from knowledge base",
             source: "rag",
           })
@@ -393,6 +407,9 @@ async function handleGetNextHint(params: GetNextHintPayload) {
     },
     fullMetrics
   )
+
+  request.generationId = generationId
+  request.sessionId = params.sessionId
 
   // highestRevealedLevel is what escalates the ladder. previousHintIds cannot:
   // every call regenerates hints tailored to the current code with fresh random
@@ -420,7 +437,14 @@ async function handleGetNextHint(params: GetNextHintPayload) {
   }
 
   return NextResponse.json({
-    hint,
+    hint: (
+      await registerHintResponses([hint], {
+        generationId,
+        userId,
+        sessionId: params.sessionId,
+        scenarioId: problemId,
+      })
+    )[0],
     message: "Hint generated successfully",
     source: hint.source,
   })

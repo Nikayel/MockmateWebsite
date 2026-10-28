@@ -23,6 +23,7 @@ import {
   getSessionMetrics,
   verifySessionOwnership,
 } from "@/lib/session-metrics"
+import { recordRecommendationCompletion } from "@/lib/agents/recommendations/decision-outcomes.server"
 import { logger } from "@/lib/logger"
 
 export async function POST(request: NextRequest) {
@@ -114,6 +115,7 @@ export async function POST(request: NextRequest) {
       }
 
       case "session_complete": {
+        await recordRecommendationCompletion(userId, sessionId)
         const summary = await completeSessionMetrics({
           sessionId,
           finalCode: data.finalCode,

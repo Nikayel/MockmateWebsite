@@ -59,11 +59,3 @@ export function enforceExecuteRateLimit(userId: string) {
 export function enforceAiFeedbackRateLimit(userId: string) {
   return enforceRateLimitPolicy("feedback", `user:${userId}`)
 }
-
-export async function enforceFeedbackStreamRateLimit(userId: string) {
-  const identifier = `user:${userId}`
-  return (
-    (await enforceRateLimitPolicy("feedbackStreamBurst", identifier)) ??
-    enforceRateLimitPolicy("feedbackStreamSustained", identifier)
-  )
-}

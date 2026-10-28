@@ -65,6 +65,8 @@ interface ChatUserProfile {
 }
 
 interface ChatApiResponse {
+  generationId?: string
+  feedbackAvailable?: boolean
   reaction?: unknown
   action?: unknown
   reply?: string | null
@@ -645,7 +647,18 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             setMessages((previous) =>
               previous.map((chatMessage) =>
                 chatMessage.id === streamingResponseId
-                  ? { ...chatMessage, message: streamResponse.reply, isStreaming: false }
+                  ? {
+                      ...chatMessage,
+                      ...(streamResponse.generationId
+                        ? {
+                            id: streamResponse.generationId,
+                            generationId: streamResponse.generationId,
+                            feedbackAvailable: streamResponse.feedbackAvailable !== false,
+                          }
+                        : {}),
+                      message: streamResponse.reply,
+                      isStreaming: false,
+                    }
                   : chatMessage
               )
             )
@@ -708,7 +721,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
               reply
             )
           if (!replyAlreadyRendered) {
-            setMessages((prev) => [...prev, createChatMessage("ai", reply)])
+            setMessages((prev) => [...prev, createChatMessage("ai", reply, data)])
           }
 
           if (

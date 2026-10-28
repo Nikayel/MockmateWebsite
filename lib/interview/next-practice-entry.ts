@@ -1,4 +1,10 @@
+import {
+  recommendationDecisionIdSchema,
+  recommendationSessionIdSchema,
+} from "@/lib/agents/recommendations/decision-contract"
+
 export interface NextPracticeEntry {
+  decisionId?: string
   sourceSessionId: string
   scenarioId: string
   returnSource?: "feedback" | "dashboard" | "reminder"
@@ -16,15 +22,15 @@ export function getNextPracticeEntry(
     params.get("roadmap") === "true"
   )
     return null
-  const scenarioId = params.get("scenario")
-  const sourceSessionId = params.get("fromSession")
-  const validId = (value: string | null): value is string =>
-    Boolean(value && value.trim() === value && /^[^/\x00-\x1f]{1,200}$/.test(value))
+  const scenarioId = recommendationSessionIdSchema.safeParse(params.get("scenario"))
+  const sourceSessionId = recommendationSessionIdSchema.safeParse(params.get("fromSession"))
+  const decisionId = recommendationDecisionIdSchema.safeParse(params.get("decisionId"))
   const entry = params.get("return")
-  return validId(scenarioId) && validId(sourceSessionId)
+  return scenarioId.success && sourceSessionId.success
     ? {
-        sourceSessionId,
-        scenarioId,
+        sourceSessionId: sourceSessionId.data,
+        ...(decisionId.success ? { decisionId: decisionId.data } : {}),
+        scenarioId: scenarioId.data,
         ...(entry === "dashboard" || entry === "reminder" ? { returnSource: entry } : {}),
       }
     : null

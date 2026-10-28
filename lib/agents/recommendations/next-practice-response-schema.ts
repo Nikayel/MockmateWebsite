@@ -1,7 +1,9 @@
 import { z } from "zod"
+import { recommendationDecisionIdSchema } from "./decision-contract"
 import type { NextPracticeResponse } from "./next-practice-types"
 
 export const nextPracticeRecommendationSchema = z.object({
+  decisionId: recommendationDecisionIdSchema.optional(),
   scenarioId: z.string().min(1).max(200),
   title: z.string().min(1).max(500),
   type: z.enum(["dsa", "bugfix", "system-design", "add-functionality"]),

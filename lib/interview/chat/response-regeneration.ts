@@ -43,6 +43,8 @@ Generate a compliant response NOW:`
         complexity,
         userId,
         sessionId,
+        generationId: request.generationId,
+        scenarioId: request.scenarioId,
         service: "interview-chat",
         abortSignal: signal,
         eventType: "chat_message",

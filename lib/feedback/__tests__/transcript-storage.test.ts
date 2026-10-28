@@ -79,3 +79,13 @@ it("archives only recognized reactions on candidate messages, including shortene
   expect(stored?.messages[1]).not.toHaveProperty("reaction")
   expect(stored?.messages[2]).not.toHaveProperty("reaction")
 })
+
+it("preserves valid generation links through archival and drops malformed legacy metadata", () => {
+  const generationId = "a136081b-2732-48b4-953b-acf8b2658703"
+  const stored = prepareTranscriptForStorage([
+    { role: "ai_partner", content: "Inspect the test", generationId },
+    { role: "interviewer", content: "Explain the approach", generationId: "slot-0" },
+  ])
+  expect(stored?.messages[0]).toMatchObject({ generationId })
+  expect(stored?.messages[1]).not.toHaveProperty("generationId")
+})

@@ -1,3 +1,4 @@
+import { recordRecommendationCompletion } from "@/lib/agents/recommendations/decision-outcomes.server"
 import { adminDb } from "@/lib/firebase-admin"
 import { resolvePersistAction, type PersistSource } from "@/lib/feedback/persist-guard"
 import { FieldValue } from "firebase-admin/firestore"
@@ -8,7 +9,7 @@ export async function persistFinalSession(
   userId: string,
   update: Record<string, unknown>
 ): Promise<boolean> {
-  return adminDb.runTransaction(async (transaction) => {
+  const persisted = await adminDb.runTransaction(async (transaction) => {
     const session = adminDb.collection("interview_sessions").doc(sessionId)
     const current = await transaction.get(session)
     if (!current.exists || current.get("user_id") !== userId)
@@ -39,4 +40,6 @@ export async function persistFinalSession(
     )
     return true
   })
+  await recordRecommendationCompletion(userId, sessionId)
+  return persisted
 }

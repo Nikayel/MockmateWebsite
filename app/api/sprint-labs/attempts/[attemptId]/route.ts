@@ -25,7 +25,7 @@ import { apiRateLimit } from "@/lib/rate-limiting"
 import { getSprintLabRun } from "@/lib/sprint-labs/runs"
 import { requireSprintLabsEnabled, requireTierForSprint } from "@/lib/sprint-labs/route-guards"
 import { getFinalizedSprintLabAttempt } from "@/lib/sprint-labs/grading/attempts-service"
-import { attemptServiceErrorResponse } from "../route"
+import { attemptServiceErrorResponse } from "@/lib/sprint-labs/grading/attempt-http-error"
 
 export async function GET(
   request: NextRequest,

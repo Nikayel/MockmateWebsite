@@ -1,3 +1,4 @@
+import { responseIdentitySchema } from "@/lib/ai-response-feedback/contract"
 import { evidenceMatchesLab } from "@/lib/bugfix/guided-lab/assessment/validation"
 import { summarizeLabFeedback } from "@/lib/bugfix/guided-lab/assessment/summary"
 import { getGuidedLabScenario } from "@/lib/bugfix/guided-lab/scenarios"
@@ -70,7 +71,7 @@ import { reportEdgeUsageInBackground, type EdgeUsageReport } from "@/lib/usage/e
 // failure on the path that scores DSA, bugfix, optimization, security, and
 // add-functionality sessions landed in a short-retention Edge log and nowhere else.
 import { logger } from "@/lib/logger"
-import { enforceFeedbackStreamRateLimit } from "@/lib/rate-limiting"
+import { enforceFeedbackStreamRateLimit } from "@/lib/rate-limiting/enforce"
 import { summarizeBugfixEvidence } from "@/lib/bugfix/evidence"
 import { buildBugfixPostSessionReport } from "@/lib/bugfix/report"
 import {
@@ -278,7 +279,10 @@ const MAX_CODE_CHARS = 30_000
 /** AI partner turns feed the copy-detection overlap scan, which is O(code x messages). */
 const MAX_PARTNER_MESSAGES = 200
 
+const optionalGenerationId = responseIdentitySchema.shape.generationId.optional().catch(undefined)
+
 interface RawTranscriptMessage {
+  generationId?: string
   type?: string
   role?: string
   message?: string
@@ -313,6 +317,7 @@ function boundTranscript(raw: unknown): { messages: RawTranscriptMessage[]; trun
 
   return {
     messages: kept.map((entry: RawTranscriptMessage) => ({
+      generationId: optionalGenerationId.parse(entry?.generationId),
       lane: entry?.lane,
       ...(entry?.reaction === "acknowledged" ? { reaction: entry.reaction } : {}),
       timestamp: typeof entry?.timestamp === "number" ? entry.timestamp : undefined,

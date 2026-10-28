@@ -14,9 +14,11 @@
  * hard-fails at 1MB: recency always wins when anything must go.
  */
 
+import { responseIdentitySchema } from "@/lib/ai-response-feedback/contract"
 import type { InterviewerReaction } from "@/lib/interview/reactions/contract"
 
 export interface TranscriptMessage {
+  generationId?: string
   reaction?: InterviewerReaction
   role: string
   content: string
@@ -33,7 +35,10 @@ export const TRANSCRIPT_MAX_CONTENT_CHARS = 4000
 export const TRANSCRIPT_MAX_TOTAL_BYTES = 700_000
 
 export function prepareTranscriptForStorage(
-  raw: Array<{ role?: unknown; content?: unknown; reaction?: unknown }> | null | undefined
+  raw:
+    | Array<{ role?: unknown; content?: unknown; reaction?: unknown; generationId?: unknown }>
+    | null
+    | undefined
 ): StoredTranscript | null {
   if (!Array.isArray(raw) || raw.length === 0) return null
 
@@ -43,6 +48,10 @@ export function prepareTranscriptForStorage(
     valid.push({
       role: entry.role,
       content: entry.content,
+      ...(typeof entry.generationId === "string" &&
+      responseIdentitySchema.shape.generationId.safeParse(entry.generationId).success
+        ? { generationId: entry.generationId }
+        : {}),
       ...(["user", "candidate"].includes(entry.role) && entry.reaction === "acknowledged"
         ? { reaction: "acknowledged" as const }
         : {}),

@@ -28,6 +28,7 @@ test.describe("post-feedback recommendation", () => {
     const destination = new URL(href!, "http://127.0.0.1:3101")
     expect(destination.searchParams.get("language")).toBe("python")
     expect(destination.searchParams.get("fromSession")).toBe("source")
+    expect(destination.searchParams.get("decisionId")).toBe("a".repeat(64))
     expect(destination.searchParams.has("practice")).toBe(false)
     await link.click()
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(title!)
@@ -36,10 +37,7 @@ test.describe("post-feedback recommendation", () => {
     const events = await page.evaluate(() =>
       JSON.parse(sessionStorage.getItem("recommendation-fixture-events") ?? "[]")
     )
-    expect(events.map((entry: { event: string }) => entry.event)).toEqual([
-      "next_practice_impression",
-      "next_practice_click",
-    ])
+    expect(events.map((entry: { event: string }) => entry.event)).toEqual([])
     expect(browserErrors).toEqual([])
   })
 
@@ -252,4 +250,47 @@ test.describe("saved task return journey", () => {
     await page.getByRole("button", { name: "Remove saved task" }).click()
     await expect(page.getByRole("region", { name: "Saved next practice" })).not.toBeVisible()
   })
+})
+
+test("measures visible exposure and carries the same decision through click and saved practice", async ({
+  page,
+}) => {
+  const interactions: Array<{ stage: string; decisionId: string; returnSource: string }> = []
+  const errors: string[] = []
+  page.on("pageerror", (error) => errors.push(error.message))
+  page.on("request", (request) => {
+    if (request.url().includes("/api/recommendations/interaction"))
+      interactions.push(request.postDataJSON())
+  })
+  await page.goto("/")
+  const card = page.getByRole("region", { name: "Your next practice" })
+  await expect(card.getByRole("link", { name: /open practice/i })).toBeVisible()
+  await card.evaluate((element) => {
+    element.style.marginTop = "1500px"
+  })
+  await page.waitForTimeout(1_200)
+  expect(interactions).toEqual([])
+  await card.scrollIntoViewIfNeeded()
+  await expect.poll(() => interactions.filter((report) => report.stage === "viewed").length).toBe(1)
+  const decisionId = interactions[0].decisionId
+  expect(decisionId).toBe("a".repeat(64))
+  await card.getByRole("button", { name: "Save for later" }).click()
+  await expect(page.getByText("Saved to dashboard", { exact: true })).toBeVisible()
+  await page.goto("/dashboard")
+  const link = page.getByRole("link", { name: "Open saved practice" })
+  await expect(link).toHaveAttribute(
+    "href",
+    new RegExp(`decisionId=${decisionId}&return=dashboard`)
+  )
+  await link.click()
+  await expect(page).toHaveURL(new RegExp(`decisionId=${decisionId}&return=dashboard`))
+  await expect
+    .poll(() =>
+      interactions.some(
+        (report) => report.stage === "clicked" && report.returnSource === "dashboard"
+      )
+    )
+    .toBe(true)
+  expect(interactions.every((report) => report.decisionId === decisionId)).toBe(true)
+  expect(errors).toEqual([])
 })

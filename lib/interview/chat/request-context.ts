@@ -21,6 +21,8 @@ export interface ChatEdgeCase {
 }
 
 export interface ChatRequestContext {
+  /** Server-issued identity for this logical response, shared by provider attempts. */
+  generationId?: string
   sessionContext?: ChatRequestData["sessionContext"]
   message?: string
   candidateMessage?: string

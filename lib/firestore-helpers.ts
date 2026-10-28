@@ -1,3 +1,4 @@
+import type { RecommendationStart } from "@/lib/agents/recommendations/decision-contract"
 import type { GuidedLabProgress } from "@/lib/bugfix/guided-lab/types"
 import { normalizeStoredCheckpoint } from "./interview/session-lifecycle/recovery"
 import {
@@ -1095,7 +1096,8 @@ export async function recordSessionStart(
   _userId: string,
   // Lets the server recognize a paid-tier redo (a scenario already attempted
   // this billing period starts free instead of spending a session).
-  scenarioId?: string
+  scenarioId?: string,
+  recommendation?: RecommendationStart
 ): Promise<{
   success: boolean
   usedPaidSession: boolean
@@ -1113,7 +1115,10 @@ export async function recordSessionStart(
   const response = await fetch("/api/usage/session-start", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify(scenarioId ? { scenarioId } : {}),
+    body: JSON.stringify({
+      ...(scenarioId ? { scenarioId } : {}),
+      ...(recommendation ? { recommendation } : {}),
+    }),
   })
 
   if (response.status === 403) {

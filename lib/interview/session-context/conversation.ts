@@ -3,6 +3,8 @@ import type { ConversationEntry } from "./schema"
 
 interface Message {
   id?: string
+  generationId?: string
+  feedbackAvailable?: boolean
   type: "user" | "ai"
   message: string
   timestamp?: number
@@ -11,8 +13,24 @@ interface Message {
   reaction?: InterviewerReaction
 }
 let sequence = 0
-export function createChatMessage(type: "user" | "ai", message: string): Message {
-  return { id: crypto.randomUUID(), type, message, timestamp: Date.now(), sequence: sequence++ }
+export function createChatMessage(
+  type: "user" | "ai",
+  message: string,
+  response?: { generationId?: string; feedbackAvailable?: boolean }
+): Message {
+  return {
+    id: response?.generationId ?? crypto.randomUUID(),
+    type,
+    message,
+    timestamp: Date.now(),
+    sequence: sequence++,
+    ...(response?.generationId
+      ? {
+          generationId: response.generationId,
+          feedbackAvailable: response.feedbackAvailable !== false,
+        }
+      : {}),
+  }
 }
 
 /** Legacy messages retain unknown dates. Never invent chronology for restored history. */
@@ -30,6 +48,7 @@ export function buildConversationTimeline(
       .filter((message) => !message.isStreaming)
       .map(
         (message, index): ConversationEntry => ({
+          ...(message.generationId ? { generationId: message.generationId } : {}),
           id: message.id ?? `legacy-${lane}-${index}`,
           lane,
           role:

@@ -12,7 +12,7 @@ import {
   createFlagSchema,
   rejectImmutableFields,
   updateFlagSchema,
-} from "@/app/api/admin/feature-flags/route"
+} from "@/lib/admin/feature-flag-schema"
 
 describe("mass assignment is refused, not silently dropped", () => {
   it.each(["key", "createdBy", "createdAt", "updatedAt"])(
@@ -30,7 +30,9 @@ describe("mass assignment is refused, not silently dropped", () => {
   })
 
   it("allows a body that only names mutable fields", () => {
-    expect(rejectImmutableFields({ id: "flag-1", enabled: false, rolloutPercentage: 25 })).toBeNull()
+    expect(
+      rejectImmutableFields({ id: "flag-1", enabled: false, rolloutPercentage: 25 })
+    ).toBeNull()
   })
 })
 

@@ -1,9 +1,8 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { useAuthedFetch } from "./useAuthedFetch"
-import { trackEvent } from "@/lib/analytics"
 import type { NextPracticeResponse } from "@/lib/agents/recommendations/next-practice-types"
 import { nextPracticeResponseSchema } from "@/lib/agents/recommendations/next-practice-response-schema"
 
@@ -18,7 +17,6 @@ export function useNextPractice(sessionId: string) {
   const [attempt, setAttempt] = useState(0)
   const key = `${firebaseUser?.uid ?? ""}:${sessionId}`
   const [loaded, setLoaded] = useState<{ key: string; result: Result } | null>(null)
-  const reported = useRef(new Set<string>())
 
   useEffect(() => {
     if (!firebaseUser || !sessionId) return
@@ -44,19 +42,6 @@ export function useNextPractice(sessionId: string) {
         setLoaded({ key, result })
         if (result.status === "not_ready" && saveRetries < SAVE_RETRY_DELAYS.length) {
           timer = setTimeout(() => void fetchNext(), SAVE_RETRY_DELAYS[saveRetries++])
-        }
-        if (result.status === "ready") {
-          const impressionKey = `${key}:${result.recommendation.scenarioId}`
-          if (!reported.current.has(impressionKey)) {
-            reported.current.add(impressionKey)
-            trackEvent("next_practice_impression", {
-              source_session_id: sessionId,
-              scenario_id: result.recommendation.scenarioId,
-              scenario_type: result.recommendation.type,
-              focus_source: result.recommendation.focusSource,
-              recommendation_source: "feedback",
-            })
-          }
         }
       } catch {
         if (!controller.signal.aborted) setLoaded({ key, result: { status: "error" } })

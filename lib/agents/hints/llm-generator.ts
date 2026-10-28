@@ -12,6 +12,7 @@ import type { GeneratedHint, HintLevel, HintCategory, HintTrigger } from "./type
 import type { StruggleLevel } from "./struggle-calculator"
 
 export interface LLMHintRequest {
+  generationId?: string
   // Problem info
   problemTitle: string
   problemText: string
@@ -297,6 +298,7 @@ export async function generateLLMHint(request: LLMHintRequest): Promise<Generate
       eventType: "hint_request",
       userId: request.userId,
       sessionId: request.sessionId,
+      generationId: request.generationId,
     })
 
     // Parse response
@@ -353,6 +355,7 @@ export async function generateLLMHintsForLevels(
         eventType: "hint_request",
         userId: request.userId,
         sessionId: request.sessionId,
+        generationId: request.generationId,
       }
     )
 

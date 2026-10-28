@@ -9,6 +9,8 @@ import { ConversationMessage } from "./ConversationMessage"
 export interface PartnerChatMessage {
   type: "user" | "ai"
   message: string
+  generationId?: string
+  feedbackAvailable?: boolean
 }
 
 interface SparraPartnerWidgetProps {
@@ -66,6 +68,7 @@ export function SparraPartnerWidget({
               key={`sparra-chat-${message.type}-${index}`}
               message={message}
               speaker="Sparra"
+              allowRating
             />
           ))
         )}

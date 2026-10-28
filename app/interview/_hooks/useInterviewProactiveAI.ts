@@ -1,3 +1,4 @@
+import { createChatMessage } from "@/lib/interview/session-context/conversation"
 import { sessionFetch } from "@/lib/interview/session-fetch"
 import type { SessionContext } from "@/lib/interview/session-context/schema"
 import { useEffect, useRef } from "react"
@@ -173,7 +174,7 @@ export function useInterviewProactiveAI(
         if (typeof data.reply === "string" && data.reply) {
           opts.setInterviewerMessages((previous) => [
             ...previous,
-            { id: crypto.randomUUID(), timestamp: Date.now(), type: "ai", message: data.reply },
+            createChatMessage("ai", data.reply, data),
           ])
           opts.updateTrackerOnMessage(data.reply, "interviewer")
           const topics = extractTopicsFromMessage(data.reply)

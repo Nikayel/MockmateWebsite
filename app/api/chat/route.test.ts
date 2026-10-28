@@ -22,6 +22,10 @@ vi.mock("@/lib/ai-providers", () => ({
   validateResponseRelevance: vi.fn(),
 }))
 
+vi.mock("@/lib/ai-response-feedback/generations", () => ({
+  registerResponseGeneration: vi.fn(async () => true),
+}))
+
 vi.mock("@/lib/analytics-server", () => ({
   trackAIChatServer: vi.fn(),
 }))
@@ -115,6 +119,59 @@ describe("/api/chat route", () => {
     vi.clearAllMocks()
   })
 
+  it("shares response identity across model usage, telemetry, registration and delivered text", async () => {
+    const { generateAIResponse, trackAIChatServer } = await setupMocks()
+    const { registerResponseGeneration } = await import("@/lib/ai-response-feedback/generations")
+    const { POST } = await import("./route")
+    const response = await POST(
+      createRequest({
+        role: "partner",
+        message: "Help me inspect this",
+        sessionId: "owned-session",
+        scenarioId: "boundary",
+      })
+    )
+    const body = (
+      response as unknown as { data: { generationId: string; feedbackAvailable: boolean } }
+    ).data
+    expect(body.generationId).toMatch(/^[a-f0-9-]{36}$/)
+    expect(body.feedbackAvailable).toBe(true)
+    expect(generateAIResponse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({
+        generationId: body.generationId,
+        sessionId: "owned-session",
+        scenarioId: "boundary",
+      })
+    )
+    expect(trackAIChatServer).toHaveBeenCalledWith(
+      expect.objectContaining({ generationId: body.generationId, userId: "user-1" })
+    )
+    expect(registerResponseGeneration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        generationId: body.generationId,
+        userId: "user-1",
+        kind: "partner",
+        outputs: [{ id: body.generationId, content: "Mocked assistant reply" }],
+      })
+    )
+  })
+
+  it("keeps a generated reply usable when rating metadata cannot be registered", async () => {
+    await setupMocks()
+    const { registerResponseGeneration } = await import("@/lib/ai-response-feedback/generations")
+    vi.mocked(registerResponseGeneration).mockResolvedValueOnce(false)
+    const { POST } = await import("./route")
+    const response = await POST(createRequest({ role: "partner", message: "Check my reasoning" }))
+    expect((response as unknown as { data: unknown }).data).toMatchObject({
+      reply: "Mocked assistant reply",
+      generationId: expect.any(String),
+      feedbackAvailable: false,
+    })
+  })
+
   // Freeze the model-facing contract before extracting the route's orchestration.
   // Hashes catch even subtle prompt/history changes without storing full prompts.
   it.each(
@@ -176,11 +233,13 @@ describe("/api/chat route", () => {
       const [system, turn, history, options] = vi.mocked(generateAIResponse).mock.calls[0]
       const hash = (value: unknown) =>
         createHash("sha256").update(JSON.stringify(value)).digest("hex")
+      const { generationId, ...modelOptions } = options!
+      expect(generationId).toEqual(expect.any(String))
       expect({
         system: hash(system),
         turn: hash(turn),
         history: hash(history),
-        options: { ...options, abortSignal: undefined },
+        options: { ...modelOptions, abortSignal: undefined },
       }).toMatchSnapshot()
     }
   )

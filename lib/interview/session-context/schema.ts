@@ -3,6 +3,7 @@ import { z } from "zod"
 
 export const conversationEntrySchema = z.object({
   id: z.string().max(200),
+  generationId: z.string().uuid().optional(),
   lane: z.enum(["interviewer", "partner"]),
   role: z.enum(["candidate", "interviewer", "ai_partner"]),
   content: z.string().max(10000),

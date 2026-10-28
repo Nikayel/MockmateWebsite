@@ -68,6 +68,8 @@ export async function generateValidatedChatResponse(input: ChatGenerationContext
         preferredProvider,
         userId,
         sessionId,
+        generationId: input.request.generationId,
+        ...(input.request.scenarioId ? { scenarioId: input.request.scenarioId } : {}),
         service: "interview-chat",
         abortSignal: signal,
         eventType: "chat_message",

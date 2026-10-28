@@ -37,6 +37,7 @@ async function setup(reminder = true) {
   })
   const next = await getNextPractice(uid, source.id)
   if (next.status !== "ready") throw new Error("Missing fixture task")
+  created.push(adminDb.collection("recommendation_decisions").doc(next.recommendation.decisionId!))
   const request = {
     sourceSessionId: source.id,
     scenarioId: next.recommendation.scenarioId,
@@ -45,6 +46,8 @@ async function setup(reminder = true) {
   }
   const result = await savePracticePlan(uid, request, new Date("2026-10-10T09:00:00.000Z"))
   if (result.status !== "ready") throw new Error("Missing fixture plan")
+  expect(result.plan.recommendation.decisionId).toBe(next.recommendation.decisionId)
+  expect(result.plan.recommendation.href).toBe(next.recommendation.href)
   const ref = adminDb.collection("practice_plans").doc(uid)
   created.push(ref)
   return { uid, source, request, plan: result.plan, ref }

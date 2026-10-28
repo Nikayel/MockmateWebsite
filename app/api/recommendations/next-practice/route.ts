@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { z } from "zod"
 import { verifyAuth } from "@/lib/auth-helpers"
 import { enforceRateLimitPolicy } from "@/lib/rate-limiting"
+import { recommendationSessionIdSchema } from "@/lib/agents/recommendations/decision-contract"
 import { getNextPractice } from "@/lib/agents/recommendations/next-practice.server"
 import { logger } from "@/lib/logger"
 
 const NO_STORE = { "Cache-Control": "private, no-store" }
-const sessionIdSchema = z
-  .string()
-  .min(1)
-  .max(200)
-  .regex(/^[^/\x00-\x1f]+$/)
-  .refine((value) => value.trim() === value)
 export const dynamic = "force-dynamic"
 
 export async function GET(request: NextRequest) {
@@ -20,7 +14,9 @@ export async function GET(request: NextRequest) {
     if (!auth.authenticated || !auth.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: NO_STORE })
     }
-    const parsed = sessionIdSchema.safeParse(request.nextUrl.searchParams.get("sessionId"))
+    const parsed = recommendationSessionIdSchema.safeParse(
+      request.nextUrl.searchParams.get("sessionId")
+    )
     if (!parsed.success)
       return NextResponse.json({ error: "Invalid session" }, { status: 400, headers: NO_STORE })
     const limited = await enforceRateLimitPolicy("api", `next-practice:${auth.userId}`)

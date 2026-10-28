@@ -13,7 +13,6 @@ import type {
   TestSummary,
   WorkspaceContextFile,
 } from "../_types"
-import type { HintFeedbackValue } from "./useInterviewMetrics"
 
 type ScoreBreakdown = {
   understandingScore?: number
@@ -84,7 +83,6 @@ export interface UseInterviewSessionResetOptions {
   setRevealedHints: Dispatch<SetStateAction<number>>
   setRevealedHintIndices: Dispatch<SetStateAction<Set<number>>>
   setRevealedAIHintIndices: Dispatch<SetStateAction<Set<number>>>
-  setHintFeedback: Dispatch<SetStateAction<Map<string, HintFeedbackValue>>>
   setWorkspaceContext: Dispatch<SetStateAction<WorkspaceContextFile[]>>
   setActiveWorkspacePath: Dispatch<SetStateAction<string | null>>
   setComprehensiveFeedback: Dispatch<SetStateAction<string>>
@@ -275,7 +273,6 @@ export function useInterviewSessionReset(opts: UseInterviewSessionResetOptions) 
     opts.setRevealedHintIndices(new Set())
     opts.hintAgent.resetHints()
     opts.setRevealedAIHintIndices(new Set())
-    opts.setHintFeedback(new Map())
     opts.setWorkspaceContext([])
     opts.setActiveWorkspacePath(null)
     opts.resetBugfixSessionState()

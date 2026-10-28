@@ -1,5 +1,6 @@
 "use client"
 
+import { AIResponseRating } from "@/components/interview/AIResponseRating"
 import type { ChatMessage } from "../_types"
 import { MessageAcknowledgment } from "@/components/interview/MessageAcknowledgment"
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
@@ -8,9 +9,14 @@ import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer"
 export function ConversationMessage({
   message,
   speaker,
+  allowRating = false,
 }: {
-  message: Pick<ChatMessage, "type" | "message" | "isStreaming" | "reaction">
+  message: Pick<
+    ChatMessage,
+    "type" | "message" | "isStreaming" | "reaction" | "generationId" | "feedbackAvailable"
+  >
   speaker: string
+  allowRating?: boolean
 }) {
   return (
     <article className={`w-fit max-w-[92%] min-w-0 ${message.type === "user" ? "ml-auto" : ""}`}>
@@ -31,6 +37,18 @@ export function ConversationMessage({
           />
         )}
       </div>
+      {allowRating &&
+        message.type === "ai" &&
+        !message.isStreaming &&
+        message.generationId &&
+        message.feedbackAvailable !== false && (
+          <AIResponseRating
+            key={message.generationId}
+            generationId={message.generationId}
+            responseId={message.generationId}
+            label="Rate partner response"
+          />
+        )}
       {message.type === "user" && message.reaction === "acknowledged" && (
         <div className="mt-1 flex justify-end">
           <MessageAcknowledgment speaker={speaker} />

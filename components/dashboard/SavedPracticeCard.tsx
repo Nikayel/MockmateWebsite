@@ -3,10 +3,15 @@ import { useEffect, useRef } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { usePracticePlan } from "@/lib/hooks/usePracticePlan"
+import { useRecommendationTracking } from "@/lib/hooks/useRecommendationTracking"
 import { trackEvent } from "@/lib/analytics"
 
 export function SavedPracticeCard({ isPro = false }: { isPro?: boolean }) {
   const { result, remove, writing, error, retry } = usePracticePlan()
+  const tracking = useRecommendationTracking(
+    result.status === "ready" ? result.plan.recommendation.decisionId : undefined,
+    "dashboard"
+  )
   const reported = useRef(new Set<string>())
   useEffect(() => {
     if (
@@ -28,6 +33,7 @@ export function SavedPracticeCard({ isPro = false }: { isPro?: boolean }) {
     return null
   return (
     <section
+      ref={tracking.ref}
       aria-label="Saved next practice"
       className="border-border/50 bg-card/50 mb-6 rounded-xl border p-4 sm:p-5"
     >
@@ -92,12 +98,16 @@ export function SavedPracticeCard({ isPro = false }: { isPro?: boolean }) {
               <Button asChild className="mt-4 min-h-11">
                 <a
                   href={`${result.plan.recommendation.href}&return=dashboard`}
-                  onClick={() =>
+                  onClick={() => {
+                    tracking.reportClick()
                     trackEvent("practice_plan_return_clicked", {
                       source_session_id: result.plan.sourceSessionId,
                       scenario_id: result.plan.recommendation.scenarioId,
+                      ...(result.plan.recommendation.decisionId
+                        ? { decision_id: result.plan.recommendation.decisionId }
+                        : {}),
                     })
-                  }
+                  }}
                 >
                   Open saved practice
                 </a>

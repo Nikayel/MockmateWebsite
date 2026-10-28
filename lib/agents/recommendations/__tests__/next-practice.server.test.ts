@@ -15,6 +15,9 @@ vi.mock("@/lib/firebase-admin", () => ({ adminDb: { collection: mocks.collection
 vi.mock("@/lib/account/overview.server", () => ({ getAccountOverview: mocks.account }))
 vi.mock("@/lib/scenarios", () => ({ scenarios: [] }))
 vi.mock("../next-practice", () => ({ selectNextPractice: mocks.choose }))
+vi.mock("../decisions.server", () => ({
+  attachRecommendationDecision: async (_user: string, _source: string, choice: unknown) => choice,
+}))
 import { getNextPractice } from "../next-practice.server"
 
 beforeEach(() => {

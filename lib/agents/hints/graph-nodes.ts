@@ -64,6 +64,7 @@ export async function generateLlmHints(state: HintGraphStateType) {
     struggleLevel,
     userId: request.userId,
     sessionId: request.sessionId,
+    generationId: request.generationId,
     existingHints: request.existingHints,
     testFailures: request.testResults?.failingTests,
     optimalComplexity: request.optimalComplexity,

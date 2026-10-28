@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { createFlagSchema, updateFlagSchema } from "../route"
+import { createFlagSchema, updateFlagSchema } from "@/lib/admin/feature-flag-schema"
 
 /**
  * Regression: enabling a flag with no expiry set failed with "expiresAt: Invalid datetime".

@@ -1,6 +1,7 @@
 import type { DifficultyLevel, ScenarioType } from "@/lib/scenarios/types"
 
 export interface NextPracticeRecommendation {
+  decisionId?: string
   scenarioId: string
   title: string
   type: ScenarioType

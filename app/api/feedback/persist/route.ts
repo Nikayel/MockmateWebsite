@@ -32,6 +32,7 @@ import {
   validateFeedbackGenerationFailureReport,
 } from "@/lib/feedback/persist-request-schema"
 import { resolvePersistAction } from "@/lib/feedback/persist-guard"
+import { recordRecommendationCompletion } from "@/lib/agents/recommendations/decision-outcomes.server"
 import { persistFinalSession } from "@/lib/user-metrics/persist-final"
 import { prepareTranscriptForStorage } from "@/lib/feedback/transcript-storage"
 import { verifyFeedbackInternalRequest } from "@/lib/feedback/internal-auth"
@@ -351,6 +352,7 @@ export async function POST(request: NextRequest) {
       incomingSource
     )
     if (persistAction === "skip") {
+      await recordRecommendationCompletion(authenticatedUserId, sessionId)
       logger.info("[Feedback Persist] Skipped: session already has terminal feedback", {
         sessionId,
         incomingSource,

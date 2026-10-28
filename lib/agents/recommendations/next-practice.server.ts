@@ -3,10 +3,11 @@ import "server-only"
 import { adminDb } from "@/lib/firebase-admin"
 import { scenarios } from "@/lib/scenarios"
 import type { InterviewSession } from "@/lib/types"
+import { attachRecommendationDecision } from "./decisions.server"
 import { selectNextPractice } from "./next-practice"
 import type { NextPracticeResponse } from "./next-practice-types"
 
-/** Read-only advice. Opening a task never grants access or spends allowance. */
+/** Advice records its decision metadata but never grants access or spends allowance. */
 export async function getNextPractice(
   userId: string,
   sessionId: string
@@ -36,5 +37,10 @@ export async function getNextPractice(
     return doc.get("completed_at") && typeof id === "string" ? [id] : []
   })
   const recommendation = selectNextPractice(session, scenarios, recentIds)
-  return recommendation ? { status: "ready", recommendation } : { status: "no_match" }
+  return recommendation
+    ? {
+        status: "ready",
+        recommendation: await attachRecommendationDecision(userId, sessionId, recommendation),
+      }
+    : { status: "no_match" }
 }

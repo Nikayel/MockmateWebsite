@@ -207,6 +207,11 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
           problem_id: problemId,
           trigger,
           hint_count: (data.hints || []).length,
+          generation_ids: [
+            ...new Set(
+              (data.hints || []).flatMap((hint) => (hint.generationId ? [hint.generationId] : []))
+            ),
+          ],
         })
       } catch (err) {
         logger.error("[useHintAgent] Generate error", { error: err, problemId, userId, trigger })
@@ -215,7 +220,7 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
         setIsLoading(false)
       }
     },
-    [buildBasePayload, buildHeaders, staticHints]
+    [buildBasePayload, buildHeaders, staticHints, problemId, userId]
   )
 
   // Generate hints (for backwards compatibility, uses 'initial' trigger)
@@ -260,9 +265,14 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
       // The generation->reveal funnel: a month of generations shipped with a
       // measured reveal rate of zero before anyone noticed, because reveals
       // never left the browser.
-      trackEvent("hint_revealed", { problem_id: problemId, hint_id: hintId })
+      const generationId = hints.find((hint) => hint.id === hintId)?.generationId
+      trackEvent("hint_revealed", {
+        problem_id: problemId,
+        hint_id: hintId,
+        ...(generationId ? { generation_id: generationId } : {}),
+      })
     },
-    [problemId]
+    [problemId, hints]
   )
 
   // Get the next unrevealed hint

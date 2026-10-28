@@ -3,16 +3,22 @@
 import { ArrowRight, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useNextPractice } from "@/lib/hooks/useNextPractice"
+import { useRecommendationTracking } from "@/lib/hooks/useRecommendationTracking"
 import { trackEvent } from "@/lib/analytics"
 import { getTypeConfig } from "@/components/interview/scenario-display"
 import { PracticeSaveControls } from "./PracticeSaveControls"
 
 export function NextPracticeCard({ sessionId }: { sessionId: string }) {
   const { result, retry } = useNextPractice(sessionId)
+  const tracking = useRecommendationTracking(
+    result.status === "ready" ? result.recommendation.decisionId : undefined,
+    "feedback"
+  )
   if (result.status === "signed_out" || result.status === "not_found") return null
 
   return (
     <section
+      ref={tracking.ref}
       aria-label="Your next practice"
       className="border-border/50 bg-card/50 rounded-xl border p-4 sm:p-5"
     >
@@ -45,15 +51,17 @@ export function NextPracticeCard({ sessionId }: { sessionId: string }) {
               <a
                 href={result.recommendation.href}
                 aria-label={`Open practice: ${result.recommendation.title}`}
-                onClick={() =>
-                  trackEvent("next_practice_click", {
-                    source_session_id: sessionId,
-                    scenario_id: result.recommendation.scenarioId,
-                    scenario_type: result.recommendation.type,
-                    focus_source: result.recommendation.focusSource,
-                    recommendation_source: "feedback",
-                  })
-                }
+                onClick={() => {
+                  tracking.reportClick()
+                  if (!result.recommendation.decisionId)
+                    trackEvent("next_practice_click", {
+                      source_session_id: sessionId,
+                      scenario_id: result.recommendation.scenarioId,
+                      scenario_type: result.recommendation.type,
+                      focus_source: result.recommendation.focusSource,
+                      recommendation_source: "feedback",
+                    })
+                }}
               >
                 Open practice <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </a>

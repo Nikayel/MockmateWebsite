@@ -61,6 +61,7 @@ function normalizeMessages(value: unknown, aiRole?: string) {
           : message.role,
         content: aiRole ? message.message : message.content,
         reaction: message.reaction,
+        generationId: message.generationId,
       }
     })
   )

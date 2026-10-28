@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { buildConversationTimeline, timelineProviderHistory } from "./conversation"
+import {
+  buildConversationTimeline,
+  createChatMessage,
+  timelineProviderHistory,
+} from "./conversation"
 import { buildSessionContext, workspaceRevision } from "./snapshot"
 import { buildSessionBaselinePrompt, buildSessionEvidencePrompt } from "./prompts"
 import { sessionContextSchema } from "./schema"
@@ -19,6 +23,21 @@ const base = {
   partnerMessages: [],
 }
 describe("full attributed session context", () => {
+  it("retains server generation identity from an AI reply through the feedback timeline", () => {
+    const generationId = "a136081b-2732-48b4-953b-acf8b2658703"
+    const message = createChatMessage("ai", "Inspect the failing branch", {
+      generationId,
+      feedbackAvailable: true,
+    })
+    expect(message.id).toBe(generationId)
+    const context = buildSessionContext({ ...base, partnerMessages: [message] })
+    expect(sessionContextSchema.parse(context).timeline[0]).toMatchObject({
+      id: generationId,
+      generationId,
+      role: "ai_partner",
+    })
+    expect(JSON.stringify(createChatMessage("ai", "Legacy reply"))).not.toContain("generationId")
+  })
   it("tracks the standalone solution alongside read-only supporting files", () => {
     const context = buildSessionContext({
       ...base,

@@ -1,4 +1,8 @@
-export { enforceRateLimitPolicy, checkRateLimitPolicy } from "./enforce"
+export {
+  enforceRateLimitPolicy,
+  checkRateLimitPolicy,
+  enforceFeedbackStreamRateLimit,
+} from "./enforce"
 export { getClientIdentifier, resolveVerifiedIdentifier } from "./identity"
 export {
   RATE_LIMIT_POLICIES,
@@ -14,7 +18,6 @@ export {
   enforceAiFeedbackRateLimit,
   enforceChatRateLimit,
   enforceExecuteRateLimit,
-  enforceFeedbackStreamRateLimit,
   executeRateLimit,
   guestApiRateLimit,
   guestSessionRateLimit,

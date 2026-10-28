@@ -1,3 +1,4 @@
+import { registerResponseGeneration } from "@/lib/ai-response-feedback/generations"
 import { shouldAcknowledgeWithReaction } from "../reactions/policy"
 import { buildChatRequestContext, type ChatRequestData } from "./request-context"
 import { checkChatTurnEligibility } from "./turn-eligibility"
@@ -40,6 +41,9 @@ export async function processChatMessage(
     }
   }
 
+  const generationId = crypto.randomUUID()
+  requestContext.generationId = generationId
+
   // Prepared before generation, started afterward, and never awaited on the response path.
   const extractionJob = prepareConversationExtraction(requestContext, userId)
   const interviewState = resolveChatInterviewState(requestContext)
@@ -62,12 +66,24 @@ export async function processChatMessage(
     currentPhase,
     signal,
   })
+  const feedbackAvailable =
+    Boolean(aiResponse.text.trim()) &&
+    (await registerResponseGeneration({
+      generationId,
+      userId,
+      kind: requestContext.role ?? "partner",
+      sessionId: requestContext.sessionId,
+      scenarioId: requestContext.scenarioId ?? requestContext.sessionContext?.task.id,
+      outputs: [{ id: generationId, content: aiResponse.text }],
+    }))
   trackChatCompletion(requestContext, userId, aiResponse, Date.now() - startTime)
   if (!signal?.aborted) runConversationExtractionAfterResponse(extractionJob)
 
   return {
     kind: "reply",
     response: {
+      generationId,
+      feedbackAvailable,
       reply: aiResponse.text,
       provider: aiResponse.provider,
       latencyMs: aiResponse.latencyMs,

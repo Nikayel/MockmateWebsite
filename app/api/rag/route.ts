@@ -56,13 +56,8 @@ export async function POST(request: NextRequest) {
       }
       params.userId = verifiedUserId
 
-      // The $250/day global ceiling lived only inside checkQuota, which this
-      // route never calls. Every action in authRequiredActions is on that list
-      // precisely because it generates paid work (an LLM call or an embedded
-      // vector search), so those are exactly the ones a spend emergency must be
-      // able to stop. A rate limit bounds one caller's pace; the ceiling bounds
-      // everyone's total, and they are not substitutes.
-      if (await isGlobalCeilingExceeded()) {
+      // Ratings do no model or vector work and remain available during an AI spend pause.
+      if (action !== "record-feedback" && (await isGlobalCeilingExceeded())) {
         return NextResponse.json(
           {
             error: "AI features are temporarily paused",
@@ -101,7 +96,14 @@ export async function POST(request: NextRequest) {
         return handleStoreOnboarding(params)
 
       case "record-feedback":
-        return handleRecordFeedback(params)
+        return handleRecordFeedback(
+          {
+            generationId: params.generationId,
+            responseId: params.responseId ?? params.hintId,
+            feedbackType: params.feedbackType,
+          },
+          params.userId
+        )
 
       default:
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })

@@ -17,7 +17,7 @@ async function recommendationFor(vite) {
     resolve(repoRoot, "lib/agents/recommendations/next-practice.ts")
   )
   const source = scenarios.find((scenario) => scenario.id === "dsa-two-sum")
-  return selectNextPractice(
+  const choice = selectNextPractice(
     {
       id: "source",
       user_id: "fixture-owner",
@@ -36,6 +36,8 @@ async function recommendationFor(vite) {
     },
     scenarios
   )
+  const decisionId = "a".repeat(64)
+  return choice ? { ...choice, decisionId, href: `${choice.href}&decisionId=${decisionId}` } : null
 }
 const server = await createServer({
   configFile: false,
@@ -60,6 +62,10 @@ const server = await createServer({
     {
       name: "recommendation-fixture-api",
       configureServer(vite) {
+        vite.middlewares.use("/api/recommendations/interaction", (req, res) => {
+          res.setHeader("Content-Type", "application/json")
+          res.end(JSON.stringify({ success: true }))
+        })
         vite.middlewares.use("/api/practice-plan", async (req, res) => {
           res.setHeader("Content-Type", "application/json")
           res.setHeader("Cache-Control", "private, no-store")

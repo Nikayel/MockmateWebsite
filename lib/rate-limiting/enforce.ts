@@ -80,3 +80,11 @@ export async function enforceRateLimitPolicy(
     }
   )
 }
+
+export async function enforceFeedbackStreamRateLimit(userId: string) {
+  const identifier = `user:${userId}`
+  return (
+    (await enforceRateLimitPolicy("feedbackStreamBurst", identifier)) ??
+    enforceRateLimitPolicy("feedbackStreamSustained", identifier)
+  )
+}

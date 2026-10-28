@@ -84,6 +84,7 @@ export async function trackEnvDriftServer(params: {
  * Track AI chat interaction
  */
 export async function trackAIChatServer(params: {
+  generationId?: string
   sessionId?: string
   userId?: string
   interactionType: "partner" | "interviewer"

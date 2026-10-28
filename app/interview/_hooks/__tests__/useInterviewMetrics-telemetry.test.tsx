@@ -20,10 +20,6 @@ describe("completion telemetry", () => {
       useInterviewMetrics({
         firebaseUser: null,
         selectedScenarioId: "cache",
-        userId: "u",
-        guestId: null,
-        currentSessionId: "s",
-        ragHints: [],
         scenarioType: "bugfix",
         difficulty: "medium",
         elapsedTimeSeconds: 180,
@@ -44,10 +40,6 @@ describe("completion telemetry", () => {
       useInterviewMetrics({
         firebaseUser: null,
         selectedScenarioId: "cache",
-        userId: "u",
-        guestId: null,
-        currentSessionId: "s",
-        ragHints: [],
       })
     )
     await act(async () => result.current.trackSessionCompletion(completion))

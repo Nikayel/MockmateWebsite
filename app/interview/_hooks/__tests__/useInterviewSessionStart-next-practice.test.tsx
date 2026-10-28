@@ -93,7 +93,6 @@ function options(overrides: Partial<UseInterviewSessionStartOptions> = {}) {
     setRevealedHints: vi.fn(),
     setRevealedHintIndices: vi.fn(),
     setRevealedAIHintIndices: vi.fn(),
-    setHintFeedback: vi.fn(),
     setWorkspaceContext: vi.fn(),
     setActiveWorkspacePath: vi.fn(),
     setComprehensiveFeedback: vi.fn(),
@@ -159,7 +158,7 @@ describe("recommended task start", () => {
     )
     expect(mocks.record).not.toHaveBeenCalled()
     await act(() => start.result.current.startInterview())
-    expect(mocks.record).toHaveBeenCalledWith("owner", selected.id)
+    expect(mocks.record).toHaveBeenCalledWith("owner", selected.id, undefined)
     const started = mocks.track.mock.calls.find(([event]) => event === "next_practice_started")?.[1]
     expect(started).toMatchObject({
       source_session_id: "source",
@@ -172,9 +171,7 @@ describe("recommended task start", () => {
           opts.firebaseUser as unknown as UseInterviewSessionStartOptions["firebaseUser"],
         selectedScenarioId: selected.id,
         userId: "owner",
-        guestId: null,
         currentSessionId: "destination-session",
-        ragHints: [],
       })
     )
     await act(() =>
@@ -192,7 +189,6 @@ describe("recommended task start", () => {
     )
     await waitFor(() =>
       expect(mocks.track.mock.calls.map(([event]) => event)).toEqual([
-        "next_practice_impression",
         "next_practice_click",
         "next_practice_started",
       ])
@@ -211,7 +207,7 @@ describe("recommended task start", () => {
     expect(mocks.create).not.toHaveBeenCalled()
     expect(mocks.record).not.toHaveBeenCalled()
     await act(() => result.current.startInterview())
-    expect(mocks.record).toHaveBeenCalledWith("owner", target.id)
+    expect(mocks.record).toHaveBeenCalledWith("owner", target.id, undefined)
     expect(mocks.track).toHaveBeenCalledWith("next_practice_started", {
       source_session_id: "source",
       scenario_id: target.id,
@@ -290,4 +286,32 @@ describe("recommended task start", () => {
     expect(mocks.record).toHaveBeenCalledTimes(1)
     unmount()
   })
+})
+
+it("carries the decision into the accepted-start request without duplicating server funnel events", async () => {
+  const opts = options({
+    nextPracticeEntry: {
+      sourceSessionId: "source",
+      scenarioId: target.id,
+      decisionId: "a".repeat(64),
+      returnSource: "reminder",
+    },
+  })
+  const { result, unmount } = renderHook(() =>
+    useInterviewSessionStart(opts as unknown as UseInterviewSessionStartOptions)
+  )
+  await act(() => result.current.startInterview())
+  expect(mocks.record).toHaveBeenCalledWith("owner", target.id, {
+    decisionId: "a".repeat(64),
+    sessionId: "destination-session",
+    returnSource: "reminder",
+  })
+  expect(mocks.track.mock.calls.filter(([event]) => event === "next_practice_started")).toEqual([])
+  unmount()
+})
+it("accepts legacy links and strips malformed supplemental decision IDs", () => {
+  const params = new URLSearchParams(
+    "source=next-practice&scenario=next&fromSession=source&decisionId=../foreign"
+  )
+  expect(getNextPracticeEntry(params)).toEqual({ sourceSessionId: "source", scenarioId: "next" })
 })

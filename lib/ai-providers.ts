@@ -865,6 +865,7 @@ export async function generateAIResponse(
     userTier?: RateLimitTier
     sessionId?: string
     scenarioId?: string
+    generationId?: string
     eventType?: "chat_message" | "feedback_generation" | "hint_request"
     skipCache?: boolean
     skipRateLimit?: boolean
@@ -881,6 +882,7 @@ export async function generateAIResponse(
     userTier = "free",
     sessionId,
     scenarioId,
+    generationId,
     eventType = "chat_message",
     skipCache = false,
     skipRateLimit = false,
@@ -924,6 +926,7 @@ export async function generateAIResponse(
         eventType,
         service,
         cached: true,
+        ...(generationId ? { generationId } : {}),
         sessionId,
         scenarioId,
         latencyMs: Date.now() - startTime,
@@ -1093,6 +1096,7 @@ export async function generateAIResponse(
           scenarioId,
           // Lets a reconciliation separate measured rows from estimated ones
           // without re-deriving which providers report usage.
+          ...(generationId ? { generationId } : {}),
           isExactTokenCount: measuredUsage !== undefined,
           ...(measuredUsage?.cachedInputTokens !== undefined
             ? { metadata: { cachedInputTokens: measuredUsage.cachedInputTokens } }

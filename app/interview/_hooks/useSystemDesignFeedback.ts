@@ -1,3 +1,4 @@
+import { createChatMessage } from "@/lib/interview/session-context/conversation"
 import { sessionFetch } from "@/lib/interview/session-fetch"
 import { toast } from "sonner"
 import type { Dispatch, SetStateAction } from "react"
@@ -467,7 +468,7 @@ export function useSystemDesignFeedback(
         console.warn("[API] Request failed:", response.status, response.url, data)
       }
       if (data.reply) {
-        opts.setInterviewerMessages((prev) => [...prev, { type: "ai", message: data.reply }])
+        opts.setInterviewerMessages((prev) => [...prev, createChatMessage("ai", data.reply, data)])
         // Track interviewer response for conversation context
         opts.updateTrackerOnMessage(data.reply, "interviewer")
       }

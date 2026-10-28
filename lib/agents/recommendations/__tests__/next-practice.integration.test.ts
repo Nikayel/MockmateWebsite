@@ -52,11 +52,13 @@ beforeAll(() => {
   expect(adminDb.projectId).toBe("codesparring-integration")
 })
 afterEach(async () => {
+  const decisions = await adminDb.collection("recommendation_decisions").get()
+  await Promise.all(decisions.docs.map((doc) => adminDb.recursiveDelete(doc.ref)))
   await Promise.all(created.splice(0).map((ref) => ref.delete()))
 })
 
 describe("saved feedback → next practice → authoritative start (real Firestore)", () => {
-  it("gives exhausted free users advice without writes, but denies an actual start", async () => {
+  it("gives exhausted free users advice without spending quota, but denies an actual start", async () => {
     const uid = `recommendation-${randomUUID()}`
     const quota = await freeAccount(uid, true)
     const session = await source(uid)
@@ -85,6 +87,7 @@ describe("saved feedback → next practice → authoritative start (real Firesto
     expect(getNextPracticeEntry(params)).toEqual({
       sourceSessionId: session.id,
       scenarioId: recommendation.scenarioId,
+      decisionId: recommendation.decisionId,
     })
     expect(params.get("language")).toBe("python")
     expect(scenarios.some((task) => task.id === recommendation.scenarioId)).toBe(true)

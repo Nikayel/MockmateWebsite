@@ -737,3 +737,25 @@ describe("the catch-all denies anything not explicitly allowed", () => {
     await assertFails(setDoc(doc(db, "profiles", USER), newProfile(USER)))
   })
 })
+
+describe("recommendation evidence: server-only authority", () => {
+  it("denies client reads/writes to decisions and start receipts, including the owner", async () => {
+    const decisionPath = `recommendation_decisions/${"a".repeat(64)}`
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), decisionPath), { userId: USER, startedAt: "server-time" })
+      await setDoc(doc(ctx.firestore(), `${decisionPath}/starts/session`), { userId: USER })
+    })
+    for (const context of [
+      testEnv.authenticatedContext(USER),
+      testEnv.authenticatedContext(OTHER),
+      testEnv.unauthenticatedContext(),
+    ]) {
+      for (const path of [decisionPath, `${decisionPath}/starts/session`]) {
+        const ref = doc(context.firestore(), path)
+        await assertFails(getDoc(ref))
+        await assertFails(setDoc(ref, { userId: USER, completedAt: "forged" }))
+        await assertFails(deleteDoc(ref))
+      }
+    }
+  })
+})

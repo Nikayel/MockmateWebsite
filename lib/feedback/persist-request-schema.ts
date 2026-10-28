@@ -84,6 +84,7 @@ export const persistRequestSchema = z
       .array(
         z
           .object({
+            generationId: z.string().uuid().optional().catch(undefined),
             role: z.string(),
             content: z.string(),
             reaction: interviewerReactionSchema.optional(),

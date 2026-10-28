@@ -16,6 +16,7 @@ import { isGlobalCeilingExceeded } from "@/lib/global-spend-guard"
 import { completeFeedbackSections } from "@/lib/feedback/structured-feedback-schema"
 import { parseFeedbackSections } from "@/lib/feedback/parsers"
 import { feedbackJobDueTime, isFeedbackJobDue } from "@/lib/feedback/job-state"
+import { recordRecommendationCompletion } from "@/lib/agents/recommendations/decision-outcomes.server"
 import { adminDb } from "@/lib/firebase-admin"
 import { logger } from "@/lib/logger"
 
@@ -163,7 +164,7 @@ async function finishJob(
     overallScore: job.scores.overall,
   })
 
-  return adminDb.runTransaction(async (transaction) => {
+  const finished = await adminDb.runTransaction(async (transaction) => {
     const [jobSnapshot, sessionSnapshot] = await Promise.all([
       transaction.get(jobRef),
       transaction.get(sessionRef),
@@ -228,6 +229,8 @@ async function finishJob(
     })
     return true
   })
+  await recordRecommendationCompletion(job.user_id, job.session_id)
+  return finished
 }
 
 async function recordFailure(jobId: string, token: string, job: FeedbackJob, error: unknown) {

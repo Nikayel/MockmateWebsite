@@ -15,7 +15,7 @@ import {
   reviewAttemptInputSchema,
   reviewSprintLabAttempt,
 } from "@/lib/sprint-labs/grading/attempts-service"
-import { attemptServiceErrorResponse } from "../route"
+import { attemptServiceErrorResponse } from "@/lib/sprint-labs/grading/attempt-http-error"
 
 export async function POST(request: NextRequest) {
   const rateLimited = await apiRateLimit(request)

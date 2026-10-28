@@ -131,6 +131,7 @@ export interface UsageEvent {
   cached?: boolean
   sessionId?: string
   scenarioId?: string
+  generationId?: string
   // NEW: Granular tracking fields
   pattern?: string // DSA pattern (arrays-hashing, trees, etc.)
   difficulty?: string // easy, medium, hard

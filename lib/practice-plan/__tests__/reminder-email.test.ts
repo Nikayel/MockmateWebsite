@@ -17,6 +17,8 @@ describe("saved practice reminder", () => {
       ...fixturePlan,
       recommendation: {
         ...fixturePlan.recommendation,
+        decisionId: "a".repeat(64),
+        href: `${fixturePlan.recommendation.href}&decisionId=${"a".repeat(64)}`,
         title: "<script>bad</script>",
         focus: "a & b",
       },
@@ -24,7 +26,9 @@ describe("saved practice reminder", () => {
     expect(content.htmlContent).not.toContain("<script>")
     expect(content.htmlContent).toContain("&lt;script&gt;")
     expect(content.htmlContent).toContain("a &amp; b")
-    expect(content.textContent).toContain(`${fixturePlan.recommendation.href}&return=reminder`)
+    expect(content.textContent).toContain(
+      `${fixturePlan.recommendation.href}&decisionId=${"a".repeat(64)}&return=reminder`
+    )
     expect(content.headers?.["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click")
   })
   it("sends one explicitly requested reminder", async () => {

@@ -12,6 +12,11 @@ import { verifyAuth } from "@/lib/auth-helpers"
 import { apiRateLimit } from "@/lib/rate-limiting"
 import { recordSessionStartAdmin } from "@/lib/quota/session-start-admin"
 import { trackEventServer } from "@/lib/analytics-server"
+import {
+  recommendationStartSchema,
+  type RecommendationStart,
+} from "@/lib/agents/recommendations/decision-contract"
+import { recordRecommendationStart } from "@/lib/agents/recommendations/decision-outcomes.server"
 import { logger } from "@/lib/logger"
 
 export async function POST(request: NextRequest) {
@@ -28,8 +33,13 @@ export async function POST(request: NextRequest) {
   // free redo. Absent or malformed ids degrade to the legacy opens mechanic
   // rather than blocking the start — stale bundles still post no body at all.
   let scenarioId: string | undefined
+  let recommendation: RecommendationStart | undefined
   try {
     const body: unknown = await request.json()
+    if (body && typeof body === "object" && "recommendation" in body) {
+      const parsed = recommendationStartSchema.safeParse(body.recommendation)
+      if (parsed.success) recommendation = parsed.data
+    }
     const candidate =
       body && typeof body === "object" ? (body as { scenarioId?: unknown }).scenarioId : undefined
     if (typeof candidate === "string" && /^[a-z0-9][a-z0-9_-]{0,99}$/i.test(candidate)) {
@@ -44,6 +54,10 @@ export async function POST(request: NextRequest) {
 
     if (!result.success) {
       return NextResponse.json({ error: "Session limit exceeded", ...result }, { status: 403 })
+    }
+
+    if (scenarioId && recommendation) {
+      await recordRecommendationStart(authResult.userId, scenarioId, recommendation)
     }
 
     // Funnel: every paid-session spend, server-observed, so it counts

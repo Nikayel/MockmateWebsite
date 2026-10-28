@@ -1,3 +1,4 @@
+import { createChatMessage } from "@/lib/interview/session-context/conversation"
 import { sessionFetch } from "@/lib/interview/session-fetch"
 import {
   captureSessionRequest,
@@ -250,9 +251,7 @@ Be conversational and thorough - like a real interviewer debriefing after a codi
 
       if (data.reply) {
         const kickoffMessage: ChatMessage = {
-          type: "ai",
-          message: data.reply,
-          timestamp: Date.now(),
+          ...createChatMessage("ai", data.reply, data),
           phase: "post_interview",
         }
         const updatedMessages = [...opts.interviewerMessages, kickoffMessage]

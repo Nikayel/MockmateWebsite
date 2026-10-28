@@ -129,6 +129,13 @@ export const USER_KEYED_QUERIES: readonly UserKeyedQuery[] = [
   { collection: "in_app_notifications", fields: ["userId"] },
   { collection: "notification_queue", fields: ["userId"] },
   { collection: "usage_events", fields: ["userId"] },
+  { collection: "ai_response_generations", fields: ["userId"] },
+  {
+    collection: "recommendation_decisions",
+    fields: ["userId"],
+    recursive: true,
+    note: "Includes server-owned start receipts.",
+  },
   { collection: "user_activities", fields: ["userId"] },
   { collection: "user_misconceptions", fields: ["userId"] },
   { collection: "insight_interactions", fields: ["userId"] },

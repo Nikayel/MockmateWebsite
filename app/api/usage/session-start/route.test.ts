@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   verifyAuth: vi.fn(),
   recordSessionStartAdmin: vi.fn(),
   loggerError: vi.fn(),
+  attribute: vi.fn(),
 }))
 
 vi.mock("@/lib/rate-limiting", () => ({
@@ -18,6 +19,10 @@ vi.mock("@/lib/auth-helpers", () => ({
 
 vi.mock("@/lib/quota/session-start-admin", () => ({
   recordSessionStartAdmin: mocks.recordSessionStartAdmin,
+}))
+
+vi.mock("@/lib/agents/recommendations/decision-outcomes.server", () => ({
+  recordRecommendationStart: mocks.attribute,
 }))
 
 vi.mock("@/lib/logger", () => ({
@@ -152,4 +157,51 @@ describe("/api/usage/session-start", () => {
     expect(response.status).toBe(500)
     expect(mocks.loggerError).toHaveBeenCalled()
   })
+})
+
+beforeEach(() => {
+  mocks.apiRateLimit.mockResolvedValue(null)
+  mocks.verifyAuth.mockResolvedValue({ authenticated: true, userId: "user-1" })
+})
+const attribution = {
+  decisionId: "a".repeat(64),
+  sessionId: "owned-session",
+  returnSource: "feedback",
+}
+it("attributes an accepted recommendation using token identity, including free redos", async () => {
+  mocks.recordSessionStartAdmin.mockResolvedValue({ success: true, freeRetry: true })
+  const { POST } = await import("./route")
+  expect(
+    (
+      await POST(
+        createRequest({ scenarioId: "dsa-two-sum", recommendation: attribution, userId: "forged" })
+      )
+    ).status
+  ).toBe(200)
+  expect(mocks.attribute).toHaveBeenCalledWith("user-1", "dsa-two-sum", attribution)
+})
+it("never attributes a denied start", async () => {
+  mocks.recordSessionStartAdmin.mockResolvedValue({ success: false })
+  mocks.attribute.mockClear()
+  const { POST } = await import("./route")
+  expect(
+    (await POST(createRequest({ scenarioId: "dsa-two-sum", recommendation: attribution }))).status
+  ).toBe(403)
+  expect(mocks.attribute).not.toHaveBeenCalled()
+})
+it("drops invalid attribution without breaking an accepted practice start", async () => {
+  mocks.recordSessionStartAdmin.mockResolvedValue({ success: true })
+  mocks.attribute.mockClear()
+  const { POST } = await import("./route")
+  expect(
+    (
+      await POST(
+        createRequest({
+          scenarioId: "dsa-two-sum",
+          recommendation: { ...attribution, decisionId: "../bad" },
+        })
+      )
+    ).status
+  ).toBe(200)
+  expect(mocks.attribute).not.toHaveBeenCalled()
 })

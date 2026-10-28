@@ -36,7 +36,6 @@ import type {
 } from "../_types"
 import { isUsageBlocked } from "./useGuestQuota"
 import type { UsageLimit } from "./useGuestQuota"
-import type { HintFeedbackValue } from "./useInterviewMetrics"
 import type { NextPracticeEntry } from "@/lib/interview/next-practice-entry"
 
 type ScoreBreakdown = {
@@ -80,7 +79,6 @@ export interface UseInterviewSessionStartOptions {
   setRevealedHints: Dispatch<SetStateAction<number>>
   setRevealedHintIndices: Dispatch<SetStateAction<Set<number>>>
   setRevealedAIHintIndices: Dispatch<SetStateAction<Set<number>>>
-  setHintFeedback: Dispatch<SetStateAction<Map<string, HintFeedbackValue>>>
   setWorkspaceContext: Dispatch<SetStateAction<WorkspaceContextFile[]>>
   setActiveWorkspacePath: Dispatch<SetStateAction<string | null>>
   setComprehensiveFeedback: Dispatch<SetStateAction<string>>
@@ -194,11 +192,26 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
           scenarioPattern,
           effectiveTargetCompany // Pass target company for RAG + analytics
         )
-        const result = await recordSessionStart(opts.user.id, scenario.id)
+        const result = await recordSessionStart(
+          opts.user.id,
+          scenario.id,
+          fromNextPractice && opts.nextPracticeEntry?.decisionId
+            ? {
+                decisionId: opts.nextPracticeEntry.decisionId,
+                sessionId,
+                returnSource: opts.nextPracticeEntry.returnSource ?? "feedback",
+              }
+            : undefined
+        )
         if (!result.success) throw new Error("Session limit exceeded")
         opts.setCurrentSessionId(sessionId)
 
-        if (fromNextPractice && opts.nextPracticeEntry && !attributedRef.current) {
+        if (
+          fromNextPractice &&
+          opts.nextPracticeEntry &&
+          !opts.nextPracticeEntry.decisionId &&
+          !attributedRef.current
+        ) {
           attributedRef.current = true
           trackEvent("next_practice_started", {
             source_session_id: opts.nextPracticeEntry.sourceSessionId,
@@ -347,7 +360,6 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
     opts.setRevealedHintIndices(new Set())
     opts.hintAgent.resetHints()
     opts.setRevealedAIHintIndices(new Set())
-    opts.setHintFeedback(new Map())
     opts.setWorkspaceContext([])
     opts.setActiveWorkspacePath(null)
     opts.resetBugfixSessionState()

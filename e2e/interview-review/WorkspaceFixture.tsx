@@ -19,6 +19,7 @@ import { voiceUnavailableCopy } from "@/lib/voice/voice-availability"
 const noop = () => {}
 export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
   const params = new URLSearchParams(window.location.search)
+  const ratingFixture = params.get("ratings") === "1"
   const handoffEnabled = params.get("handoff") === "1"
   const isDsa = params.get("scenario") === "dsa"
   const started = params.get("started") !== "0"
@@ -71,7 +72,12 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
   const [path, setPath] = useState(files.find((file) => file.role === "editable")?.path ?? "")
   const [documentPreviewPath, setDocumentPreviewPath] = useState<string | null>(null)
   const [input, setInput] = useState("")
-  const [messages, setMessages] = useState<PartnerChatMessage[]>([])
+  const [messages, setMessages] = useState<PartnerChatMessage[]>(() =>
+    ratingFixture ? JSON.parse(localStorage.getItem("rating-fixture-messages") ?? "[]") : []
+  )
+  useEffect(() => {
+    if (ratingFixture) localStorage.setItem("rating-fixture-messages", JSON.stringify(messages))
+  }, [ratingFixture, messages])
   const [interviewerInput, setInterviewerInput] = useState("")
   const [replyPending, setReplyPending] = useState(false)
   const [simulatedRecording, setRecording] = useState(false)
@@ -235,13 +241,21 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
           focusMode,
           handleFileUpload: async () => {},
           hintAgent: { revealHint: noop },
-          hintFeedback: new Map(),
-          hintFetchStatus: "idle",
+          hintFetchStatus: ratingFixture ? "success" : "idle",
           hintsStale: false,
           isInterviewStarted: started,
-          ragHints: [],
+          ragHints: ratingFixture
+            ? [
+                {
+                  id: "fixture-hint",
+                  generationId: "a136081b-2732-48b4-953b-acf8b2658704",
+                  hint: "Inspect the boundary before changing the loop.",
+                  level: 1,
+                },
+              ]
+            : [],
           realInterviewMode: false,
-          revealedAIHintIndices: new Set(),
+          revealedAIHintIndices: ratingFixture ? new Set([0]) : new Set(),
           revealedHintIndices: new Set(),
           revealedHints: 0,
           selectedScenario: scenario,
@@ -251,7 +265,6 @@ export function WorkspaceFixture({ onSubmit }: { onSubmit: () => void }) {
           setSelectedFile: noop,
           setShowOptimalApproach: noop,
           showOptimalApproach: false,
-          submitHintFeedback: async () => {},
           workspaceContext: files,
         }}
         activePanel={activePanel}

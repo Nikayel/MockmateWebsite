@@ -1,21 +1,19 @@
 "use client"
 
 import { type Dispatch, type SetStateAction } from "react"
-import { Eye, Lightbulb, RefreshCw, ThumbsDown, ThumbsUp } from "lucide-react"
+import { Eye, Lightbulb, RefreshCw } from "lucide-react"
+import { AIResponseRating } from "@/components/interview/AIResponseRating"
 import { Button } from "@/components/ui/button"
 
 interface ProblemHintSectionProps {
   isBugfix: boolean
-  ragHints: Array<{ level: number; hint: string; id?: string }>
+  ragHints: Array<{ level: number; hint: string; id?: string; generationId?: string }>
   hintFetchStatus: "idle" | "loading" | "success" | "error"
-  hintFeedback: Map<string, "helpful" | "unhelpful">
   revealedAIHintIndices: Set<number>
-  selectedScenarioId: string | undefined
   hintAgent: { revealHint: (hintId: string) => void }
   /** Test outcome changed since these hints were generated. */
   hintsStale: boolean
   fetchRAGHints: () => Promise<void>
-  submitHintFeedback: (hintIndex: number, feedbackType: "helpful" | "unhelpful") => Promise<void>
   setRevealedAIHintIndices: Dispatch<SetStateAction<Set<number>>>
 }
 
@@ -23,13 +21,10 @@ export function ProblemHintSection({
   isBugfix,
   ragHints,
   hintFetchStatus,
-  hintFeedback,
   revealedAIHintIndices,
-  selectedScenarioId,
   hintAgent,
   hintsStale,
   fetchRAGHints,
-  submitHintFeedback,
   setRevealedAIHintIndices,
 }: ProblemHintSectionProps) {
   return (
@@ -71,13 +66,11 @@ export function ProblemHintSection({
           {ragHints
             .slice(0, Math.min(revealedAIHintIndices.size + 1, ragHints.length))
             .map((hint, i) => {
-              const hintId = `hint-${selectedScenarioId}-${i}`
               const isRevealed = revealedAIHintIndices.has(i)
-              const feedback = hintFeedback.get(hintId)
 
               return (
                 <div
-                  key={`ai-hint-${i}`}
+                  key={`${hint.generationId ?? "legacy"}:${hint.id ?? i}`}
                   className={`rounded-lg border transition-all ${
                     isRevealed
                       ? "border-border/70 bg-muted/30"
@@ -86,39 +79,18 @@ export function ProblemHintSection({
                 >
                   {isRevealed ? (
                     <div className="p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-foreground flex-1 text-sm leading-relaxed">
-                          <span className="text-accent-strong font-medium">
-                            Level {hint.level}:
-                          </span>{" "}
-                          {hint.hint}
-                        </p>
-                        {/* Feedback buttons */}
-                        <div className="flex flex-shrink-0 items-center gap-1">
-                          <button
-                            onClick={() => submitHintFeedback(i, "helpful")}
-                            className={`rounded p-1 transition-colors ${
-                              feedback === "helpful"
-                                ? "bg-green-500/30 text-green-400"
-                                : "text-muted-foreground hover:bg-green-500/10 hover:text-green-400"
-                            }`}
-                            title="Helpful"
-                          >
-                            <ThumbsUp className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => submitHintFeedback(i, "unhelpful")}
-                            className={`rounded p-1 transition-colors ${
-                              feedback === "unhelpful"
-                                ? "bg-red-500/30 text-red-400"
-                                : "text-muted-foreground hover:bg-red-500/10 hover:text-red-400"
-                            }`}
-                            title="Not helpful"
-                          >
-                            <ThumbsDown className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </div>
+                      <p className="text-foreground flex-1 text-sm leading-relaxed">
+                        <span className="text-accent-strong font-medium">Level {hint.level}:</span>{" "}
+                        {hint.hint}
+                      </p>
+                      {hint.generationId && hint.id && (
+                        <AIResponseRating
+                          key={`${hint.generationId}:${hint.id}`}
+                          generationId={hint.generationId}
+                          responseId={hint.id}
+                          label="Rate hint"
+                        />
+                      )}
                     </div>
                   ) : (
                     <button

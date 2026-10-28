@@ -63,7 +63,7 @@ describe("next-practice lifecycle", () => {
     }
     expect(mocks.track).not.toHaveBeenCalled()
   })
-  it("fetches the owned session and reports one impression despite retries", async () => {
+  it("fetches the owned session without treating a fetch or retry as a view", async () => {
     const { result, unmount } = renderHook(() => useNextPractice("source"))
     await flush()
     expect(result.current.result.status).toBe("ready")
@@ -72,14 +72,7 @@ describe("next-practice lifecycle", () => {
     })
     act(() => result.current.retry())
     await flush()
-    expect(mocks.track).toHaveBeenCalledTimes(1)
-    expect(mocks.track).toHaveBeenCalledWith("next_practice_impression", {
-      source_session_id: "source",
-      scenario_id: "next",
-      scenario_type: "dsa",
-      focus_source: "transfer",
-      recommendation_source: "feedback",
-    })
+    expect(mocks.track).not.toHaveBeenCalled()
     unmount()
   })
 

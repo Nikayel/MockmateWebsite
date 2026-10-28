@@ -14,6 +14,7 @@ export function trackChatCompletion(
   if (sessionId) {
     trackAIChatServer({
       sessionId,
+      ...(request.generationId ? { generationId: request.generationId } : {}),
       userId,
       interactionType: role === "interviewer" ? "interviewer" : "partner",
       messageLength: message?.length || 0,

@@ -339,7 +339,13 @@ function InterviewPageContent() {
   // useInterviewMetrics / the ProblemColumn ctx every tick. hintAgent.hints is
   // useState-backed and only changes when hints are (re)generated.
   const ragHints = useMemo(
-    () => hintAgent.hints.map((h) => ({ level: h.level, hint: h.content, id: h.id })),
+    () =>
+      hintAgent.hints.map((h) => ({
+        level: h.level,
+        hint: h.content,
+        id: h.id,
+        generationId: h.generationId,
+      })),
     [hintAgent.hints]
   )
   const isLoadingHints = hintAgent.isLoading
@@ -1118,22 +1124,12 @@ function InterviewPageContent() {
     }
   }, [code])
 
-  const {
-    trackSessionCompletion,
-    updateSpacedRepetition,
-    submitHintFeedback,
-    hintFeedback,
-    setHintFeedback,
-  } = useInterviewMetrics({
+  const { trackSessionCompletion, updateSpacedRepetition } = useInterviewMetrics({
     firebaseUser,
     selectedScenarioId: selectedScenario?.id,
     scenarioType: selectedScenario?.type,
     difficulty: selectedScenario?.difficulty,
     elapsedTimeSeconds: elapsedTime,
-    userId: user?.id,
-    guestId,
-    currentSessionId,
-    ragHints,
   })
 
   // Extract edge cases from scenario for interviewer to ask about
@@ -1275,7 +1271,6 @@ function InterviewPageContent() {
     setRevealedHints,
     setRevealedHintIndices,
     setRevealedAIHintIndices,
-    setHintFeedback,
     setWorkspaceContext,
     setActiveWorkspacePath,
     setComprehensiveFeedback,
@@ -1324,7 +1319,6 @@ function InterviewPageContent() {
     setRevealedHints,
     setRevealedHintIndices,
     setRevealedAIHintIndices,
-    setHintFeedback,
     setWorkspaceContext,
     setActiveWorkspacePath,
     setComprehensiveFeedback,
@@ -2140,7 +2134,6 @@ function InterviewPageContent() {
           }
         },
       },
-      hintFeedback,
       hintFetchStatus,
       hintsStale: hintAgent.hintsStale,
       isInterviewStarted,
@@ -2156,7 +2149,6 @@ function InterviewPageContent() {
       setSelectedFile,
       setShowOptimalApproach,
       showOptimalApproach,
-      submitHintFeedback,
       workspaceContext,
     }
     // elapsedTime is intentionally omitted (see comment above). Every other value
@@ -2172,7 +2164,6 @@ function InterviewPageContent() {
     handleFileUpload,
     hintAgent.revealHint,
     hintAgent.hintsStale,
-    hintFeedback,
     hintFetchStatus,
     isInterviewStarted,
     ragHints,
@@ -2187,7 +2178,6 @@ function InterviewPageContent() {
     setSelectedFile,
     setShowOptimalApproach,
     showOptimalApproach,
-    submitHintFeedback,
     workspaceContext,
   ])
 

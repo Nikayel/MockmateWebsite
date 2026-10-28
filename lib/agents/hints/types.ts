@@ -34,6 +34,7 @@ export interface HintDiagnosis {
 }
 
 export interface GeneratedHint {
+  generationId?: string
   id: string
   level: HintLevel
   category: HintCategory
@@ -60,6 +61,8 @@ export interface StruggleMetrics {
 }
 
 export interface HintGenerationRequest {
+  /** Server-issued logical batch identity. */
+  generationId?: string
   userId: string
   /** Interview session doc id, threaded into usage tracking. */
   sessionId?: string

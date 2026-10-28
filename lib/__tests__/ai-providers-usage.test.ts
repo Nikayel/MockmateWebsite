@@ -75,9 +75,13 @@ describe("generateAIResponse provider-reported token usage", () => {
     const { generateAIResponse } = await import("../ai-providers")
     await generateAIResponse("system", "question", [], {
       service: "interview-chat",
+      generationId: "a136081b-2732-48b4-953b-acf8b2658703",
       preferredProvider: "openai-none",
       maxRetries: 1,
     })
+    expect(mocks.trackUsageEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ generationId: "a136081b-2732-48b4-953b-acf8b2658703" })
+    )
     expect(mocks.calculateCost).toHaveBeenCalledWith(
       1000,
       20,

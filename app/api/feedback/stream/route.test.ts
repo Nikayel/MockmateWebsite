@@ -41,7 +41,7 @@ vi.mock("@/lib/usage/edge-reporter", () => ({
   reportEdgeUsageInBackground: mocks.reportEdgeUsageInBackground,
 }))
 
-vi.mock("@/lib/rate-limiting", () => ({
+vi.mock("@/lib/rate-limiting/enforce", () => ({
   enforceFeedbackStreamRateLimit: mocks.enforceFeedbackStreamRateLimit,
 }))
 

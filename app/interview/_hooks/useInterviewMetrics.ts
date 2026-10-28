@@ -1,13 +1,7 @@
 import { sessionFetch } from "@/lib/interview/session-fetch"
-import { useCallback, useState } from "react"
-import type { Dispatch, SetStateAction } from "react"
+import { useCallback } from "react"
 import type { User as FirebaseUser } from "firebase/auth"
 import { trackSessionComplete } from "@/lib/analytics"
-
-/** A single RAG hint as rendered in the problem column. Only `hint` is read here. */
-interface MetricsRagHint {
-  hint: string
-}
 
 export interface TrackSessionCompletionParams {
   sessionId: string
@@ -29,50 +23,25 @@ export interface UpdateSpacedRepetitionParams {
   testCasesTotal: number
 }
 
-export type HintFeedbackValue = "helpful" | "unhelpful"
-
 export interface UseInterviewMetricsOptions {
   // auth (used by track + spaced-rep token fetch)
   firebaseUser: FirebaseUser | null
-  // read-only cross-cutting deps for submitHintFeedback's /api/rag body
   selectedScenarioId: string | undefined
   scenarioType?: string
   difficulty?: string
   elapsedTimeSeconds?: number
-  userId: string | undefined
-  guestId: string | null
-  currentSessionId: string | null
-  ragHints: MetricsRagHint[]
 }
 
 export interface UseInterviewMetricsResult {
   trackSessionCompletion: (params: TrackSessionCompletionParams) => Promise<void>
   updateSpacedRepetition: (params: UpdateSpacedRepetitionParams) => Promise<void>
-  submitHintFeedback: (hintIndex: number, feedbackType: HintFeedbackValue) => Promise<void>
-  hintFeedback: Map<string, HintFeedbackValue>
-  setHintFeedback: Dispatch<SetStateAction<Map<string, HintFeedbackValue>>>
 }
 
-/** Pure: builds the per-hint feedback key. Exported for unit testing. */
-export function buildHintFeedbackId(scenarioId: string | undefined, hintIndex: number): string {
-  return `hint-${scenarioId}-${hintIndex}`
-}
-
-/**
- * Owns the interview's outbound metrics/feedback writes: session-completion stats
- * (POST /api/session/metrics), spaced-repetition scheduling (POST
- * /api/spaced-repetition/complete), and per-hint feedback (POST /api/rag +
- * the local `hintFeedback` Map). Lifted verbatim from `app/interview/page.tsx`;
- * request payloads and behavior are preserved exactly. The functions + state are
- * returned so the session/feedback flows (which stay in the page) keep calling
- * them; cross-cutting inputs are injected.
- */
+/** Session-completion telemetry and spaced-repetition writes. */
 export function useInterviewMetrics(
   options: UseInterviewMetricsOptions
 ): UseInterviewMetricsResult {
-  const { firebaseUser, selectedScenarioId, userId, guestId, currentSessionId, ragHints } = options
-
-  const [hintFeedback, setHintFeedback] = useState<Map<string, HintFeedbackValue>>(new Map())
+  const { firebaseUser, selectedScenarioId } = options
 
   const trackSessionCompletion = useCallback(
     async (params: TrackSessionCompletionParams) => {
@@ -160,46 +129,8 @@ export function useInterviewMetrics(
     [firebaseUser]
   )
 
-  const submitHintFeedback = useCallback(
-    async (hintIndex: number, feedbackType: HintFeedbackValue) => {
-      const hintId = buildHintFeedbackId(selectedScenarioId, hintIndex)
-
-      // Update local state immediately for responsive UI
-      setHintFeedback((prev) => {
-        const newMap = new Map(prev)
-        newMap.set(hintId, feedbackType)
-        return newMap
-      })
-
-      // Send feedback to API (non-blocking)
-      try {
-        await sessionFetch("/api/rag", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "record-feedback",
-            hintId,
-            feedbackType,
-            userId: userId || guestId,
-            sessionId: currentSessionId,
-            problemId: selectedScenarioId,
-            hintText: ragHints[hintIndex]?.hint,
-            source: "ai-hint",
-          }),
-        })
-      } catch (error) {
-        console.error("Error submitting hint feedback:", error)
-        // Don't revert - feedback is stored locally anyway
-      }
-    },
-    [selectedScenarioId, userId, guestId, currentSessionId, ragHints]
-  )
-
   return {
     trackSessionCompletion,
     updateSpacedRepetition,
-    submitHintFeedback,
-    hintFeedback,
-    setHintFeedback,
   }
 }

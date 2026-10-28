@@ -42,11 +42,10 @@ export interface ProblemColumnCtx {
   focusMode: boolean
   handleFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => Promise<void>
   hintAgent: { revealHint: (hintId: string) => void }
-  hintFeedback: Map<string, "helpful" | "unhelpful">
   hintFetchStatus: "idle" | "loading" | "success" | "error"
   hintsStale: boolean
   isInterviewStarted: boolean
-  ragHints: Array<{ level: number; hint: string; id?: string }>
+  ragHints: Array<{ level: number; hint: string; id?: string; generationId?: string }>
   realInterviewMode: boolean
   revealedAIHintIndices: Set<number>
   revealedHintIndices: Set<number>
@@ -58,7 +57,6 @@ export interface ProblemColumnCtx {
   setSelectedFile: (file: WorkspaceContextFile | null) => void
   setShowOptimalApproach: (show: boolean) => void
   showOptimalApproach: boolean
-  submitHintFeedback: (hintIndex: number, feedbackType: "helpful" | "unhelpful") => Promise<void>
   workspaceContext: WorkspaceContextFile[]
 }
 
@@ -75,7 +73,6 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
     fileInputRef,
     handleFileUpload,
     hintAgent,
-    hintFeedback,
     hintFetchStatus,
     hintsStale,
     isInterviewStarted,
@@ -91,7 +88,6 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
     setSelectedFile,
     setShowOptimalApproach,
     showOptimalApproach,
-    submitHintFeedback,
     workspaceContext,
   } = ctx
   const isBugfix = selectedScenario?.type === "bugfix"
@@ -284,13 +280,10 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
                         isBugfix={isBugfix}
                         ragHints={ragHints}
                         hintFetchStatus={hintFetchStatus}
-                        hintFeedback={hintFeedback}
                         revealedAIHintIndices={revealedAIHintIndices}
-                        selectedScenarioId={selectedScenario?.id}
                         hintAgent={hintAgent}
                         hintsStale={hintsStale}
                         fetchRAGHints={fetchRAGHints}
-                        submitHintFeedback={submitHintFeedback}
                         setRevealedAIHintIndices={setRevealedAIHintIndices}
                       />
                     )}
