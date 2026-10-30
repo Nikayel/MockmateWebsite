@@ -45,7 +45,7 @@ function withoutHash(url: unknown): string {
 function isAttributableFrame(frame: StackFrame, pageUrl: string): boolean {
   const filename = typeof frame.filename === "string" ? frame.filename : ""
   if (!filename || filename === "<anonymous>") return false
-  if (pageUrl && withoutHash(filename) === pageUrl) return false
+  if (withoutHash(filename) === pageUrl) return false
   return !EXTENSION_FRAME_SCHEMES.some((scheme) => filename.startsWith(scheme))
 }
 
