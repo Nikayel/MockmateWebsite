@@ -15,11 +15,15 @@ import { describe, expect, it } from "vitest"
 import type { CaptureResult } from "posthog-js"
 import { dropUnattributableExceptions } from "@/lib/posthog-exception-filter"
 
-function exceptionEvent(filenames: (string | undefined)[][]): CaptureResult {
+function exceptionEvent(
+  filenames: (string | undefined)[][],
+  currentUrl?: string,
+): CaptureResult {
   return {
     uuid: "test-uuid",
     event: "$exception",
     properties: {
+      $current_url: currentUrl,
       $exception_list: filenames.map((frameFilenames) => ({
         type: "Error",
         value: "boom",
@@ -95,6 +99,41 @@ describe("dropUnattributableExceptions", () => {
         "https://codesparring.com/_next/static/chunks/page.js",
       ],
     ])
+    expect(dropUnattributableExceptions(event)).toBe(event)
+  })
+
+  // A script that the browser injects inline (Brave on iOS sets
+  // `window.ethereum`) throws from "global code" with the page URL as filename.
+  it.each([
+    "https://www.codesparring.dev/free-ai-coding-interview",
+    "https://www.codesparring.dev/interview",
+  ])("drops an exception whose only frame is inline code on %s", (pageUrl) => {
+    const event = exceptionEvent([[pageUrl]], pageUrl)
+    expect(dropUnattributableExceptions(event)).toBeNull()
+  })
+
+  it("ignores the hash when it matches a frame to the page URL", () => {
+    const event = exceptionEvent(
+      [["https://www.codesparring.dev/interview"]],
+      "https://www.codesparring.dev/interview#editor",
+    )
+    expect(dropUnattributableExceptions(event)).toBeNull()
+  })
+
+  it("keeps an exception with a bundle frame next to an inline frame", () => {
+    const pageUrl = "https://www.codesparring.dev/interview"
+    const event = exceptionEvent(
+      [[pageUrl, "https://www.codesparring.dev/_next/static/chunks/app.js"]],
+      pageUrl,
+    )
+    expect(dropUnattributableExceptions(event)).toBe(event)
+  })
+
+  it("keeps a bundle frame when the event carries a page URL", () => {
+    const event = exceptionEvent(
+      [["https://www.codesparring.dev/_next/static/chunks/app.js"]],
+      "https://www.codesparring.dev/interview",
+    )
     expect(dropUnattributableExceptions(event)).toBe(event)
   })
 })
