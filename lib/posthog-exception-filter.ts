@@ -11,7 +11,10 @@
  *
  * This filter keeps an exception only when at least one stack frame is
  * attributable: a frame with a real script filename that is neither a browser
- * extension URL nor an anonymous frame. An event with no attributable frame is
+ * extension URL, an anonymous frame, nor the page URL itself. A frame whose
+ * filename is the page URL ran as an inline script in the document. Browsers
+ * inject wallet scripts that way (Brave on iOS sets `window.ethereum`), and no
+ * source map can resolve such a frame. An event with no attributable frame is
  * dropped before it leaves the browser. Non-exception events pass through
  * unchanged.
  */
@@ -35,17 +38,25 @@ interface CapturedException {
   stacktrace?: { frames?: unknown }
 }
 
-function isAttributableFrame(frame: StackFrame): boolean {
+function withoutHash(url: unknown): string {
+  return typeof url === "string" ? url.split("#")[0] : ""
+}
+
+function isAttributableFrame(frame: StackFrame, pageUrl: string): boolean {
   const filename = typeof frame.filename === "string" ? frame.filename : ""
   if (!filename || filename === "<anonymous>") return false
+  if (pageUrl && withoutHash(filename) === pageUrl) return false
   return !EXTENSION_FRAME_SCHEMES.some((scheme) => filename.startsWith(scheme))
 }
 
-function hasAttributableFrame(exceptionList: unknown): boolean {
+function hasAttributableFrame(exceptionList: unknown, pageUrl: string): boolean {
   if (!Array.isArray(exceptionList)) return false
   return exceptionList.some((exception: CapturedException) => {
     const frames = exception?.stacktrace?.frames
-    return Array.isArray(frames) && frames.some(isAttributableFrame)
+    return (
+      Array.isArray(frames) &&
+      frames.some((frame: StackFrame) => isAttributableFrame(frame, pageUrl))
+    )
   })
 }
 
@@ -53,6 +64,7 @@ export const dropUnattributableExceptions: BeforeSendFn = (
   event: CaptureResult | null,
 ): CaptureResult | null => {
   if (!event || event.event !== "$exception") return event
-  if (hasAttributableFrame(event.properties?.$exception_list)) return event
+  const pageUrl = withoutHash(event.properties?.$current_url)
+  if (hasAttributableFrame(event.properties?.$exception_list, pageUrl)) return event
   return null
 }
