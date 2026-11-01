@@ -51,9 +51,15 @@ function Fixture() {
         <AdminSessionFixture />
       ) : view === "lifecycle" ? (
         <SessionLifecycleFixture />
-      ) : view === "picker" ? (
+      ) : view === "picker" || view === "guided-labs" ? (
         <ScenarioBrowser
-          onStartInterview={() => setView("workspace")}
+          onStartInterview={(scenario) => {
+            const url = new URL(window.location.href)
+            url.searchParams.set("view", "workspace")
+            url.searchParams.set("scenario", scenario.id)
+            window.history.replaceState(null, "", url)
+            setView("workspace")
+          }}
           usageLimit={null}
           completedProblems={[]}
         />

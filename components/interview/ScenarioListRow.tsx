@@ -10,6 +10,7 @@ import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { getTypeConfig } from "./scenario-display"
 import { getScenarioDiscoveryLabel } from "./scenario-discovery"
 import { ScenarioLanguageTags } from "./ScenarioLanguageTags"
+import { ScenarioPrerequisites } from "./ScenarioPrerequisites"
 
 interface ScenarioListRowProps {
   scenario: Scenario
@@ -24,7 +25,7 @@ interface ScenarioListRowProps {
 }
 
 // Compact, scannable row for the List density mode (LeetCode/HackerRank-style).
-// One line on desktop, gracefully wraps on small screens.
+// Preparation details expand under the title; actions stay beside the title.
 export const ScenarioListRow = memo(function ScenarioListRow({
   scenario,
   isSelected,
@@ -44,24 +45,14 @@ export const ScenarioListRow = memo(function ScenarioListRow({
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={() => onSelect(scenario)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault()
-          onSelect(scenario)
-        }
-      }}
-      aria-pressed={isSelected}
-      className={`group focus-visible:ring-accent/50 grid cursor-pointer grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none sm:flex sm:gap-4 sm:px-4 ${
+      className={`group grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-start gap-3 rounded-xl border px-3 py-2.5 transition-colors duration-200 sm:flex sm:gap-4 sm:px-4 ${
         isSelected
           ? "border-accent/50 bg-accent/5"
           : "border-border bg-card hover:border-accent/40 hover:bg-accent/5"
       }`}
     >
       {/* Completion status */}
-      <div className="flex w-5 flex-shrink-0 justify-center">
+      <div className="flex h-11 w-5 flex-shrink-0 items-center justify-center">
         {isCompleted ? (
           <Check className="text-neural h-4 w-4" aria-label="Solved" />
         ) : (
@@ -71,7 +62,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
 
       {/* Type icon */}
       <span
-        className="bg-muted text-muted-foreground hidden h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg sm:flex"
+        className="bg-muted text-muted-foreground mt-2 hidden h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg sm:flex"
         title={typeConfig.label}
       >
         <typeConfig.icon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -80,9 +71,14 @@ export const ScenarioListRow = memo(function ScenarioListRow({
       {/* Title + meta (the flexible, truncating column) */}
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="flex min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
-          <span className="text-foreground line-clamp-2 w-full font-medium sm:line-clamp-none sm:w-auto sm:truncate">
+          <button
+            type="button"
+            onClick={() => onSelect(scenario)}
+            aria-pressed={isSelected}
+            className="text-foreground focus-visible:ring-ring min-h-11 w-full min-w-0 cursor-pointer rounded-sm text-left font-medium focus-visible:ring-2 focus-visible:outline-none sm:w-auto"
+          >
             {scenario.title}
-          </span>
+          </button>
           <ScenarioLanguageTags scenario={scenario} compact className="shrink-0" />
           {/* Same progression cue as the card view. */}
           {discoveryLabel && (
@@ -106,10 +102,11 @@ export const ScenarioListRow = memo(function ScenarioListRow({
             </span>
           )}
         </span>
+        <ScenarioPrerequisites scenario={scenario} />
       </div>
 
       {/* Tags — only on wide screens where there's room */}
-      <div className="hidden max-w-[200px] flex-shrink-0 gap-1.5 lg:flex">
+      <div className="hidden h-11 max-w-[200px] flex-shrink-0 items-center gap-1.5 lg:flex">
         {scenario.tags.slice(0, 2).map((tag) => (
           <span
             key={tag}
@@ -121,7 +118,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
       </div>
 
       {/* Difficulty */}
-      <div className="hidden w-[72px] flex-shrink-0 items-center gap-1.5 sm:flex">
+      <div className="hidden h-11 w-[72px] flex-shrink-0 items-center gap-1.5 sm:flex">
         <span
           className={`h-2 w-2 rounded-full ${difficultyColorClass(scenario.difficulty, "dot")}`}
           aria-hidden="true"
@@ -135,7 +132,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
           Select that swaps into Start under the cursor. */}
       <div className="flex-shrink-0">
         {isLocked ? (
-          <Link href="/limit-reached" onClick={(e) => e.stopPropagation()}>
+          <Link href="/limit-reached">
             <Button size="sm" variant="outline" className="min-h-11 rounded-full px-3 text-xs">
               Upgrade
             </Button>
@@ -143,8 +140,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
         ) : (
           <Button
             size="sm"
-            onClick={(e) => {
-              e.stopPropagation()
+            onClick={() => {
               // Select before starting so the in-flight state binds to this row.
               onSelect(scenario)
               onStart(scenario)

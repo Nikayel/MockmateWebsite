@@ -14,6 +14,7 @@ import { getScenarioCardContext } from "./scenario-card-meta"
 import { getScenarioDiscoveryLabel } from "./scenario-discovery"
 import { GuidedLabPreview } from "./GuidedLabPreview"
 import { ScenarioLanguageTags } from "./ScenarioLanguageTags"
+import { ScenarioPrerequisites } from "./ScenarioPrerequisites"
 
 interface ScenarioCardProps {
   scenario: Scenario
@@ -43,7 +44,6 @@ export const ScenarioCard = memo(function ScenarioCard({
   onStart,
 }: ScenarioCardProps) {
   const guidedLab = scenario.type === "bugfix" ? scenario.guidedLab : undefined
-  const CardSurface = guidedLab ? "article" : "div"
   const TypeIcon = guidedLab ? ListTree : (TYPE_ICONS[scenario.type] ?? Cpu)
   const { typeLabel, contextLine, signal } = getScenarioCardContext(scenario)
   const labLink = getScenarioLabLink(scenario.id)
@@ -63,22 +63,8 @@ export const ScenarioCard = memo(function ScenarioCard({
     !guidedLab && (scenario.type === "bugfix" || scenario.type === "add-functionality")
 
   return (
-    <CardSurface
-      role={guidedLab ? undefined : "button"}
-      tabIndex={guidedLab ? undefined : 0}
-      onClick={guidedLab ? undefined : () => onSelect(scenario)}
-      onKeyDown={
-        guidedLab
-          ? undefined
-          : (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault()
-                onSelect(scenario)
-              }
-            }
-      }
-      aria-pressed={guidedLab ? undefined : isSelected}
-      className={`${guidedLab ? "md:col-span-2 lg:col-span-3" : "cursor-pointer"} group focus-visible:ring-accent/50 relative flex flex-col rounded-xl border p-5 shadow-xs transition-colors duration-200 focus-visible:ring-2 focus-visible:outline-none ${
+    <article
+      className={`${guidedLab ? "md:col-span-2 lg:col-span-3" : ""} group relative flex flex-col rounded-xl border p-5 shadow-xs transition-colors duration-200 ${
         isSelected
           ? "border-accent/50 bg-accent/5"
           : "border-border bg-card hover:border-accent/40 hover:bg-accent/5"
@@ -116,7 +102,14 @@ export const ScenarioCard = memo(function ScenarioCard({
 
       {/* Focal point: title */}
       <h3 className="text-foreground mb-1.5 line-clamp-2 text-base leading-snug font-semibold">
-        {scenario.title}
+        <button
+          type="button"
+          onClick={() => onSelect(scenario)}
+          aria-pressed={isSelected}
+          className="focus-visible:ring-ring min-h-11 cursor-pointer rounded-sm text-left focus-visible:ring-2 focus-visible:outline-none"
+        >
+          {scenario.title}
+        </button>
       </h3>
 
       {/* Context line — the differentiating signal per type. Debugging scenarios render it as a
@@ -132,6 +125,8 @@ export const ScenarioCard = memo(function ScenarioCard({
 
       {guidedLab && <GuidedLabPreview config={guidedLab} />}
 
+      <ScenarioPrerequisites scenario={scenario} />
+
       {/* Guided-version pointer. The four Case Lab Build exercises also live here as
           standalone scenarios, where they are scored as full interviews; without this
           line, browser arrivals never learn the guided lab exists before choosing. */}
@@ -140,7 +135,6 @@ export const ScenarioCard = memo(function ScenarioCard({
           Part of the {labLink.labTitle} Case Lab.{" "}
           <Link
             href={`/labs/${labLink.labId}`}
-            onClick={(e) => e.stopPropagation()}
             className="text-accent-strong font-medium hover:underline"
           >
             Take the guided version
@@ -187,8 +181,7 @@ export const ScenarioCard = memo(function ScenarioCard({
       {!isLocked && (
         <div className="mt-4">
           <Button
-            onClick={(e) => {
-              e.stopPropagation()
+            onClick={() => {
               // Select before starting so the in-flight state binds to this card.
               onSelect(scenario)
               onStart(scenario)
@@ -209,6 +202,6 @@ export const ScenarioCard = memo(function ScenarioCard({
           )}
         </div>
       )}
-    </CardSurface>
+    </article>
   )
 })
