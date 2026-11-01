@@ -4,16 +4,10 @@ import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { isHarnessError } from "@/lib/workspace-execution/harness-errors"
-import { bugfixApiRateLimiterWorkspaceScenario } from "../real-world/bugfix/bugfix-api-rate-limiter-workspace"
-import { bugfixBillingWebhookIdempotencyScenario } from "../real-world/bugfix/bugfix-billing-webhook-idempotency"
-import { bugfixBookclubReadingStreakWorkspaceScenario } from "../real-world/bugfix/bugfix-bookclub-reading-streak-workspace"
-import { bugfixCommentThreadMergeScenario } from "../real-world/bugfix/bugfix-comment-thread-merge"
-import { bugfixEventAggregationRetriesScenario } from "../real-world/bugfix/bugfix-event-aggregation-retries"
-import { bugfixFeaturePipelineNanWorkspaceScenario } from "../real-world/bugfix/bugfix-feature-pipeline-nan-workspace"
-import { bugfixFoundryUsageRollupScenario } from "../real-world/bugfix/bugfix-foundry-usage-rollup"
-import { bugfixOnboardingScenario } from "../real-world/bugfix/bugfix-onboarding"
-import { bugfixSearchRaceScenario } from "../real-world/bugfix/bugfix-search-race"
-import { bugfixTemperatureAlertRegressionScenario } from "../real-world/bugfix/bugfix-temperature-alert-regression"
+import { realWorldBugFixScenarios } from "@/lib/scenarios-realworld"
+import { bugfixRateLimiterErrorHandlingScenario } from "../real-world/bugfix/bugfix-rate-limiter-error-handling"
+import { loadSealedLegacyReferenceFiles } from "../sealed/legacy-registry.server"
+import { createJavaScriptTestRunner } from "../workspace-test-runner"
 
 /**
  * Runs every JavaScript workspace scenario the way the browser does, and fails if the
@@ -144,23 +138,88 @@ async function runWorkspaceScenario(
   return captured
 }
 
-const WORKSPACE_SCENARIOS = [
-  bugfixOnboardingScenario,
-  bugfixSearchRaceScenario,
-  bugfixTemperatureAlertRegressionScenario,
-  bugfixCommentThreadMergeScenario,
-  bugfixEventAggregationRetriesScenario,
-  bugfixBillingWebhookIdempotencyScenario,
-  bugfixFeaturePipelineNanWorkspaceScenario,
-  bugfixBookclubReadingStreakWorkspaceScenario,
-  bugfixApiRateLimiterWorkspaceScenario,
-  bugfixFoundryUsageRollupScenario,
-]
+describe("shared JavaScript workspace runner", () => {
+  it.each([
+    ["missing module", [{ name: "visible", path: "./missing" }], undefined],
+    ["empty suite", [{ name: "visible", path: "./suite" }], "module.exports = { runTests() {} }"],
+    [
+      "non-Error exception",
+      [{ name: "visible", path: "./suite" }],
+      "module.exports = { runTests() { throw null } }",
+    ],
+    ["no suites", [], undefined],
+  ])("reports %s instead of an empty passing run", async (_name, suites, source) => {
+    const results = await runWorkspaceScenario(
+      [
+        { path: "runner.js", content: createJavaScriptTestRunner(suites) },
+        ...(source ? [{ path: "suite.js", content: source }] : []),
+      ],
+      "runner.js"
+    )
+    expect(results).toHaveLength(1)
+    expect(results![0].passed).toBe(false)
+    expect(results![0].error).toBeTruthy()
+  })
+})
+
+describe("rate limiter exception-handling regression guards", () => {
+  const scenario = bugfixRateLimiterErrorHandlingScenario
+
+  async function runPatch(transform: (reference: string) => string) {
+    const reference = (await loadSealedLegacyReferenceFiles(scenario.id))![0]
+    const files = scenario.workspace!.files.map((file) => ({
+      ...file,
+      content: file.path === reference.path ? transform(reference.content) : file.content,
+    }))
+    return (await runWorkspaceScenario(files, scenario.workspace!.testRunnerPath!))!
+  }
+
+  it("runs every reference case through the actual browser assertion shim", async () => {
+    const results = await runPatch((reference) => reference)
+    expect(results).toHaveLength(12)
+    expect(results.filter((result) => !result.passed)).toEqual([])
+  })
+
+  it("rejects denying every exception because it hides unexpected failures", async () => {
+    const results = await runPatch((reference) =>
+      reference.replace(
+        "if (error instanceof StoreUnavailableError) return false\n    throw error",
+        "return false"
+      )
+    )
+    expect(
+      results.find((result) => result.name === "an unexpected error remains visible to the caller")
+        ?.passed
+    ).toBe(false)
+    expect(
+      results.find((result) => result.name === "non-Error thrown values also propagate unchanged")
+        ?.passed
+    ).toBe(false)
+  })
+
+  it("rejects replaying a reservation after its acknowledgment is lost", async () => {
+    const results = await runPatch((reference) =>
+      reference.replace(
+        "if (error instanceof StoreUnavailableError) return false",
+        `if (error instanceof StoreUnavailableError) {
+      try { store.add(key, now) } catch { return false }
+      return false
+    }`
+      )
+    )
+    expect(
+      results.find(
+        (result) =>
+          result.name === "a lost write acknowledgment neither retries nor rolls back usage"
+      )?.passed
+    ).toBe(false)
+  })
+})
 
 describe("JavaScript workspace scenarios actually run", () => {
   // Python workspaces run under Pyodide, which this loader cannot stand in for. Stdout-oracle
   // packs have no testRunnerPath and are graded by byte-diffing stdout instead.
-  const jsScenarios = WORKSPACE_SCENARIOS.filter(
+  const jsScenarios = realWorldBugFixScenarios.filter(
     (scenario) =>
       scenario.executionMode === "workspace" &&
       scenario.workspace?.language === "javascript" &&

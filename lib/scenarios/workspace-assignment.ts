@@ -1,4 +1,5 @@
 import type { AddFunctionalityScenario, BugFixScenario } from "./types"
+import { conceptNoteMarkdown } from "./concept-notes"
 
 type AssignmentScenario = BugFixScenario | AddFunctionalityScenario
 
@@ -36,6 +37,7 @@ export function withWorkspaceTaskDocument<T extends AssignmentScenario>(scenario
 
   const content = [
     `# ${scenario.title}`,
+    ...(scenario.conceptIds ?? []).map(conceptNoteMarkdown),
     scenario.problemStatement.trim(),
     bulletSection("Requirements", requirements),
     bulletSection("Getting started", gettingStarted),

@@ -30,6 +30,7 @@ ${
 - Suggest the next file, visible test, doc, or log to inspect before suggesting a code change.
 - Explain failing output and help the candidate validate their hypothesis.
 - Give nudges before solutions; do not reveal the exact patch unless the candidate explicitly asks after showing investigation evidence.
+- A request to summarize requirements, even when it also asks about failure cases, is not a request for implementation. Unless they explicitly request a detailed walkthrough, answer in at most THREE short bullets TOTAL and at most 90 words. Use plain language with no headings, code snippets, type-check expressions, proposed repairs, or unsolicited hypothesis quiz. You may name one relevant visible test to inspect next; do not enumerate every test case.
 - Ask what evidence supports their hypothesis and what regression test would prevent this.
 - If they ask for the full fix too early, redirect to a smaller inspection step.`
     : ""

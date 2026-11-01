@@ -23,14 +23,17 @@ export function isPackScenario(scenario: Scenario): scenario is PackScenario {
 }
 
 export function isValidWorkspacePath(path: string): boolean {
-  if (!path || path.startsWith("/") || path.includes("\0")) return false
+  if (!path || path.startsWith("/") || path.includes("\0") || path.includes("\\")) return false
   return !path.split("/").some((segment) => segment === "" || segment === "." || segment === "..")
 }
 
 export function validateWorkspaceScenario(scenario: WorkspaceScenario): string[] {
   const errors: string[] = []
   const { workspace } = scenario
-  const paths = new Set(workspace.files.map((file) => file.path))
+  const filesByPath = new Map(workspace.files.map((file) => [file.path, file]))
+
+  if (filesByPath.size !== workspace.files.length)
+    errors.push("Workspace file paths must be unique")
 
   if (!SUPPORTED_WORKSPACE_LANGUAGES.has(workspace.language)) {
     errors.push(`Unsupported workspace language: ${workspace.language}`)
@@ -47,6 +50,35 @@ export function validateWorkspaceScenario(scenario: WorkspaceScenario): string[]
     if (!isValidWorkspacePath(file.path)) {
       errors.push(`Invalid workspace file path: ${file.path}`)
     }
+    if (file.role === "editable" && !workspace.editableFilePaths.includes(file.path)) {
+      errors.push(`Editable file is not declared: ${file.path}`)
+    }
+  }
+
+  const declaredPaths = [
+    ...workspace.editableFilePaths,
+    ...workspace.visibleTestPaths,
+    ...workspace.hiddenTestPaths,
+  ]
+  if (new Set(declaredPaths).size !== declaredPaths.length) {
+    errors.push("Editable, visible-test, and hidden-test paths must be unique and disjoint")
+  }
+  for (const path of workspace.editableFilePaths) {
+    const file = filesByPath.get(path)
+    if (file && (file.role !== "editable" || file.hidden)) {
+      errors.push(`Editable path must reference a visible editable file: ${path}`)
+    }
+  }
+  for (const [testPaths, hidden] of [
+    [workspace.visibleTestPaths, false],
+    [workspace.hiddenTestPaths, true],
+  ] as const) {
+    for (const path of testPaths) {
+      const file = filesByPath.get(path)
+      if (file && (file.role !== "test" || Boolean(file.hidden) !== hidden)) {
+        errors.push(`Test path has an inconsistent role or visibility: ${path}`)
+      }
+    }
   }
 
   for (const path of [
@@ -57,7 +89,7 @@ export function validateWorkspaceScenario(scenario: WorkspaceScenario): string[]
     ...workspace.visibleTestPaths,
     ...workspace.hiddenTestPaths,
   ]) {
-    if (!paths.has(path)) {
+    if (!filesByPath.has(path)) {
       errors.push(`Workspace references missing file: ${path}`)
     }
   }
@@ -72,6 +104,15 @@ export function validateWorkspaceScenario(scenario: WorkspaceScenario): string[]
 
   if (workspace.hiddenTestPaths.length === 0) {
     errors.push("Workspace scenario must include at least one hidden test file")
+  }
+
+  const referencePaths = new Set<string>()
+  for (const file of workspace.referenceFiles ?? []) {
+    if (referencePaths.has(file.path)) errors.push(`Duplicate reference file: ${file.path}`)
+    referencePaths.add(file.path)
+    if (!workspace.editableFilePaths.includes(file.path) || file.role !== "editable") {
+      errors.push(`Reference solution may only replace editable files: ${file.path}`)
+    }
   }
 
   return errors

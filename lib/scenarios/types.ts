@@ -5,6 +5,7 @@
 
 import { DSAPattern } from "../types/dsa-patterns"
 import type { ValidatorConfig, ReferenceSolution } from "../validators/types"
+import type { ScenarioConceptId } from "./concept-notes"
 import type { GuidedLabConfig } from "../bugfix/guided-lab/types"
 
 export type ScenarioType = "dsa" | "bugfix" | "system-design" | "add-functionality"
@@ -72,6 +73,10 @@ export type Company =
 
 export interface BaseScenario {
   id: string
+  /** One catalog entry, with a stable attempt/grading ID per language. */
+  variantGroup?: string
+  /** Optional public foundations; never a diagnosis or a prescribed repair. */
+  conceptIds?: ScenarioConceptId[]
   title: string
   type: ScenarioType
   difficulty: DifficultyLevel

@@ -1,6 +1,6 @@
 /**
  * Sealed legacy-scenario registry (SERVER-ONLY). Mirrors the sealed-PACK registry
- * (`registry.server.ts`) for the 10 legacy bugfix scenarios and the 4
+ * (`registry.server.ts`) for assert-based bugfix scenarios and the
  * add-functionality scenarios whose answer content (root cause, ground truth,
  * scoring rubric, and the complete reference solution) used to ship in the client
  * bundle.
@@ -23,7 +23,7 @@ if (typeof window !== "undefined") {
  * The answer half of a legacy scenario, moved out of the client module.
  *
  * `referenceFiles` (the complete fixed solution) is always present. The bugfix
- * fields are present only for the 10 legacy bugfix scenarios; the 4
+ * fields are present only for bugfix scenarios; the
  * add-functionality scenarios seal only their reference solution because no
  * runtime code reads their bug description / ground truth / rubric.
  */
@@ -43,6 +43,10 @@ const SEALED_LEGACY_LOADERS: Record<string, () => Promise<{ sealed: SealedLegacy
     import("./legacy/bugfix-billing-webhook-idempotency.server"),
   "bugfix-api-rate-limiter-workspace": () =>
     import("./legacy/bugfix-api-rate-limiter-workspace.server"),
+  "bugfix-rate-limiter-error-handling": () =>
+    import("./legacy/bugfix-rate-limiter-error-handling.server"),
+  "bugfix-rate-limiter-error-handling-python": () =>
+    import("./legacy/bugfix-rate-limiter-error-handling-python.server"),
   "bugfix-comment-thread-merge": () => import("./legacy/bugfix-comment-thread-merge.server"),
   "bugfix-event-aggregation-retries": () =>
     import("./legacy/bugfix-event-aggregation-retries.server"),
@@ -68,14 +72,15 @@ export function hasSealedLegacyBugfix(id: string): boolean {
 }
 
 export async function loadSealedLegacyBugfix(id: string): Promise<SealedLegacyScenario | null> {
+  if (!hasSealedLegacyBugfix(id)) return null
   const loader = SEALED_LEGACY_LOADERS[id]
-  if (!loader) return null
   const mod = await loader()
+  if (mod.sealed.id !== id) throw new Error(`Sealed scenario ID mismatch: ${id}`)
   return mod.sealed
 }
 
 /**
- * The sealed reference solution for any of the 14 scenarios. Used by the node-side
+ * The sealed reference solution for a registered scenario. Used by the node-side
  * workspace-runner and case-lab wiring gates, which apply the fixed files over the
  * starter workspace and assert the suite goes green.
  */

@@ -1,4 +1,5 @@
 import type { BugFixScenario } from "../../types"
+import { createJavaScriptTestRunner } from "../../workspace-test-runner"
 
 const starter = `function allowRequest(store, clientId, now, limit, windowMs) {
   const key = "rl:" + clientId
@@ -118,11 +119,10 @@ async function runTests(record) {
 module.exports = { runTests }
 `
 
-const runner = `const suites = [["visible rate limiter", require("./rate-limiter.test")], ["hidden rate limiter", require("./rate-limiter.hidden.test")]]
-const results = []
-async function record(suite, name, fn) { try { await fn(); results.push({ suite, name, passed: true, error: null, isHidden: suite.toLowerCase().includes("hidden") }) } catch (error) { results.push({ suite, name, passed: false, error: error.message, isHidden: suite.toLowerCase().includes("hidden") }) } }
-;(async () => { for (const [suite, mod] of suites) await mod.runTests((name, fn) => record(suite, name, fn)); console.log("__WORKSPACE_TEST_RESULTS__:" + JSON.stringify(results)) })().catch((error) => { results.push({ suite: "runner", name: "execute workspace tests", passed: false, error: error.message, isHidden: true }); console.log("__WORKSPACE_TEST_RESULTS__:" + JSON.stringify(results)); process.exitCode = 1 })
-`
+const runner = createJavaScriptTestRunner([
+  { name: "visible rate limiter", path: "./rate-limiter.test" },
+  { name: "hidden rate limiter", path: "./rate-limiter.hidden.test" },
+])
 
 export const bugfixApiRateLimiterWorkspaceScenario: BugFixScenario = {
   id: "bugfix-api-rate-limiter-workspace",

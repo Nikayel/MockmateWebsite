@@ -2,17 +2,17 @@ import { describe, expect, it } from "vitest"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 
-import {
-  realWorldBugFixScenarios,
-  realWorldSystemDesignScenarios,
-} from "../../scenarios-realworld"
+import { realWorldBugFixScenarios, realWorldSystemDesignScenarios } from "../../scenarios-realworld"
 import { scenarios } from "../../scenarios"
 import { bugfixPackScenarios } from "../real-world/bugfix/packs"
 import { validateBugfixScenarioQuality } from "../bugfix-quality"
 import {
   hydrateSealedLegacyBugfix,
   loadSealedLegacyBugfix,
+  sealedLegacyScenarioIds,
 } from "../sealed/legacy-registry.server"
+import { addFunctionalityScenarios } from "../add-functionality"
+import { loadSealedPack, sealedPackIds } from "../sealed/registry.server"
 import { validateWorkspaceScenario, isWorkspaceScenario } from "../../workspace-execution"
 
 describe("real-world scenario modules", () => {
@@ -20,6 +20,8 @@ describe("real-world scenario modules", () => {
     "bugfix-search-race",
     "bugfix-billing-webhook-idempotency",
     "bugfix-api-rate-limiter-workspace",
+    "bugfix-rate-limiter-error-handling",
+    "bugfix-rate-limiter-error-handling-python",
     "bugfix-comment-thread-merge",
     "bugfix-event-aggregation-retries",
     "bugfix-feature-pipeline-nan-workspace",
@@ -28,6 +30,25 @@ describe("real-world scenario modules", () => {
     "bugfix-bookclub-reading-streak-workspace",
     "bugfix-foundry-usage-rollup",
   ]
+
+  it("requires a matching sealed answer for every assert-based debugging question, without orphaned entries", () => {
+    expect(sealedLegacyScenarioIds().sort()).toEqual(
+      [...realWorldBugFixScenarios, ...addFunctionalityScenarios].map(({ id }) => id).sort()
+    )
+  })
+
+  it("keeps generated pack answers aligned with the public pack catalog", async () => {
+    expect(sealedPackIds().sort()).toEqual(bugfixPackScenarios.map(({ id }) => id).sort())
+    for (const { id } of bugfixPackScenarios) expect((await loadSealedPack(id))?.packId).toBe(id)
+  })
+
+  it.each(["missing-question", "__proto__", "constructor", "toString"])(
+    "does not load an unknown or inherited question ID: %s",
+    async (id) => {
+      expect(await loadSealedLegacyBugfix(id)).toBeNull()
+      expect(await loadSealedPack(id)).toBeNull()
+    }
+  )
 
   it("keeps the legacy export order and IDs", () => {
     expect(realWorldBugFixScenarios.map((scenario) => scenario.id)).toEqual(publicBugfixIds)

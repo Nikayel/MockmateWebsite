@@ -19,6 +19,7 @@ import { WorkspaceFilesPanel } from "./_sub/WorkspaceFilesPanel"
 import { GuidedLabRail } from "./guided-lab/GuidedLabRail"
 import { isWorkspaceScenario } from "../_utils/workspace"
 import { ScenarioPrerequisites } from "@/components/interview/ScenarioPrerequisites"
+import { ScenarioConceptNote } from "@/components/interview/ScenarioConceptNote"
 
 type ScenarioPanelDetails = Scenario & {
   expectedBehavior?: string
@@ -133,6 +134,9 @@ export const ProblemColumn = memo(function ProblemColumn({ ctx }: ProblemColumnP
           <ResizablePanelGroup direction="vertical" className="h-full">
             <ResizablePanel defaultSize={showFileTree ? initialBriefSize : 100} minSize={30}>
               <div className="h-full space-y-5 overflow-y-auto px-4 pb-4">
+                {selectedScenario?.conceptIds?.map((id) => (
+                  <ScenarioConceptNote key={id} conceptId={id} />
+                ))}
                 {selectedScenario && <ScenarioPrerequisites scenario={selectedScenario} />}
                 {guidedLab && selectedScenario && (
                   <div className="border-border/60 bg-muted/20 rounded-lg border p-3">

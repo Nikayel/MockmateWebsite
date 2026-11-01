@@ -1,6 +1,6 @@
 # Debugging prerequisites
 
-The Debugging track's 24 bugfix questions (including the BookClub guided lab) and
+The Debugging track's 25 bugfix rounds (including the BookClub guided lab and 26 executable language variants) and
 4 feature-building questions have reviewed, high-level prerequisites. Users can
 expand **Prerequisites** in both catalog layouts and the workspace problem panel,
 which stays available in focus mode for these multi-file questions. Basic language

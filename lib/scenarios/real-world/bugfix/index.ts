@@ -7,6 +7,8 @@
 import type { BugFixScenario } from "../../types"
 import { withBugfixIncidentDefaults } from "../../bugfix-quality"
 import { bugfixApiRateLimiterWorkspaceScenario } from "./bugfix-api-rate-limiter-workspace"
+import { bugfixRateLimiterErrorHandlingScenario } from "./bugfix-rate-limiter-error-handling"
+import { bugfixRateLimiterErrorHandlingPythonScenario } from "./bugfix-rate-limiter-error-handling-python"
 import { bugfixBillingWebhookIdempotencyScenario } from "./bugfix-billing-webhook-idempotency"
 import { bugfixBookclubReadingStreakWorkspaceScenario } from "./bugfix-bookclub-reading-streak-workspace"
 import { bugfixCommentThreadMergeScenario } from "./bugfix-comment-thread-merge"
@@ -21,6 +23,8 @@ export const realWorldBugFixScenarios: BugFixScenario[] = [
   bugfixSearchRaceScenario,
   bugfixBillingWebhookIdempotencyScenario,
   bugfixApiRateLimiterWorkspaceScenario,
+  bugfixRateLimiterErrorHandlingScenario,
+  bugfixRateLimiterErrorHandlingPythonScenario,
   bugfixCommentThreadMergeScenario,
   bugfixEventAggregationRetriesScenario,
   bugfixFeaturePipelineNanWorkspaceScenario,

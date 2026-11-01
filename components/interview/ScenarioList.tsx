@@ -6,8 +6,8 @@ import { Search } from "lucide-react"
 import type { Scenario } from "@/lib/scenarios"
 import type { UsageLimit } from "@/lib/stores"
 
-import { ScenarioCard } from "./ScenarioCard"
-import { ScenarioListRow } from "./ScenarioListRow"
+import { ScenarioPracticeChoice } from "./ScenarioPracticeChoice"
+import { groupScenarioVariants } from "@/lib/scenarios/variants"
 import type { ScenarioDensity } from "./useScenarioDensity"
 
 // Progressive reveal: render a light initial batch and let users expand in chunks rather than
@@ -77,42 +77,33 @@ export function ScenarioList({
     )
   }
 
-  const visible = scenarios.slice(0, visibleCount)
-  const remaining = scenarios.length - visible.length
+  const groups = groupScenarioVariants(scenarios)
+  const visible = groups.slice(0, visibleCount)
+  const remaining = groups.length - visible.length
 
   return (
     <>
-      {density === "rows" ? (
-        <div className="flex flex-col gap-1.5">
-          {visible.map((scenario) => (
-            <ScenarioListRow
-              key={scenario.id}
-              scenario={scenario}
-              isSelected={selectedScenarioId === scenario.id}
-              isCompleted={completedProblems.includes(scenario.id)}
-              usageLimit={usageLimit}
-              isStarting={isStarting}
-              onSelect={onSelect}
-              onStart={onStart}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {visible.map((scenario) => (
-            <ScenarioCard
-              key={scenario.id}
-              scenario={scenario}
-              isSelected={selectedScenarioId === scenario.id}
-              isCompleted={completedProblems.includes(scenario.id)}
-              usageLimit={usageLimit}
-              isStarting={isStarting}
-              onSelect={onSelect}
-              onStart={onStart}
-            />
-          ))}
-        </div>
-      )}
+      <div
+        className={
+          density === "rows"
+            ? "flex flex-col gap-1.5"
+            : "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+        }
+      >
+        {visible.map((variants) => (
+          <ScenarioPracticeChoice
+            key={variants[0].variantGroup ?? variants[0].id}
+            variants={variants}
+            density={density}
+            selectedScenarioId={selectedScenarioId}
+            completedProblems={completedProblems}
+            usageLimit={usageLimit}
+            isStarting={isStarting}
+            onSelect={onSelect}
+            onStart={onStart}
+          />
+        ))}
+      </div>
 
       {remaining > 0 && (
         <div className="mt-6 flex flex-col items-center gap-2">
@@ -127,7 +118,7 @@ export function ScenarioList({
             </span>
           </button>
           <p className="text-muted-foreground text-xs">
-            Showing {visible.length} of {scenarios.length}
+            Showing {visible.length} of {groups.length}
           </p>
         </div>
       )}

@@ -9,6 +9,7 @@
  */
 
 import type { Scenario, ScenarioType } from "@/lib/scenarios/types"
+import { groupScenarioVariants } from "@/lib/scenarios/variants"
 
 import { INTERVIEW_TRACK_PARAM, type InterviewTrack } from "./interview-tracks"
 
@@ -110,11 +111,12 @@ export function trackProgress(
   catalog: readonly Scenario[],
   completedProblemIds: readonly string[]
 ): TrackProgress {
-  const owned = scenariosInTrack(track, catalog)
+  const owned = groupScenarioVariants(scenariosInTrack(track, catalog))
   const completed = new Set(completedProblemIds)
   return {
     total: owned.length,
-    completed: owned.filter((scenario) => completed.has(scenario.id)).length,
+    completed: owned.filter((variants) => variants.some((scenario) => completed.has(scenario.id)))
+      .length,
   }
 }
 

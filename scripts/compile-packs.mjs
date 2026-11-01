@@ -211,9 +211,10 @@ export function hasSealedPack(packId: string): boolean {
 }
 
 export async function loadSealedPack(packId: string): Promise<SealedPackContent | null> {
+  if (!hasSealedPack(packId)) return null
   const loader = SEALED_PACK_LOADERS[packId]
-  if (!loader) return null
   const mod = await loader()
+  if (mod.sealed.packId !== packId) throw new Error("Sealed pack ID mismatch: " + packId)
   return mod.sealed
 }
 

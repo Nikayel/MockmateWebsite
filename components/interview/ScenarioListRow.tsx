@@ -1,6 +1,6 @@
 "use client"
 
-import { memo } from "react"
+import { memo, type ReactNode } from "react"
 import Link from "next/link"
 import { Play, Check, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -20,6 +20,7 @@ interface ScenarioListRowProps {
   isStarting?: boolean
   onSelect: (scenario: Scenario) => void
   onStart: (scenario: Scenario) => void
+  languageChoice?: ReactNode
 }
 
 export const ScenarioListRow = memo(function ScenarioListRow({
@@ -30,6 +31,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
   isStarting = false,
   onSelect,
   onStart,
+  languageChoice,
 }: ScenarioListRowProps) {
   const typeConfig = getTypeConfig(scenario.type)
   const discoveryLabel = getScenarioDiscoveryLabel(scenario.id, isCompleted)
@@ -48,7 +50,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
           <span className={difficultyColorClass(scenario.difficulty, "textOnLight")}>
             <span className="capitalize">{scenario.difficulty}</span>
           </span>
-          <ScenarioLanguageTags scenario={scenario} compact />
+          {languageChoice ? null : <ScenarioLanguageTags scenario={scenario} compact />}
           <span className="inline-flex items-center gap-1">
             <Clock className="h-3 w-3" aria-hidden="true" />
             {scenario.estimatedTime} min
@@ -65,6 +67,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
       </div>
 
       <div className={isDebugging ? "min-w-0 sm:w-72" : "sm:w-24"}>
+        {languageChoice && <div className="mb-3">{languageChoice}</div>}
         <ScenarioPrerequisites scenario={scenario}>
           {isLocked ? (
             <Button asChild variant="outline" className="min-h-11 w-full">

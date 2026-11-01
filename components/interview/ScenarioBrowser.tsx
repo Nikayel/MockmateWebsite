@@ -9,6 +9,7 @@ import { useShallow } from "zustand/react/shallow"
 import { useScenarioFilters } from "@/lib/hooks/useScenarioFilters"
 import { getScenarioLanguages, SCENARIO_LANGUAGES, scenarios, type Scenario } from "@/lib/scenarios"
 import { prioritizeDebuggingScenarios } from "./scenario-discovery"
+import { groupScenarioVariants } from "@/lib/scenarios/variants"
 import { useInterviewStore, type UsageLimit } from "@/lib/stores"
 
 import { DebuggingFormatNavigation } from "./DebuggingFormatNavigation"
@@ -159,14 +160,14 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
       }
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
-      resultsCount={trackScenarios.length}
+      resultsCount={groupScenarioVariants(trackScenarios).length}
       hasActiveFilters={hasActiveFilters}
       onClearFilters={clearAllFilters}
       // Derived from the track, never hand-listed. The old constant advertised Optimization and
       // Security chips against zero scenarios, so clicking one could only empty the list. A
       // single-type track shows no row at all, because a chip that can only reselect everything
       // already on screen is the same kind of dead control.
-      catalogScenarios={viewScenarios}
+      catalogScenarios={groupScenarioVariants(viewScenarios).map(([scenario]) => scenario)}
       availableTypes={
         track &&
         track.types.filter((type) => viewScenarios.some((scenario) => scenario.type === type))
@@ -227,8 +228,12 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
             track.id === "debugging" && (
               <DebuggingFormatNavigation
                 browsingLabs={browsingLabs}
-                roundCount={scenariosInTrackView(track, scenarios, false).length}
-                labCount={scenariosInTrackView(track, scenarios, true).length}
+                roundCount={
+                  groupScenarioVariants(scenariosInTrackView(track, scenarios, false)).length
+                }
+                labCount={
+                  groupScenarioVariants(scenariosInTrackView(track, scenarios, true)).length
+                }
               />
             )
           }

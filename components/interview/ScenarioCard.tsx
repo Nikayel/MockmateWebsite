@@ -1,6 +1,6 @@
 "use client"
 
-import { memo } from "react"
+import { memo, type ReactNode } from "react"
 import Link from "next/link"
 import { Play, Check, Clock, ListTree } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -22,6 +22,7 @@ interface ScenarioCardProps {
   isStarting?: boolean
   onSelect: (scenario: Scenario) => void
   onStart: (scenario: Scenario) => void
+  languageChoice?: ReactNode
 }
 
 export const ScenarioCard = memo(function ScenarioCard({
@@ -32,6 +33,7 @@ export const ScenarioCard = memo(function ScenarioCard({
   isStarting = false,
   onSelect,
   onStart,
+  languageChoice,
 }: ScenarioCardProps) {
   const guidedLab = scenario.type === "bugfix" ? scenario.guidedLab : undefined
   const typeConfig = getTypeConfig(scenario.type)
@@ -72,7 +74,7 @@ export const ScenarioCard = memo(function ScenarioCard({
             {scenario.difficulty}
           </span>
         )}
-        <ScenarioLanguageTags scenario={scenario} />
+        {languageChoice ? null : <ScenarioLanguageTags scenario={scenario} />}
         <span className="inline-flex items-center gap-1.5">
           <Clock className="h-3.5 w-3.5" aria-hidden="true" />
           {scenario.estimatedTime} min
@@ -80,6 +82,7 @@ export const ScenarioCard = memo(function ScenarioCard({
       </div>
 
       {guidedLab && <GuidedLabPreview config={guidedLab} />}
+      {languageChoice}
 
       {labLink && (
         <Link

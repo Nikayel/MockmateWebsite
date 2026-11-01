@@ -22,6 +22,11 @@ export const PREREQUISITE_TOPICS = {
     label: "API handlers",
     description: "Follow request parameters through a service and into a response.",
   },
+  "exception-handling": {
+    label: "Exception handling",
+    description:
+      "Follow failures through try/catch or try/except, and distinguish returning from propagating an error.",
+  },
   "events-retries": {
     label: "Events and retries",
     description: "Understand event records, repeated deliveries, and arrival order.",
@@ -82,6 +87,12 @@ export const DEBUGGING_PREREQUISITES = {
   "bugfix-search-race": ["arrays-lists", "maps-dictionaries", "async-await", "api-handlers"],
   "bugfix-billing-webhook-idempotency": ["maps-dictionaries", "sets", "events-retries"],
   "bugfix-api-rate-limiter-workspace": ["arrays-lists", "maps-dictionaries", "time-windows"],
+  "bugfix-rate-limiter-error-handling": ["exception-handling", "api-handlers", "time-windows"],
+  "bugfix-rate-limiter-error-handling-python": [
+    "exception-handling",
+    "api-handlers",
+    "time-windows",
+  ],
   "bugfix-comment-thread-merge": ["arrays-lists", "maps-dictionaries", "collection-references"],
   "bugfix-event-aggregation-retries": [
     "arrays-lists",

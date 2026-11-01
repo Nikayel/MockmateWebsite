@@ -235,7 +235,11 @@ describe("trackProgress", () => {
   it("counts the whole track, not the filtered view", () => {
     expect(trackProgress(dsa, scenarios, []).total).toBe(countOfType("dsa"))
     expect(trackProgress(debugging, scenarios, []).total).toBe(
-      countOfType("bugfix") + countOfType("add-functionality")
+      new Set(
+        scenariosInTrack(debugging, scenarios).map(
+          (scenario) => scenario.variantGroup ?? scenario.id
+        )
+      ).size
     )
   })
 
