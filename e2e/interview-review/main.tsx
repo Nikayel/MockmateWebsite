@@ -60,7 +60,13 @@ function Fixture() {
             window.history.replaceState(null, "", url)
             setView("workspace")
           }}
-          usageLimit={null}
+          usageLimit={
+            params.get("quota") === "available"
+              ? { used: 6, limit: 100, allowed: true }
+              : params.get("quota") === "exhausted"
+                ? { used: 100, limit: 100, allowed: false }
+                : null
+          }
           completedProblems={[]}
         />
       ) : view === "done" ? (

@@ -3,7 +3,7 @@ import type { ScenarioType } from "@/lib/scenarios"
 
 /**
  * The single scenario-type table. Every scenario-type surface derives from this: the filter
- * pills (ScenarioFilters, uses `description`), the card type marker (scenario-card-meta, uses
+ * pills (ScenarioFilters, uses `description`), the card type marker (ScenarioCard, uses
  * `cardLabel ?? label`), and the card/list icons (ScenarioCard, ScenarioListRow, use `icon`).
  */
 export interface ExerciseTypeConfig {

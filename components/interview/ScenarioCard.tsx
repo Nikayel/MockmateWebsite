@@ -2,15 +2,13 @@
 
 import { memo } from "react"
 import Link from "next/link"
-import { Play, Check, Clock, Cpu, Bug, ListTree } from "lucide-react"
-import { EXERCISE_TYPES } from "./scenario-display"
+import { Play, Check, Clock, ListTree } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import type { Scenario, ScenarioType } from "@/lib/scenarios"
-import { PRICING_CONFIG } from "@/lib/config"
+import type { Scenario } from "@/lib/scenarios"
 import type { UsageLimit } from "@/lib/stores"
 import { difficultyColorClass } from "@/lib/ui/difficulty-colors"
 import { getScenarioLabLink } from "@/lib/labs/lab-links"
-import { getScenarioCardContext } from "./scenario-card-meta"
+import { getTypeConfig } from "./scenario-display"
 import { getScenarioDiscoveryLabel } from "./scenario-discovery"
 import { GuidedLabPreview } from "./GuidedLabPreview"
 import { ScenarioLanguageTags } from "./ScenarioLanguageTags"
@@ -21,18 +19,10 @@ interface ScenarioCardProps {
   isSelected: boolean
   isCompleted: boolean
   usageLimit: UsageLimit | null
-  // True while a session start is in flight; keeps the Start button loading and
-  // disabled so a second click cannot open a duplicate session.
   isStarting?: boolean
   onSelect: (scenario: Scenario) => void
   onStart: (scenario: Scenario) => void
 }
-
-// Derived from the shared EXERCISE_TYPES table so the card icons cannot drift from the filters.
-const TYPE_ICONS = Object.fromEntries(EXERCISE_TYPES.map((type) => [type.id, type.icon])) as Record<
-  ScenarioType,
-  typeof Bug
->
 
 export const ScenarioCard = memo(function ScenarioCard({
   scenario,
@@ -44,164 +34,86 @@ export const ScenarioCard = memo(function ScenarioCard({
   onStart,
 }: ScenarioCardProps) {
   const guidedLab = scenario.type === "bugfix" ? scenario.guidedLab : undefined
-  const TypeIcon = guidedLab ? ListTree : (TYPE_ICONS[scenario.type] ?? Cpu)
-  const { typeLabel, contextLine, signal } = getScenarioCardContext(scenario)
+  const typeConfig = getTypeConfig(scenario.type)
+  const TypeIcon = guidedLab ? ListTree : typeConfig.icon
+  const typeLabel = guidedLab ? "Guided lab" : (typeConfig.cardLabel ?? typeConfig.label)
   const labLink = getScenarioLabLink(scenario.id)
   const discoveryLabel = getScenarioDiscoveryLabel(scenario.id, isCompleted)
   const isLocked = !!(usageLimit && usageLimit.allowed === false && scenario.type !== "dsa")
-  const visibleCompanies =
-    scenario.type === "dsa"
-      ? scenario.companies
-      : scenario.companies.filter((company) => company !== "Generic")
-  const companies = visibleCompanies.slice(0, 2).join(", ")
-  const extraCompanies = visibleCompanies.length > 2 ? ` +${visibleCompanies.length - 2}` : ""
-
-  // Debugging-track scenarios open with a reported symptom, not a task statement. The quote
-  // bar marks the line as an incoming report — the visual language of a ticket, which is the
-  // fiction those tracks sell.
-  const contextIsReport =
-    !guidedLab && (scenario.type === "bugfix" || scenario.type === "add-functionality")
 
   return (
     <article
-      className={`${guidedLab ? "md:col-span-2 lg:col-span-3" : ""} group relative flex flex-col rounded-xl border p-5 shadow-xs transition-colors duration-200 ${
-        isSelected
-          ? "border-accent/50 bg-accent/5"
-          : "border-border bg-card hover:border-accent/40 hover:bg-accent/5"
-      }`}
+      className={`border-border bg-card flex flex-col gap-4 rounded-xl border p-5 shadow-xs ${guidedLab ? "md:col-span-2 lg:col-span-3" : ""}`}
     >
-      {/* Top row: type marker + difficulty (left), status (right) */}
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs font-medium">
-            <TypeIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            {typeLabel}
-          </span>
-          {!guidedLab && (
-            <span
-              className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${difficultyColorClass(scenario.difficulty, "badgeOnLight")}`}
-            >
-              {scenario.difficulty}
-            </span>
-          )}
-          <ScenarioLanguageTags scenario={scenario} />
-          {/* Quiet progression cue, shared with list view; solved status replaces it. */}
-          {discoveryLabel && (
-            <span className="bg-accent/10 text-accent-strong rounded-full px-2 py-0.5 text-[11px] font-medium">
-              {discoveryLabel}
-            </span>
-          )}
-        </div>
-        {isCompleted && (
-          <span className="bg-neural/10 text-neural inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs font-medium">
+          <TypeIcon className="h-3.5 w-3.5" aria-hidden="true" />
+          {typeLabel}
+        </span>
+        {isCompleted ? (
+          <span className="bg-neural/10 text-neural inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium">
             <Check className="h-3 w-3" aria-hidden="true" />
             Solved
           </span>
-        )}
+        ) : discoveryLabel ? (
+          <span className="bg-accent/10 text-accent-strong rounded-full px-2 py-0.5 text-xs font-medium">
+            {discoveryLabel}
+          </span>
+        ) : null}
       </div>
 
-      {/* Focal point: title */}
-      <h3 className="text-foreground mb-1.5 line-clamp-2 text-base leading-snug font-semibold">
-        <button
-          type="button"
-          onClick={() => onSelect(scenario)}
-          aria-pressed={isSelected}
-          className="focus-visible:ring-ring min-h-11 cursor-pointer rounded-sm text-left focus-visible:ring-2 focus-visible:outline-none"
-        >
-          {scenario.title}
-        </button>
-      </h3>
+      <h3 className="text-foreground text-base leading-6 font-semibold">{scenario.title}</h3>
 
-      {/* Context line — the differentiating signal per type. Debugging scenarios render it as a
-          reported symptom (quote bar); DSA renders it as a plain pattern line. */}
-      {contextLine &&
-        (contextIsReport ? (
-          <p className="border-accent/40 text-muted-foreground mb-4 line-clamp-2 border-l-2 pl-2.5 text-sm leading-6">
-            {contextLine}
-          </p>
-        ) : (
-          <p className="text-muted-foreground mb-4 line-clamp-2 text-sm leading-6">{contextLine}</p>
-        ))}
+      <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+        {!guidedLab && (
+          <span
+            className={`rounded-full px-2 py-0.5 font-medium capitalize ${difficultyColorClass(scenario.difficulty, "badgeOnLight")}`}
+          >
+            {scenario.difficulty}
+          </span>
+        )}
+        <ScenarioLanguageTags scenario={scenario} />
+        <span className="inline-flex items-center gap-1.5">
+          <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+          {scenario.estimatedTime} min
+        </span>
+      </div>
 
       {guidedLab && <GuidedLabPreview config={guidedLab} />}
 
-      <ScenarioPrerequisites scenario={scenario} />
-
-      {/* Guided-version pointer. The four Case Lab Build exercises also live here as
-          standalone scenarios, where they are scored as full interviews; without this
-          line, browser arrivals never learn the guided lab exists before choosing. */}
       {labLink && (
-        <p className="text-muted-foreground mb-4 text-xs">
-          Part of the {labLink.labTitle} Case Lab.{" "}
-          <Link
-            href={`/labs/${labLink.labId}`}
-            className="text-accent-strong font-medium hover:underline"
-          >
-            Take the guided version
-          </Link>
-        </p>
+        <Link
+          href={`/labs/${labLink.labId}`}
+          className="text-accent-strong focus-visible:ring-ring w-fit rounded-sm text-xs font-medium underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
+        >
+          Guided version: {labLink.labTitle}
+        </Link>
       )}
 
-      {/* Quiet meta row */}
-      <div className="text-muted-foreground mt-auto flex items-center justify-between gap-2 pt-1 text-xs">
-        <span className="inline-flex items-center gap-1.5">
-          <Clock className="h-3 w-3" aria-hidden="true" />
-          {scenario.estimatedTime} min
-          {companies && (
-            <span>
-              · {companies}
-              {extraCompanies}
-            </span>
-          )}
-        </span>
-        {signal && <span className="truncate text-right">{signal}</span>}
-      </div>
-
-      {/* Locked upsell */}
-      {isLocked && (
-        <div className="border-border bg-muted/50 mt-4 rounded-lg border p-3">
-          <p className="text-foreground mb-1 text-xs font-medium">Session limit reached</p>
-          <p className="text-muted-foreground mb-2 text-xs">
-            Upgrade to Pro for {PRICING_CONFIG.pro.sessionsPerMonth} sessions every month
-          </p>
-          <Link href="/limit-reached">
-            <Button
-              size="sm"
-              className="bg-accent text-accent-foreground hover:bg-accent/90 h-7 w-full text-xs"
-            >
-              Upgrade
+      <div className="mt-auto pt-1">
+        <ScenarioPrerequisites scenario={scenario}>
+          {isLocked ? (
+            <Button asChild variant="outline" className="min-h-11 w-full">
+              <Link href="/limit-reached">Upgrade</Link>
             </Button>
-          </Link>
-        </div>
-      )}
-
-      {/* One action, one step. The old Select-then-Start pair swapped the label under the
-          cursor, which read as two controls and double-fired for double-clickers. A button
-          that says what it does is both fewer clicks and harder to hit by accident. */}
-      {!isLocked && (
-        <div className="mt-4">
-          <Button
-            onClick={() => {
-              // Select before starting so the in-flight state binds to this card.
-              onSelect(scenario)
-              onStart(scenario)
-            }}
-            disabled={isStarting}
-            loading={isStarting && isSelected}
-            aria-label={`Start practice: ${scenario.title}`}
-            className={`bg-accent text-accent-foreground hover:bg-accent/90 focus-visible:ring-accent/50 min-h-11 w-full font-semibold ${guidedLab ? "sm:w-auto sm:px-6" : ""}`}
-          >
-            {!(isStarting && isSelected) && <Play className="mr-2 h-4 w-4" aria-hidden="true" />}
-            {isStarting && isSelected ? "Starting..." : "Start practice"}
-          </Button>
-          {usageLimit && usageLimit.allowed && scenario.type !== "dsa" && (
-            <p className="text-muted-foreground mt-2 text-center text-[11px]">
-              {usageLimit.limit - usageLimit.used} session
-              {usageLimit.limit - usageLimit.used !== 1 ? "s" : ""} remaining
-            </p>
+          ) : (
+            <Button
+              type="button"
+              onClick={() => {
+                onSelect(scenario)
+                onStart(scenario)
+              }}
+              disabled={isStarting}
+              loading={isStarting && isSelected}
+              aria-label={`Start practice: ${scenario.title}`}
+              className="bg-accent text-accent-foreground hover:bg-accent/90 min-h-11 w-full font-semibold"
+            >
+              {!(isStarting && isSelected) && <Play className="h-4 w-4" aria-hidden="true" />}
+              {isStarting && isSelected ? "Starting..." : "Start practice"}
+            </Button>
           )}
-        </div>
-      )}
+        </ScenarioPrerequisites>
+      </div>
     </article>
   )
 })

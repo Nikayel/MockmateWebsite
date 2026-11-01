@@ -33,26 +33,33 @@ Existing saved sessions resolve topics from their scenario ID.
 
 ## Interaction decision
 
-A single native `details` / `summary` disclosure matches the existing guided-lab
-preview. It starts collapsed and resets when the question changes. The visible
-label, topic count, chevron, keyboard operation, focus ring, and minimum 44px
-target make the action discoverable. The list stays inline so long descriptions
-can wrap on phones without an overlay or focus trap. Topic content remains
-optional; the assignment and Start action stay directly available.
+Cards show the full title, a compact metadata row, and an action row. Descriptions
+and generic codebase labels are omitted; the complete assignment remains inside
+the workspace. Remaining session allowance appears once in the catalog header.
 
-This choice follows [GOV.UK's guidance for one optional details section](https://design-system.service.gov.uk/components/details/)
-and the [WAI disclosure keyboard pattern](https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/).
-Catalog selection belongs to a real title button, separate from the disclosure
-and Start action. Wrapping all three in a simulated button would let keyboard
-events from one control activate another and obscure their semantics.
+**Prerequisites** is a bordered button beside the primary **Start practice**
+action. Both stay in the same place when the details expand underneath, and wrap
+into full-width controls on narrow cards. The existing Radix Collapsible primitive
+owns disclosure state, keyboard operation, and `aria-expanded` / `aria-controls`.
+Controls have focus rings and at least 44px targets. Changing questions resets the
+disclosure. The same button is available in the workspace problem panel.
+
+The first implementation used a quiet disclosure row among metadata. Owner
+feedback showed that this was difficult to find. The revised button affordance
+and primary/secondary hierarchy follow [Apple's button guidance](https://developer.apple.com/design/human-interface-guidelines/buttons)
+and [NN/g's recognition guidance](https://www.nngroup.com/articles/recognition-and-recall/).
+This is a design rationale, not a claim of measured usability improvement.
+
+Titles are headings; Start selects the question and starts it in one action.
+Prerequisites never select a question or start a session.
 
 ## Engineering judgment
 
 - Store shared topic copy once and reference it by stable IDs. An explicit
   question map plus a catalog coverage check is enough; a new API or authoring
   framework would add maintenance without solving a current problem.
-- Let the native element own open/closed state. No synchronized React state,
-  effects, persistence, or event propagation workarounds are needed.
+- Reuse the existing disclosure primitive for open/closed state. No synchronized
+  React state, effects, persistence, or event propagation workarounds are needed.
 - Background knowledge and assessment hints are different contracts. Keeping
   prerequisites independent of sealed answers and hint counters preserves that
   boundary.

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest"
 import { filterScenarios, scenarios } from "@/lib/scenarios"
-import { getScenarioCardContext } from "../scenario-card-meta"
 import {
   FLAGSHIP_SCENARIO_ID,
   STARTER_SCENARIO_ID,
@@ -41,10 +40,9 @@ describe("debugging discovery progression", () => {
     ).toBe(false)
   })
 
-  it("displays honest scope and difficulty rather than calling the flagship an easy intro", () => {
+  it("keeps progression labels consistent with difficulty and completion", () => {
     const flagship = debugging.find((scenario) => scenario.id === FLAGSHIP_SCENARIO_ID)!
     expect(flagship.difficulty).toBe("medium")
-    expect(getScenarioCardContext(flagship).signal).toBe("Real codebase · 4 files")
     expect(getScenarioDiscoveryLabel(flagship.id, false, Date.UTC(2026, 9, 22))).toBe(
       "New · Fix + extend"
     )

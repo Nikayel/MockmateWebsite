@@ -1,6 +1,7 @@
 "use client"
 
 import { memo, useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { LayoutGrid, List, Target } from "lucide-react"
 import { useShallow } from "zustand/react/shallow"
@@ -70,6 +71,7 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
   hasGuestBanner = false,
   roadmapPitchEligible = false,
 }: ScenarioBrowserProps) {
+  const remainingSessions = usageLimit ? Math.max(0, usageLimit.limit - usageLimit.used) : 0
   // Safe without a Suspense boundary of its own: page.tsx already wraps this whole tree in one.
   const searchParams = useSearchParams()
   const track = findInterviewTrack(searchParams?.get(INTERVIEW_TRACK_PARAM))
@@ -238,7 +240,34 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
               : undefined
           }
         >
-          {track.id === "debugging" && renderFilters()}
+          {track.id === "debugging" && (
+            <>
+              {renderFilters()}
+              {usageLimit && (
+                <p
+                  aria-label="Practice session allowance"
+                  className="text-muted-foreground mt-3 text-xs"
+                >
+                  {usageLimit.allowed ? (
+                    <>
+                      {remainingSessions} session{remainingSessions === 1 ? "" : "s"} remaining
+                    </>
+                  ) : (
+                    <>
+                      Session limit reached.{" "}
+                      <Link
+                        href="/limit-reached"
+                        className="text-accent-strong underline underline-offset-4"
+                      >
+                        Upgrade to keep practicing
+                      </Link>
+                      .
+                    </>
+                  )}
+                </p>
+              )}
+            </>
+          )}
         </InterviewTrackHeader>
         {track.id === "dsa" ? (
           <>
