@@ -279,16 +279,6 @@ exports[`interview payload contract (Slice 0 oracle) > captures every API reques
   "fetch POST /api/rag": [
     [
       "action",
-      "feedbackType",
-      "hintId",
-      "hintText",
-      "problemId",
-      "sessionId",
-      "source",
-      "userId",
-    ],
-    [
-      "action",
       "language",
       "passed",
       "problemId",

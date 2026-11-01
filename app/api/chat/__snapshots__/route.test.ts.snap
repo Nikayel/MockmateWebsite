@@ -46,7 +46,7 @@ exports[`/api/chat route > preserves model input for 'bugfix'/'partner'/session=
     "sessionId": undefined,
     "userId": "user-1",
   },
-  "system": "9cb6b7dceee42b91c630a2d4ce42548b821ec3e7b574e092e873e5833b7174cc",
+  "system": "b6aaff3f51010465736808168a546ae7f261a32296f4e3e946ce64548104b26f",
   "turn": "3bff5e4e72a6558f818e9714d41426f189f0431683f66226a1088ca7e383bfbc",
 }
 `;
@@ -63,7 +63,7 @@ exports[`/api/chat route > preserves model input for 'bugfix'/'partner'/session=
     "sessionId": undefined,
     "userId": "user-1",
   },
-  "system": "d60b322ba83fd0aa464038173944bd55fe46fefdc8b9eb257afba77d139309cc",
+  "system": "6f02cdfdf6659c4a4bcaefec3f349ad9a6672f6587b7d45fff1708613ba9493f",
   "turn": "124a76fdaead091583864b9102ccfc1c773088343c83baa189c4b6d07bf33a97",
 }
 `;

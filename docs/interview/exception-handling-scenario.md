@@ -23,6 +23,14 @@ The public concept note and dialog explain failure propagation and uncertain
 remote outcomes without showing the patch. The same text is generated into
 task.md, so the interviewer and AI partner see the learner's preparation context.
 
+Hint generation also receives the active workspace language for both initial and
+follow-up requests. The hook requires that language explicitly; a regression test
+checks Python and JavaScript across a language change. The debugging validation
+command includes the chat route and payload snapshots so intentional prompt edits
+cannot silently leave the release checks stale. The obsolete `/api/rag` rating
+payload was removed from its snapshot after verifying ratings now use
+`useResponseRating` and `/api/ai-response-feedback` (covered by their own tests).
+
 Live Python interviewer and partner probes succeeded on November 1, 2026 using
 the production prompt/response pipeline. Replies respected the public contract
 without supplying an implementation. The existing background semantic observer

@@ -46,6 +46,7 @@ interface UseHintAgentOptions {
   problemId: string
   problemTitle: string
   problemText: string
+  language: string
   problemPattern?: DSAPattern
   difficulty: "easy" | "medium" | "hard"
   staticHints?: string[]
@@ -85,6 +86,7 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
     problemId,
     problemTitle,
     problemText,
+    language,
     problemPattern,
     difficulty,
     staticHints = [],
@@ -144,11 +146,11 @@ export function useHintAgent(options: UseHintAgentOptions): UseHintAgentReturn {
       problemPattern,
       difficulty,
       userCode: userCodeRef.current,
-      language: "javascript",
+      language,
       struggleMetrics: struggleMetricsRef.current,
       testResults: testResultsRef.current,
     }),
-    [userId, sessionId, problemId, problemTitle, problemText, problemPattern, difficulty]
+    [userId, sessionId, problemId, problemTitle, problemText, language, problemPattern, difficulty]
   )
 
   // Timer for elapsed time

@@ -327,6 +327,7 @@ function InterviewPageContent() {
     problemId: selectedScenario?.id || "",
     problemTitle: selectedScenario?.title || "",
     problemText: selectedScenario?.problemStatement || "",
+    language: selectedScenario?.workspace?.language ?? selectedLanguage,
     problemPattern: (selectedScenario as any)?.pattern,
     difficulty: (selectedScenario?.difficulty as "easy" | "medium" | "hard") || "medium",
     autoGenerate: false,
