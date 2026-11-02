@@ -13,10 +13,21 @@ and result count remain available. Normal URL, reload and Back/Forward behavior
 continues to work.
 
 The two promotional banners are removed. Beta appears once next to Guided labs.
-The cache incident remains second after the warm-up and carries an inline New
-label until 16 November 2026, then keeps its existing Fix + extend cue. Filters
-continue to control which pinned questions appear; nothing is injected into an
-unmatched result set.
+The first three independent rounds carry a Featured badge: the rate-limiter
+outage (JavaScript/Python), cache cleanup, and comment-thread merging. They cover
+exception boundaries, debugging across modules, and fix-efficiency trade-offs.
+This editorial selection reflects the breadth of the authored exercises.
+The shared `FEATURED_DEBUGGING_SCENARIO_IDS` list in
+`scenario-discovery.ts` owns both order and labeling. Language variants inherit
+curation through `variantGroup`, so switching the rate limiter to Python does not
+lose its badge or create a fourth featured card.
+
+Featured status remains visible alongside Solved, since curation and completion
+are independent. The warm-up retains Start here and leads the remaining rounds;
+all other relative ordering stays the same. Both catalog densities use the same
+rule. The previous date-based New promotion is removed. Filters continue to
+control which featured questions appear; nothing is injected into an unmatched
+result set. Guided labs retain their own collection.
 
 Guided lab cards use the same card and start action as the catalog, at full
 width to accommodate an optional phase preview. A native details disclosure

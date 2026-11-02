@@ -124,8 +124,8 @@ export const ScenarioBrowser = memo(function ScenarioBrowser({
 
   // Narrowed to the track before anything renders it, so a track can never show another track's
   // problems whatever the shared filter store holds. Memoized because ScenarioList resets its
-  // progressive reveal whenever this array's identity changes. Debugging leads with the
-  // warm-up, then the fix-and-extend flagship. Pin only results that survived the filters.
+  // progressive reveal whenever this array's identity changes. Curated debugging rounds
+  // lead the list; pin only results that survived the filters.
   const viewScenarios = useMemo(
     () => (track ? scenariosInTrackView(track, scenarios, browsingLabs) : []),
     [track, browsingLabs]

@@ -34,7 +34,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
   languageChoice,
 }: ScenarioListRowProps) {
   const typeConfig = getTypeConfig(scenario.type)
-  const discoveryLabel = getScenarioDiscoveryLabel(scenario.id, isCompleted)
+  const discoveryLabel = getScenarioDiscoveryLabel(scenario, isCompleted)
   const isLocked = !!(usageLimit && usageLimit.allowed === false && scenario.type !== "dsa")
   const isDebugging = scenario.type === "bugfix" || scenario.type === "add-functionality"
 
@@ -55,14 +55,15 @@ export const ScenarioListRow = memo(function ScenarioListRow({
             <Clock className="h-3 w-3" aria-hidden="true" />
             {scenario.estimatedTime} min
           </span>
-          {isCompleted ? (
+          {discoveryLabel && (
+            <span className="text-accent-strong font-medium">{discoveryLabel}</span>
+          )}
+          {isCompleted && (
             <span className="text-neural inline-flex items-center gap-1">
               <Check className="h-3 w-3" aria-hidden="true" />
               Solved
             </span>
-          ) : discoveryLabel ? (
-            <span className="text-accent-strong font-medium">{discoveryLabel}</span>
-          ) : null}
+          )}
         </div>
       </div>
 

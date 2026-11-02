@@ -11,10 +11,10 @@ test("real browser worker reproduces, runs edited sibling modules, and keeps edi
   const cards = page.locator("h3")
   await expect(cards.nth(1)).toHaveText(pack.title)
   const card = page
-    .getByRole("button")
+    .getByRole("article")
     .filter({ has: page.getByRole("heading", { name: pack.title }) })
-  await expect(card.getByText("Fix + extend")).toBeVisible()
-  await card.getByRole("button", { name: "Start" }).click()
+  await expect(card.getByText("Featured", { exact: true })).toBeVisible()
+  await card.getByRole("button", { name: /^Start practice:/ }).click()
   await expect(page.getByTestId("active-file")).toHaveText("src/cache_sweep.py")
   await page.getByRole("button", { name: "Run report", exact: true }).click()
   await expect(page.getByRole("status")).toContainText("sessions: 3", { timeout: 65_000 })
@@ -68,10 +68,20 @@ test("the flagship cue works in both densities without overflowing mobile or enl
     ]) {
       await page.setViewportSize(viewport)
       await page.goto(`/?theme=${theme}`)
-      await expect(page.getByText("Fix + extend")).toBeVisible()
+      await expect(
+        page
+          .getByRole("article")
+          .filter({ has: page.getByRole("heading", { name: pack.title }) })
+          .getByText("Featured", { exact: true })
+      ).toBeVisible()
       await page.screenshot({ path: testInfo.outputPath(`${theme}-${viewport.width}-cards.png`) })
       await page.getByRole("button", { name: "List view" }).click()
-      await expect(page.getByText("Fix + extend")).toBeVisible()
+      await expect(
+        page
+          .getByRole("article")
+          .filter({ has: page.getByRole("heading", { name: pack.title }) })
+          .getByText("Featured", { exact: true })
+      ).toBeVisible()
       await page.evaluate(() => {
         document.documentElement.style.fontSize = "24px"
       })

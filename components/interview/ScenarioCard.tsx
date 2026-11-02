@@ -40,7 +40,7 @@ export const ScenarioCard = memo(function ScenarioCard({
   const TypeIcon = guidedLab ? ListTree : typeConfig.icon
   const typeLabel = guidedLab ? "Guided lab" : (typeConfig.cardLabel ?? typeConfig.label)
   const labLink = getScenarioLabLink(scenario.id)
-  const discoveryLabel = getScenarioDiscoveryLabel(scenario.id, isCompleted)
+  const discoveryLabel = getScenarioDiscoveryLabel(scenario, isCompleted)
   const isLocked = !!(usageLimit && usageLimit.allowed === false && scenario.type !== "dsa")
 
   return (
@@ -52,16 +52,19 @@ export const ScenarioCard = memo(function ScenarioCard({
           <TypeIcon className="h-3.5 w-3.5" aria-hidden="true" />
           {typeLabel}
         </span>
-        {isCompleted ? (
-          <span className="bg-neural/10 text-neural inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium">
-            <Check className="h-3 w-3" aria-hidden="true" />
-            Solved
-          </span>
-        ) : discoveryLabel ? (
-          <span className="bg-accent/10 text-accent-strong rounded-full px-2 py-0.5 text-xs font-medium">
-            {discoveryLabel}
-          </span>
-        ) : null}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {discoveryLabel && (
+            <span className="bg-accent/10 text-accent-strong rounded-full px-2 py-0.5 text-xs font-medium">
+              {discoveryLabel}
+            </span>
+          )}
+          {isCompleted && (
+            <span className="bg-neural/10 text-neural inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium">
+              <Check className="h-3 w-3" aria-hidden="true" />
+              Solved
+            </span>
+          )}
+        </div>
       </div>
 
       <h3 className="text-foreground text-base leading-6 font-semibold">{scenario.title}</h3>

@@ -67,7 +67,7 @@ function Fixture() {
                 ? { used: 100, limit: 100, allowed: false }
                 : null
           }
-          completedProblems={[]}
+          completedProblems={params.get("completed")?.split(",") ?? []}
         />
       ) : view === "done" ? (
         <h1>Dashboard return</h1>
