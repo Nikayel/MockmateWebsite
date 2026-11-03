@@ -6,7 +6,7 @@ import posthog from "posthog-js"
 import { User as UserType } from "./types"
 import { convertFirebaseUser } from "./auth"
 import { hasAnalyticsConsent } from "@/components/CookieConsent"
-import { applyPostHogConsent } from "./posthog-consent"
+import { applyPostHogConsent, identifyPostHogUser } from "./posthog-consent"
 
 interface AuthContextType {
   user: UserType | null
@@ -62,12 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setUser(convertedUser)
               // Set auth indicator cookie for middleware (server-side route protection)
               document.cookie = `firebase-auth-token=1; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
-              // Tie PostHog to the Firebase uid so product analytics joins to
-              // Firestore profiles on the same key. __loaded guards the no-key
-              // deploys where instrumentation-client never initialized PostHog.
-              if (posthog.__loaded) {
-                posthog.identify(fbUser.uid, { email: fbUser.email ?? undefined })
-              }
+              // No-op without consent; ConsentAnalytics identifies on opt-in.
+              identifyPostHogUser(fbUser, hasAnalyticsConsent())
               hadUser = true
             } else {
               setUser(null)
