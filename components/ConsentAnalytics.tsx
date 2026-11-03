@@ -181,9 +181,7 @@ export function ConsentAnalytics() {
     // value at init, so the first pass here is normally a no-op in effect.
     if (appliedConsent.current !== hasConsent) {
       applyPostHogConsent(hasConsent)
-      // A visitor who signed in before consenting was skipped at login, because
-      // a cookieless identify is dropped at ingestion. Now that the opt-in above
-      // has ended cookieless mode, link them. See lib/posthog-consent.
+      // After the opt-in above, so the identify is not cookieless. See lib/posthog-consent.
       if (firebaseUser) identifyPostHogUser(firebaseUser, hasConsent)
       appliedConsent.current = hasConsent
     }
