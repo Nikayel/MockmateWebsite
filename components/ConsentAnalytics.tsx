@@ -7,7 +7,8 @@ import { SpeedInsights } from "@vercel/speed-insights/next"
 import posthog from "posthog-js"
 import { getConsentState, type ConsentState } from "@/components/CookieConsent"
 import { syncAnalyticsConsent } from "@/lib/analytics"
-import { applyPostHogConsent } from "@/lib/posthog-consent"
+import { useAuth } from "@/lib/auth-context"
+import { applyPostHogConsent, identifyPostHogUser } from "@/lib/posthog-consent"
 
 /**
  * Routes where session replay never runs.
@@ -96,6 +97,7 @@ export function ConsentAnalytics() {
    */
   const hasConsent = consentState === "granted"
   const pathname = usePathname()
+  const { firebaseUser } = useAuth()
 
   /** The reason last reported, so a navigation that changes nothing is silent. */
   const lastDecision = useRef<string | null>(null)
@@ -179,6 +181,8 @@ export function ConsentAnalytics() {
     // value at init, so the first pass here is normally a no-op in effect.
     if (appliedConsent.current !== hasConsent) {
       applyPostHogConsent(hasConsent)
+      // After the opt-in above, so the identify is not cookieless. See lib/posthog-consent.
+      if (firebaseUser) identifyPostHogUser(firebaseUser, hasConsent)
       appliedConsent.current = hasConsent
     }
 
@@ -216,7 +220,7 @@ export function ConsentAnalytics() {
       posthog.capture("replay_decision", { started: mayRecord, reason })
       lastDecision.current = reason
     }
-  }, [consentState, hasConsent, pathname])
+  }, [consentState, hasConsent, pathname, firebaseUser])
 
   if (!hasConsent) return null
 

@@ -34,7 +34,7 @@
  * first-call indices.
  */
 
-import { render } from "@testing-library/react"
+import { act, render } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 /** Every posthog call this component makes, in the order it made them. */
@@ -44,6 +44,7 @@ let captured: Array<{ event: string; props?: Record<string, unknown> }> = []
 
 let pathname = "/"
 let consentState: "granted" | "declined" | "unanswered" = "granted"
+let firebaseUser: { uid: string; email: string | null } | null = null
 
 vi.mock("next/navigation", () => ({
   usePathname: () => pathname,
@@ -59,12 +60,17 @@ vi.mock("posthog-js", () => ({
     opt_in_capturing: (o: { captureEventName?: unknown }) =>
       calls.push(`optIn:captureEventName=${String(o?.captureEventName)}`),
     opt_out_capturing: () => calls.push("optOut"),
+    identify: (uid: string) => calls.push(`identify:${uid}`),
     capture: (event: string, props?: Record<string, unknown>) => captured.push({ event, props }),
   },
 }))
 
 vi.mock("@/components/CookieConsent", () => ({
   getConsentState: () => consentState,
+}))
+
+vi.mock("@/lib/auth-context", () => ({
+  useAuth: () => ({ firebaseUser }),
 }))
 
 vi.mock("@/lib/analytics", () => ({
@@ -85,6 +91,7 @@ describe("session replay start/stop ordering", () => {
     captured = []
     pathname = "/"
     consentState = "granted"
+    firebaseUser = null
   })
 
   it("locks the route down BEFORE touching consent, on an excluded route", async () => {
@@ -294,6 +301,55 @@ describe("session replay start/stop ordering", () => {
         event: "replay_decision",
         props: { started: false, reason: "consent-unanswered" },
       })
+    })
+  })
+
+  /**
+   * A cookieless `$identify` is personless, and ingestion drops it. So a
+   * visitor who signed in before consenting is skipped at login and must be
+   * identified here, on the opt-in, and only AFTER the opt-in has ended
+   * cookieless mode.
+   */
+  describe("identify on opt-in", () => {
+    it("never identifies a signed-in visitor who has not consented", async () => {
+      consentState = "unanswered"
+      firebaseUser = { uid: "uid-1", email: "a@example.com" }
+
+      await mount()
+
+      expect(calls.some((c) => c.startsWith("identify"))).toBe(false)
+    })
+
+    it("identifies a signed-in visitor right AFTER they opt in", async () => {
+      consentState = "unanswered"
+      pathname = "/pricing"
+      firebaseUser = { uid: "uid-1", email: "a@example.com" }
+
+      await mount()
+      calls = []
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent("consentUpdated", { detail: { analytics: true } }))
+      })
+
+      expect(calls).toEqual([
+        "config:disable_recording=false",
+        "optIn:captureEventName=false",
+        "identify:uid-1",
+        "start",
+      ])
+    })
+
+    it("leaves a login after consent to auth-context, without a second identify", async () => {
+      consentState = "granted"
+
+      const { rerender } = await mount()
+      const { ConsentAnalytics } = await import("@/components/ConsentAnalytics")
+
+      firebaseUser = { uid: "uid-1", email: "a@example.com" }
+      rerender(<ConsentAnalytics />)
+
+      expect(calls.some((c) => c.startsWith("identify"))).toBe(false)
     })
   })
 })

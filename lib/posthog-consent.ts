@@ -67,3 +67,27 @@ export function applyPostHogConsent(consented: boolean): void {
     posthog.opt_out_capturing()
   }
 }
+
+/**
+ * Tie PostHog to the Firebase uid so product analytics joins to Firestore
+ * profiles and server-side events on the same key.
+ *
+ * Only with consent. Without it the visitor is cookieless, cookieless events
+ * are personless, and ingestion drops a personless `$identify`
+ * (`invalid_event_when_process_person_profile_is_false`), so the login never
+ * links to the Firebase person. A signed-in visitor can arrive in either order,
+ * so there are two call sites:
+ *  - lib/auth-context.tsx, on login, for a visitor who already consented
+ *  - components/ConsentAnalytics.tsx, on opt-in, for a visitor already signed
+ *    in. It must run AFTER `applyPostHogConsent(true)`, which is what ends
+ *    cookieless mode.
+ */
+export function identifyPostHogUser(
+  user: { uid: string; email: string | null },
+  consented: boolean
+): void {
+  if (typeof window === "undefined") return
+  if (!consented || !posthog.__loaded) return
+
+  posthog.identify(user.uid, { email: user.email ?? undefined })
+}
