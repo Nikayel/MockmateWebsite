@@ -1,4 +1,4 @@
-import type { BugFixScenario } from "../../types"
+import { defineBugfixScenario } from "../../define-bugfix-scenario"
 
 const starter = `function findAdjustmentPair(lineItems, targetCents) {
   const seenAmounts = new Map();
@@ -184,7 +184,7 @@ async function record(suite, name, fn) {
   process.exitCode = 1
 })`
 
-export const bugfixOnboardingScenario: BugFixScenario = {
+export const bugfixOnboardingScenario = defineBugfixScenario({
   id: "bugfix-onboarding",
   // The bank's designed first rep (after featured rounds in the Debugging track, see
   // STARTER_SCENARIO_ID). The lookup is two-sum with a status guard, so anyone
@@ -195,7 +195,6 @@ export const bugfixOnboardingScenario: BugFixScenario = {
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "easy",
-  companies: ["Generic"],
   description:
     "The billing review queue explained a manual invoice adjustment with ledger money that had already been settled, and finance approved the match before review caught it.",
   tags: ["javascript", "onboarding", "billing", "reconciliation", "real-codebase"],
@@ -355,4 +354,4 @@ Each row has an \`id\`, an \`amountCents\` integer, and a \`status\` that is eit
       },
     ],
   },
-}
+})

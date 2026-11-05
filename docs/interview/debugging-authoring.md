@@ -6,6 +6,40 @@ chat handlers, or scoring formulas.
 
 ## Identity and modules
 
+Author every debugging scenario with `defineBugfixScenario` from
+`lib/scenarios/define-bugfix-scenario.ts`. Omit `companyAlignment` for Generic
+practice. For reviewed company preparation, select a typed profile from
+`lib/scenarios/company-alignment.ts`, such as `google-code-comprehension` or
+`stripe-library-debugging`. The helper derives `companies`; independent company
+arrays are rejected by TypeScript. `BugFixScenario` requires the normalized
+alignment on published entries, so adding a raw object cannot silently bypass it.
+
+A profile records the company, round, source, and whether coverage matches a
+format or a publicly reported task pattern. Company names, domains, and pack IDs
+are not evidence. Review the task, editable files, executable regressions, and
+follow-ups against the source before assigning a profile. Use Generic if that
+review does not establish a match. An original task must not claim to be an exact
+or official company question.
+
+For stdout-oracle packs, use optional `company_alignment` in
+`packs/<id>/manifest.json` and run `node scripts/compile-packs.mjs`. The generated
+`companyAlignment` is typechecked against the same profiles and `packToScenario`
+uses the same default/helper. The older pack `company.tag` is a round-family
+authoring field, not the source of company filters. Do not restore a separate
+`companies` list or infer attribution from a filename.
+
+New company-aligned examples:
+
+- `bugfix-maze-navigation`: separate model, solver, renderer, public/hidden tests,
+  and sealed references; follows a reported Meta task pattern with our own rules.
+- `bugfix-http-client-library`: unfamiliar client-library diagnosis with injected
+  transport fixtures; matches the Stripe debugging format, without claiming its
+  exact repository, network setup, or live interview prompt.
+
+The browser exposes the reviewed alignment and source. Generic questions stay
+explicitly generic. Add provenance here, not through company-specific UI or
+interviewer branches.
+
 Use a new ID when changing the assessed problem or its grading contract. Resumed
 sessions resolve sealed answers by ID; the workspace evidence hash does not pin a
 historical rubric. Copy edits that preserve the assessment can keep the ID.

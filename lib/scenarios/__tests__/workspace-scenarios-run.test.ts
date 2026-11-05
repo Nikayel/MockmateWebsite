@@ -282,3 +282,36 @@ describe("JavaScript workspace scenarios actually run", () => {
     })
   })
 })
+
+describe.each(["bugfix-maze-navigation", "bugfix-http-client-library"])(
+  "%s complete and incomplete repairs",
+  (id) => {
+    const scenario = realWorldBugFixScenarios.find((s) => s.id === id)!
+
+    async function runReference(selectedPaths?: string[]) {
+      const references = (await loadSealedLegacyReferenceFiles(id))!
+      const replacements = new Map(
+        references
+          .filter((file) => !selectedPaths || selectedPaths.includes(file.path))
+          .map((file) => [file.path, file.content])
+      )
+      const files = scenario.workspace!.files.map((file) => ({
+        path: file.path,
+        content: replacements.get(file.path) ?? file.content,
+      }))
+      return (await runWorkspaceScenario(files, scenario.workspace!.testRunnerPath!))!
+    }
+
+    it("passes all visible and hidden cases with the sealed reference", async () => {
+      const results = await runReference()
+      expect(results.length).toBeGreaterThan(5)
+      expect(results.filter((result) => !result.passed)).toEqual([])
+    })
+
+    it.each(scenario.workspace!.editableFilePaths)("rejects repairing only %s", async (path) => {
+      const results = await runReference([path])
+      expect(results.some((result) => !result.passed)).toBe(true)
+      expect(results.filter((result) => !result.passed && isHarnessError(result.error))).toEqual([])
+    })
+  }
+)

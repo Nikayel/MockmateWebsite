@@ -1,4 +1,4 @@
-import type { BugFixScenario } from "../../types"
+import { defineBugfixScenario } from "../../define-bugfix-scenario"
 
 const starter = `const { createSearchState } = require("./state")
 const { normalizeBookingRef } = require("./normalize")
@@ -176,13 +176,12 @@ async function record(suite, name, fn) {
 })
 `
 
-export const bugfixSearchRaceScenario: BugFixScenario = {
+export const bugfixSearchRaceScenario = defineBugfixScenario({
   id: "bugfix-search-race",
   title: "Support Console: Reservation Lookup Shows the Wrong Guest",
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "medium",
-  companies: ["Generic"],
   description:
     "A reservation support console sometimes shows the previous caller's booking after an agent searches a new ref, and an agent acted on the wrong reservation before catching it.",
   task: "Investigate why reservation searches show the wrong guest and restore reliable results for the current search.",
@@ -340,4 +339,4 @@ Support agents look up a guest's reservation by booking ref while on a call. The
       },
     ],
   },
-}
+})

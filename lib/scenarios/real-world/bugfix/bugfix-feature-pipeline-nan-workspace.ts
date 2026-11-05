@@ -1,4 +1,4 @@
-import type { BugFixScenario } from "../../types"
+import { defineBugfixScenario } from "../../define-bugfix-scenario"
 
 const starter = `import math
 from src.model_contract import FEATURE_DEFAULTS
@@ -121,13 +121,12 @@ test_feature_pipeline_hidden.run_tests(record_factory("hidden feature pipeline")
 print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
 `
 
-export const bugfixFeaturePipelineNanWorkspaceScenario: BugFixScenario = {
+export const bugfixFeaturePipelineNanWorkspaceScenario = defineBugfixScenario({
   id: "bugfix-feature-pipeline-nan-workspace",
   title: "Feature Pipeline: A Migrated Cohort Scores Wrong",
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "medium",
-  companies: ["Generic"],
   description:
     "A model scoring job stopped erroring after the feature builder was hardened, but accounts migrated from the legacy CRM now score like empty users even though their history exists.",
   task: "Investigate incorrect scores for migrated accounts and restore feature values that match the model contract.",
@@ -277,4 +276,4 @@ The scoring service turns an account row into a finite feature vector for infere
       },
     ],
   },
-}
+})

@@ -72,6 +72,9 @@ function listPackIds() {
 function loadPack(id) {
   const dir = join(PACKS_DIR, id)
   const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8"))
+  if ("companies" in manifest) {
+    throw new Error(`${id}: use company_alignment instead of an independent companies list`)
+  }
   const sealed = JSON.parse(readFileSync(join(dir, "sealed.json"), "utf8"))
   const taskMd = readFileSync(join(dir, "task.md"), "utf8")
   const solutionMd = readFileSync(join(dir, "solution.md"), "utf8")
@@ -101,7 +104,7 @@ function clientModule(pack) {
       // instead of reporting NO DATA"); it is consumed nowhere and must not ship to the
       // browser. It stays in manifest.json as the authoring record.
     },
-    companies: manifest.companies,
+    companyAlignment: manifest.company_alignment ?? "generic",
     domain: manifest.domain,
     language: manifest.language,
     difficulty: manifest.difficulty,

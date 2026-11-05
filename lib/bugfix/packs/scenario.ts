@@ -12,12 +12,12 @@
 
 import type {
   BugFixScenario,
-  Company,
   DifficultyLevel,
   RoleTag,
   WorkspaceScenarioFile,
 } from "@/lib/scenarios/types"
 import type { BugfixPack, PackCompanyTag, PackDifficulty } from "./types"
+import { defineBugfixScenario } from "@/lib/scenarios/define-bugfix-scenario"
 
 const DIFFICULTY_BY_LEVEL: Record<PackDifficulty, DifficultyLevel> = {
   1: "easy",
@@ -105,12 +105,12 @@ export function packToScenario(pack: BugfixPack): BugFixScenario {
   const primaryFilePath = pack.primaryFilePath ?? pack.srcFiles[0]?.path ?? "src/main.py"
   const editableFilePaths = pack.srcFiles.map((file) => file.path)
 
-  return {
+  return defineBugfixScenario({
     id: pack.id,
     title: pack.title,
     type: "bugfix",
     difficulty: DIFFICULTY_BY_LEVEL[pack.difficulty],
-    companies: pack.companies,
+    companyAlignment: pack.companyAlignment,
     roles: rolesForTag(pack.company.tag),
     description: pack.summary,
     tags: [pack.domain, pack.company.tag],
@@ -195,7 +195,7 @@ export function packToScenario(pack: BugfixPack): BugFixScenario {
       // oracle JSON is what made every pack run silently do nothing.
       files: packWorkspaceFiles(pack),
     },
-  }
+  })
 }
 
 export interface PackQualityIssue {

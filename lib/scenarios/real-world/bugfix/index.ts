@@ -18,6 +18,8 @@ import { bugfixFoundryUsageRollupScenario } from "./bugfix-foundry-usage-rollup"
 import { bugfixSearchRaceScenario } from "./bugfix-search-race"
 import { bugfixOnboardingScenario } from "./bugfix-onboarding"
 import { bugfixTemperatureAlertRegressionScenario } from "./bugfix-temperature-alert-regression"
+import { bugfixMazeNavigationScenario } from "./bugfix-maze-navigation"
+import { bugfixHttpClientLibraryScenario } from "./bugfix-http-client-library"
 
 export const realWorldBugFixScenarios: BugFixScenario[] = [
   bugfixSearchRaceScenario,
@@ -32,6 +34,8 @@ export const realWorldBugFixScenarios: BugFixScenario[] = [
   bugfixOnboardingScenario,
   bugfixBookclubReadingStreakWorkspaceScenario,
   bugfixFoundryUsageRollupScenario,
+  bugfixMazeNavigationScenario,
+  bugfixHttpClientLibraryScenario,
 ].map(withBugfixIncidentDefaults)
 
 export default realWorldBugFixScenarios

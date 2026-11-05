@@ -1,4 +1,4 @@
-import type { BugFixScenario } from "../../types"
+import { defineBugfixScenario } from "../../define-bugfix-scenario"
 
 const starter = `const PLAN_RANK = { free: 0, pro: 1, team: 2 }
 const SUBSCRIPTION_EVENT_TYPES = new Set([
@@ -123,13 +123,12 @@ async function record(suite, name, fn) {
 })
 `
 
-export const bugfixBillingWebhookIdempotencyScenario: BugFixScenario = {
+export const bugfixBillingWebhookIdempotencyScenario = defineBugfixScenario({
   id: "bugfix-billing-webhook-idempotency",
   title: "Billing: Duplicate Credits and Surprise Downgrades After Replays",
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "hard",
-  companies: ["Stripe"],
   description:
     "Paid accounts got double monthly credits after a webhook replay, and one account was downgraded even though a later upgrade had already been applied.",
   task: "Investigate duplicate credits and unexpected plan changes after webhook replays, and restore correct account entitlements.",
@@ -272,4 +271,4 @@ The billing worker applies subscription webhooks from the payment provider to an
       },
     ],
   },
-}
+})

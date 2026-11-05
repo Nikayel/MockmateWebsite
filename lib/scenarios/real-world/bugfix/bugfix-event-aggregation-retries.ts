@@ -1,4 +1,4 @@
-import type { BugFixScenario } from "../../types"
+import { defineBugfixScenario } from "../../define-bugfix-scenario"
 
 const starter = `def aggregate_events(events):
     totals = {}
@@ -113,13 +113,12 @@ test_event_aggregation_hidden.run_tests(record_factory("hidden event aggregation
 print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
 `
 
-export const bugfixEventAggregationRetriesScenario: BugFixScenario = {
+export const bugfixEventAggregationRetriesScenario = defineBugfixScenario({
   id: "bugfix-event-aggregation-retries",
   title: "Analytics: One Account's Event Counts Are Inflated",
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "medium",
-  companies: ["Generic"],
   description:
     "A customer analytics report shows one account with far more delivery events than its raw log supports, after the ingestion queue moved to at-least-once delivery.",
   task: "Investigate inflated delivery-event totals and make the customer report agree with the underlying events.",
@@ -262,4 +261,4 @@ The reporting job rolls raw delivery events into per-account totals for the cust
       },
     ],
   },
-}
+})

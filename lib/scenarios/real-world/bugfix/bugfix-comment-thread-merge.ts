@@ -1,4 +1,4 @@
-import type { BugFixScenario } from "../../types"
+import { defineBugfixScenario } from "../../define-bugfix-scenario"
 import { COMMENT_THREAD_MERGE_WORKLOAD } from "@/lib/bugfix/fix-tradeoffs"
 
 const starter = `def merge_threads(existing_threads, incoming_threads):
@@ -108,13 +108,13 @@ test_comment_threads_hidden.run_tests(record_factory("hidden comment threads"))
 print("__WORKSPACE_TEST_RESULTS__:" + json.dumps(results))
 `
 
-export const bugfixCommentThreadMergeScenario: BugFixScenario = {
+export const bugfixCommentThreadMergeScenario = defineBugfixScenario({
   id: "bugfix-comment-thread-merge",
   title: "Editor Comments: Sidebar Over-Counts Unresolved Threads",
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "medium",
-  companies: ["Generic"],
+  companyAlignment: "google-code-comprehension",
   description:
     "A collaborative editor's comment sidebar sometimes reports one more unresolved thread than the document actually has, and a reviewer held a doc open believing a comment was still unresolved.",
   task: "Investigate duplicated comments and an inflated unresolved badge, and restore accurate thread updates.",
@@ -273,4 +273,4 @@ ${COMMENT_THREAD_MERGE_WORKLOAD} After fixing the incident, be ready to compare 
       },
     ],
   },
-}
+})

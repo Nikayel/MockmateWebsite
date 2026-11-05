@@ -6,7 +6,7 @@ const scenarios = [...bugfixScenarios, ...addFunctionalityScenarios]
 
 describe("debugging-track assignments", () => {
   it("covers the complete published debugging track", () => {
-    expect(scenarios).toHaveLength(30)
+    expect(scenarios).toHaveLength(32)
   })
 
   for (const scenario of scenarios) {

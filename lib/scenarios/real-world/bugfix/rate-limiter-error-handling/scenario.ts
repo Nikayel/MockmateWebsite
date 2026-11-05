@@ -1,3 +1,4 @@
+import { defineBugfixScenario } from "../../../define-bugfix-scenario"
 import type { BugFixScenario } from "../../../types"
 
 type RateLimiterVariant = {
@@ -28,7 +29,7 @@ export function createRateLimiterErrorHandlingScenario({
     ? "tests/test_rate_limiter_hidden.py"
     : "tests/rate-limiter.hidden.test.js"
   const runnerPath = isPython ? "tests/run_workspace_tests.py" : "tests/run-workspace-tests.js"
-  return {
+  return defineBugfixScenario({
     id,
     variantGroup: "bugfix-rate-limiter-error-handling",
     conceptIds: ["exception-handling"],
@@ -36,7 +37,6 @@ export function createRateLimiterErrorHandlingScenario({
     type: "bugfix",
     executionMode: "workspace",
     difficulty: "medium",
-    companies: ["Generic"],
     description:
       "The API gateway admits requests during a quota-store outage, while unexpected storage errors disappear from its caller.",
     task: "Investigate quota decisions during storage failures and restore the gateway's documented error contract.",
@@ -172,5 +172,5 @@ Use Run Tests in the workspace. The complete incident and acceptance criteria ar
         },
       ],
     },
-  }
+  })
 }

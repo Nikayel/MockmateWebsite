@@ -13,7 +13,7 @@ export const genericCacheEvictionMutationPack: BugfixPack = {
     roundName: "Debugging round",
     confidence: "styled",
   },
-  companies: ["Generic"],
+  companyAlignment: "google-code-comprehension",
   domain: "caching",
   language: "python",
   difficulty: 2,

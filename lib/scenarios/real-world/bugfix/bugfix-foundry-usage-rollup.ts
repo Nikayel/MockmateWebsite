@@ -1,4 +1,4 @@
-import type { BugFixScenario } from "../../types"
+import { defineBugfixScenario } from "../../define-bugfix-scenario"
 
 const starter = `function normalizeAccountId(raw) {
   return String(raw).trim().toLowerCase()
@@ -153,13 +153,13 @@ async function record(suite, name, fn) {
 })
 `
 
-export const bugfixFoundryUsageRollupScenario: BugFixScenario = {
+export const bugfixFoundryUsageRollupScenario = defineBugfixScenario({
   id: "bugfix-foundry-usage-rollup",
   title: "Compute-Usage Rollup Overbills a Replayed Build",
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "medium",
-  companies: ["Palantir"],
+  companyAlignment: "palantir-codebase-debugging",
   description:
     "A metered compute-usage rollup overbills several accounts for compute-seconds after a backfill replayed a transform's backup build into the pipeline.",
   task: "Investigate inflated compute-usage bills after a replay and restore accurate account totals.",
@@ -300,4 +300,4 @@ The metering pipeline rolls compute-usage events from transform builds into per-
       },
     ],
   },
-}
+})

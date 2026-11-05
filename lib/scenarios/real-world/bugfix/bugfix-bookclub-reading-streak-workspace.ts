@@ -1,4 +1,4 @@
-import type { BugFixScenario } from "../../types"
+import { defineBugfixScenario } from "../../define-bugfix-scenario"
 import {
   bookclubDocumentationFiles,
   bookclubProblemStatement,
@@ -13,13 +13,13 @@ const editablePaths = bookclubSourceFiles
   .filter((file) => file.role === "editable")
   .map((file) => file.path)
 
-export const bugfixBookclubReadingStreakWorkspaceScenario: BugFixScenario = {
+export const bugfixBookclubReadingStreakWorkspaceScenario = defineBugfixScenario({
   id: "bugfix-bookclub-reading-streak-workspace",
   title: "BookClub: Repair the Reader Dashboard",
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "medium",
-  companies: ["Generic"],
+  companyAlignment: "google-code-comprehension",
   description: "Repair broken streaks, missing history, calendar totals, and stale dashboards.",
   task: "Repair BookClub's reader dashboard through the guided phases, using task.md as the product contract.",
   symptom: {
@@ -94,4 +94,4 @@ export const bugfixBookclubReadingStreakWorkspaceScenario: BugFixScenario = {
     testRunnerPath: "tests/run_workspace_tests.py",
     files,
   },
-}
+})

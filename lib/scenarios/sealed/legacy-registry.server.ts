@@ -58,6 +58,8 @@ const SEALED_LEGACY_LOADERS: Record<string, () => Promise<{ sealed: SealedLegacy
   "bugfix-bookclub-reading-streak-workspace": () =>
     import("./legacy/bugfix-bookclub-reading-streak-workspace.server"),
   "bugfix-foundry-usage-rollup": () => import("./legacy/bugfix-foundry-usage-rollup.server"),
+  "bugfix-maze-navigation": () => import("./legacy/bugfix-maze-navigation.server"),
+  "bugfix-http-client-library": () => import("./legacy/bugfix-http-client-library.server"),
   // The two Palantir case-lab build scenarios key on their runtime scenario id,
   // which differs from the module filename (palantir-*-build, not add-feature-*).
   "add-feature-support-ticket-search": () =>

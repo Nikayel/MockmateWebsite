@@ -13,6 +13,7 @@ import { getScenarioDiscoveryLabel } from "./scenario-discovery"
 import { GuidedLabPreview } from "./GuidedLabPreview"
 import { ScenarioLanguageTags } from "./ScenarioLanguageTags"
 import { ScenarioPrerequisites } from "./ScenarioPrerequisites"
+import { ScenarioCompanyAlignment } from "./ScenarioCompanyAlignment"
 
 interface ScenarioCardProps {
   scenario: Scenario
@@ -68,6 +69,8 @@ export const ScenarioCard = memo(function ScenarioCard({
       </div>
 
       <h3 className="text-foreground text-base leading-6 font-semibold">{scenario.title}</h3>
+
+      <ScenarioCompanyAlignment scenario={scenario} />
 
       <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
         {!guidedLab && (

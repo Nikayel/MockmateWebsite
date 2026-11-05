@@ -1,4 +1,4 @@
-import type { BugFixScenario } from "../../types"
+import { defineBugfixScenario } from "../../define-bugfix-scenario"
 
 const starter = `function toMinutes(observedAt) {
   const [hours, mins] = observedAt.split(":").map(Number);
@@ -173,13 +173,12 @@ async function record(suite, name, fn) {
   process.exitCode = 1
 })`
 
-export const bugfixTemperatureAlertRegressionScenario: BugFixScenario = {
+export const bugfixTemperatureAlertRegressionScenario = defineBugfixScenario({
   id: "bugfix-temperature-alert-regression",
   title: "Ops Panel Undercounts Cold-Streak Recovery Windows",
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "medium",
-  companies: ["Generic"],
   description:
     "A data-center telemetry panel annotates only part of a cold streak's recovery wait, so alert summaries look calmer than the racks actually ran.",
   tags: ["javascript", "telemetry", "observability", "alerts", "real-codebase"],
@@ -324,4 +323,4 @@ The alert summary uses those annotations to highlight readings that waited longe
       },
     ],
   },
-}
+})

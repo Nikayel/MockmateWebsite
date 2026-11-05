@@ -11,6 +11,7 @@ import { getTypeConfig } from "./scenario-display"
 import { getScenarioDiscoveryLabel } from "./scenario-discovery"
 import { ScenarioLanguageTags } from "./ScenarioLanguageTags"
 import { ScenarioPrerequisites } from "./ScenarioPrerequisites"
+import { ScenarioCompanyAlignment } from "./ScenarioCompanyAlignment"
 
 interface ScenarioListRowProps {
   scenario: Scenario
@@ -65,6 +66,7 @@ export const ScenarioListRow = memo(function ScenarioListRow({
             </span>
           )}
         </div>
+        <ScenarioCompanyAlignment scenario={scenario} />
       </div>
 
       <div className={isDebugging ? "min-w-0 sm:w-72" : "sm:w-24"}>

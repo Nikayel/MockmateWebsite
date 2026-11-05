@@ -9,7 +9,6 @@
     "confidence": "styled",
     "notes": "Sessionization over an inactivity gap; an order-dependent boundary comparison error, no syntax fault and no crash."
   },
-  "companies": ["Generic"],
   "domain": "sessionization",
   "language": "python",
   "difficulty": 3,

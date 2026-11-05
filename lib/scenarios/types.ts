@@ -7,6 +7,7 @@ import { DSAPattern } from "../types/dsa-patterns"
 import type { ValidatorConfig, ReferenceSolution } from "../validators/types"
 import type { ScenarioConceptId } from "./concept-notes"
 import type { GuidedLabConfig } from "../bugfix/guided-lab/types"
+import type { BugfixCompanyAlignment } from "./company-alignment"
 
 export type ScenarioType = "dsa" | "bugfix" | "system-design" | "add-functionality"
 export type DifficultyLevel = "easy" | "medium" | "hard"
@@ -267,6 +268,8 @@ export interface BugfixPackRuntime {
 
 export interface BugFixScenario extends BaseScenario {
   type: "bugfix"
+  /** Required on published questions; defineBugfixScenario defaults authors to generic. */
+  companyAlignment: BugfixCompanyAlignment
   problemStatement: string
   /**
    * Present only on stdout-oracle packs. Legacy assert-based scenarios leave this

@@ -15,7 +15,6 @@ function makePack(overrides: Partial<BugfixPack> = {}): BugfixPack {
     summary: "The nightly rollup shows the wrong compute-seconds total for one account.",
     task: "Bill each account for the compute-seconds it used so the nightly totals match the metering dashboard.",
     company: { tag: "palantir-fdse", roundName: "Re-engineering round", confidence: "styled" },
-    companies: ["Palantir"],
     domain: "data-pipeline",
     language: "python",
     difficulty: 2,

@@ -116,6 +116,13 @@ export const DEBUGGING_PREREQUISITES = {
     "caching",
   ],
   "bugfix-foundry-usage-rollup": ["arrays-lists", "maps-dictionaries", "sets", "events-retries"],
+  "bugfix-maze-navigation": ["arrays-lists", "sets", "graphs", "maps-dictionaries"],
+  "bugfix-http-client-library": [
+    "maps-dictionaries",
+    "async-await",
+    "parsing-validation",
+    "collection-references",
+  ],
   "datadog-alert-dedup-order": [
     "arrays-lists",
     "maps-dictionaries",

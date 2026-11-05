@@ -29,6 +29,8 @@ describe("real-world scenario modules", () => {
     "bugfix-onboarding",
     "bugfix-bookclub-reading-streak-workspace",
     "bugfix-foundry-usage-rollup",
+    "bugfix-maze-navigation",
+    "bugfix-http-client-library",
   ]
 
   it("requires a matching sealed answer for every assert-based debugging question, without orphaned entries", () => {

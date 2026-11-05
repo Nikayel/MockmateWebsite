@@ -14,7 +14,7 @@
  * bundle — only the concrete sealed values are server-only.
  */
 
-import type { Company } from "@/lib/scenarios/types"
+import type { BugfixCompanyAlignment } from "@/lib/scenarios/company-alignment"
 
 /**
  * Company profiles enumerated in PACK_REALISM_GUIDE.md §1. `generic-fdse` is the
@@ -98,8 +98,8 @@ export interface BugfixPack {
    */
   task: string
   company: PackCompany
-  /** Company-union tags for BugFixScenario registration + card display. */
-  companies: Company[]
+  /** Reviewed interview alignment; omitted means Generic, regardless of pack id/domain. */
+  companyAlignment?: BugfixCompanyAlignment
   domain: string
   language: PackLanguage
   difficulty: PackDifficulty

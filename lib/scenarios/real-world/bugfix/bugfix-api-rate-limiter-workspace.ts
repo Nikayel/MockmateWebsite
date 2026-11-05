@@ -1,4 +1,4 @@
-import type { BugFixScenario } from "../../types"
+import { defineBugfixScenario } from "../../define-bugfix-scenario"
 import { createJavaScriptTestRunner } from "../../workspace-test-runner"
 
 const starter = `function allowRequest(store, clientId, now, limit, windowMs) {
@@ -124,13 +124,12 @@ const runner = createJavaScriptTestRunner([
   { name: "hidden rate limiter", path: "./rate-limiter.hidden.test" },
 ])
 
-export const bugfixApiRateLimiterWorkspaceScenario: BugFixScenario = {
+export const bugfixApiRateLimiterWorkspaceScenario = defineBugfixScenario({
   id: "bugfix-api-rate-limiter-workspace",
   title: "Rate Limiter: Bursts Slip Past the Plan Limit",
   type: "bugfix",
   executionMode: "workspace",
   difficulty: "hard",
-  companies: ["Generic"],
   description:
     "The API gateway lets a traffic spike reserve more requests than a customer's plan allows, and two accounts blew past their quota during this week's spikes.",
   task: "Investigate why traffic bursts exceed a customer's plan limit and restore reliable quota enforcement.",
@@ -271,4 +270,4 @@ The API gateway limits how many requests a client may reserve within a rolling w
       },
     ],
   },
-}
+})
