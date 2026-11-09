@@ -102,7 +102,7 @@ export interface UseInterviewFeedbackOptions {
 }
 
 export interface UseInterviewFeedbackResult {
-  proceedToFinalFeedback: () => Promise<void>
+  proceedToFinalFeedback: (finalInterviewerMessages?: ChatMessage[]) => Promise<void>
 }
 
 /**
@@ -127,7 +127,7 @@ export function useInterviewFeedback(
   // finally below so a retry after a genuine failure still works.
   const isGeneratingFeedbackRef = useRef(false)
 
-  const proceedToFinalFeedback = async () => {
+  const proceedToFinalFeedback = async (finalInterviewerMessages = opts.interviewerMessages) => {
     const bugfixEvidencePayload = opts.buildBugfixEvidencePayload()
     const bugfixExpectedTouchedFiles = opts.getBugfixExpectedTouchedFiles()
 
@@ -151,7 +151,7 @@ export function useInterviewFeedback(
           language: opts.selectedLanguage,
           elapsedTime: opts.elapsedTime,
           chatMessages: opts.chatMessages,
-          interviewerMessages: opts.interviewerMessages,
+          interviewerMessages: finalInterviewerMessages,
           testResults: opts.testResults,
           testSummary: opts.testSummary,
           isPostInterviewDiscussion: true,
@@ -175,7 +175,7 @@ export function useInterviewFeedback(
 
       const partnerMessagesSent = opts.chatMessages.filter((msg) => msg.type === "user").length
       const partnerMessagesReceived = opts.chatMessages.filter((msg) => msg.type === "ai").length
-      const interviewerUserMessages = opts.interviewerMessages.filter((msg) => msg.type === "user")
+      const interviewerUserMessages = finalInterviewerMessages.filter((msg) => msg.type === "user")
       const interviewerQuestionsAnswered = interviewerUserMessages.length
       const interviewerClarificationsRequested = interviewerUserMessages.filter((msg) =>
         msg.message.includes("?")
@@ -242,7 +242,7 @@ export function useInterviewFeedback(
         try {
           // Prepare conversation transcript - NOW includes ALL messages including post-interview discussion
           const conversationTranscript = buildConversationTimeline(
-            opts.interviewerMessages,
+            finalInterviewerMessages,
             opts.chatMessages
           )
 

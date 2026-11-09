@@ -298,6 +298,30 @@ describe("guest post-submit pause", () => {
 })
 
 describe("proceedToFinalFeedback for a signed-in user", () => {
+  it("saves and scores the closing exchange supplied by chat before a rerender", async () => {
+    const opts = buildOpts({ user: { id: "user-1" }, isGuestMode: false, guestId: null })
+    const finalMessages = [
+      { type: "user" as const, message: "No nothing to add" },
+      { type: "ai" as const, message: "I’ll end the interview and open your feedback." },
+    ]
+    const { result } = renderHook(() => useInterviewFeedback(opts as never))
+    await act(async () => result.current.proceedToFinalFeedback(finalMessages))
+
+    expect(firestoreMocks.markSessionEvaluating).toHaveBeenCalledWith(
+      opts.currentSessionId,
+      expect.objectContaining({ interviewerMessages: finalMessages })
+    )
+    expect(opts.streamingFeedback.startStreaming).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationTranscript: expect.arrayContaining([
+          expect.objectContaining({ role: "candidate", content: finalMessages[0].message }),
+          expect.objectContaining({ role: "interviewer", content: finalMessages[1].message }),
+        ]),
+      })
+    )
+    expect(opts.setShowPostInterviewDiscussion).toHaveBeenCalledWith(false)
+    expect(opts.setShowFeedback).toHaveBeenCalledWith(true)
+  })
   it("still streams feedback and sets the score", async () => {
     const opts = buildOpts({
       user: { id: "user-1" },

@@ -49,7 +49,7 @@ describe("candidate-led non-DSA prompts", () => {
       },
       "turn"
     )
-    expect(prompt).toContain("View feedback")
+    expect(prompt).toContain("call end_interview to open scoring")
     expect(prompt).not.toContain("What's the time complexity")
     expect(prompt).not.toContain("See Full Interview Score")
   })

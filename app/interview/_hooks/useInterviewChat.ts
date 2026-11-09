@@ -1,5 +1,6 @@
 import { sessionFetch } from "@/lib/interview/session-fetch"
 import { interviewerReactionSchema } from "@/lib/interview/reactions/contract"
+import { interviewCompletionActionSchema } from "@/lib/interview/completion/contract"
 import {
   SPARRA_COMPOSER_ID,
   hasSparraPartner,
@@ -123,7 +124,7 @@ export interface UseInterviewChatOptions extends SessionRequestGuard {
     event: Omit<BugfixEvidenceEvent, "timestamp"> & { timestamp?: number }
   ) => void
   classifyBugfixAIHelpKind: (message: string) => NonNullable<BugfixEvidenceEvent["aiHelpKind"]>
-  proceedToFinalFeedback: () => void
+  proceedToFinalFeedback: (finalInterviewerMessages?: ChatMessage[]) => void
   onOpenSparra?: () => void
 }
 
@@ -473,7 +474,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
         let additionalContext = ""
         if (showPostInterviewDiscussion && isInterviewer) {
           additionalContext = isEndingSession
-            ? "\n\n[IMPORTANT: The candidate wants to end the session. Respond with a brief, graceful conclusion. Thank them, give a quick summary of their performance, and wish them luck. Do NOT ask more questions.]"
+            ? "\n\n[POST-INTERVIEW DISCUSSION: If the candidate is finished, call end_interview to open scoring. Read their actual message in context before ending. Do NOT ask more questions after they choose to finish.]"
             : "\n\n[POST-INTERVIEW DISCUSSION: Continue discussing their solution. If they indicate they're done or have no questions, wrap up gracefully.]"
         }
 
@@ -713,6 +714,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
 
         const reply = data.reply
         if (reply) {
+          const aiMessage = createChatMessage("ai", reply, data)
           if (selectedScenario?.type === "bugfix")
             captureLabMessage(
               selectedScenario.id,
@@ -721,7 +723,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
               reply
             )
           if (!replyAlreadyRendered) {
-            setMessages((prev) => [...prev, createChatMessage("ai", reply, data)])
+            setMessages((prev) => [...prev, aiMessage])
           }
 
           if (
@@ -789,6 +791,16 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             }).catch((err) => {
               console.error("System design solution storage error (non-blocking):", err)
             })
+          }
+          if (
+            isInterviewer &&
+            showPostInterviewDiscussion &&
+            interviewCompletionActionSchema.safeParse(data.action).success
+          ) {
+            toast.dismiss(SESSION_COMPLETE_TOAST_ID)
+            // Feedback starts in this send's closure, before React can render
+            // the final exchange into the feedback hook's options.
+            proceedToFinalFeedback([...messages, newUserMessage, aiMessage])
           }
         } else {
           // A 200 with no reply is still our failure, not something the interviewer said.

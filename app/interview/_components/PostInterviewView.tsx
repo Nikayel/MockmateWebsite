@@ -55,7 +55,7 @@ export function PostInterviewView(props: PostInterviewViewProps) {
           )}
           <Button
             className="min-h-11"
-            onClick={props.proceedToFinalFeedback}
+            onClick={() => props.proceedToFinalFeedback()}
             loading={props.isGeneratingFeedback}
             disabled={props.isGeneratingFeedback}
           >

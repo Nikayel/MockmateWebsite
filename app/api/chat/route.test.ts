@@ -998,6 +998,105 @@ describe("interviewer native Sparra handoff", () => {
   })
 })
 
+describe("interviewer completion tool", () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it.each(["json", "validated-stream"] as const)(
+    "delivers completion after the candidate's final answer in %s",
+    async (responseMode) => {
+      const { generateAIResponse } = await setupMocks()
+      vi.mocked(generateAIResponse).mockResolvedValueOnce({
+        text: "",
+        provider: "openai-none",
+        latencyMs: 12,
+        toolCalls: [{ name: "end_interview", args: {} }],
+      })
+      const { POST } = await import("./route")
+      const response = await POST(
+        createRequest({
+          role: "interviewer",
+          isPostInterview: true,
+          hasSubmitted: true,
+          message: "No nothing to add",
+          context: [
+            { type: "ai", message: "Any questions for me about the problem or anything else?" },
+          ],
+          responseMode,
+        })
+      )
+      const body =
+        responseMode === "validated-stream"
+          ? await (
+              await import("@/lib/interview/chat/validated-response-stream")
+            ).readValidatedChatStream(response, () => {})
+          : (response as unknown as { data: Record<string, unknown> }).data
+
+      expect(body).toMatchObject({
+        action: { type: "end_interview" },
+        reply: "Sounds good. I’ll end the interview and open your score and feedback now.",
+      })
+      expect(generateAIResponse).toHaveBeenCalledOnce()
+      expect(vi.mocked(generateAIResponse).mock.calls[0][3]?.tools).toMatchObject([
+        { function: { name: "end_interview" } },
+      ])
+    }
+  )
+
+  it("allows asking for the score after a previous goodbye instead of returning button instructions", async () => {
+    const { generateAIResponse } = await setupMocks()
+    vi.mocked(generateAIResponse).mockResolvedValueOnce({
+      text: "",
+      provider: "openai-none",
+      latencyMs: 12,
+      toolCalls: [{ name: "end_interview", args: {} }],
+    })
+    const { POST } = await import("./route")
+    const response = await POST(
+      createRequest({
+        role: "interviewer",
+        isPostInterview: true,
+        hasSubmitted: true,
+        message: "where can I fin the full interview score ?",
+        context: [{ type: "ai", message: "Best of luck with your interview." }],
+      })
+    )
+    expect((response as unknown as { data: Record<string, unknown> }).data.action).toEqual({
+      type: "end_interview",
+    })
+    expect(generateAIResponse).toHaveBeenCalledOnce()
+  })
+
+  it("continues technical discussion without a completion call", async () => {
+    const { generateAIResponse } = await setupMocks()
+    const { POST } = await import("./route")
+    const response = await POST(
+      createRequest({
+        role: "interviewer",
+        isPostInterview: true,
+        hasSubmitted: true,
+        message: "My solution is O(N) time and space; O(1) space brute force takes O(N^2).",
+      })
+    )
+    expect((response as unknown as { data: Record<string, unknown> }).data.action).toBeUndefined()
+    expect(generateAIResponse).toHaveBeenCalledOnce()
+  })
+
+  it("ignores a completion tool call before submission", async () => {
+    const { generateAIResponse } = await setupMocks()
+    vi.mocked(generateAIResponse).mockResolvedValueOnce({
+      text: "Let's finish working on the problem first.",
+      provider: "openai-none",
+      latencyMs: 12,
+      toolCalls: [{ name: "end_interview", args: {} }],
+    })
+    const { POST } = await import("./route")
+    const response = await POST(
+      createRequest({ role: "interviewer", message: "I'm done with that loop" })
+    )
+    expect((response as unknown as { data: Record<string, unknown> }).data.action).toBeUndefined()
+  })
+})
+
 describe("interviewer acknowledgments", () => {
   beforeEach(() => vi.clearAllMocks())
   it.each(["json", "validated-stream"] as const)(

@@ -1,5 +1,6 @@
 import type { InterviewerReaction } from "../reactions/contract"
 import type { PartnerHandoffAction } from "../partner-handoff/contract"
+import type { InterviewCompletionAction } from "../completion/contract"
 
 export const VALIDATED_CHAT_STREAM_CONTENT_TYPE = "application/x-ndjson"
 
@@ -7,7 +8,7 @@ export interface ValidatedChatResponse {
   generationId?: string
   feedbackAvailable?: boolean
   reaction?: InterviewerReaction
-  action?: PartnerHandoffAction
+  action?: PartnerHandoffAction | InterviewCompletionAction
   reply: string
   provider: string
   latencyMs?: number

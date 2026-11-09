@@ -3,6 +3,18 @@ import { buildChatPromptFlow } from "../prompt-flow"
 import { INTERVIEW_ENDED_MESSAGE } from "../response-flow"
 
 describe("buildChatPromptFlow", () => {
+  it("allows the completion tool after a goodbye in a restored debrief", () => {
+    const result = buildChatPromptFlow({
+      role: "interviewer",
+      isPostInterview: true,
+      message: "where can I find the full interview score?",
+      context: [{ type: "ai", message: "Best of luck with your interviews." }],
+      currentCodeContext: "",
+      workspaceContextStr: "",
+    })
+    expect(result.earlyResponse).toBeUndefined()
+    expect(result.fullUserMessage).toContain("where can I find the full interview score?")
+  })
   it("keeps a time-only check-in instead of overwriting it with assumed code activity", () => {
     const result = buildChatPromptFlow({
       role: "interviewer",

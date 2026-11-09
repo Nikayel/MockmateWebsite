@@ -19,6 +19,7 @@ export interface ChatPromptFlowInput {
   context?: Array<{ type: string; message: string }>
   isProactive?: boolean
   isWrapUp?: boolean
+  isPostInterview?: boolean
   currentCode?: string
   currentCodeContext: string
   workspaceContextStr: string
@@ -167,7 +168,11 @@ Keep it conversational and real - like you're actually debriefing someone after 
     }
   }
 
-  const endedConversationResponse = buildEndedConversationResponse({ role, context })
+  // A restored debrief may contain a previous goodbye; it still needs the
+  // completion tool when the candidate asks to open their results.
+  const endedConversationResponse = input.isPostInterview
+    ? null
+    : buildEndedConversationResponse({ role, context })
   if (endedConversationResponse) {
     return { earlyResponse: endedConversationResponse }
   }

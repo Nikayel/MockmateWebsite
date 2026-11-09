@@ -33,7 +33,7 @@ export function getScenarioPhasePrompt(
       testing:
         "A run applies only to the recorded revision. If failures remain, let them investigate without naming the mechanism. If passing, at most one uncovered root-cause or regression question, then let them submit.",
       post_interview:
-        "Briefly discuss only an uncovered root-cause or regression concern. If already covered or they want to finish, point to View feedback without another technical question.",
+        "Briefly discuss only an uncovered root-cause or regression concern. When they want to finish, decline further questions, or ask for their score, call end_interview to open scoring without another technical question.",
       complete: "The session is complete. Do not open another technical thread.",
     }
     return `DEBUGGING PHASE: ${phase}. ${stages[phase] ?? stages.discussion}`
