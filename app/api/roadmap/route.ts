@@ -303,8 +303,9 @@ export async function POST(request: NextRequest) {
           },
           { status: 403 }
         )
+      } else {
+        return tierCheck.response!
       }
-      return tierCheck.response!
     }
 
     // One schema instead of scattered ifs: CreateRoadmapSchema carries the
@@ -454,6 +455,14 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
+    logger.error("Error creating roadmap:", { error })
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to create roadmap" },
+      { status: 500 }
+    )
+  } finally {
+    // Validation and generation can return early as well as throw. Keep an
+    // unsuccessful attempt from holding the learner's offer until its TTL.
     if (freeReservation) {
       try {
         await releaseFirstFreeRoadmapReservation(freeReservation.userId, freeReservation.roadmapId)
@@ -461,11 +470,6 @@ export async function POST(request: NextRequest) {
         logger.error("Failed to release free roadmap reservation:", { releaseError })
       }
     }
-    logger.error("Error creating roadmap:", { error })
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to create roadmap" },
-      { status: 500 }
-    )
   }
 }
 

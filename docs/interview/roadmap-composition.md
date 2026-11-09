@@ -9,6 +9,12 @@ first-roadmap path and the optional RAG path both use
 `generatePersonalizedRoadmap` in `lib/roadmap/prioritization-algorithm.ts`; RAG
 enriches the resulting plan without replacing its scheduled questions.
 
+The API audit also found that an eligible free learner was still returned the
+Pro access error after reserving their first roadmap. The creation route now
+continues for a successfully reserved offer, and releases unsuccessful
+reservations on early validation returns as well as thrown failures. The offer
+remains feature-flagged, single-use, and limited to deterministic generation.
+
 The old default was the company/role-weighted `full` mix. Limited non-DSA
 inventory was redistributed into other included categories, usually DSA.
 For a Google intermediate assessment with two hours per day, the inspected
