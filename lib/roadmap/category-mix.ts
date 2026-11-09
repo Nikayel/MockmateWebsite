@@ -12,8 +12,12 @@ import type {
   BugFixScenario,
   AddFunctionalityScenario,
   SystemDesignScenario,
-  Company,
 } from "@/lib/scenarios"
+import {
+  getBugfixCompanyProfile,
+  type BugfixCompanyAlignment,
+} from "@/lib/scenarios/company-alignment"
+import { groupScenarioVariants } from "@/lib/scenarios/variants"
 import type {
   RoadmapCategory,
   UserRoadmapAssessment,
@@ -32,6 +36,7 @@ export interface NonDsaPrioritizedQuestion {
   estimatedMinutes: number
   reasons: string[]
   isRequired: boolean
+  companyAlignment?: BugfixCompanyAlignment
 }
 
 export type CategoryCounts = Record<RoadmapCategory, number>
@@ -48,6 +53,19 @@ export function emptyCounts(): CategoryCounts {
 
 export function categoryOf(scenario: Scenario): RoadmapCategory {
   return SCENARIO_TYPE_TO_CATEGORY[scenario.type] ?? "dsa"
+}
+
+/** Keep the recommended split when inventory is thin; an odd slot favors debugging. */
+export function allocateBalancedCategoryCounts(
+  totalSlots: number,
+  available: CategoryCounts
+): CategoryCounts {
+  const pairs = Math.min(Math.floor(totalSlots / 2), available.dsa, available.bugfix)
+  return {
+    ...emptyCounts(),
+    dsa: pairs,
+    bugfix: pairs + (totalSlots % 2 === 1 && available.bugfix > pairs ? 1 : 0),
+  }
 }
 
 /**
@@ -81,7 +99,7 @@ export function allocateCategoryCounts(
   const order: RoadmapCategory[] = ["decomposition", "bugfix", "system-design", "dsa"]
   for (const c of order) {
     if (shortfall <= 0) break
-    if (weights[c] === 0 && c !== "dsa") continue // don't schedule categories the user excluded
+    if (weights[c] === 0) continue // don't schedule categories the user excluded
     const room = available[c] - target[c]
     if (room <= 0) continue
     const add = Math.min(room, shortfall)
@@ -105,9 +123,9 @@ function scoreNonDsaScenario(
   let score = 40
   const reasons: string[] = []
 
-  if (scenario.companies?.includes(company.name as Company)) {
+  if (scenario.companies?.some((name) => name === company.name)) {
     score += 25
-    reasons.push(`Asked at ${company.name}`)
+    reasons.push(`Relevant to ${company.name}`)
   }
   if (company.mustKnowQuestions.some((q) => q.scenarioId === scenario.id)) {
     score += 20
@@ -130,11 +148,17 @@ export function prioritizeNonDsaQuestions(
   assessment: UserRoadmapAssessment,
   company: CompanyQuestionData
 ): NonDsaPrioritizedQuestion[] {
-  return scenarios
-    .filter(
-      (s): s is BugFixScenario | AddFunctionalityScenario | SystemDesignScenario => s.type !== "dsa"
-    )
-    .map((scenario) => {
+  const candidates = scenarios.filter(
+    (scenario): scenario is BugFixScenario | AddFunctionalityScenario | SystemDesignScenario => {
+      if (scenario.type === "dsa") return false
+      if (scenario.type !== "bugfix") return true
+      const profile = getBugfixCompanyProfile(scenario.companyAlignment)
+      return !profile || profile.company === company.name
+    }
+  )
+  // A language variant is an execution choice, not another practice task.
+  return groupScenarioVariants(candidates)
+    .map(([scenario]) => {
       const category = categoryOf(scenario)
       const { score, reasons } = scoreNonDsaScenario(scenario, assessment, company)
       return {
@@ -148,9 +172,14 @@ export function prioritizeNonDsaQuestions(
         estimatedMinutes: scenario.estimatedTime || 40,
         reasons,
         isRequired: company.mustKnowQuestions.some((q) => q.scenarioId === scenario.id),
+        ...(scenario.type === "bugfix" ? { companyAlignment: scenario.companyAlignment } : {}),
       }
     })
-    .sort((a, b) => b.priorityScore - a.priorityScore)
+    .sort((a, b) => {
+      const alignedA = Boolean(a.companyAlignment && a.companyAlignment !== "generic")
+      const alignedB = Boolean(b.companyAlignment && b.companyAlignment !== "generic")
+      return Number(alignedB) - Number(alignedA) || b.priorityScore - a.priorityScore
+    })
 }
 
 /** Count available non-DSA questions per category. */

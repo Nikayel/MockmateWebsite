@@ -1,9 +1,16 @@
 import type { Scenario } from "@/lib/scenarios/types"
-import { getBugfixCompanyProfile } from "@/lib/scenarios/company-alignment"
+import {
+  getBugfixCompanyProfile,
+  type BugfixCompanyAlignment,
+} from "@/lib/scenarios/company-alignment"
 
-export function ScenarioCompanyAlignment({ scenario }: { scenario: Scenario }) {
+export function ScenarioCompanyAlignment({
+  scenario,
+}: {
+  scenario: { type: Scenario["type"]; companyAlignment?: BugfixCompanyAlignment }
+}) {
   if (scenario.type !== "bugfix") return null
-  const profile = getBugfixCompanyProfile(scenario.companyAlignment)
+  const profile = getBugfixCompanyProfile(scenario.companyAlignment ?? "generic")
   if (!profile) return <span className="text-muted-foreground text-xs">Generic debugging</span>
 
   return (

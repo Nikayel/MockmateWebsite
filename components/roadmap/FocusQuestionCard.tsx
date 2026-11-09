@@ -14,6 +14,7 @@ import { DailyPlan } from "@/lib/data/company-questions/types"
 import { cn } from "@/lib/utils"
 import { DifficultyBadge } from "./FocusSharedComponents"
 import { AnimatedEllipsis } from "@/components/brand/AnimatedEllipsis"
+import { ScenarioCompanyAlignment } from "@/components/interview/ScenarioCompanyAlignment"
 
 interface QuestionCardProps {
   question: DailyPlan["questions"][0]
@@ -96,6 +97,13 @@ export function QuestionCard({
                     : (question.topic ?? "Practice")}
                 </span>
               </div>
+              {question.scenarioType === "bugfix" && question.companyAlignment && (
+                <div className="mt-2">
+                  <ScenarioCompanyAlignment
+                    scenario={{ type: "bugfix", companyAlignment: question.companyAlignment }}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

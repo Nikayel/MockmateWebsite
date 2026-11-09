@@ -125,8 +125,12 @@ export class RAGRoadmapGenerator {
       return null
     }
 
-    // If RAG is disabled, return base roadmap with empty enhancements
-    if (!enableRAG) {
+    // The optional advice pipeline is DSA-pattern based. Keep debugging-only
+    // plans usable without fetching irrelevant pattern advice or spending on it.
+    const hasAlgorithms = baseRoadmap.dailyPlans.some((plan) =>
+      plan.questions.some((question) => question.scenarioType === "dsa")
+    )
+    if (!enableRAG || !hasAlgorithms) {
       return this.toBaseEnhancedRoadmap(baseRoadmap)
     }
 

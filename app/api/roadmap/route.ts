@@ -347,8 +347,7 @@ export async function POST(request: NextRequest) {
       Math.ceil((interview.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
     )
 
-    // Resolve the category composition the user chose (defaults to the research
-    // full mix). Weighted by experience level, target track, and company.
+    // Resolve the chosen composition; new requests default to debugging/DSA parity.
     const categoryMix = resolveCategoryMix({
       mixMode,
       selectedCategories,

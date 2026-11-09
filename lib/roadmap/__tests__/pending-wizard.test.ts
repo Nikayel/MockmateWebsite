@@ -45,6 +45,12 @@ describe("savePendingWizard / loadPendingWizard", () => {
     expect(loadPendingWizard(NOW)).toEqual(wizard)
   })
 
+  it("preserves the balanced choice through the authentication round trip", () => {
+    const balanced = { ...wizard, result: { ...wizard.result, mixMode: "balanced" as const } }
+    savePendingWizard(balanced, NOW)
+    expect(loadPendingWizard(NOW)).toEqual(balanced)
+  })
+
   it("loads null when nothing was saved", () => {
     expect(loadPendingWizard(NOW)).toBeNull()
   })

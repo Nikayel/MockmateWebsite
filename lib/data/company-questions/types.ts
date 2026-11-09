@@ -3,6 +3,7 @@
  */
 
 import { DSAPattern } from "@/lib/types/dsa-patterns"
+import type { BugfixCompanyAlignment } from "@/lib/scenarios/company-alignment"
 
 export type CompanyId =
   | "google"
@@ -154,7 +155,9 @@ export type CompanyTrack = "swe" | "fdse"
 export type RoadmapCategory = "dsa" | "bugfix" | "decomposition" | "system-design"
 
 /** How the user chose to compose their roadmap during creation. */
-export type RoadmapMixMode = "full" | "dsa-only" | "custom"
+export const ROADMAP_MIX_MODES = ["balanced", "full", "dsa-only", "custom"] as const
+export type RoadmapMixMode = (typeof ROADMAP_MIX_MODES)[number]
+export const DEFAULT_ROADMAP_MIX_MODE: RoadmapMixMode = "balanced"
 
 /**
  * Resolved category composition for a roadmap. `weights` are percentages that
@@ -164,7 +167,7 @@ export interface RoadmapCategoryMix {
   mode: RoadmapMixMode
   weights: Record<RoadmapCategory, number>
   selectedCategories?: RoadmapCategory[]
-  source: "research-default" | "user-custom"
+  source: "recommended-default" | "research-default" | "user-custom"
 }
 
 export interface UserRoadmapAssessment {
@@ -192,8 +195,8 @@ export interface UserRoadmapAssessment {
   // Goals
   targetScore: number // 0-100, what they want to achieve
 
-  // Optional category composition chosen at creation (full mix / DSA only /
-  // custom subset). Absent = legacy DSA-only roadmap.
+  // Optional creation choice. Older saved documents can omit this; their
+  // existing scheduled questions retain their categories on read.
   categoryMix?: RoadmapCategoryMix
 }
 
@@ -236,6 +239,7 @@ export interface DailyPlan {
     category?: RoadmapCategory
     scenarioType?: "dsa" | "bugfix" | "system-design" | "add-functionality"
     topic?: string
+    companyAlignment?: BugfixCompanyAlignment
   }[]
   notes?: string
 }

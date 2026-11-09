@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { DSAPattern, PATTERN_METADATA } from "@/lib/types/dsa-patterns"
 import type { RoadmapCategory, RoadmapMixMode } from "@/lib/data/company-questions/types"
+import { DEFAULT_ROADMAP_MIX_MODE } from "@/lib/data/company-questions/types"
 import type { AssessmentResult } from "@/lib/roadmap/pending-wizard"
 import { cn } from "@/lib/utils"
 
@@ -35,8 +36,8 @@ type Step = "experience" | "track" | "focus" | "problems" | "hours" | "patterns"
 // Categories the user can pick in a custom mix (system design is not yet
 // schedulable, so it is not offered here).
 const CUSTOM_CATEGORIES: { category: RoadmapCategory; label: string }[] = [
-  { category: "dsa", label: "Algorithms" },
   { category: "bugfix", label: "Debugging" },
+  { category: "dsa", label: "Algorithms" },
   { category: "decomposition", label: "Feature Build" },
 ]
 
@@ -57,20 +58,20 @@ export function SkillAssessment({ onComplete, onBack }: SkillAssessmentProps) {
     "intern" | "beginner" | "intermediate" | "advanced" | null
   >(null)
   const [targetTrack, setTargetTrack] = useState<"swe" | "fdse" | null>(null)
-  const [mixMode, setMixMode] = useState<RoadmapMixMode>("full")
-  const [selectedCategories, setSelectedCategories] = useState<RoadmapCategory[]>([
-    "dsa",
-    "bugfix",
-    "decomposition",
-  ])
+  const [mixMode, setMixMode] = useState<RoadmapMixMode>(DEFAULT_ROADMAP_MIX_MODE)
+  const [selectedCategories, setSelectedCategories] = useState<RoadmapCategory[]>(["bugfix", "dsa"])
   const [problemsSolved, setProblemsSolved] = useState<number>(0)
   const [hoursPerDay, setHoursPerDay] = useState<number>(2)
   const [patternFamiliarity, setPatternFamiliarity] = useState<
     Record<DSAPattern, "unknown" | "seen" | "practiced" | "confident">
   >({} as Record<DSAPattern, "unknown" | "seen" | "practiced" | "confident">)
 
-  const steps: Step[] = ["experience", "track", "focus", "problems", "hours", "patterns"]
+  const includesAlgorithms = mixMode !== "custom" || selectedCategories.includes("dsa")
+  const steps: Step[] = includesAlgorithms
+    ? ["experience", "track", "focus", "problems", "hours", "patterns"]
+    : ["experience", "track", "focus", "hours"]
   const currentStepIndex = steps.indexOf(step)
+  const isLastStep = currentStepIndex === steps.length - 1
 
   const canContinue = () => {
     switch (step) {
@@ -93,7 +94,7 @@ export function SkillAssessment({ onComplete, onBack }: SkillAssessmentProps) {
   }
 
   const handleNext = () => {
-    if (step === "patterns") {
+    if (isLastStep) {
       onComplete({
         experienceLevel: experienceLevel!,
         targetTrack: targetTrack ?? undefined,
@@ -196,7 +197,7 @@ export function SkillAssessment({ onComplete, onBack }: SkillAssessmentProps) {
               : "bg-muted text-muted-foreground cursor-not-allowed"
           )}
         >
-          {step === "patterns" ? "Generate Roadmap" : "Continue"}
+          {isLastStep ? "Generate Roadmap" : "Continue"}
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
@@ -386,12 +387,19 @@ function FocusStep({
     badge?: string
   }[] = [
     {
+      mode: "balanced",
+      icon: Bug,
+      title: "Debugging + algorithms",
+      description: "50% debugging · 50% algorithms by question count",
+      detail: "Our recommended split. Question counts depend on your time and available practice.",
+      badge: "Recommended",
+    },
+    {
       mode: "full",
       icon: Shuffle,
-      title: "Full mix",
-      description: "Research-driven blend for your role and company",
-      detail: "Algorithms plus debugging and feature-building, weighted to real interview loops",
-      badge: "Recommended",
+      title: "Company mix",
+      description: "A blend tailored to your role and company",
+      detail: "Includes debugging, algorithms, and feature-building in different proportions",
     },
     {
       mode: "dsa-only",
@@ -421,8 +429,8 @@ function FocusStep({
       <div className="text-center">
         <h2 className="text-foreground text-xl font-bold">What Should Your Roadmap Focus On?</h2>
         <p className="text-muted-foreground mt-1 text-sm">
-          Modern interviews go beyond algorithms. Pick how much debugging and feature building to
-          include.
+          We recommend equal practice in debugging and algorithms. Choose a different mix if it
+          better fits your interview.
         </p>
       </div>
 
@@ -435,6 +443,7 @@ function FocusStep({
             <button
               key={option.mode}
               onClick={() => onSelectMode(option.mode)}
+              aria-pressed={isSelected}
               className={cn(
                 "rounded-xl border-2 p-3 text-left transition-all hover:shadow-md",
                 isSelected ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"

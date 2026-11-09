@@ -47,6 +47,12 @@ describe("resolveCategoryMix", () => {
     companyId: "google" as const,
   }
 
+  it.each(["google", "stripe"] as const)("recommends debugging/DSA parity for %s", (companyId) => {
+    const mix = resolveCategoryMix({ ...base, companyId, mixMode: "balanced" })
+    expect(mix.weights).toEqual({ dsa: 50, bugfix: 50, decomposition: 0, "system-design": 0 })
+    expect(mix.source).toBe("recommended-default")
+  })
+
   it("dsa-only yields 100% algorithms", () => {
     const mix = resolveCategoryMix({ ...base, mixMode: "dsa-only" })
     expect(mix.weights).toEqual({ dsa: 100, bugfix: 0, decomposition: 0, "system-design": 0 })

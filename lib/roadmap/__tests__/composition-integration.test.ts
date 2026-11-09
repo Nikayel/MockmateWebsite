@@ -8,7 +8,9 @@
 
 import { describe, it, expect } from "vitest"
 import { scenarios } from "@/lib/scenarios"
-import { generatePersonalizedRoadmap } from "../prioritization-algorithm"
+import { generatePersonalizedRoadmap, recalculateRoadmap } from "../prioritization-algorithm"
+import { getCompanyById } from "@/lib/data/company-questions"
+import { getBugfixCompanyProfile } from "@/lib/scenarios/company-alignment"
 import { resolveCategoryMix } from "../category-weights"
 import { serializeRoadmapDocument, isRoadmapQuestionStatus } from "../roadmap-serialization"
 import type { UserRoadmapAssessment } from "@/lib/data/company-questions/types"
@@ -30,6 +32,130 @@ function makeAssessment(overrides: Partial<UserRoadmapAssessment> = {}): UserRoa
 }
 
 describe("generatePersonalizedRoadmap composition", () => {
+  it.each(["google", "meta", "stripe", "palantir", "amazon"] as const)(
+    "schedules matching-company debugging before Generic practice for %s",
+    (targetCompany) => {
+      const roadmap = generatePersonalizedRoadmap(
+        scenarios,
+        makeAssessment({ targetCompany, hoursPerDay: 2 }),
+        "test-user"
+      )!
+      const nodes = roadmap.dailyPlans.flatMap((p) => p.questions)
+      const debugging = nodes.filter((q) => q.scenarioType === "bugfix")
+      const company = getCompanyById(targetCompany)!
+      const expectedAligned = scenarios.filter(
+        (s) =>
+          s.type === "bugfix" &&
+          getBugfixCompanyProfile(s.companyAlignment)?.company === company.name
+      )
+      expect(debugging.length).toBeGreaterThan(0)
+      expect(debugging.length).toBeGreaterThanOrEqual(
+        nodes.filter((q) => q.scenarioType === "dsa").length
+      )
+      expect(
+        new Set(debugging.filter((q) => q.companyAlignment !== "generic").map((q) => q.scenarioId))
+      ).toEqual(new Set(expectedAligned.map((s) => s.id)))
+      let reachedGeneric = false
+      for (const node of debugging) {
+        expect(node.companyAlignment).toBeDefined()
+        const profile = getBugfixCompanyProfile(node.companyAlignment!)
+        if (!profile) reachedGeneric = true
+        else {
+          expect(profile.company).toBe(company.name)
+          expect(reachedGeneric).toBe(false)
+        }
+      }
+      const familyIds = debugging
+        .map((q) => scenarios.find((s) => s.id === q.scenarioId)!)
+        .map((s) => s.variantGroup ?? s.id)
+      expect(new Set(familyIds).size).toBe(familyIds.length)
+    }
+  )
+
+  it("does not bring back another language of an already-completed task on recalculation", () => {
+    const roadmap = generatePersonalizedRoadmap(
+      scenarios,
+      makeAssessment({
+        interviewDate: new Date("2027-01-01"),
+        categoryMix: resolveCategoryMix({
+          mixMode: "custom",
+          selectedCategories: ["bugfix"],
+          experienceLevel: "intermediate",
+          companyId: "google",
+        }),
+      }),
+      "test-user"
+    )!
+    const variant = roadmap.dailyPlans
+      .flatMap((p) => p.questions)
+      .find((q) => q.scenarioId === "bugfix-rate-limiter-error-handling")!
+    expect(variant).toBeDefined()
+    variant.status = "completed"
+    const replanned = recalculateRoadmap(roadmap, scenarios)
+    expect(
+      replanned.dailyPlans
+        .flatMap((p) => p.questions)
+        .some((q) => q.scenarioId.startsWith("bugfix-rate-limiter-error-handling"))
+    ).toBe(false)
+  })
+  it.each([1, 7, 30, 90])(
+    "keeps the recommended balance in the actual %i-day schedule",
+    (daysRemaining) => {
+      const roadmap = generatePersonalizedRoadmap(
+        scenarios,
+        makeAssessment({ daysRemaining, hoursPerDay: 2 }),
+        "test-user"
+      )!
+      const nodes = roadmap.dailyPlans.flatMap((p) => p.questions)
+      const debugging = nodes.filter((q) => q.scenarioType === "bugfix")
+      const algorithms = nodes.filter((q) => q.scenarioType === "dsa")
+      expect(roadmap.categoryMix?.mode).toBe("balanced")
+      expect(debugging.length).toBeGreaterThan(0)
+      expect(debugging.length).toBeGreaterThanOrEqual(algorithms.length)
+      expect(debugging.length - algorithms.length).toBeLessThanOrEqual(1)
+      expect(nodes[0].scenarioType).toBe("bugfix")
+      expect(debugging.length + algorithms.length).toBe(nodes.length)
+      expect(new Set(nodes.map((q) => q.scenarioId)).size).toBe(nodes.length)
+    }
+  )
+
+  it("keeps debugging first when only one task fits in a day", () => {
+    const roadmap = generatePersonalizedRoadmap(
+      scenarios,
+      makeAssessment({ daysRemaining: 1, hoursPerDay: 0.25 }),
+      "test-user"
+    )!
+    expect(roadmap.dailyPlans.flatMap((p) => p.questions).map((q) => q.scenarioType)).toEqual([
+      "bugfix",
+    ])
+  })
+
+  it("honors a debugging-only custom plan", () => {
+    const assessment = makeAssessment({
+      categoryMix: resolveCategoryMix({
+        mixMode: "custom",
+        selectedCategories: ["bugfix"],
+        experienceLevel: "intermediate",
+        companyId: "google",
+      }),
+    })
+    const nodes = generatePersonalizedRoadmap(
+      scenarios,
+      assessment,
+      "test-user"
+    )!.dailyPlans.flatMap((p) => p.questions)
+    expect(nodes.length).toBeGreaterThan(0)
+    expect(nodes.every((q) => q.scenarioType === "bugfix")).toBe(true)
+  })
+
+  it("does not silently return a DSA plan if the balanced pool has no debugging", () => {
+    const roadmap = generatePersonalizedRoadmap(
+      scenarios.filter((s) => s.type === "dsa"),
+      makeAssessment(),
+      "test-user"
+    )!
+    expect(roadmap.dailyPlans.flatMap((p) => p.questions)).toEqual([])
+  })
   it("full mix schedules bug-fix AND feature-building nodes, not just DSA", () => {
     const assessment = makeAssessment({
       categoryMix: resolveCategoryMix({

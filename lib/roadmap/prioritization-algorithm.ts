@@ -18,10 +18,14 @@ import {
 import { getCompanyById } from "@/lib/data/company-questions"
 import { DSAScenario, RoleTag, type Scenario } from "@/lib/scenarios"
 import { formatPatternLabel } from "@/lib/pattern-labels"
-import { resolveResearchMix, CATEGORY_LABELS } from "./category-weights"
+import type { BugfixCompanyAlignment } from "@/lib/scenarios/company-alignment"
+import { groupScenarioVariants } from "@/lib/scenarios/variants"
+import { resolveCategoryMix, CATEGORY_LABELS } from "./category-weights"
+import { DEFAULT_ROADMAP_MIX_MODE } from "@/lib/data/company-questions/types"
 import {
   prioritizeNonDsaQuestions,
   allocateCategoryCounts,
+  allocateBalancedCategoryCounts,
   countByCategory,
   type NonDsaPrioritizedQuestion,
   type CategoryCounts,
@@ -596,6 +600,7 @@ interface ScheduledItem {
   scenarioType: "dsa" | "bugfix" | "system-design" | "add-functionality"
   topic: string
   pattern?: DSAPattern
+  companyAlignment?: BugfixCompanyAlignment
 }
 
 function dsaToItem(q: PrioritizedQuestion): ScheduledItem {
@@ -620,14 +625,14 @@ function nonDsaToItem(q: NonDsaPrioritizedQuestion): ScheduledItem {
     category: q.category,
     scenarioType: q.scenarioType,
     topic: q.topic,
+    ...(q.companyAlignment ? { companyAlignment: q.companyAlignment } : {}),
   }
 }
 
 /**
  * Stratified interleave: spread each category evenly across the whole sequence
- * (by fractional within-group position) so non-DSA nodes are sprinkled through
- * the DSA-heavy list rather than clustered at the end. Within a category the
- * incoming priority order is preserved.
+ * (by fractional within-group position). Within a category the incoming priority
+ * order is preserved; equal positions retain the caller's category order.
  */
 function interleaveByCategory(groups: ScheduledItem[][]): ScheduledItem[] {
   const tagged = groups
@@ -649,6 +654,7 @@ function itemToNode(item: ScheduledItem): DailyPlan["questions"][number] {
   }
   // Only DSA nodes carry a pattern; never write undefined (Firestore rejects it).
   if (item.pattern) node.pattern = item.pattern
+  if (item.companyAlignment) node.companyAlignment = item.companyAlignment
   return node
 }
 
@@ -680,8 +686,8 @@ export function buildMixedDailySchedule(
   const maxQuestionsPerDay = getDailyQuestionLimit(assessment.experienceLevel)
 
   const ordered = interleaveByCategory([
-    dsaPicked.map(dsaToItem),
     nonDsaPicked.filter((q) => q.category === "bugfix").map(nonDsaToItem),
+    dsaPicked.map(dsaToItem),
     nonDsaPicked.filter((q) => q.category === "decomposition").map(nonDsaToItem),
     nonDsaPicked.filter((q) => q.category === "system-design").map(nonDsaToItem),
   ])
@@ -786,15 +792,14 @@ function composePlans(
   assessment: UserRoadmapAssessment,
   companyData: CompanyQuestionData
 ): { dailyPlans: DailyPlan[]; mix: RoadmapCategoryMix } {
-  const mix: RoadmapCategoryMix = assessment.categoryMix ?? {
-    mode: "full",
-    weights: resolveResearchMix(
-      assessment.experienceLevel,
-      assessment.targetTrack,
-      assessment.targetCompany
-    ),
-    source: "research-default",
-  }
+  const mix =
+    assessment.categoryMix ??
+    resolveCategoryMix({
+      mixMode: DEFAULT_ROADMAP_MIX_MODE,
+      experienceLevel: assessment.experienceLevel,
+      targetTrack: assessment.targetTrack,
+      companyId: assessment.targetCompany,
+    })
 
   const dsaPool = scenarios.filter((s): s is DSAScenario => s.type === "dsa")
   const dsaPrioritized = prioritizeQuestions(dsaPool, assessment, companyData)
@@ -807,13 +812,16 @@ function composePlans(
     ...countByCategory(nonDsaPrioritized),
     dsa: dsaPrioritized.length,
   }
-  const { targetCounts } = allocateCategoryCounts(mix.weights, totalSlots, available)
+  const targetCounts =
+    mix.mode === "balanced"
+      ? allocateBalancedCategoryCounts(totalSlots, available)
+      : allocateCategoryCounts(mix.weights, totalSlots, available).targetCounts
 
   const nonDsaTotal =
     targetCounts.bugfix + targetCounts.decomposition + targetCounts["system-design"]
 
   const dailyPlans =
-    nonDsaTotal === 0
+    nonDsaTotal === 0 && mix.weights.dsa > 0 && mix.mode !== "balanced"
       ? buildDailySchedule(dsaPrioritized, assessment)
       : buildMixedDailySchedule(
           dsaPrioritized.slice(0, targetCounts.dsa),
@@ -944,9 +952,11 @@ export function recalculateRoadmap(
 
   // Re-prioritize and re-schedule the remaining questions, keeping the same
   // category composition as the original roadmap.
-  const remainingScenarios = scenarios.filter(
-    (s) => !completedIds.has(s.id) && !skippedIds.has(s.id)
-  )
+  const remainingScenarios = groupScenarioVariants(scenarios)
+    .filter((group) =>
+      group.every((scenario) => !completedIds.has(scenario.id) && !skippedIds.has(scenario.id))
+    )
+    .flat()
 
   const { dailyPlans: newDailyPlans } = composePlans(
     remainingScenarios,

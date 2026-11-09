@@ -13,6 +13,7 @@ import { UserMetricsFixture } from "./UserMetricsFixture"
 import { AdminSessionFixture } from "./AdminSessionFixture"
 import { WorkspaceFixture } from "./WorkspaceFixture"
 import { ScenarioBrowser } from "@/components/interview/ScenarioBrowser"
+import { RoadmapAssessmentFixture } from "./RoadmapAssessmentFixture"
 import "@/app/globals.css"
 
 const params = new URLSearchParams(window.location.search)
@@ -43,7 +44,9 @@ function Fixture() {
   const Surface = params.get("surface") === "saved" ? Fragment : InterviewSurfaceFrame
   return (
     <main className="bg-background text-foreground">
-      {view === "email-consent" ? (
+      {view === "roadmap-assessment" ? (
+        <RoadmapAssessmentFixture />
+      ) : view === "email-consent" ? (
         <EmailConsentFixture />
       ) : view === "user-metrics" ? (
         <UserMetricsFixture />

@@ -34,21 +34,21 @@ export const metadata: Metadata = {
 const sampleDays = [
   {
     day: 1,
-    theme: "Arrays & Hashing",
-    problems: ["Two Sum", "Valid Anagram", "Group Anagrams"],
-    time: "50 min",
+    theme: "Debugging & Hashing",
+    problems: ["Cache cleanup: reconcile the overnight report", "Two Sum"],
+    time: "65 min",
   },
   {
     day: 2,
-    theme: "Binary Search",
-    problems: ["Binary Search", "Search in Rotated Array"],
-    time: "45 min",
+    theme: "Debugging & Search",
+    problems: ["Editor Comments: Sidebar Over-Counts Unresolved Threads", "Binary Search"],
+    time: "65 min",
   },
   {
     day: 3,
-    theme: "Sliding Window",
-    problems: ["Best Time to Buy Stock", "Longest Substring Without Repeat"],
-    time: "55 min",
+    theme: "Debugging & Arrays",
+    problems: ["BookClub: Repair the Reader Dashboard", "Valid Anagram"],
+    time: "115 min",
   },
 ]
 
@@ -80,6 +80,10 @@ export default function RoadmapPreviewPage() {
               This is a sample 30-day Google prep plan. Yours will be personalized to your interview
               date, company, and skill level.
             </p>
+            <p className="text-muted-foreground mt-3 text-sm">
+              Our recommended mix is 50% debugging and 50% algorithms by question count. You can
+              choose a company mix, algorithms only, or your own categories when creating your plan.
+            </p>
           </div>
         </div>
       </section>
@@ -95,7 +99,7 @@ export default function RoadmapPreviewPage() {
                 <div className="text-foreground font-medium">Google · 30 days · Intermediate</div>
               </div>
               <div className="text-right text-sm">
-                <div className="text-foreground">42 problems</div>
+                <div className="text-foreground">50/50 practice mix</div>
                 <div className="text-muted-foreground">~2 hrs/day</div>
               </div>
             </div>

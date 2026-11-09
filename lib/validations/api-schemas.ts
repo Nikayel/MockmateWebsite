@@ -10,6 +10,7 @@ import { z } from "zod"
 import { NextResponse } from "next/server"
 import { ALL_COMPANIES } from "@/lib/data/company-questions"
 import type { CompanyId } from "@/lib/data/company-questions/types"
+import { DEFAULT_ROADMAP_MIX_MODE, ROADMAP_MIX_MODES } from "@/lib/data/company-questions/types"
 import { DSA_PATTERNS } from "@/lib/types/dsa-patterns"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 import { VECTOR_CONTENT_TYPES, type VectorContentType } from "@/lib/rag/types"
@@ -398,8 +399,8 @@ export const RAGV2ActionSchema = z.discriminatedUnion("action", [
  *
  * Defaults mirror what the route's hand-rolled parsing used to do for absent
  * fields (experienceLevel "intermediate", problemsSolved 0, hoursPerDay 2,
- * patternFamiliarity [], mixMode "full", selectedCategories undefined), so
- * every previously valid wizard payload parses to the same assessment.
+ * patternFamiliarity [], selectedCategories undefined). New requests without
+ * a mix choose the balanced recommendation; explicit older choices still parse.
  * `targetCompany` doubles as the catalog-membership guard: CompanyIdSchema
  * rejects ids outside ALL_COMPANIES with a clear 400.
  */
@@ -423,7 +424,7 @@ export const CreateRoadmapSchema = z.object({
     )
     .max(64)
     .default([]),
-  mixMode: z.enum(["full", "dsa-only", "custom"]).default("full"),
+  mixMode: z.enum(ROADMAP_MIX_MODES).default(DEFAULT_ROADMAP_MIX_MODE),
   selectedCategories: z
     .array(z.enum(["dsa", "bugfix", "decomposition", "system-design"]))
     .optional(),

@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import type { CompanyId, RoadmapCategory, RoadmapMixMode } from "@/lib/data/company-questions/types"
+import { ROADMAP_MIX_MODES } from "@/lib/data/company-questions/types"
 import type { DSAPattern } from "@/lib/types/dsa-patterns"
 
 // The pattern id gets only a string check here. The strict membership validator
@@ -32,7 +33,7 @@ const assessmentResultSchema = z.object({
       level: z.enum(["unknown", "seen", "practiced", "confident"]),
     })
   ),
-  mixMode: z.enum(["full", "dsa-only", "custom"]) satisfies z.ZodType<RoadmapMixMode>,
+  mixMode: z.enum(ROADMAP_MIX_MODES) satisfies z.ZodType<RoadmapMixMode>,
   selectedCategories: z
     .array(
       z.enum([

@@ -150,9 +150,10 @@ export function resolveResearchMix(
 
 /**
  * Resolve the user's creation choice into a concrete category mix.
+ * - "balanced" (default): 50% debugging and 50% algorithms, our practice recommendation.
  * - "dsa-only": 100% algorithms (classic grind).
  * - "custom": renormalize the research weights over the selected categories.
- * - "full" (default): the research-driven mix.
+ * - "full": the existing company/role-weighted mix.
  */
 export function resolveCategoryMix(input: {
   mixMode: RoadmapMixMode
@@ -161,6 +162,13 @@ export function resolveCategoryMix(input: {
   targetTrack?: CompanyTrack
   companyId: CompanyId
 }): RoadmapCategoryMix {
+  if (input.mixMode === "balanced") {
+    return {
+      mode: "balanced",
+      weights: { dsa: 50, bugfix: 50, decomposition: 0, "system-design": 0 },
+      source: "recommended-default",
+    }
+  }
   const research = resolveResearchMix(input.experienceLevel, input.targetTrack, input.companyId)
 
   if (input.mixMode === "dsa-only") {
