@@ -475,7 +475,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
         let additionalContext = ""
         if (showPostInterviewDiscussion && isInterviewer) {
           additionalContext =
-            "\n\n[POST-INTERVIEW DISCUSSION: The candidate chooses View feedback when ready. Only use end_interview on an explicit request to finish, help closing the interview, or help finding/opening their score. Technical answers, confusion about the problem, and having no more questions do not authorize closing.]"
+            "\n\n[POST-INTERVIEW DISCUSSION: The candidate chooses View feedback when ready. The application handles explicit requests to close the interview or open scoring. Technical answers, confusion about the problem, and having no more questions do not authorize closing. Leave this discussion open; mention View feedback if useful.]"
         }
 
         // Flag code edits made since this lane's previous message. `messages` is
@@ -798,7 +798,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
             requestsInterviewCompletion(userMessage) &&
             interviewCompletionActionSchema.safeParse(data.action).success
           ) {
-            toast.dismiss(SESSION_COMPLETE_TOAST_ID)
+            toast.info(reply, { id: SESSION_COMPLETE_TOAST_ID, duration: 6000 })
             // Feedback starts in this send's closure, before React can render
             // the final exchange into the feedback hook's options.
             proceedToFinalFeedback([...messages, newUserMessage, aiMessage])

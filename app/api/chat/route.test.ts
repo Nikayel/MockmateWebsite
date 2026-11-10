@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { buildSessionContext } from "@/lib/interview/session-context/snapshot"
 import { createEmptyTracker } from "@/lib/interview/interview-phases"
 import { createHash } from "node:crypto"
+import { INTERVIEW_COMPLETION_REPLY } from "@/lib/interview/completion/contract"
 
 vi.mock("@/lib/interview/session-lifecycle/server", () => ({
   claimProactiveNudge: vi.fn(async () => true),
@@ -998,19 +999,13 @@ describe("interviewer native Sparra handoff", () => {
   })
 })
 
-describe("interviewer completion tool", () => {
+describe("deterministic interviewer completion", () => {
   beforeEach(() => vi.clearAllMocks())
 
   it.each(["json", "validated-stream"] as const)(
     "delivers completion after an explicit request to close in %s",
     async (responseMode) => {
-      const { generateAIResponse } = await setupMocks()
-      vi.mocked(generateAIResponse).mockResolvedValueOnce({
-        text: "",
-        provider: "openai-none",
-        latencyMs: 12,
-        toolCalls: [{ name: "end_interview", args: {} }],
-      })
+      const { generateAIResponse, buildRAGContext } = await setupMocks()
       const { POST } = await import("./route")
       const response = await POST(
         createRequest({
@@ -1033,23 +1028,19 @@ describe("interviewer completion tool", () => {
 
       expect(body).toMatchObject({
         action: { type: "end_interview" },
-        reply: "Sounds good. I’ll end the interview and open your score and feedback now.",
+        reply: INTERVIEW_COMPLETION_REPLY,
+        provider: "local",
+        feedbackAvailable: false,
       })
-      expect(generateAIResponse).toHaveBeenCalledOnce()
-      expect(vi.mocked(generateAIResponse).mock.calls[0][3]?.tools).toMatchObject([
-        { function: { name: "end_interview" } },
-      ])
+      expect(generateAIResponse).not.toHaveBeenCalled()
+      expect(buildRAGContext).not.toHaveBeenCalled()
+      const { registerResponseGeneration } = await import("@/lib/ai-response-feedback/generations")
+      expect(registerResponseGeneration).not.toHaveBeenCalled()
     }
   )
 
   it("allows asking for the score after a previous goodbye instead of returning button instructions", async () => {
     const { generateAIResponse } = await setupMocks()
-    vi.mocked(generateAIResponse).mockResolvedValueOnce({
-      text: "",
-      provider: "openai-none",
-      latencyMs: 12,
-      toolCalls: [{ name: "end_interview", args: {} }],
-    })
     const { POST } = await import("./route")
     const response = await POST(
       createRequest({
@@ -1063,7 +1054,45 @@ describe("interviewer completion tool", () => {
     expect((response as unknown as { data: Record<string, unknown> }).data.action).toEqual({
       type: "end_interview",
     })
-    expect(generateAIResponse).toHaveBeenCalledOnce()
+    expect(generateAIResponse).not.toHaveBeenCalled()
+  })
+
+  it("preserves authorization before a local completion response", async () => {
+    const { generateAIResponse } = await setupMocks()
+    const { enforceQuota } = await import("@/lib/quota-enforcement")
+    vi.mocked(enforceQuota).mockResolvedValueOnce({
+      allowed: false,
+      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    })
+    const { POST } = await import("./route")
+    const response = await POST(
+      createRequest({
+        role: "interviewer",
+        isPostInterview: true,
+        hasSubmitted: true,
+        message: "End the interview",
+      })
+    )
+    expect(response.status).toBe(401)
+    expect((response as unknown as { data: Record<string, unknown> }).data.action).toBeUndefined()
+    expect(generateAIResponse).not.toHaveBeenCalled()
+  })
+
+  it("does not deliver a completion action for an aborted request", async () => {
+    const { generateAIResponse } = await setupMocks()
+    const request = createRequest({
+      role: "interviewer",
+      isPostInterview: true,
+      hasSubmitted: true,
+      message: "End the interview",
+    })
+    const controller = new AbortController()
+    controller.abort()
+    Object.defineProperty(request, "signal", { value: controller.signal })
+    const { POST } = await import("./route")
+    const response = await POST(request)
+    expect((response as unknown as { data: Record<string, unknown> }).data.action).toBeUndefined()
+    expect(generateAIResponse).not.toHaveBeenCalled()
   })
 
   it("continues technical discussion without a completion call", async () => {

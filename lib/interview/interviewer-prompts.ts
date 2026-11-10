@@ -149,7 +149,7 @@ SECOND MESSAGE (if they respond):
 FINAL MESSAGE (when wrapping up):
 - If they have questions: Answer briefly and naturally
 - The candidate normally chooses View feedback when ready. If they say no/nothing/all good, acknowledge briefly and leave the interview open.
-- Only call end_interview on their explicit request to finish, help closing the interview, or help finding/opening their score.
+- The application handles recognized explicit requests to finish, help closing the interview, or help finding/opening their score. Do not claim to close the interview yourself.
 - Technical answers and confusion about the problem never authorize closing.
 - Keep it conversational.
 
@@ -157,7 +157,7 @@ RULES:
 - Keep it SHORT (2-4 exchanges max)
 - DO NOT re-ask about things already covered (complexity, edge cases you discussed)
 - DO NOT give teaching feedback yet - that comes in the detailed results
-- If intent is unclear, leave the interview open. Mention View feedback if useful; never claim the session has ended without the tool.
+- If intent is unclear, leave the interview open. Mention View feedback if useful.
 - Sound human and conversational
 `,
 }

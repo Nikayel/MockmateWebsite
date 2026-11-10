@@ -17,6 +17,8 @@ interface FixtureChatOptions {
   setInterviewerMessages: Dispatch<SetStateAction<ChatMessage[]>>
   setIsLoadingInterviewer: (value: boolean) => void
   onOpenSparra: () => void
+  showPostInterviewDiscussion?: boolean
+  proceedToFinalFeedback?: () => void
 }
 
 /** Real send hook + real workspace components. Only the API/identity are fixtures. */
@@ -33,7 +35,7 @@ export function useWorkspaceChatFixture(options: FixtureChatOptions) {
     usageLimit: null,
     experienceLevel: "beginner",
     targetCompany: null,
-    showPostInterviewDiscussion: false,
+    showPostInterviewDiscussion: options.showPostInterviewDiscussion ?? false,
     interviewStartTime: null,
     recentNudgeTopics: [],
     userAnsweredTopics: [],
@@ -49,12 +51,14 @@ export function useWorkspaceChatFixture(options: FixtureChatOptions) {
     setIsLoadingChat,
     setRecentNudgeTopics: noop,
     updateTrackerOnMessage: noop,
-    getInterviewerChatParams: () => ({}),
+    getInterviewerChatParams: () => ({
+      hasSubmitted: options.showPostInterviewDiscussion === true,
+    }),
     getEdgeCasesForInterviewer: () => [],
     getCachedUserProfile: async () => null,
     recordBugfixEvidence: noop,
     classifyBugfixAIHelpKind: () => "hypothesis-check",
-    proceedToFinalFeedback: noop,
+    proceedToFinalFeedback: options.proceedToFinalFeedback ?? noop,
     generationRef,
     paused,
   })

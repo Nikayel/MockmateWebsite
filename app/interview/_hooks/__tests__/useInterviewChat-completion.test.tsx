@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { useInterviewChat, type UseInterviewChatOptions } from "../useInterviewChat"
 import { INTERVIEW_COMPLETION_REPLY } from "@/lib/interview/completion/contract"
 import { createValidatedChatStream } from "@/lib/interview/chat/validated-response-stream"
+import { toast } from "sonner"
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }))
@@ -56,11 +57,14 @@ function options(): UseInterviewChatOptions {
 
 const completionResponse = {
   reply: INTERVIEW_COMPLETION_REPLY,
-  provider: "openai-none",
+  provider: "local",
   action: { type: "end_interview" as const },
 }
 
-beforeEach(() => vi.stubGlobal("fetch", vi.fn()))
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.stubGlobal("fetch", vi.fn())
+})
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
@@ -78,6 +82,13 @@ describe("chat completion opens scoring", () => {
       const opts = options()
       const { result } = renderHook(() => useInterviewChat(opts))
       await act(async () => result.current.handleSendMessage(true))
+      expect(toast.info).toHaveBeenCalledWith(INTERVIEW_COMPLETION_REPLY, {
+        id: "interview-session-complete",
+        duration: 6000,
+      })
+      expect(vi.mocked(toast.info).mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(opts.proceedToFinalFeedback).mock.invocationCallOrder[0]
+      )
       expect(opts.proceedToFinalFeedback).toHaveBeenCalledOnce()
       expect(opts.proceedToFinalFeedback).toHaveBeenCalledWith([
         ...opts.interviewerMessages,
@@ -100,6 +111,7 @@ describe("chat completion opens scoring", () => {
       const { result } = renderHook(() => useInterviewChat(opts))
       await act(async () => result.current.handleSendMessage(true))
       expect(opts.proceedToFinalFeedback).not.toHaveBeenCalled()
+      expect(toast.info).not.toHaveBeenCalled()
     }
   )
 

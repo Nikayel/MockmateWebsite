@@ -1,36 +1,37 @@
 # Completing an interview from chat
 
-After submission, the candidate normally chooses **View feedback**. Sable can call
-`end_interview` as an alternative when the current candidate message explicitly
-asks to finish, asks how to close the interview, or asks to see or find their score.
-The application supplies this acknowledgment:
+After submission, the candidate normally chooses **View feedback**. An explicit
+current request recognized by `lib/interview/completion/intent.ts` can also close
+the debrief and open scoring. For example, "How do I close this interview?" or
+"Where can I find my interview score?" receives:
 
-> Sounds good. I’ll end the interview and open your score and feedback now.
+> I’ll close the interview for you and open your score and feedback now.
 
-The completed reply opens the existing feedback screen and starts score generation.
-Technical answers, confusion about the problem, and declining further questions
-(including "No nothing to add") leave the interview open. Passing tests and completing
-the regression discussion never authorize closing.
+This is a deterministic application action. `completion/response.ts` checks the
+candidate's actual message and requires an interviewer turn with both
+`isPostInterview` and `hasSubmitted` set. Partner turns, proactive messages, and
+the initial wrap-up cannot execute it. Authentication, quota enforcement, input
+validation, and cancellation still apply. `chat-service.ts` returns the local
+reply and `{ type: "end_interview" }` before retrieval, model generation, or
+background extraction. No model tool selection or extra AI call is needed.
 
-`lib/interview/completion/` defines the native tool and strict action contract.
-The tool is available only on candidate-initiated interviewer turns with both
-`isPostInterview` and `hasSubmitted` set and an explicit current request recognized
-by `lib/interview/completion/intent.ts`. Both tool availability and execution check
-this conservative whole-message allowlist; negation, quotations, mixed requests,
-and ambiguous wording fall back to the manual button. Partner turns, proactive
-messages, and the initial wrap-up cannot execute it. Selection shares the existing model generation,
-provider fallback, authorization, quota checks, and cancellation; no classifier or
-second model call is added. Only native calls with valid empty arguments execute.
+The allowlist matches whole messages conservatively. Technical answers, confusion
+about the problem, negation, mixed requests, and declining further questions
+(including "No nothing to add") leave the interview open. Passing tests and
+completing the regression discussion never authorize closing. Unrecognized
+wording continues through normal chat; **View feedback** remains available.
 
-Both JSON and validated-stream responses carry `{ type: "end_interview" }`. The
-chat hook validates that action, the current candidate's request, and the current session before invoking
-`proceedToFinalFeedback`. It supplies the closing exchange explicitly because the
-feedback callback otherwise captures state from before the send. The existing
-feedback hook handles saving, scoring, and duplicate-submission protection. Button
-handlers invoke it without passing a browser click event as transcript data.
+Both JSON and validated-stream transports carry the same reply and action. The
+chat hook validates the action, current candidate request, and session. It appends
+the acknowledgment and displays it in a six-second toast before invoking
+`proceedToFinalFeedback`. The global toast remains visible as the discussion is
+replaced by scoring; there is no artificial delay or extra confirmation. The final
+exchange is passed explicitly to the feedback hook to avoid stale state. Existing
+saving, scoring, and duplicate-submission protection remain in that hook.
 
-Tests cover the reported 1800/1801-second regression answers, unsolicited model tool
-calls, ambiguous/negated requests, tool eligibility and argument validation, both response transports,
-restored debriefs containing a previous goodbye, stale-session responses, and
-inclusion of the last exchange in saved sessions and feedback requests. These tests
-stub model responses; they do not establish live-model tool-selection accuracy.
+Tests cover request eligibility, the reported 1800/1801-second regression answers,
+unsolicited model calls, authorization, cancellation, both response transports,
+restored debriefs, stale sessions, acknowledgment ordering, and the last exchange
+in saved/scored transcripts. Browser checks use the real chat hook and review UI
+with a local response fixture and simulated scoring screen; they do not invoke
+paid scoring or write production sessions.

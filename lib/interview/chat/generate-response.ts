@@ -9,12 +9,6 @@ import {
   PARTNER_HANDOFF_GUIDANCE,
 } from "../partner-handoff/tool"
 import { PARTNER_HANDOFF_REPLY } from "../partner-handoff/contract"
-import {
-  executeInterviewCompletion,
-  getInterviewCompletionTools,
-  INTERVIEW_COMPLETION_GUIDANCE,
-} from "../completion/tool"
-import { INTERVIEW_COMPLETION_REPLY } from "../completion/contract"
 import { tracePartnerHandoff } from "../partner-handoff/tracing"
 import { generateAIResponse, type TaskComplexity } from "@/lib/ai-providers"
 import { providerForPhase } from "@/lib/interview/interview-phases"
@@ -60,15 +54,13 @@ export async function generateValidatedChatResponse(input: ChatGenerationContext
   // Pass userId/sessionId for proper cost tracking
   const handoffTools = getPartnerHandoffTools(input.request)
   const reactionTools = getInterviewerReactionTools(input.request)
-  const completionTools = getInterviewCompletionTools(input.request)
-  const availableTools = [...(handoffTools ?? []), ...reactionTools, ...completionTools]
+  const availableTools = [...(handoffTools ?? []), ...reactionTools]
   const tools = availableTools.length ? availableTools : undefined
   const generate = async () => {
     const aiResponse = await generateAIResponse(
       systemPrompt +
         (handoffTools ? PARTNER_HANDOFF_GUIDANCE : "") +
-        (reactionTools.length ? INTERVIEWER_REACTION_GUIDANCE : "") +
-        (completionTools.length ? INTERVIEW_COMPLETION_GUIDANCE : ""),
+        (reactionTools.length ? INTERVIEWER_REACTION_GUIDANCE : ""),
       fullUserMessage,
       history,
       {
@@ -85,14 +77,6 @@ export async function generateValidatedChatResponse(input: ChatGenerationContext
       }
     )
     if (tools) signal?.throwIfAborted()
-    const completion = await executeInterviewCompletion(aiResponse.toolCalls, input.request)
-    if (completion)
-      return {
-        ...aiResponse,
-        text: INTERVIEW_COMPLETION_REPLY,
-        action: completion,
-        reaction: undefined,
-      }
     const action = await executePartnerHandoff(aiResponse.toolCalls, input.request)
     if (action) return { ...aiResponse, text: PARTNER_HANDOFF_REPLY, action, reaction: undefined }
     const reaction = await executeInterviewerReaction(aiResponse.toolCalls, input.request)

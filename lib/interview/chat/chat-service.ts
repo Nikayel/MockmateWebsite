@@ -1,5 +1,6 @@
 import { registerResponseGeneration } from "@/lib/ai-response-feedback/generations"
 import { shouldAcknowledgeWithReaction } from "../reactions/policy"
+import { buildInterviewCompletionResponse } from "../completion/response"
 import { buildChatRequestContext, type ChatRequestData } from "./request-context"
 import { checkChatTurnEligibility } from "./turn-eligibility"
 import { resolveChatInterviewState } from "./interview-state"
@@ -32,6 +33,12 @@ export async function processChatMessage(
   const requestContext = buildChatRequestContext(validatedData)
   const early = await checkChatTurnEligibility(requestContext, userId, validatedData.ownerId)
   if (early) return { kind: "early", ...early }
+
+  const completion = buildInterviewCompletionResponse(requestContext)
+  if (completion) {
+    signal?.throwIfAborted()
+    return { kind: "reply", response: completion }
+  }
 
   if (shouldAcknowledgeWithReaction(requestContext)) {
     signal?.throwIfAborted()

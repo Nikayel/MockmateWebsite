@@ -5,4 +5,4 @@ export const interviewCompletionActionSchema = z
   .strict()
 export type InterviewCompletionAction = z.infer<typeof interviewCompletionActionSchema>
 export const INTERVIEW_COMPLETION_REPLY =
-  "Sounds good. I’ll end the interview and open your score and feedback now."
+  "I’ll close the interview for you and open your score and feedback now."
