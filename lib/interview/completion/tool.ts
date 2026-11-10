@@ -5,12 +5,13 @@ import type { ModelToolCall } from "@/lib/ai/model-tools"
 import type { ChatRequestContext } from "../chat/request-context"
 import { candidateMessageText } from "../reactions/eligibility"
 import type { InterviewCompletionAction } from "./contract"
+import { requestsInterviewCompletion } from "./intent"
 
 const inputSchema = z.object({}).strict()
 const endInterview = tool((): InterviewCompletionAction => ({ type: "end_interview" }), {
   name: "end_interview",
   description:
-    "Finish the post-submit debrief and open the candidate's score and feedback. Call when the candidate asks to end the interview, asks to see or find their full interview score/results, or says they have no more questions in response to the final invitation. Do not call for a technical answer, a request to continue, or a refusal of a particular hint or optimization. This completes the interview; do not ask them to find a button.",
+    "Finish the post-submit debrief and open the candidate's score and feedback only on their explicit request to finish, help closing the interview, or help finding/opening their score. Technical answers, confusion about the problem, and saying they have no more questions do not authorize closing. The candidate normally chooses View feedback themselves.",
   schema: inputSchema,
 })
 
@@ -21,7 +22,7 @@ function canCompleteInterview(request: ChatRequestContext): boolean {
     request.hasSubmitted === true &&
     !request.isProactive &&
     !request.isWrapUp &&
-    Boolean(candidateMessageText(request).trim())
+    requestsInterviewCompletion(candidateMessageText(request))
   )
 }
 
@@ -44,4 +45,4 @@ export async function executeInterviewCompletion(
 }
 
 export const INTERVIEW_COMPLETION_GUIDANCE = `
-INTERVIEW COMPLETION: The end_interview tool finishes the debrief and opens scoring. Use it when the candidate asks to end, asks where to find or see their score/results, or declines further questions after your final invitation (for example, "No nothing to add"). Read their message in context: a technical trade-off explanation, declining one optimization, or "no, I still have a question" is not consent to finish. Do not end while a substantive question is pending. Never tell them to look for, click, or scroll to a score button. Do not claim to end the session without calling the tool. The application supplies your closing acknowledgment after a successful call.`
+INTERVIEW COMPLETION: The candidate controls when to open scoring, normally through View feedback. The end_interview tool is an alternative only when their current message explicitly asks to finish, asks how to close the interview, or asks to find/open their score/results. A technical answer, confusion about the problem, or "no more questions" does not authorize closing. Never infer consent from passing tests, a completed answer, elapsed time, or an earlier message. If intent is unclear, leave the interview open and mention View feedback if useful. Do not claim to end the session without calling the tool. The application supplies your closing acknowledgment after a successful call.`

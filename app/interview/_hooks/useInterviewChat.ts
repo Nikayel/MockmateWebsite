@@ -1,6 +1,7 @@
 import { sessionFetch } from "@/lib/interview/session-fetch"
 import { interviewerReactionSchema } from "@/lib/interview/reactions/contract"
 import { interviewCompletionActionSchema } from "@/lib/interview/completion/contract"
+import { requestsInterviewCompletion } from "@/lib/interview/completion/intent"
 import {
   SPARRA_COMPOSER_ID,
   hasSparraPartner,
@@ -473,9 +474,8 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
         // Add post-interview context if in that phase
         let additionalContext = ""
         if (showPostInterviewDiscussion && isInterviewer) {
-          additionalContext = isEndingSession
-            ? "\n\n[POST-INTERVIEW DISCUSSION: If the candidate is finished, call end_interview to open scoring. Read their actual message in context before ending. Do NOT ask more questions after they choose to finish.]"
-            : "\n\n[POST-INTERVIEW DISCUSSION: Continue discussing their solution. If they indicate they're done or have no questions, wrap up gracefully.]"
+          additionalContext =
+            "\n\n[POST-INTERVIEW DISCUSSION: The candidate chooses View feedback when ready. Only use end_interview on an explicit request to finish, help closing the interview, or help finding/opening their score. Technical answers, confusion about the problem, and having no more questions do not authorize closing.]"
         }
 
         // Flag code edits made since this lane's previous message. `messages` is
@@ -795,6 +795,7 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
           if (
             isInterviewer &&
             showPostInterviewDiscussion &&
+            requestsInterviewCompletion(userMessage) &&
             interviewCompletionActionSchema.safeParse(data.action).success
           ) {
             toast.dismiss(SESSION_COMPLETE_TOAST_ID)

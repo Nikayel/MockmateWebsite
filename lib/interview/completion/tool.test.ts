@@ -8,7 +8,7 @@ const request = () =>
     role: "interviewer",
     isPostInterview: true,
     hasSubmitted: true,
-    candidateMessage: "No nothing to add",
+    candidateMessage: "How do I close this interview?",
   })
 
 describe("interview completion capability", () => {
@@ -34,6 +34,40 @@ describe("interview completion capability", () => {
     { candidateMessage: "" },
   ])("rejects completion outside a candidate's submitted debrief: %j", async (overrides) => {
     const context = { ...request(), ...overrides }
+    expect(getInterviewCompletionTools(context)).toEqual([])
+    expect(
+      await executeInterviewCompletion([{ name: "end_interview", args: {} }], context)
+    ).toBeUndefined()
+  })
+
+  it.each([
+    "two events same user 1800 seconds apart -> count 1",
+    "two events same user 1801 seconds apart -> count 2",
+    "No nothing to add",
+    "No questions",
+    "I'm done with that test",
+    "I don't understand the question",
+    "Don't end the interview",
+    "Where is the full interview score? I still have a question first.",
+  ])("rejects an unsolicited model completion after %j", async (candidateMessage) => {
+    const context = {
+      ...request(),
+      candidateMessage,
+      context: [{ type: "ai", message: "Any questions for me?" }],
+    }
+    expect(getInterviewCompletionTools(context)).toEqual([])
+    expect(
+      await executeInterviewCompletion([{ name: "end_interview", args: {} }], context)
+    ).toBeUndefined()
+  })
+
+  it("uses the current candidate message, not an earlier request or presentation notes", async () => {
+    const context = {
+      ...request(),
+      candidateMessage: "two events same user 1801 seconds apart -> count 2",
+      message: "Please end the interview",
+      context: [{ type: "user", message: "Where can I find my interview score?" }],
+    }
     expect(getInterviewCompletionTools(context)).toEqual([])
     expect(
       await executeInterviewCompletion([{ name: "end_interview", args: {} }], context)

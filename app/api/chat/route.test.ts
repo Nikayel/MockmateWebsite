@@ -1002,7 +1002,7 @@ describe("interviewer completion tool", () => {
   beforeEach(() => vi.clearAllMocks())
 
   it.each(["json", "validated-stream"] as const)(
-    "delivers completion after the candidate's final answer in %s",
+    "delivers completion after an explicit request to close in %s",
     async (responseMode) => {
       const { generateAIResponse } = await setupMocks()
       vi.mocked(generateAIResponse).mockResolvedValueOnce({
@@ -1017,7 +1017,7 @@ describe("interviewer completion tool", () => {
           role: "interviewer",
           isPostInterview: true,
           hasSubmitted: true,
-          message: "No nothing to add",
+          message: "How do I close this interview?",
           context: [
             { type: "ai", message: "Any questions for me about the problem or anything else?" },
           ],
@@ -1080,6 +1080,48 @@ describe("interviewer completion tool", () => {
     expect((response as unknown as { data: Record<string, unknown> }).data.action).toBeUndefined()
     expect(generateAIResponse).toHaveBeenCalledOnce()
   })
+
+  it.each(["json", "validated-stream"] as const)(
+    "rejects an unsolicited model completion after the reported boundary answer in %s",
+    async (responseMode) => {
+      const { generateAIResponse } = await setupMocks()
+      vi.mocked(generateAIResponse).mockResolvedValueOnce({
+        text: "Noted. Any questions about the problem?",
+        provider: "openai-none",
+        latencyMs: 12,
+        toolCalls: [{ name: "end_interview", args: {} }],
+      })
+      const { POST } = await import("./route")
+      const response = await POST(
+        createRequest({
+          role: "interviewer",
+          scenarioType: "bugfix",
+          isPostInterview: true,
+          hasSubmitted: true,
+          candidateMessage: "two events same user 1801 seconds apart -> count 2",
+          message: "two events same user 1801 seconds apart -> count 2",
+          context: [
+            {
+              type: "ai",
+              message:
+                "What case would you add for a gap just over 1800 seconds, and what session count should it produce?",
+            },
+          ],
+          responseMode,
+        })
+      )
+      const body =
+        responseMode === "validated-stream"
+          ? await (
+              await import("@/lib/interview/chat/validated-response-stream")
+            ).readValidatedChatStream(response, () => {})
+          : (response as unknown as { data: Record<string, unknown> }).data
+      expect(body.action).toBeUndefined()
+      expect(body.reply).toBe("Noted. Any questions about the problem?")
+      expect(vi.mocked(generateAIResponse).mock.calls[0][3]?.tools).toBeUndefined()
+      expect(generateAIResponse).toHaveBeenCalledOnce()
+    }
+  )
 
   it("ignores a completion tool call before submission", async () => {
     const { generateAIResponse } = await setupMocks()

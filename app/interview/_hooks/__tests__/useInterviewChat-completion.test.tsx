@@ -13,7 +13,7 @@ vi.mock("sonner", () => ({ toast: { dismiss: vi.fn(), info: vi.fn(), error: vi.f
 function options(): UseInterviewChatOptions {
   return {
     chatInput: "",
-    interviewerInput: "No nothing to add",
+    interviewerInput: "How do I close this interview?",
     chatMessages: [],
     interviewerMessages: [{ type: "ai", message: "Any questions for me?" }],
     interviewerVoice: {
@@ -81,9 +81,25 @@ describe("chat completion opens scoring", () => {
       expect(opts.proceedToFinalFeedback).toHaveBeenCalledOnce()
       expect(opts.proceedToFinalFeedback).toHaveBeenCalledWith([
         ...opts.interviewerMessages,
-        expect.objectContaining({ type: "user", message: "No nothing to add" }),
+        expect.objectContaining({ type: "user", message: "How do I close this interview?" }),
         expect.objectContaining({ type: "ai", message: INTERVIEW_COMPLETION_REPLY }),
       ])
+    }
+  )
+
+  it.each([
+    "two events same user 1801 seconds apart -> count 2",
+    "No nothing to add",
+    "I don't understand the question",
+    "Don't end the interview",
+  ])(
+    "keeps the interview open after %j even with a completion action",
+    async (interviewerInput) => {
+      vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(completionResponse)))
+      const opts = { ...options(), interviewerInput }
+      const { result } = renderHook(() => useInterviewChat(opts))
+      await act(async () => result.current.handleSendMessage(true))
+      expect(opts.proceedToFinalFeedback).not.toHaveBeenCalled()
     }
   )
 

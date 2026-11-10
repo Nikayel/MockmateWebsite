@@ -50,6 +50,8 @@ describe("candidate-led non-DSA prompts", () => {
       "turn"
     )
     expect(prompt).toContain("call end_interview to open scoring")
+    expect(prompt).toContain("Only on an explicit request")
+    expect(prompt).toContain("declining further questions do not authorize closing")
     expect(prompt).not.toContain("What's the time complexity")
     expect(prompt).not.toContain("See Full Interview Score")
   })
