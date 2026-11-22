@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file gives AI coding agents and human contributors the working rules for this repository. Follow the constitution in `constitution/` and the engineering standards below.
+This file gives AI coding agents and human contributors the working rules for this repository. Follow the engineering standards below.
 
 ## Project Context
 
@@ -14,6 +14,8 @@ CodeSparring is an AI-powered coding interview practice platform built in the `M
 - Do not revert unrelated user changes.
 - Prefer clear, boring, maintainable code over clever code.
 - Run focused checks after meaningful changes.
+- Pushing `main` deploys to production.
+- Crons are scheduled on cron-job.org. Never add a `crons` block to `vercel.json`; see `app/api/cron/README.md`.
 
 ## Complexity Review & Learning
 
