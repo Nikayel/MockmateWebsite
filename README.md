@@ -1,384 +1,113 @@
 <p align="center">
-  <img src="public/logo-codesparring.svg" alt="CodeSparring Logo" width="300" />
-</p>
-
-<h1 align="center">CodeSparring</h1>
-
-<p align="center">
-  <strong>AI-Powered Coding Interview Practice Platform</strong>
+  <img src="public/logo-codesparring.svg" alt="CodeSparring" width="300" />
 </p>
 
 <p align="center">
-  <a href="https://codesparring.com">Live Demo</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="docs/API.md">API Docs</a> •
+  <strong>Practice the interview rounds LeetCode skips, with an AI interviewer that watches you work.</strong>
+</p>
+
+<p align="center">
+  <a href="https://www.codesparring.dev">Live site</a> •
+  <a href="https://www.codesparring.dev/interview?track=debugging">Try a debugging round</a> •
+  <a href="#benchmark">Benchmark</a> •
   <a href="docs/ARCHITECTURE.md">Architecture</a>
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Next.js-16-black?logo=next.js" alt="Next.js 16" />
-  <img src="https://img.shields.io/badge/React-19-blue?logo=react" alt="React 19" />
-  <img src="https://img.shields.io/badge/TypeScript-5-blue?logo=typescript" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Tailwind-4-38B2AC?logo=tailwind-css" alt="Tailwind CSS" />
-</p>
+![Debugging round: task brief and files on the left, code editor in the middle, AI interviewer on the right](docs/images/debugging-workspace.png)
 
----
+CodeSparring runs mock technical interviews in the browser. You get a real multi-file codebase or a
+DSA problem, executable tests, an AI interviewer who can see your edits and test runs, and feedback
+tied to what you did. Free courses, case labs, study roadmaps, and spaced repetition sit around it.
 
-## What is CodeSparring?
+## Engineering highlights
 
-CodeSparring helps developers prepare for technical interviews by simulating realistic coding interviews with an AI interviewer. Practice in your browser with executable tests, contextual AI hints, RAG-backed interview guidance, spaced repetition, personalized roadmaps, and voice mode.
+| Area | How it works | Start reading |
+| --- | --- | --- |
+| **AI interviewer** | Grounds each turn in structured session state (phase, code, test runs), checks replies against interview rules, and regenerates violations | [`lib/interview/chat`](lib/interview/chat) |
+| **Evidence-based scoring** | A root-cause score counts as observed only when its quote appears in something the candidate said | [`lib/bugfix`](lib/bugfix), [measurement contracts](docs/measurement-contracts.md) |
+| **Hint agent** | LangGraph workflow: the LLM diagnoses the need, TypeScript controls which hints are allowed | [`lib/agents/hints`](lib/agents/hints) |
+| **Retrieval** | DSA rounds use semantic search plus BM25 with reranking; an offline script reports Precision@K, Recall@K, and MRR | [`lib/rag`](lib/rag), [`scripts/eval-rag.ts`](scripts/eval-rag.ts) |
+| **Model routing** | One table routes tasks by reasoning effort, with an OpenAI → DeepSeek → Gemini fallback chain | [`lib/ai-providers.ts`](lib/ai-providers.ts) |
+| **In-browser execution** | JavaScript, TypeScript, Python, and SQL run client-side in sandboxed workers | [`lib/workspace-execution`](lib/workspace-execution) |
+| **Review scheduling** | FSRS and SM-2 schedulers behind one router | [`lib/spaced-repetition`](lib/spaced-repetition) |
 
-### Key Features
+## Benchmark
 
-| Feature | Description |
-|---------|-------------|
-| **AI Interviewer** | Phase-aware interviewer chat with RAG context, tool-result state injection, validation, and company-aware prompts |
-| **Adaptive Hint Agent** | LangGraph hint workflow with LLM diagnosis that chooses conceptual, approach, implementation, optimization, or debugging focus |
-| **Code Execution** | Write and run code in multiple languages with Piston-backed test validation and structured console capture |
-| **RAG Memory** | Pinecone or Firestore vector retrieval over problems, hints, knowledge, company data, and user learning history |
-| **Spaced Repetition** | FSRS/SM-2 scheduling, mastery scoring, due reviews, and learning-state analytics |
-| **Voice Mode** | Talk through your solution like a real interview with Deepgram-backed speech input |
-| **Smart Recommendations** | Personalized next-problem recommendations based on readiness, weaknesses, and session goals |
-| **Study Roadmaps** | Personalized learning paths for target companies and interview timelines |
+[`benchmarks/codesparring`](benchmarks/codesparring) asks whether an AI tutor can give a useful,
+grounded hint **without** leaking the answer or inventing bugs in correct code.
 
----
+| Measured in v0.1.1 | Result |
+| --- | ---: |
+| Tasks (10 DSA, 10 bugfix) | 20 |
+| Learner states / hint requests | 70 / 210 |
+| Reference cases passing | 1,179 / 1,179 |
+| Deliberately wrong programs rejected | 80 / 80 |
+| Wrong programs the original public tests missed | **23 / 80** |
 
-## Tech Stack
-
-| Category | Technologies |
-|----------|-------------|
-| **Frontend** | Next.js 16, React 19, TypeScript, Tailwind CSS 4 |
-| **UI Components** | shadcn/ui, Radix UI, Framer Motion |
-| **State Management** | Zustand |
-| **Code Editor** | CodeMirror 6 |
-| **Database** | Firebase Firestore |
-| **Authentication** | Firebase Auth (GitHub/Google OAuth) |
-| **AI** | Google Gemini 2.5 Flash, Gemini Flash-Lite, optional DeepSeek/Claude fallbacks |
-| **Embeddings** | Gemini `text-embedding-004`, optional OpenAI/TF-IDF fallback |
-| **Vector Search** | Pinecone when configured, Firestore fallback |
-| **Payments** | Stripe |
-| **Voice** | Deepgram |
-| **Deployment** | Vercel |
-
----
-
-## Quick Start
-
-### Prerequisites
-
-- Node.js 18+
-- pnpm (recommended) or npm
-- Firebase project
-- Gemini API key
-
-### Installation
+**Status:** the fixtures are verified, but no model responses have been scored yet. The 23 of 80
+result describes these authored programs and is not a general grading-accuracy estimate. See the
+[QA report](benchmarks/codesparring/reports/qa.md) and [design](docs/benchmarks/codesparring-v0.md).
 
 ```bash
-# Clone the repository
+pnpm benchmark:test
+pnpm benchmark:verify
+```
+
+## Architecture
+
+```mermaid
+flowchart LR
+  Browser["Browser<br/>Next.js, React, CodeMirror"] --> Workers["Sandboxed workers<br/>JS, TS, Python, SQL"]
+  Browser --> API["Next.js route handlers"]
+  API --> Interview["Interviewer, scoring, feedback"]
+  API --> Hints["LangGraph hint agent"]
+  Interview --> RAG["Hybrid retrieval"]
+  Hints --> RAG
+  RAG --> Vectors[("Pinecone or Firestore")]
+  Interview --> Models["OpenAI → DeepSeek → Gemini"]
+  Hints --> Models
+  API --> Firestore[("Firestore")]
+  API --> External["Firebase Auth, Stripe, Deepgram"]
+```
+
+Code runs in the browser. The server-side Piston route (`/api/execute`) is deprecated and remains
+only for one case-lab station.
+
+**Stack:** Next.js 16, React 19, TypeScript 5, Tailwind CSS 4, Firebase, LangGraph, Pinecone, Vitest,
+Playwright, Vercel.
+
+## Run it locally
+
+You need Node.js 22, pnpm, a Firebase project, and at least one AI provider key.
+
+```bash
 git clone https://github.com/Nikayel/MockmateWebsite.git
 cd MockmateWebsite
-
-# Install dependencies
 pnpm install
-
-# Set up environment variables
-cp .env.example .env.local
-# Edit .env.local with your credentials
-
-# Start development server
-pnpm dev
+cp .env.example .env.local   # then fill in your own credentials
+pnpm dev                     # http://localhost:3000
 ```
 
-Visit http://localhost:3000
-
-### Environment Variables
-
-```env
-# Required
-NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-GEMINI_API_KEY=your_gemini_key
-
-# Optional (for payments)
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-```
-
-See `.env.example` for full configuration.
-
----
-
-## Project Structure
-
-```
-MockmateWebsite/
-├── app/                      # Next.js App Router
-│   ├── api/                  # API routes (80+ endpoints)
-│   ├── dashboard/            # User dashboard
-│   ├── interview/            # Interview interface
-│   ├── practice/             # Practice mode
-│   └── admin/                # Admin panel
-├── components/               # React components
-│   ├── ui/                   # shadcn/ui primitives
-│   ├── interview/            # Interview components
-│   ├── dashboard/            # Dashboard components
-│   └── ...
-├── lib/                      # Core logic
-│   ├── agents/               # Hint and recommendation agents
-│   ├── interview/            # Interview prompts, phases, policies, tools
-│   ├── rag/                  # RAG, embeddings, retrieval, vector DB
-│   ├── spaced-repetition/    # Learning algorithms
-│   ├── stores/               # Zustand stores
-│   └── types.ts              # TypeScript types
-├── docs/                     # Documentation
-│   ├── API.md                # API reference
-│   ├── ARCHITECTURE.md       # System design
-│   ├── ONBOARDING.md         # New engineer guide
-│   └── ...
-└── public/                   # Static assets
-```
-
-
----
-
-## See It In Action
-
-<p align="center">
-  <img src="./public/screenshots/hero-interview.png" alt="CodeSparring Interview Interface" width="100%" />
-</p>
-
-<p align="center">
-  <em>Real-time AI interviewing with code execution, hints, and instant feedback</em>
-</p>
-
-<details>
-  <summary>More Screenshots</summary>
-
-### Performance Dashboard
-<p align="center">
-  <img src="./public/screenshots/dashboard.png" alt="Performance Dashboard" width="100%" />
-</p>
-<p align="center">
-  <em>Track your progress with spaced repetition and detailed analytics</em>
-</p>
-
-### Problem Selection
-<p align="center">
-  <img src="./public/screenshots/skill-tree.png" alt="DSA Skill Tree" width="100%" />
-</p>
-<p align="center">
-  <em>Choose from problems organized by pattern</em>
-</p>
-
-</details>
-
----
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [Architecture](docs/ARCHITECTURE.md) | System design & data flow |
-| [Platform Architecture (Quick)](docs/PLATFORM-ARCHITECTURE.md) | High-level architecture and runtime flows |
-| [Post-interview recommendations](docs/RECOMMENDATION-ENGINE.md) | Free-advice contract, deterministic selector, compatibility, and release checks |
-| [Backend](docs/BACKEND.md) | API domains, integrations, request lifecycle |
-| [PRD](docs/PRD.md) | Product vision, requirements, success metrics |
-| [Mermaid architecture](docs/PLATFORM-ARCHITECTURE-MERMAID.md) | Supplemental copy-paste diagrams; primary diagrams are inline below |
-| [API Reference](docs/API.md) | Complete API documentation |
-| [Onboarding Guide](docs/ONBOARDING.md) | New engineer setup |
-| [Firebase Structure](docs/FIREBASE_STRUCTURE.md) | Database schema |
-| [Testing Guide](docs/TESTING_GUIDE.md) | How to write tests |
-| [Contributing](CONTRIBUTING.md) | Contribution guidelines |
-| [Security](SECURITY.md) | Security policy |
-
----
-
-## Development
-
-### Available Scripts
+Check a change before opening a PR:
 
 ```bash
-pnpm dev          # Start dev server (Turbopack)
-pnpm build        # Production build
-pnpm start        # Start production server
-pnpm test         # Run tests
-pnpm test:watch   # Tests in watch mode
-pnpm test:coverage # Tests with coverage
-pnpm lint         # Check code style
-pnpm lint:fix     # Fix linting issues
-pnpm typecheck    # TypeScript check
-pnpm format       # Format code (Prettier)
-```
-
-### Code Quality
-
-```bash
-# Before committing
 pnpm lint && pnpm typecheck && pnpm test
 ```
 
----
+## Repository map
 
-## Architecture Overview
+| Path | Contents |
+| --- | --- |
+| `app/` | Pages and route handlers |
+| `components/` | UI, with shared primitives in `components/ui` |
+| `lib/` | Interview, AI, retrieval, scoring, and scheduling logic |
+| `packs/` | Authored debugging incidents and their test oracles |
+| `benchmarks/` | Hint benchmark, fixtures, and reports |
+| `docs/` | Architecture, design decisions, and specifications |
 
-```mermaid
-flowchart TB
-  Browser["Browser UI\nNext.js + React + CodeMirror"] --> App["Next.js App Router\npages + route handlers"]
-
-  App --> Chat["/api/chat\nAI interviewer + partner"]
-  App --> Execute["/api/execute\nPiston test runner"]
-  App --> Hints["/api/agents/hints\nLangGraph hint agent"]
-  App --> Roadmap["/api/roadmap\npersonalized study plans"]
-  App --> SR["/api/spaced-repetition/*\nreviews + mastery"]
-  App --> Admin["/api/admin/*\nops + analytics"]
-
-  Chat --> AI["AI providers\nGemini + optional fallbacks"]
-  Hints --> AI
-  Hints --> RAG["RAG retrieval\ncontext builder + vector DB"]
-  Chat --> RAG
-  Roadmap --> RAG
-
-  RAG --> Embeddings["Embeddings\nGemini text-embedding-004"]
-  RAG --> VectorDB[("Pinecone or Firestore vectors")]
-  App --> Firestore[("Firestore\nusers, sessions, billing, metrics")]
-  App --> Auth["Firebase Auth"]
-  App --> Stripe["Stripe"]
-  App --> Deepgram["Deepgram"]
-  Execute --> Piston["Piston sandbox"]
-```
-
-The primary architecture diagrams live in this README so the repo front page stays useful. See [Architecture Documentation](docs/ARCHITECTURE.md) for deeper route trees, data flows, and implementation notes.
-
-### Hint Agent Flow
-
-```mermaid
-flowchart LR
-  Start([START]) --> Prepare[prepareState\nstruggle + reveal level]
-  Prepare --> Diagnose[diagnoseHintNeed\nLLM classifies intent]
-  Diagnose --> LLM[generateLlmHints\nwrite targeted hints]
-  LLM --> Pattern[addPatternHints\nif diagnosis allows]
-  Pattern --> Fallback[ensureAtLeastOneHint]
-  Fallback --> RAGHint[addRagHint\nif diagnosis allows]
-  RAGHint --> History[addUserHistoryHints\nif diagnosis allows]
-  History --> Tests[addTestFailureHints\nif diagnosis allows]
-  Tests --> Finalize[finalizeHints\nsort, dedupe, cap]
-  Finalize --> End([END])
-```
-
-The hint agent is intentionally constrained: the LLM diagnoses the kind of help needed, while TypeScript code controls the allowed graph nodes, validation, fallback behavior, and final response shape.
-
-### RAG Data Processing
-
-```mermaid
-flowchart LR
-  Sources["Platform content\nscenarios, hints, company data,\npattern knowledge, user artifacts"]
-  Text["Text builders\nrich embedding documents"]
-  Clean["Sanitize + prepare text"]
-  Embed["Embedding provider\nGemini primary"]
-  VectorDoc["VectorDocument\nid + vector + text + metadata"]
-  Store[("Pinecone or Firestore vectors")]
-  Query["Runtime query\nproblem, code, message"]
-  Retrieve["Nearest matches\nfilters + reranking"]
-  Prompt["RAG context\nadded to AI prompt"]
-
-  Sources --> Text --> Clean --> Embed --> VectorDoc --> Store
-  Query --> Clean
-  Clean --> Embed
-  Embed --> Store
-  Store --> Retrieve --> Prompt
-```
-
-Pinecone is the scaled vector store when configured; Firestore is the fallback. The important shape is the same either way: product data becomes embedding text, embedding text becomes vectors, and runtime user context retrieves nearby knowledge for the interviewer, hint agent, roadmaps, and feedback.
-
----
-
-## API Highlights
-
-### Interview Chat
-
-```typescript
-POST /api/chat
-{
-  "message": "How should I approach this?",
-  "code": "function twoSum(nums, target) { }",
-  "scenarioTitle": "Two Sum",
-  "language": "javascript",
-  "roleType": "interviewer"
-}
-```
-
-### Code Execution
-
-```typescript
-POST /api/execute
-{
-  "code": "function twoSum(...) { ... }",
-  "language": "javascript",
-  "scenarioId": "two-sum"
-}
-```
-
-See [API Documentation](docs/API.md) for all endpoints.
-
----
-
-## Engineering Domains
-
-The codebase is organized into clear ownership areas:
-
-| Domain | Description | Key Files |
-|--------|-------------|-----------|
-| **Interview Engine** | Core interview experience | `components/interview/`, `app/api/chat/` |
-| **Learning System** | Spaced repetition & roadmaps | `lib/spaced-repetition/`, `components/roadmap/` |
-| **AI/RAG Platform** | LLM orchestration, agents, embeddings, retrieval | `lib/ai-providers.ts`, `lib/agents/`, `lib/rag/` |
-| **User Dashboard** | Metrics & progress | `components/dashboard/`, `components/practice/` |
-| **Platform & Infra** | Auth, billing, admin | `lib/admin/`, `app/api/webhook/` |
-| **Growth** | Notifications & engagement | `lib/email/`, `app/api/cron/` |
-
----
-
-## Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Quick Contribution Guide
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing`)
-3. Make your changes
-4. Run tests (`pnpm test`)
-5. Commit (`git commit -m 'feat: add amazing feature'`)
-6. Push and create a Pull Request
-
----
-
-## Security
-
-See [SECURITY.md](SECURITY.md) for security policies and vulnerability reporting.
-
----
+More: [onboarding](docs/ONBOARDING.md) · [API](docs/API.md) · [database](docs/FIREBASE_STRUCTURE.md) ·
+[testing](docs/TESTING_GUIDE.md) · [contributing](CONTRIBUTING.md) · [security](SECURITY.md)
 
 ## License
 
-Proprietary - All rights reserved.
-
----
-
-## Support
-
-- **Issues:** [GitHub Issues](https://github.com/Nikayel/MockmateWebsite/issues)
-- **Email:** support@codesparring.com
-- **Twitter:** [@codesparring](https://twitter.com/codesparring)
-
----
-
-<p align="center">
-  <strong>Built with ☕ and determination</strong>
-</p>
-
-<p align="center">
-  <a href="https://codesparring.com">Website</a> •
-  <a href="https://codesparring.com/blog">Blog</a> •
-  <a href="https://codesparring.com/pricing">Pricing</a>
-</p>
+Proprietary. All rights reserved.
