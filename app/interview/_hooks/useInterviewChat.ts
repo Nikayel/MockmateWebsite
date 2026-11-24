@@ -42,6 +42,11 @@ import {
   readValidatedChatStream,
   VALIDATED_CHAT_STREAM_CONTENT_TYPE,
 } from "@/lib/interview/chat/validated-response-stream"
+import {
+  buildGuestChatWallMessage,
+  GUEST_CHAT_LIMIT_CODE,
+  GUEST_TURNS_REMAINING_HEADER,
+} from "@/lib/interview/guest-chat-limit"
 import type { Scenario } from "@/lib/scenarios"
 import type { BugfixEvidenceEvent } from "@/lib/bugfix"
 import type { ChatMessage, WorkspaceContextFile } from "../_types"
@@ -99,6 +104,8 @@ export interface UseInterviewChatOptions extends SessionRequestGuard {
   consoleLogs: unknown[]
   currentSessionId: string | null
   firebaseUser: { getIdToken: () => Promise<string> } | null
+  guestId?: string | null
+  onGuestTurnsRemainingChange?: (remaining: number | null) => void
   user: { id: string; email?: string; user_metadata?: { full_name?: string } } | null
   usageLimit: { used?: number } | null
   experienceLevel: string
@@ -303,6 +310,15 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
     scenarioId: string | undefined
     lanes: { interviewer: ChatCodeSnapshot | null; partner: ChatCodeSnapshot | null }
   }>({ scenarioId: undefined, lanes: { interviewer: null, partner: null } })
+  // Tracks server-reported remaining guest AI turns for the active session so
+  // once exhausted we render the signup prompt without an extra round-trip.
+  const guestTurnsRemainingRef = useRef<number | null>(null)
+  const onGuestTurnsChangeRef = useRef(opts.onGuestTurnsRemainingChange)
+  onGuestTurnsChangeRef.current = opts.onGuestTurnsRemainingChange
+  useEffect(() => {
+    guestTurnsRemainingRef.current = null
+    onGuestTurnsChangeRef.current?.(null)
+  }, [opts.currentSessionId])
   const {
     chatInput,
     interviewerInput,
@@ -504,38 +520,47 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
           )
         }
 
-        // The guest wall is a pitch, not a dead end: it names what unlocks and
-        // the real free-plan terms. It must not promise a return to this exact
-        // session: the login flow lands on the scenario browser or the
-        // sessions page, not back inside a live interview. Rendered via
-        // MarkdownRenderer, so the link is live inside the chat bubble.
-        if (!firebaseUser) {
-          trackEvent("guest_chat_walled", { scenario_id: selectedScenario?.id })
+        const appendGuestChatWall = (exhausted: boolean) => {
+          trackEvent("guest_chat_walled", {
+            scenario_id: selectedScenario?.id,
+            exhausted,
+          })
           reportFunnelEvent("guest_chat_walled")
           setMessages((prev) => [
             ...prev,
             {
               type: "ai",
               candidateMessage: userMessage,
-              message:
-                "This is where the interviewer comes in, and it needs a free account: one click " +
-                "with Google or GitHub, 8 full AI sessions a month, no card required. Your code " +
-                "and progress here carry over to your account.\n\n" +
-                "**[Create a free account](/login?redirect=interview)**\n\n" +
-                "Until then, Run Tests and Submit work right now, and the free courses in " +
-                "[Learn](/learn) never use interview sessions.",
+              message: buildGuestChatWallMessage({ exhausted }),
             },
           ])
-          return
         }
-        const idToken = await firebaseUser.getIdToken()
-        if (!isCurrent()) return
+
+        // Guests get a small server-enforced trial allowance of AI interviewer
+        // replies on their active guest session before hitting the signup wall.
+        const authHeaders: Record<string, string> = {}
+        if (!firebaseUser) {
+          if (!opts.guestId || !currentSessionId) {
+            appendGuestChatWall(false)
+            return
+          }
+          if (guestTurnsRemainingRef.current !== null && guestTurnsRemainingRef.current <= 0) {
+            appendGuestChatWall(true)
+            return
+          }
+          authHeaders["X-Guest-Id"] = opts.guestId
+        } else {
+          const idToken = await firebaseUser.getIdToken()
+          if (!isCurrent()) return
+          authHeaders.Authorization = `Bearer ${idToken}`
+        }
+
         const response = await sessionFetch("/api/chat", {
           signal: controller.signal,
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
+            ...authHeaders,
           },
           body: JSON.stringify({
             candidateMessage: userMessage,
@@ -595,6 +620,12 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
         if (!isCurrent()) return
         if (!response.ok) {
           const data = (await response.json().catch(() => null)) as ChatApiResponse | null
+          if (!firebaseUser && response.status === 403 && data?.code === GUEST_CHAT_LIMIT_CODE) {
+            guestTurnsRemainingRef.current = 0
+            opts.onGuestTurnsRemainingChange?.(0)
+            appendGuestChatWall(true)
+            return
+          }
           console.warn("[API] Request failed:", response.status, response.url, data)
           // Deliberately NOT appended to the transcript. The raw error body used to be
           // pushed in as a `type: "ai"` message, which made the interviewer appear to say
@@ -604,6 +635,17 @@ export function useInterviewChat(opts: UseInterviewChatOptions): UseInterviewCha
           // the interview.
           reportSendFailure(response.status, data, newUserMessage)
           return
+        }
+
+        if (!firebaseUser) {
+          const remainingHeader = response.headers.get(GUEST_TURNS_REMAINING_HEADER)
+          if (remainingHeader !== null) {
+            const parsed = Number.parseInt(remainingHeader, 10)
+            if (Number.isFinite(parsed) && parsed >= 0) {
+              guestTurnsRemainingRef.current = parsed
+              opts.onGuestTurnsRemainingChange?.(parsed)
+            }
+          }
         }
 
         let data: ChatApiResponse

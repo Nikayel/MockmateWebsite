@@ -231,6 +231,7 @@ function InterviewPageContent() {
     refreshUsageLimit,
   } = useGuestQuota()
   const [showSignupPrompt, setShowSignupPrompt] = useState(false)
+  const [guestTurnsRemaining, setGuestTurnsRemaining] = useState<number | null>(null)
   // Lifecycle of a guest's post-trial sign-in (see resolveResultSurface).
   // Tracked separately from isGuestMode because useSessionReopen calls
   // exitGuestMode() the moment auth lands, mid-conversion.
@@ -1925,6 +1926,8 @@ function InterviewPageContent() {
     consoleLogs,
     currentSessionId,
     firebaseUser,
+    guestId,
+    onGuestTurnsRemainingChange: setGuestTurnsRemaining,
     user,
     usageLimit,
     experienceLevel,
@@ -2288,6 +2291,7 @@ function InterviewPageContent() {
       {hasGuestBanner && (
         <GuestModeBanner
           belowHeader={!isInterviewMode}
+          remainingAiTurns={guestTurnsRemaining}
           onSignUp={() => router.push("/login?redirect=interview")}
         />
       )}
