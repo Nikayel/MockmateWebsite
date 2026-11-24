@@ -1,5 +1,6 @@
 import { Metadata } from "next"
 import Link from "next/link"
+import { interviewTrackPath } from "@/components/interview/interview-tracks"
 import { LandingPageTemplate } from "@/components/seo/LandingPageTemplate"
 
 export const metadata: Metadata = {
@@ -103,6 +104,7 @@ export default function BugFixInterviewPracticePage() {
       subtitle="Debugging"
       heroDescription="Get dropped into a broken codebase with a failing test. State your hypothesis, run the code, and fix it while an AI interviewer asks what you think is going on. A verified pack checks your fix against the real test suite."
       primaryKeyword="bug-fix interview"
+      ctaHref={interviewTrackPath("debugging")}
       contentSections={contentSections}
       faqs={faqs}
     />
