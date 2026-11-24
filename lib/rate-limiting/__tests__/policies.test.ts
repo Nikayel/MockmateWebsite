@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest"
 import { RATE_LIMITS } from "@/lib/pricing"
-import { RATE_LIMIT_POLICIES, parseGuestApiLimit, parseGuestSessionLimit } from "../policies"
+import {
+  RATE_LIMIT_POLICIES,
+  parseGuestApiLimit,
+  parseGuestChatLimit,
+  parseGuestSessionLimit,
+} from "../policies"
 
 function expectTokenBucket(policyName: "chatFree" | "chatPro" | "chatEnterprise") {
   const algorithm = RATE_LIMIT_POLICIES[policyName].algorithm
@@ -54,6 +59,7 @@ describe("rate-limit policies", () => {
     expect(RATE_LIMIT_POLICIES.accountDeletion.failureMode).toBe("deny")
     expect(RATE_LIMIT_POLICIES.adminDeletion.failureMode).toBe("deny")
     expect(RATE_LIMIT_POLICIES.adminRagJob.failureMode).toBe("deny")
+    expect(RATE_LIMIT_POLICIES.guestChat.failureMode).toBe("deny")
   })
 
   it("validates guest event overrides", () => {
@@ -63,5 +69,8 @@ describe("rate-limit policies", () => {
     expect(parseGuestApiLimit(undefined)).toBe(15)
     expect(parseGuestApiLimit("120")).toBe(120)
     expect(parseGuestApiLimit("5000")).toBe(15)
+    expect(parseGuestChatLimit(undefined)).toBe(12)
+    expect(parseGuestChatLimit("60")).toBe(60)
+    expect(parseGuestChatLimit("0")).toBe(12)
   })
 })

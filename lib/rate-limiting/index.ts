@@ -7,6 +7,7 @@ export { getClientIdentifier, resolveVerifiedIdentifier } from "./identity"
 export {
   RATE_LIMIT_POLICIES,
   parseGuestApiLimit,
+  parseGuestChatLimit,
   parseGuestSessionLimit,
   type RateLimitPolicyName,
 } from "./policies"
@@ -20,6 +21,7 @@ export {
   enforceExecuteRateLimit,
   executeRateLimit,
   guestApiRateLimit,
+  guestChatRateLimit,
   guestSessionRateLimit,
   hintRateLimit,
   productFeedbackRateLimit,

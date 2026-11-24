@@ -99,6 +99,16 @@ export const RATE_LIMIT_POLICIES = {
     failureMode: "allow",
     prefix: "guest-write",
   },
+  guestChat: {
+    algorithm: {
+      kind: "sliding-window",
+      limit: envLimit(process.env.GUEST_CHAT_LIMIT_PER_HOUR, 12),
+      window: ONE_HOUR,
+    },
+    // Fail-closed: unauthenticated LLM spend must not open up during a Redis outage.
+    failureMode: "deny",
+    prefix: "guest-chat",
+  },
   promoCode: {
     algorithm: { kind: "sliding-window", limit: 5, window: ONE_HOUR },
     failureMode: "allow",
@@ -164,4 +174,8 @@ export function parseGuestSessionLimit(raw: string | undefined): number {
 
 export function parseGuestApiLimit(raw: string | undefined): number {
   return envLimit(raw, 15)
+}
+
+export function parseGuestChatLimit(raw: string | undefined): number {
+  return envLimit(raw, 12)
 }
