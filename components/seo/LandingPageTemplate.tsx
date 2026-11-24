@@ -18,6 +18,8 @@ interface LandingPageTemplateProps {
   }[]
   faqs: FAQ[]
   primaryKeyword: string
+  /** Destination for hero and footer CTAs; defaults to the generic /interview hub. */
+  ctaHref?: string
 }
 
 /**
@@ -39,6 +41,7 @@ export function LandingPageTemplate({
   contentSections,
   faqs,
   primaryKeyword,
+  ctaHref = "/interview",
 }: LandingPageTemplateProps) {
   return (
     <main className="bg-background text-foreground font-ui min-h-screen">
@@ -61,7 +64,7 @@ export function LandingPageTemplate({
           </p>
           <div className="flex flex-col items-center">
             <TrackedCtaLink
-              href="/interview"
+              href={ctaHref}
               location="seo_landing_hero"
               keyword={primaryKeyword}
               className={PRIMARY_CTA_CLASSES}
@@ -121,7 +124,7 @@ export function LandingPageTemplate({
             </div>
           </div>
           <TrackedCtaLink
-            href="/interview"
+            href={ctaHref}
             location="seo_landing_footer"
             keyword={primaryKeyword}
             className={PRIMARY_CTA_CLASSES}
