@@ -14,6 +14,7 @@ import { trackEvent, trackSessionStart } from "@/lib/analytics"
 import { reportFunnelEvent } from "@/lib/metrics/funnel-client"
 import { markFreeTrialUsed, saveGuestSessionData } from "@/lib/guest-session"
 import { PRICING_CONFIG } from "@/lib/config"
+import { GUEST_CHAT_TURN_LIMIT } from "@/lib/interview/guest-chat-limit"
 import { extractProtectedElements } from "@/lib/code-protection"
 import { createBugfixEvidenceEvent, type BugfixEvidenceEvent } from "@/lib/bugfix"
 import { getBugfixScenarioLanguage, type EditorLanguage } from "../_utils/language"
@@ -336,8 +337,7 @@ export function useInterviewSessionStart(opts: UseInterviewSessionStartOptions) 
         reportFunnelEvent("guest_trial_start")
 
         toast.success("Free trial started.", {
-          description:
-            "Run the tests and submit. Your score and the written review unlock with a free account.",
+          description: `Try ${GUEST_CHAT_TURN_LIMIT} AI interviewer replies, run tests, and submit. Your score and written review unlock with a free account.`,
         })
       } catch (error) {
         console.error("Error creating guest session:", error)
