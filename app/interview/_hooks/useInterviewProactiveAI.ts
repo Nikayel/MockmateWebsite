@@ -95,6 +95,7 @@ export function useInterviewProactiveAI(
         opts.showPostInterviewDiscussion ||
         opts.isLoadingInterviewer ||
         document.visibilityState === "hidden" ||
+        !opts.user ||
         !opts.currentSessionId ||
         abortRef.current ||
         attemptsRef.current >= 3 ||
