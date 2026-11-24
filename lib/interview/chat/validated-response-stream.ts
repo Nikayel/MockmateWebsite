@@ -22,6 +22,7 @@ export type ValidatedChatStreamEvent =
 interface CreateValidatedChatStreamOptions {
   /** A small delay makes the already-validated response readable as it arrives. */
   chunkDelayMs?: number
+  headers?: Record<string, string>
 }
 
 function splitForReveal(text: string): string[] {
@@ -57,7 +58,7 @@ function waitForReveal(delayMs: number): Promise<void> {
  */
 export function createValidatedChatStream(
   response: ValidatedChatResponse,
-  { chunkDelayMs = 24 }: CreateValidatedChatStreamOptions = {}
+  { chunkDelayMs = 24, headers }: CreateValidatedChatStreamOptions = {}
 ): Response {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -73,6 +74,7 @@ export function createValidatedChatStream(
 
   return new Response(stream, {
     headers: {
+      ...headers,
       "Content-Type": VALIDATED_CHAT_STREAM_CONTENT_TYPE,
       "Cache-Control": "no-cache, no-transform",
     },
