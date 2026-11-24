@@ -45,6 +45,11 @@ import { checkStreakAtRisk, sendDailyReminderIfNeeded } from "@/lib/services/ses
 import { updateQuotaToFree, resetYearlySubscriberQuota } from "@/lib/quota/yearly-quota"
 import { maintainEmailConsent } from "@/lib/email/consent/maintenance"
 import { processPracticeReminders } from "@/lib/practice-plan/reminder-worker"
+import {
+  evaluateSpacedRepetitionBackoff,
+  resolveLastPracticeActivityAt,
+  SPACED_REPETITION_LOOKBACK_DAYS,
+} from "@/lib/email/reminder-backoff"
 
 const db = adminDb
 
@@ -743,19 +748,37 @@ async function processInactivityReminders(now: Date, results: any): Promise<void
 }
 
 async function processSpacedRepetitionReminders(now: Date, results: any): Promise<void> {
-  // DUPLICATE PREVENTION: Pre-fetch all spaced repetition emails sent in last 24 hours
-  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-  let usersWithRecentSREmail = new Set<string>()
+  // Pre-fetch spaced-repetition send history over the backoff lookback window in
+  // one query (reusing the existing (email_type, created_at) composite index).
+  // Fail closed if the query fails so an index outage cannot trigger a spam burst.
+  const lookbackStart = new Date(
+    now.getTime() - SPACED_REPETITION_LOOKBACK_DAYS * 24 * 60 * 60 * 1000
+  )
+  const srSendsByUser = new Map<string, string[]>()
   try {
     const recentSREmailsSnap = await db
       .collection("email_notifications")
       .where("email_type", "==", "spaced_repetition")
-      .where("created_at", ">=", twentyFourHoursAgo.toISOString())
+      .where("created_at", ">=", lookbackStart.toISOString())
       .get()
 
-    usersWithRecentSREmail = new Set(recentSREmailsSnap.docs.map((doc) => doc.data().user_id))
+    for (const doc of recentSREmailsSnap.docs) {
+      const data = doc.data()
+      const uid = typeof data.user_id === "string" ? data.user_id : null
+      const sentAt =
+        typeof data.sent_at === "string"
+          ? data.sent_at
+          : typeof data.created_at === "string"
+            ? data.created_at
+            : null
+      if (!uid || !sentAt) continue
+      const existing = srSendsByUser.get(uid)
+      if (existing) existing.push(sentAt)
+      else srSendsByUser.set(uid, [sentAt])
+    }
   } catch (indexError) {
     reportDedupFailure("Spaced repetition", indexError, results)
+    return
   }
 
   // The problem-level system writes ONLY the problems subcollection; no writer
@@ -768,10 +791,16 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
 
   // Process problem-level mastery (new system)
   for (const stateDoc of learningStatesSnap.docs) {
-    const userId = stateDoc.id
+    const learningState = stateDoc.data() as UserLearningState
+    const userId = learningState.user_id || stateDoc.id
 
-    // DUPLICATE PREVENTION: Skip if user already received SR email in last 24 hours
-    if (usersWithRecentSREmail.has(userId)) {
+    const backoff = evaluateSpacedRepetitionBackoff({
+      now,
+      lastActivityAt: resolveLastPracticeActivityAt(learningState),
+      recentSendTimestamps: srSendsByUser.get(userId) ?? [],
+    })
+    if (!backoff.allowed) {
+      processedUsers.add(userId)
       results.spacedRepetitionEmails.skipped++
       continue
     }
@@ -892,6 +921,7 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
             topic: mostOverdue.title,
             problem_id: mostOverdue.problem_id,
             mastery_level: mostOverdue.mastery_level,
+            backoff_attempt: backoff.attemptNumber,
           },
           created_at: now.toISOString(),
         })
@@ -909,13 +939,17 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
   // reusing the snapshot the problem-level pass already paid for.
   for (const doc of learningStatesSnap.docs) {
     const learningState = doc.data() as UserLearningState
-    const userId = learningState.user_id
+    const userId = learningState.user_id || doc.id
 
-    // Skip if already processed via problem_mastery
+    // Skip if already processed or paused by backoff in the problem_mastery pass
     if (processedUsers.has(userId)) continue
 
-    // DUPLICATE PREVENTION: Skip if user already received SR email in last 24 hours
-    if (usersWithRecentSREmail.has(userId)) {
+    const backoff = evaluateSpacedRepetitionBackoff({
+      now,
+      lastActivityAt: resolveLastPracticeActivityAt(learningState),
+      recentSendTimestamps: srSendsByUser.get(userId) ?? [],
+    })
+    if (!backoff.allowed) {
       results.spacedRepetitionEmails.skipped++
       continue
     }
@@ -1022,6 +1056,7 @@ async function processSpacedRepetitionReminders(now: Date, results: any): Promis
           sent_at: now.toISOString(),
           metadata: {
             topic: mostOverdue.topic.topic_name,
+            backoff_attempt: backoff.attemptNumber,
           },
           created_at: now.toISOString(),
         })
