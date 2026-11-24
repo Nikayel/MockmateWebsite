@@ -12,6 +12,12 @@ vi.mock("@/lib/interview/session-lifecycle/server", () => ({
 vi.mock("@/lib/rate-limiting", () => ({
   enforceChatRateLimit: vi.fn(),
   enforceAiFeedbackRateLimit: vi.fn(),
+  guestChatRateLimit: vi.fn(async () => null),
+}))
+
+vi.mock("@/lib/interview/chat/guest-chat-auth", () => ({
+  authorizeGuestChatTurn: vi.fn(),
+  refundGuestChatTurn: vi.fn(async () => undefined),
 }))
 
 vi.mock("@/lib/quota-enforcement", () => ({
@@ -1221,4 +1227,169 @@ it("lets Sable choose a native reaction for other wording in the existing model 
     reaction: "acknowledged",
   })
   expect(generateAIResponse).toHaveBeenCalledOnce()
+})
+
+describe("/api/chat guest trial turns", () => {
+  const GUEST_ID = "guest-12345678-1234-1234-1234-123456789abc"
+
+  function createGuestRequest(body: unknown, headers: Record<string, string> = {}) {
+    const request = new NextRequest("http://localhost/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Guest-Id": GUEST_ID,
+        ...headers,
+      },
+    })
+    request.json = async () => body
+    return request
+  }
+
+  it("allows an authorized guest turn and attaches remaining-turn headers", async () => {
+    vi.clearAllMocks()
+    const { generateAIResponse } = await setupMocks()
+    const { guestChatRateLimit } = await import("@/lib/rate-limiting")
+    const { authorizeGuestChatTurn } = await import("@/lib/interview/chat/guest-chat-auth")
+    const { enforceQuota } = await import("@/lib/quota-enforcement")
+
+    vi.mocked(guestChatRateLimit).mockResolvedValueOnce(null)
+    vi.mocked(authorizeGuestChatTurn).mockResolvedValueOnce({
+      kind: "allowed",
+      guestId: GUEST_ID,
+      sessionId: "guest-sess-1",
+      turnsUsed: 1,
+      turnsRemaining: 2,
+    })
+
+    const { POST } = await import("./route")
+    const response = await POST(
+      createGuestRequest({
+        message: "I think the cache key collides on tenant id",
+        role: "interviewer",
+        sessionId: "guest-sess-1",
+        context: [],
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get("X-Guest-Turns-Remaining")).toBe("2")
+    expect(response.headers.get("X-Guest-Turns-Limit")).toBe("3")
+    expect(enforceQuota).not.toHaveBeenCalled()
+    expect(generateAIResponse).toHaveBeenCalledOnce()
+  })
+
+  it("returns 403 GUEST_CHAT_LIMIT_REACHED without calling the LLM once trial turns are used", async () => {
+    vi.clearAllMocks()
+    const { generateAIResponse } = await setupMocks()
+    const { guestChatRateLimit } = await import("@/lib/rate-limiting")
+    const { authorizeGuestChatTurn } = await import("@/lib/interview/chat/guest-chat-auth")
+
+    vi.mocked(guestChatRateLimit).mockResolvedValueOnce(null)
+    vi.mocked(authorizeGuestChatTurn).mockResolvedValueOnce({
+      kind: "denied",
+      status: 403,
+      body: {
+        error: "Free trial interviewer limit reached.",
+        code: "GUEST_CHAT_LIMIT_REACHED",
+        turnsUsed: 3,
+        turnsLimit: 3,
+      },
+    })
+
+    const { POST } = await import("./route")
+    const response = await POST(
+      createGuestRequest({
+        message: "Fourth question",
+        role: "interviewer",
+        sessionId: "guest-sess-1",
+        context: [],
+      })
+    )
+
+    expect(response.status).toBe(403)
+    expect((response as unknown as { data: Record<string, unknown> }).data).toMatchObject({
+      code: "GUEST_CHAT_LIMIT_REACHED",
+    })
+    expect(generateAIResponse).not.toHaveBeenCalled()
+  })
+
+  it("refunds the guest turn when a local acknowledgment handles the message or the provider fails", async () => {
+    vi.clearAllMocks()
+    const { generateAIResponse } = await setupMocks()
+    const { guestChatRateLimit } = await import("@/lib/rate-limiting")
+    const { authorizeGuestChatTurn, refundGuestChatTurn } =
+      await import("@/lib/interview/chat/guest-chat-auth")
+
+    vi.mocked(guestChatRateLimit).mockResolvedValue(null)
+    vi.mocked(authorizeGuestChatTurn).mockResolvedValue({
+      kind: "allowed",
+      guestId: GUEST_ID,
+      sessionId: "guest-sess-1",
+      turnsUsed: 1,
+      turnsRemaining: 2,
+    })
+
+    const { POST } = await import("./route")
+
+    // Local receipt ("sure, let me inspect the files") does not consume a guest turn
+    const localRes = await POST(
+      createGuestRequest({
+        message:
+          "[CANDIDATE to=interviewer; id=turn; at=2026-10-26]\nsure, let me inspect the files",
+        candidateMessage: "sure, let me inspect the files",
+        role: "interviewer",
+        sessionId: "guest-sess-1",
+        context: [{ type: "ai", message: "Take a moment to inspect the repo." }],
+      })
+    )
+    expect(localRes.status).toBe(200)
+    expect(localRes.headers.get("X-Guest-Turns-Remaining")).toBe("3")
+    expect(refundGuestChatTurn).toHaveBeenCalledWith("guest-sess-1", GUEST_ID)
+
+    // Provider error also refunds the reserved turn
+    vi.mocked(refundGuestChatTurn).mockClear()
+    vi.mocked(generateAIResponse).mockRejectedValueOnce(new Error("provider down"))
+    const errRes = await POST(
+      createGuestRequest({
+        message: "What edge cases matter here?",
+        role: "interviewer",
+        sessionId: "guest-sess-1",
+        context: [],
+      })
+    )
+    expect(errRes.status).toBe(500)
+    expect(refundGuestChatTurn).toHaveBeenCalledWith("guest-sess-1", GUEST_ID)
+  })
+
+  it("rejects malformed guest IDs and never downgrades an invalid Bearer token to guest mode", async () => {
+    vi.clearAllMocks()
+    await setupMocks()
+    const { enforceQuota } = await import("@/lib/quota-enforcement")
+    const { authorizeGuestChatTurn } = await import("@/lib/interview/chat/guest-chat-auth")
+
+    const { POST } = await import("./route")
+
+    const badGuest = await POST(
+      createGuestRequest({ message: "hi", role: "interviewer" }, { "X-Guest-Id": "guest-invalid" })
+    )
+    expect(badGuest.status).toBe(401)
+    expect(authorizeGuestChatTurn).not.toHaveBeenCalled()
+
+    vi.mocked(enforceQuota).mockResolvedValueOnce({
+      allowed: false,
+      response: NextResponse.json(
+        { error: "Invalid token" },
+        { status: 401 }
+      ) as unknown as Response,
+    })
+    const badBearer = await POST(
+      createGuestRequest(
+        { message: "hi", role: "interviewer", sessionId: "guest-sess-1" },
+        { Authorization: "Bearer invalid-token", "X-Guest-Id": GUEST_ID }
+      )
+    )
+    expect(badBearer.status).toBe(401)
+    expect(enforceQuota).toHaveBeenCalledOnce()
+    expect(authorizeGuestChatTurn).not.toHaveBeenCalled()
+  })
 })
