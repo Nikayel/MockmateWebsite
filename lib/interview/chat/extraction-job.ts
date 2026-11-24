@@ -2,6 +2,7 @@ import type { ConversationTracker } from "@/lib/interview/interview-phases"
 import type { ChatRequestContext } from "./request-context"
 import { shouldRunExtraction } from "@/lib/interview/conversation-extraction"
 import { getFlag } from "@/lib/feature-flags"
+import { isGuestId } from "@/lib/guest-session"
 import { logger } from "@/lib/logger"
 
 type ConversationTrackerWithExtraction = ConversationTracker & {
@@ -38,7 +39,8 @@ export function prepareConversationExtraction(
     sessionId,
     solutionComplexity,
   } = request
-  const enableExtraction = !(sessionContext && scenarioType === "bugfix")
+  // Skip background extraction LLM calls for short guest trials.
+  const enableExtraction = !isGuestId(userId) && !(sessionContext && scenarioType === "bugfix")
   const extractionJob: ConversationExtractionJob | null =
     enableExtraction && role === "interviewer" && conversationTracker && context && message
       ? {
