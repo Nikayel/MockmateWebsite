@@ -17,6 +17,7 @@ import { logger } from "@/lib/logger"
 import { guestApiRateLimit, guestSessionRateLimit } from "@/lib/rate-limiting"
 import { SESSION } from "@/lib/constants"
 import { PRICING_CONFIG } from "@/lib/config"
+import { isValidGuestId } from "@/lib/interview/guest-chat-limit"
 import {
   GuestSessionUpdateSchema,
   validateRequest,
@@ -33,15 +34,6 @@ function safeDecodeURIComponent(value: string): string {
   } catch {
     return value
   }
-}
-
-/**
- * Validate guest ID format
- */
-function isValidGuestId(guestId: string | null): boolean {
-  if (!guestId) return false
-  // Guest IDs must start with 'guest-' and be a valid UUID format
-  return /^guest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(guestId)
 }
 
 /**
